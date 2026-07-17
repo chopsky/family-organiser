@@ -69,6 +69,16 @@ const SKIP_PATHS = new Set([
 // were linked to), and a generic "bot|crawl|spider" catch-all.
 const CRAWLER_UA = /bot|crawl|spider|slurp|ia_archiver|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|preview/i;
 
+/** Explicit "continue to the origin" response — the same contract
+ *  @vercel/edge's next() emits. Vercel's wrapper also accepts a bare
+ *  `return undefined` as continue, but being explicit survives builder/
+ *  runtime versions that are stricter about middleware return values
+ *  (a production deploy started throwing MIDDLEWARE_INVOCATION_FAILED
+ *  on every fall-through path with the implicit form). */
+function next() {
+  return new Response(null, { headers: { 'x-middleware-next': '1' } });
+}
+
 function pathForCountry(country) {
   const cc = (country || '').toUpperCase();
   if (cc === 'GB') return '/gb';
@@ -101,10 +111,10 @@ export default function middleware(request) {
   // they don't follow, which is harmless on these pages.
   if (SKIP_PATHS.has(path)) {
     const cookieHeader = request.headers.get('cookie') || '';
-    if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return; // already set
+    if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return next(); // already set
     const country = request.headers.get('x-vercel-ip-country') || '';
     const code = localeCodeForCountry(country);
-    if (!code) return; // unrecognized country - leave the page alone
+    if (!code) return next(); // unrecognized country - leave the page alone
     const maxAge = 60 * 60 * 24 * 30; // 30 days, mirrors useLocale.js
     const headers = new Headers();
     headers.set(
@@ -118,14 +128,14 @@ export default function middleware(request) {
   // Everything that isn't a locale landing root falls through to the SPA with
   // no redirect: app routes, /privacy, /terms, /support, and unknown / typo
   // URLs (which the SPA renders as a real 404).
-  if (!LOCALE_ROOTS.has(path)) return;
+  if (!LOCALE_ROOTS.has(path)) return next();
 
   // Bot bypass MUST come before the geo check. Googlebot's IP geolocates
   // to the US, but we still want it to be able to crawl /gb so that
   // hreflang annotations resolve correctly when a UK searcher hits
   // Google with a "family organiser uk" query.
   const userAgent = request.headers.get('user-agent') || '';
-  if (CRAWLER_UA.test(userAgent)) return;
+  if (CRAWLER_UA.test(userAgent)) return next();
 
   // x-vercel-ip-country is set by Vercel's edge from the request's
   // TCP-level source IP geolocation. It's never user-controllable -
@@ -133,7 +143,7 @@ export default function middleware(request) {
   const country = request.headers.get('x-vercel-ip-country') || '';
   const expected = pathForCountry(country);
 
-  if (path === expected) return;
+  if (path === expected) return next();
 
   // Preserve query string + hash on the redirect so utm tags, ?invite=…
   // tokens, etc. follow the visitor through to their locale page.
