@@ -123,7 +123,15 @@ app.get('/health', (req, res) => {
 // of every UK local education authority + its school term dates). The static
 // page is served here; its read API is mounted below, BEFORE the subscription
 // gate, because it's public and unauthenticated.
-app.use('/la-term-dates', express.static(path.join(__dirname, '..', 'public', 'la-term-dates')));
+// The term-dates directory now lives at /school-term-dates (the SEO-facing
+// name; served on the apex via a Vercel proxy). The SSR router goes FIRST -
+// it server-renders the index list, per-council/per-school pages, and the
+// sitemap - and falls through to the static bundle (app.js, fonts) for
+// everything else. The old /la-term-dates path 301s so existing links and
+// any indexed URLs carry over.
+app.use('/school-term-dates', require('./routes/termDatesSsr'));
+app.use('/school-term-dates', express.static(path.join(__dirname, '..', 'public', 'la-term-dates')));
+app.use('/la-term-dates', (req, res) => res.redirect(301, `/school-term-dates${req.url === '/' ? '/' : req.url}`));
 
 // Inbound webhooks (no auth - must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
