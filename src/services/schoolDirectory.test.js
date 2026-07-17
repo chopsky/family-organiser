@@ -19,6 +19,7 @@ jest.mock('../db/schoolDirectory', () => ({
   listLinkedHouseholdSchools: jest.fn(),
   linkHouseholdSchoolToDirectory: jest.fn(),
   matchGiasByNamePostcode: jest.fn(),
+  matchGiasByExactNameUnique: jest.fn(),
 }));
 jest.mock('../db/queries', () => ({
   updateHouseholdSchool: jest.fn(),
@@ -98,8 +99,32 @@ describe('schoolIdentity', () => {
     expect(id.urn).toBeNull();
     expect(id.postcode).toBe('WD23 4EB');
   });
-  test('no URN + no postcode → unlinkable (null)', () => {
-    expect(svc.schoolIdentity({ school_name: 'Some School', school_urn: null, postcode: null })).toBeNull();
+  test('no URN + no postcode → name-only shape (resolveIdentity decides linkability)', () => {
+    const id = svc.schoolIdentity({ school_name: 'Highgate School', school_urn: null, postcode: null });
+    expect(id).toEqual({ urn: null, nameKey: 'highgate school', postcode: null });
+  });
+});
+
+describe('resolveIdentity', () => {
+  test('name-only school + unique GIAS name match → adopts URN + postcode, heals row', async () => {
+    dirDb.matchGiasByExactNameUnique.mockResolvedValue({ urn: '102163', postcode: 'N6 4AY', local_authority: 'Haringey' });
+    const id = await svc.resolveIdentity({ id: 'hs-9', school_name: 'Highgate School', school_urn: null, postcode: null }, { heal: true });
+    expect(id.urn).toBe('102163');
+    expect(id.postcode).toBe('N6 4AY');
+    expect(db.updateHouseholdSchool).toHaveBeenCalledWith('hs-9', expect.objectContaining({ school_urn: '102163', postcode: 'N6 4AY', local_authority: 'Haringey' }));
+  });
+
+  test('name-only school with NO unique GIAS match → null (never keys on bare name)', async () => {
+    dirDb.matchGiasByExactNameUnique.mockResolvedValue(null);
+    const id = await svc.resolveIdentity({ id: 'hs-9', school_name: 'St Marys', school_urn: null, postcode: null });
+    expect(id).toBeNull();
+  });
+
+  test('postcode present → uses name+postcode match, not name-only', async () => {
+    dirDb.matchGiasByNamePostcode.mockResolvedValue({ urn: '111', local_authority: null });
+    const id = await svc.resolveIdentity({ id: 'hs-9', school_name: 'Some School', school_urn: null, postcode: 'AB1 2CD' });
+    expect(id.urn).toBe('111');
+    expect(dirDb.matchGiasByExactNameUnique).not.toHaveBeenCalled();
   });
 });
 

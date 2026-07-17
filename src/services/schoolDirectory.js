@@ -68,8 +68,40 @@ function schoolIdentity(school) {
   const nameKey = normalizeNameKey(school.school_name || school.name);
   const postcode = normalizePostcode(school.postcode);
   if (!nameKey) return null;
-  if (!urn && !postcode) return null;
+  // No URN and no postcode: identity may still be resolvable via a unique
+  // GIAS name match (async, in resolveIdentity) - so return the name-only
+  // shape and let callers that can do the lookup decide.
   return { urn: urn || null, nameKey, postcode };
+}
+
+/**
+ * Resolve a household school to a linkable identity, backfilling from GIAS
+ * when the row is missing its URN: by name+postcode when a postcode exists,
+ * else by EXACT-unique name. Optionally heals the household row. Returns the
+ * identity (urn/nameKey/postcode) or null when it cannot be safely resolved.
+ */
+async function resolveIdentity(householdSchool, { heal = false } = {}) {
+  const identity = schoolIdentity(householdSchool);
+  if (!identity) return null;
+  if (identity.urn) return identity;
+
+  const gias = identity.postcode
+    ? await dirDb.matchGiasByNamePostcode(identity.nameKey, identity.postcode, normalizeNameKey).catch(() => null)
+    : await dirDb.matchGiasByExactNameUnique(identity.nameKey, normalizeNameKey).catch(() => null);
+  if (gias?.urn) {
+    identity.urn = String(gias.urn);
+    if (!identity.postcode && gias.postcode) identity.postcode = normalizePostcode(gias.postcode);
+    if (heal) {
+      await db.updateHouseholdSchool(householdSchool.id, {
+        school_urn: identity.urn,
+        ...(gias.postcode && !householdSchool.postcode ? { postcode: gias.postcode } : {}),
+        ...(gias.local_authority && !householdSchool.local_authority ? { local_authority: gias.local_authority } : {}),
+      }).catch(() => {});
+    }
+  }
+  // Without a URN, a bare name is too collision-prone to key a shared record.
+  if (!identity.urn && !identity.postcode) return null;
+  return identity;
 }
 
 /** Stable comparison key for one dated entry (same shape as dedupeDates). */
@@ -135,22 +167,8 @@ function cleanEntries(dates) {
  */
 async function seedOrCrossCheck({ householdSchool, dates, sourceUrl, sourceText, sourceType, householdId, country = 'GB' }) {
   try {
-    const identity = schoolIdentity(householdSchool);
-    if (!identity) return { action: 'skipped', reason: 'no identity (no URN + no postcode)' };
-
-    // GIAS URN backfill for manual entries - upgrades identity to the strong
-    // key and heals the household row for next time.
-    if (!identity.urn && identity.postcode) {
-      const gias = await dirDb.matchGiasByNamePostcode(identity.nameKey, identity.postcode, normalizeNameKey)
-        .catch(() => null);
-      if (gias?.urn) {
-        identity.urn = String(gias.urn);
-        await db.updateHouseholdSchool(householdSchool.id, {
-          school_urn: identity.urn,
-          ...(gias.local_authority && !householdSchool.local_authority ? { local_authority: gias.local_authority } : {}),
-        }).catch(() => {});
-      }
-    }
+    const identity = await resolveIdentity(householdSchool, { heal: true });
+    if (!identity) return { action: 'skipped', reason: 'no resolvable identity (no URN, no postcode, no unique GIAS name match)' };
 
     const entries = cleanEntries(dates);
     if (entries.length === 0) return { action: 'skipped', reason: 'no valid dates' };
@@ -556,7 +574,7 @@ async function propagateDirectorySchoolDates(directorySchoolId) {
  * records are offered (needs_attention ones shouldn't spread).
  */
 async function lookupDirectoryDatesForSchool(householdSchool) {
-  const identity = schoolIdentity(householdSchool);
+  const identity = await resolveIdentity(householdSchool);
   if (!identity) return null;
   const school = await dirDb.findDirectorySchool(identity);
   if (!school || school.status !== 'ok') return null;
@@ -570,6 +588,7 @@ module.exports = {
   normalizeNameKey,
   normalizePostcode,
   schoolIdentity,
+  resolveIdentity,
   dateSetKey,
   diffDateSets,
   slugFor,

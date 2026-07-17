@@ -248,6 +248,28 @@ async function linkHouseholdSchoolToDirectory(householdSchoolId, directorySchool
  * within the postcode's rows. Postcode-first keeps the scan tiny. `normalize`
  * is injected by the service (single source of truth for name normalization).
  */
+/**
+ * Name-only GIAS match for manual schools with no URN AND no postcode.
+ * Deliberately strict: the normalized name must match EXACTLY ONE open school
+ * ("Highgate School" ≠ "Highgate Primary School"), else null - never guess.
+ */
+async function matchGiasByExactNameUnique(nameKey, normalize) {
+  if (!nameKey || typeof normalize !== 'function') return null;
+  const { data, error } = await supabase
+    .from('schools_directory')
+    .select('urn, name, postcode, local_authority, status')
+    .ilike('name', `%${nameKey.split(' ').join('%')}%`)
+    .eq('status', 'open')
+    .limit(50);
+  if (error) {
+    if (isMissingTableError(error)) return null;
+    throw error;
+  }
+  const hits = (data || []).filter((r) => normalize(r.name) === nameKey);
+  if (hits.length !== 1) return null;
+  return { urn: hits[0].urn, postcode: hits[0].postcode || null, local_authority: hits[0].local_authority || null };
+}
+
 async function matchGiasByNamePostcode(nameKey, postcode, normalize) {
   if (!nameKey || !postcode || typeof normalize !== 'function') return null;
   const { data, error } = await supabase
@@ -273,4 +295,5 @@ module.exports = {
   listLinkedHouseholdSchools,
   linkHouseholdSchoolToDirectory,
   matchGiasByNamePostcode,
+  matchGiasByExactNameUnique,
 };
