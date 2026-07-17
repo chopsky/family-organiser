@@ -142,14 +142,18 @@ const FileIcon = () => (
  * on every pointer/keyboard entry, since scroll changes the answer). Touch
  * devices never see the popover (CSS hover gate) — a tap just navigates.
  */
-function QrLink({ href, className, children, ariaLabel }) {
+function QrLink({ href, className, children, ariaLabel, preferUp = false }) {
   const wrapRef = useRef(null)
-  const [placement, setPlacement] = useState('bottom')
+  const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
   const recompute = () => {
     const node = wrapRef.current
     if (!node) return
     const rect = node.getBoundingClientRect()
-    setPlacement(window.innerHeight - rect.bottom < 200 ? 'top' : 'bottom')
+    // preferUp: used inside overflow-hidden sections (hero, CTA panel)
+    // where a downward popover gets clipped at the section edge — open
+    // above the trigger unless there's genuinely no room up there.
+    if (preferUp) setPlacement(rect.top < 210 ? 'bottom' : 'top')
+    else setPlacement(window.innerHeight - rect.bottom < 210 ? 'top' : 'bottom')
   }
   return (
     <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} onMouseEnter={recompute} onFocus={recompute}>
@@ -382,7 +386,7 @@ export default function LandingPage() {
           <p className="lv-hero-sub">One home for the family calendar, meals, lists and chores, with an AI assistant in WhatsApp that does it all for you.</p>
           <div className="lv-hero-ctas">
             {APP_STORE_CONFIGURED ? (
-              <QrLink href={APP_STORE_URL} className="lv-btn-cream" ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
+              <QrLink href={APP_STORE_URL} className="lv-btn-cream" preferUp ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
                 Get the app
               </QrLink>
             ) : (
@@ -618,7 +622,7 @@ export default function LandingPage() {
           <h2>Ready for calmer weeks?</h2>
           <p className="lv-cta-sub">Set Housemait up in just a few minutes. Free to get started. The {na ? 'coffee' : 'kettle'} will still be warm.</p>
           <div className="lv-cta-btns">
-            <QrLink href={APP_STORE_URL} className="lv-appstore" ariaLabel="Download Housemait on the App Store — or hover to scan the QR code">
+            <QrLink href={APP_STORE_URL} className="lv-appstore" preferUp ariaLabel="Download Housemait on the App Store — or hover to scan the QR code">
               <svg width="22" height="22" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" /></svg>
               <span className="lines">
                 <span className="l1">DOWNLOAD ON THE</span>
