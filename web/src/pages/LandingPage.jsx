@@ -1,1262 +1,652 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import '../landing.css'
 import { useLocale } from '../hooks/useLocale'
 import HreflangTags from '../components/HreflangTags'
-import { APP_STORE_URL, APP_STORE_CONFIGURED, isIos } from '../lib/app-store'
+import { APP_STORE_URL, APP_STORE_CONFIGURED } from '../lib/app-store'
+
+/**
+ * Housemait marketing site — "scroll story" design, ported from
+ * design_handoff_housemait_website (see its README for the spec).
+ *
+ * One component serves / and every locale path (/gb /us /eu /au /ca /za):
+ * copy, currency and demo content adapt via useLocale(). The scroll story,
+ * nav two-state, marquee and reveals are driven from a single rAF loop —
+ * the progress maths is ported verbatim from the prototype's behaviour
+ * class, which the handoff calls directly portable.
+ */
 
 const SIGNUP_URL = '/signup'
 const SIGNIN_URL = '/login'
 
-const NAV_LINKS = [
-  { label: 'Features', href: '#features' },
-  { label: 'WhatsApp', href: '#whatsapp' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'FAQ', href: '#faq' },
-]
+/* ── Locale-derived copy ──────────────────────────────────────────── */
 
-/** Build the FAQ list with pricing strings interpolated from the active
- *  locale. Most answers don't reference price/region, so they're shared
- *  verbatim across locales; only the pricing answer varies. */
+// North-American English locales spell/word things differently.
+const isNA = (locale) => locale.code === 'us' || locale.code === 'ca'
+
+// Receipt amounts per Stripe currency — realistic small-basket prices so
+// the "Receipts, read for you" card never shows £ to a $ visitor. Items
+// use receipt-style shorthand on purpose.
+const RECEIPTS = {
+  gbp: { items: [['Strawberries', '£2.50'], ['Penne ×2', '£1.90'], ['Milk 2L', '£1.65']], total: '£6.05' },
+  usd: { items: [['Strawberries', '$3.99'], ['Penne ×2', '$2.50'], ['Milk 1 gal', '$3.49']], total: '$9.98' },
+  eur: { items: [['Strawberries', '€2.80'], ['Penne ×2', '€2.10'], ['Milk 2L', '€1.85']], total: '€6.75' },
+  aud: { items: [['Strawberries', 'A$4.50'], ['Penne ×2', 'A$3.20'], ['Milk 2L', 'A$3.10']], total: 'A$10.80' },
+  cad: { items: [['Strawberries', 'C$4.99'], ['Penne ×2', 'C$3.29'], ['Milk 2L', 'C$3.79']], total: 'C$12.07' },
+  zar: { items: [['Strawberries', 'R44.99'], ['Penne ×2', 'R32.50'], ['Milk 2L', 'R38.99']], total: 'R116.48' },
+}
+
+// First features-grid card: automatic term-date import exists for GB + ZA
+// (locale.features.schoolTerms); everywhere else the universal story is
+// "forward the newsletter and the dates land in the calendar".
+function schoolCard(locale) {
+  if (locale.code === 'gb') {
+    return {
+      title: 'Term dates, imported in one click',
+      desc: 'Tell Housemait the school. Every term, half-term and inset day drops straight into the family calendar.',
+      chip: 'St Mary’s Primary · synced ✓',
+      rows: [['Autumn term begins', 'Wed 3 Sep'], ['Half term', '27–31 Oct'], ['Inset day · school closed', 'Mon 24 Nov']],
+    }
+  }
+  if (locale.code === 'za') {
+    return {
+      title: 'Term dates, imported in one click',
+      desc: 'Tell Housemait the school. Every term date and school holiday drops straight into the family calendar.',
+      chip: 'Westville Primary · synced ✓',
+      rows: [['Term 1 begins', 'Wed 14 Jan'], ['School holiday', '28 Mar – 14 Apr'], ['Public holiday · school closed', 'Mon 27 Apr']],
+    }
+  }
+  return {
+    title: 'School letters, read for you',
+    desc: 'Forward the class newsletter and every date lands straight in the family calendar.',
+    chip: 'Newsletter scanned · 3 dates found ✓',
+    rows: [['Class photo day', 'Fri 10 Oct'], ['Trip payment due', 'Wed 15 Oct'], ['No school · teacher day', 'Mon 24 Nov']],
+  }
+}
+
+// Marquee reviews — names fixed by the design; mum/mom, sofa/couch and the
+// term-dates reference adapt per locale.
+function buildReviews(locale) {
+  const na = isNA(locale)
+  const mum = na ? 'mom' : 'mum'
+  const hasTerms = !!locale.features?.schoolTerms
+  return [
+    { q: '“I forwarded the school newsletter on WhatsApp and every date just… appeared in the calendar. Sorcery.”', n: 'Emma', r: `${mum} of two` },
+    { q: '“We stopped arguing about whose turn it is. The kids race to finish their quests before we’ve finished dinner.”', n: 'Daniel', r: 'dad of three' },
+    { q: `“Meal planning went from an hour of Sunday dread to five minutes on the ${na ? 'couch' : 'sofa'}.”`, n: 'Priya', r: `${mum} of two` },
+    { q: `“It replaced the fridge whiteboard, three apps and a paper ${na ? 'planner' : 'diary'}. My husband finally knows what’s on this week.”`, n: 'Jess', r: `${mum} of twins` },
+    { q: '“My daughter asks to do her chores now. I’m as surprised as you are.”', n: 'Rachel', r: `${mum} of one` },
+    { q: `“Set-up took ten minutes. ${hasTerms ? 'Term dates' : 'School dates'}, swimming, the lot. It just runs itself now.”`, n: 'Sophie & Mark', r: 'parents of three' },
+  ]
+}
+
 function buildFaqs(locale) {
   const p = locale.pricing
   return [
-    {
-      q: 'How does the free trial work?',
-      a: "You get full access to every Housemait feature for 30 days, no credit card required to start. We'll only ask for payment details at the end of the trial if you want to continue. If you do nothing, your account simply pauses.",
-    },
-    {
-      q: 'How much does Housemait cost after the trial?',
-      a: `Housemait is ${p.monthly}/month or ${p.annual}/year (which works out to about ${p.monthlyEquivalent}/month, roughly 2 months free). Both plans include everything. There are no feature gates. You can switch between plans or cancel anytime.`,
-    },
-    {
-      q: 'How does the WhatsApp bot work?',
-      a: 'Each family member messages the Housemait bot directly on WhatsApp. Just send a message to add items, assign tasks, plan meals or check the shopping list. The bot understands natural language and even voice notes.',
-    },
-    {
-      q: 'Can I share documents and photos with my household?',
-      a: "Yes. Housemait has a secure Documents section where you can upload school letters, appointment slips, receipts, family photos and more. Everyone in the household has access, so no more digging through email attachments.",
-    },
-    {
-      q: 'Can I use Housemait without WhatsApp?',
-      a: 'Absolutely. The web app has everything you need. WhatsApp is an optional add-on for families who prefer chatting over apps.',
-    },
-    {
-      q: 'How many people can be in a household?',
-      a: "There's no limit. Invite as many family members as you need: parents, grandparents, older kids, au pairs, anyone who helps run the household. One subscription covers everyone.",
-    },
-    {
-      q: 'Is my family data safe?',
-      a: "Your privacy is paramount. We're fully GDPR compliant, your data is encrypted, and we never sell or share your family's information with third parties.",
-    },
+    { q: 'What is Housemait?', a: 'Housemait is an AI-powered family organiser that brings your calendar, meals, shopping, chores and school life into one shared app, with an assistant on WhatsApp that does the typing for you.' },
+    { q: 'How does the WhatsApp assistant work?', a: 'Message Housemait like you’d message a friend: type, send a voice note, or snap a photo of a school letter. It adds events, updates lists and answers questions about the week, and everything appears in the app for the whole family, instantly.' },
+    { q: 'Do both parents see the same thing?', a: 'Yes. Everyone in the family shares the same calendar, lists and plans, live. Add something on the school run and it’s on your partner’s phone before you’re home.' },
+    { q: 'Is it safe for kids?', a: 'Child Mode is a separate, playful space with their quests, stars and countdowns, and nothing else. No ads, no messages from strangers, no social feed. You decide what they see.' },
+    { q: 'How much does it cost?', a: `Housemait is ${p.monthly} a month, or ${p.annual} a year (two months free). One subscription covers the whole household, and you can cancel anytime.` },
+    { q: 'Which phones does it work on?', a: 'Housemait is on iPhone today, and the WhatsApp assistant works from any phone. Android is on the way.' },
   ]
 }
 
-/** Build the two pricing cards (monthly / annual) from the locale's
- *  pricing strings. The billing-frequency labels are locale-agnostic, so
- *  they stay hardcoded. */
-function buildPricing(locale) {
-  return {
-    monthly: { amount: locale.pricing.monthly, per: '/month', billed: 'Billed monthly after your 30-day trial' },
-    annual:  { amount: locale.pricing.annual,  per: '/year',  billed: 'Billed annually. 2 months free' },
-  }
-}
+/* ── Story config (ported from the prototype) ─────────────────────── */
 
-/** Pricing-card feature list. The school-terms bullet is UK-only -
- *  see locale.schoolTerms - so the list is built dynamically. */
-function buildPlanFeatures(locale) {
-  const features = [
-    'Unlimited household members',
-    'Shared lists, tasks & calendar',
-    'AI-powered WhatsApp assistant',
-  ]
-  // School-terms line text comes from the active locale (UK calls them
-  // "INSET days"; SA calls them "holidays"). Locales without a
-  // schoolTerms config omit the line entirely.
-  if (locale.schoolTerms?.planFeature) {
-    features.push(locale.schoolTerms.planFeature)
-  }
-  features.push(
-    'Meal planner & recipe library',
-    'Documents & photos vault',
-    'Receipt scanner',
-    'Weekly family digest',
-  )
-  return features
-}
-
-/** Testimonial quotes - universal across locales. The reviewer names,
- *  roles, and cities are localised via `locale.reviews` so an Austin
- *  parent doesn't see "Bristol" in the social proof set. The order
- *  here matters: REVIEW_QUOTES[i] pairs with locale.reviews[i]. */
-const REVIEW_QUOTES = [
-  "The Sunday planning argument is over. We do it in 12 minutes with a coffee. I didn't realise how much of it I was carrying alone.",
-  "I forwarded a school PDF to Housemait at 10pm. By morning every date was on the calendar, and the permission slip was on my task list. Magic.",
-  "We were the 14-apps-and-a-whiteboard family. Now it's one app and we actually sit down at dinner together. That's the real review.",
+// Unit vectors for the 8 floating icon tiles' spread positions.
+const ICON_VECS = [[-1, -0.58], [1, -0.54], [-0.98, 0.22], [0.99, 0.3], [-0.55, 0.84], [0.62, 0.88], [-0.52, -0.98], [0.56, -0.94]]
+// Narrow layout: side slots + jitter, four tiles per side of the phone.
+const SLOT_Y = [-0.26, -0.26, 0.24, 0.24, 0.74, 0.74, -0.76, -0.76]
+const JIT = [0, -6, -10, 4, 6, -4, -8, 8]
+// icon src, inner padding, float duration s, float delay s
+const ICONS = [
+  ['/landing/icons/calendar.svg', 8, 4.6, -0.4],
+  ['/landing/icons/whatsapp.svg', 7, 5.2, -2.1],
+  ['/landing/icons/clipboard.svg', 12, 4.2, -1.3],
+  ['/landing/icons/grocery.svg', 12, 5.4, -2.9],
+  ['/landing/icons/restaurant.svg', 9, 4.9, -3.6],
+  ['/landing/icons/sports.svg', 11, 4.4, -1.8],
+  ['/landing/icons/graduate.svg', 9, 5.0, -1.0],
+  ['/landing/icons/email.svg', 8, 4.7, -2.5],
 ]
 
-const ArrowRight = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
-
-/** Calendar mock for the showcase. parentTerm is locale-dependent
- *  (Mum vs Mom) and only appears on the assignee meta line of two of
- *  the sample events. Default keeps the historical UK wording. */
-const CalendarMock = ({ parentTerm = 'Mum' }) => (
-  <div className="shot-wrap">
-    <div className="mock">
-      <div className="mock-head">
-        <div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-soft)', textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 700 }}>Thursday</div>
-          <h4 style={{ marginTop: 2 }}>16 April · Today</h4>
-        </div>
-        <a className="mock-link">Week →</a>
-      </div>
-      <ul className="mock-list cal-list">
-        <li>
-          <span className="cal-time">08:30</span>
-          <span className="cal-bar" style={{ background: 'var(--purple)' }} />
-          <div style={{ flex: 1 }}>
-            <div className="cal-title">School run · Ben</div>
-            <div className="cal-meta">{parentTerm} · 25 min</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
-        </li>
-        <li>
-          <span className="cal-time">10:00</span>
-          <span className="cal-bar" style={{ background: 'var(--coral)' }} />
-          <div style={{ flex: 1 }}>
-            <div className="cal-title">Vet · Luna's check-up</div>
-            <div className="cal-meta">Dad · 45 min</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
-        </li>
-        <li>
-          <span className="cal-time">15:45</span>
-          <span className="cal-bar" style={{ background: 'var(--sage)' }} />
-          <div style={{ flex: 1 }}>
-            <div className="cal-title">Swimming · Sofia</div>
-            <div className="cal-meta">{parentTerm} · 1 hr</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--sage)' }}>S</span>
-        </li>
-        <li>
-          <span className="cal-time">18:30</span>
-          <span className="cal-bar" style={{ background: 'var(--butter)' }} />
-          <div style={{ flex: 1 }}>
-            <div className="cal-title">Family dinner</div>
-            <div className="cal-meta">Everyone · 1 hr</div>
-          </div>
-        </li>
-      </ul>
-    </div>
-  </div>
-)
-
-/** Tasks mock for the showcase. completedTask is the line-through item
- *  at the top - locale-dependent because "Book MOT for the Volvo"
- *  doesn't translate (US says "oil change", AU says "rego inspection",
- *  ZA says "car service" etc). Default keeps the historical UK wording. */
-const TasksMock = ({ completedTask = 'Book MOT for the Volvo' }) => (
-  <div className="shot-wrap coral">
-    <div className="mock">
-      <div className="mock-head">
-        <h4>This week's tasks</h4>
-        <a className="mock-link">All →</a>
-      </div>
-      <ul className="mock-list">
-        <li>
-          <span className="task-cb done">✓</span>
-          <div style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>{completedTask}</div>
-          <span className="avt" style={{ background: 'var(--coral)' }}>D</span>
-        </li>
-        <li>
-          <span className="task-cb" />
-          <div style={{ flex: 1 }}>
-            <div>Take bins out</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>Tonight · recurring Thu</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--sage)' }}>B</span>
-        </li>
-        <li>
-          <span className="task-cb" />
-          <div style={{ flex: 1 }}>
-            <div>Pick up prescription</div>
-            <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 2, fontWeight: 600 }}>Overdue · due Tue</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--purple)' }}>M</span>
-        </li>
-        <li>
-          <span className="task-cb" />
-          <div style={{ flex: 1 }}>
-            <div>Reply to Mrs Walker</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginTop: 2 }}>From forwarded school email</div>
-          </div>
-          <span className="avt" style={{ background: 'var(--butter)' }}>M</span>
-        </li>
-        <li>
-          <span className="task-cb" />
-          <div style={{ flex: 1 }}>Book piano lessons for term 3</div>
-          <span className="avt" style={{ background: 'var(--sky)' }}>S</span>
-        </li>
-      </ul>
-    </div>
-  </div>
-)
-
-const MealsMock = () => (
-  <div className="shot-wrap butter">
-    <div className="mock">
-      <div className="mock-head">
-        <h4>This week's meal plan</h4>
-        <a className="mock-link">Edit →</a>
-      </div>
-      <ul className="mock-list">
-        <li><span className="day-badge sage">MON</span><span className="meal">Spaghetti Bolognese</span><span className="emoji">🍝</span></li>
-        <li><span className="day-badge sage">TUE</span><span className="meal">Shepherd's Pie</span><span className="emoji">🥧</span></li>
-        <li><span className="day-badge sage">WED</span><span className="meal">Chicken Stir-fry</span><span className="emoji">🍳</span></li>
-        <li><span className="day-badge sage">THU</span><span className="meal">Fish &amp; Chips</span><span className="emoji">🐟</span></li>
-        <li><span className="day-badge coral">FRI</span><span className="meal">Pizza Night</span><span className="emoji">🍕</span></li>
-        <li><span className="day-badge sage">SAT</span><span className="meal">Roast Chicken</span><span className="emoji">🍗</span></li>
-        <li><span className="day-badge sage">SUN</span><span className="meal">Sunday Roast</span><span className="emoji">🥩</span></li>
-      </ul>
-      <button type="button" className="mock-cta">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 7h6M9 12h6M9 17h4" /></svg>
-        Add all ingredients to shopping list
-      </button>
-    </div>
-  </div>
-)
-
-const ShoppingMock = () => (
-  <div className="shot-wrap green">
-    <div className="mock">
-      <div className="mock-head">
-        <h4>🛒 Groceries</h4>
-        <span className="mock-chip">7 items</span>
-      </div>
-      <div className="shop-aisle">Meat &amp; Seafood</div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🥩</span>
-        <span style={{ flex: 1 }}>Beef sausages</span>
-        <span className="shop-qty">2</span>
-      </div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🍗</span>
-        <span style={{ flex: 1 }}>Chicken frankfurters</span>
-      </div>
-      <div className="shop-aisle">Produce</div>
-      <div className="shop-item">
-        <span className="shop-cb done">✓</span>
-        <span className="shop-emoji">🥭</span>
-        <span style={{ flex: 1, textDecoration: 'line-through', color: 'var(--ink-soft)' }}>Mango</span>
-      </div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🍐</span>
-        <span style={{ flex: 1 }}>Pears</span>
-        <span className="shop-qty">6 pcs</span>
-      </div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🥒</span>
-        <span style={{ flex: 1 }}>Cucumbers</span>
-      </div>
-      <div className="shop-aisle">Dairy &amp; Eggs</div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🥚</span>
-        <span style={{ flex: 1 }}>Eggs</span>
-        <span className="shop-qty">2 pack</span>
-      </div>
-      <div className="shop-item">
-        <span className="shop-cb" />
-        <span className="shop-emoji">🥛</span>
-        <span style={{ flex: 1 }}>Milk</span>
-      </div>
-    </div>
-  </div>
-)
-
-/** School-terms feature mock. The data shape is dictated by
- *  locale.schoolTerms.mock - see /lib/locales.js for the source of truth.
- *  Takes a `data` prop rather than reading the locale itself so the mock
- *  stays a pure rendering component (easier to test in isolation, no
- *  hook dependency). */
-const SchoolTermsMock = ({ data }) => {
-  if (!data) return null
-  return (
-    <div className="shot-wrap coral">
-      <div className="mock">
-        <div className="mock-head">
-          <h4>🏫 School details</h4>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: data.yearLabel ? '1fr 100px' : '1fr', gap: 10, marginBottom: 20 }}>
-          <div className="mock-field">
-            <span className="label">School</span>
-            <span className="value">{data.schoolName}</span>
-          </div>
-          {data.yearLabel && (
-            <div className="mock-field">
-              <span className="label">{data.yearLabel}</span>
-              <span className="value">{data.yearValue}</span>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: 'var(--coral)' }}>
-            <span>📅</span> Term dates imported
-          </div>
-          <span className="mock-chip synced">✓ Synced</span>
-        </div>
-        <div style={{ background: 'var(--cream)', borderRadius: 12, padding: '4px 16px 8px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)', margin: '14px 0 4px' }}>{data.academicYear}</div>
-          {data.terms.map((term) => (
-            <div className="term-row" key={term.name}>
-              <span className={`term-pill ${term.pillClass}`}>{term.name}</span>
-              <div style={{ flex: 1 }}>
-                <div className="term-dates">{term.dates}</div>
-                {term.breakDates && (
-                  <div className="term-half">{term.breakLabel}: {term.breakDates}</div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        {data.warning && (
-          <div className="mock-warning"><span>{data.warning}</span></div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-const SHOWCASE = [
-  {
-    id: 'cal',
-    eyebrow: <div className="eyebrow-sec">Shared Calendar</div>,
-    title: (<>Every date, <em>every&nbsp;body</em>, on one&nbsp;page.</>),
-    desc: "No more surprise birthday parties you found out about the night before. See the whole month for the whole family, add shared events in one tap, and get a heads-up when two people are double-booked.",
-    bullets: ['Colour-coded per family member', 'Connects with Google, Apple, Outlook', 'Forward a school email and it becomes an event', '"What\'s on today" widget for the fridge tablet'],
-    mock: <CalendarMock />,
-  },
-  {
-    id: 'tasks',
-    eyebrow: <div className="eyebrow-sec">Tasks</div>,
-    title: (<>The mental load, <em>finally</em> split fairly.</>),
-    desc: "Columns per family member, so nothing lives in one person's head. Recurring chores repeat themselves, and Housemait does the chasing, so nobody has to be the nag.",
-    bullets: ['Assign by name, not by guilt', 'Recurring tasks (bins, vet, MOT)', 'Kid-safe view for younger family members', 'Weekly digest: who did what'],
-    mock: <TasksMock />,
-  },
-  {
-    id: 'meals',
-    eyebrow: <div className="eyebrow-sec">Meal Plan</div>,
-    title: (<>Sunday planning, <em>finally&nbsp;fun.</em></>),
-    desc: "No more staring into the fridge at 5pm. Drag recipes onto the week, and Housemait builds the shopping list from the ingredients and remembers the meals your family actually eats.",
-    bullets: ['Breakfast, lunch, dinner + snacks', 'One-tap: ingredients to shopping list', 'Recipe box remembers the family favourites', 'Drag & drop meals across the week'],
-    mock: <MealsMock />,
-  },
-  {
-    id: 'shop',
-    eyebrow: <div className="eyebrow-sec">Shopping</div>,
-    title: (<>A list that <em>sorts</em> itself.</>),
-    desc: "No more doubling back to the dairy aisle. Items auto-group into categories so the list reads in the order you shop, and snapping the receipt checks off everything you've bought.",
-    bullets: ['Create as many lists as your family needs', 'Smart categories keep items grouped sensibly', 'Receipt scanning in 2 seconds', '"Previously purchased" memory'],
-    mock: <ShoppingMock />,
-  },
-  // The 'terms' entry is appended in the component body when the active
-  // locale has schoolTerms content configured (currently GB + ZA). Each
-  // locale brings its own title prefix, bullets, and mock data so the
-  // section advertises a country-appropriate school calendar.
+const STORY_CHAPTERS = [
+  { h: ['One calendar,', 'the whole family'], p: 'School runs, clubs, birthdays and appointments, colour-coded by person and synced to every phone in the house.' },
+  { h: ['Chores kids', 'actually do'], p: 'Routines and quests with stars to earn and treats to spend. Beds get made, teeth get brushed, and nobody nags.' },
+  { h: ['A week of dinners', 'in minutes'], p: 'Plan the week from your family recipe box, and every ingredient lands on the shopping list by itself.' },
+  { h: ['Lists that keep', 'everyone in sync'], p: 'To-dos and shopping, shared in real time. Add it the moment you think of it, sorted before you forget.' },
+  { h: ['And manage it all', 'in WhatsApp'], p: 'Message Housemait like a friend. It adds the event, updates the list and answers back in seconds.' },
 ]
 
-/** Build the locale-specific school-terms showcase item from
- *  locale.schoolTerms data, or return null if the locale doesn't have
- *  school terms enabled. */
-function buildSchoolTermsItem(locale) {
-  const st = locale.schoolTerms
-  if (!st) return null
-  return {
-    id: 'terms',
-    eyebrow: <div className="eyebrow-sec">School Term Dates</div>,
-    title: (<>{st.titlePrefix}, <em>imported in one&nbsp;click.</em></>),
-    desc: st.desc,
-    bullets: st.bullets,
-    mock: <SchoolTermsMock data={st.mock} />,
-  }
-}
+const SCREENS = ['/landing/app-calendar.jpg', '/landing/app-tasks.jpg', '/landing/app-mealplan.jpg', '/landing/app-lists.jpg']
+const SCREEN_ALTS = ['Housemait shared family calendar', 'Housemait chores, routines and rewards', 'Housemait weekly meal planner and recipe box', 'Housemait shared to-do and shopping lists']
+const COMPANIONS = ['/landing/app-calendar-month.jpg', '/landing/app-rewards.jpg', '/landing/app-meals.jpg', '/landing/app-shopping.jpg']
+const COMPANION_ALTS = ['Housemait calendar month view', 'Housemait rewards and star shop', 'Housemait recipe box', 'Housemait categorised shopping list']
 
-function Showcase({ items }) {
-  const [active, setActive] = useState(0)
-  const trigRefs = useRef([])
-  const pinRef = useRef(null)
+/* ── Small shared pieces ──────────────────────────────────────────── */
 
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) setActive(Number(e.target.dataset.idx))
-        })
-      },
-      { rootMargin: '-50% 0px -50% 0px', threshold: 0 }
-    )
-    trigRefs.current.forEach(el => el && obs.observe(el))
-    return () => obs.disconnect()
-  }, [items])
+const Chevron = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+)
+const Check = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6D38AD" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+)
+const FileIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M16 13H8" /><path d="M16 17H8" /><path d="M10 9H8" /></svg>
+)
 
-  // Plain feature name for a dot's label — pulled from the eyebrow node
-  // (e.g. "Shared Calendar"), with a numeric fallback.
-  const dotLabel = (it, i) => {
-    const text = it?.eyebrow?.props?.children
-    return typeof text === 'string' ? text : `Feature ${i + 1}`
-  }
-
-  // Clicking a dot scrolls to the band of the pinned section where that
-  // feature is active. We compute the target manually and clamp it into
-  // the stage's pinned range rather than scrollIntoView-ing the trigger:
-  // each trigger is 80vh tall and trigger 0 sits at the pin's top, so
-  // centring it resolves to ~10vh ABOVE the pin, which un-sticks the
-  // stage and reads as an unwanted jump upward. Clamping the target to
-  // >= the pin's top keeps the stage pinned for every dot.
-  const goToFeature = (i) => {
-    const pin = pinRef.current
-    if (!pin || typeof window === 'undefined') return
-    const vh = window.innerHeight
-    const pinTop = pin.getBoundingClientRect().top + window.scrollY
-    const maxStick = pinTop + pin.offsetHeight - vh
-    // Trigger i (80vh tall) centres in the viewport at this scroll offset.
-    const target = pinTop + (i * 0.8 - 0.1) * vh
-    const clamped = Math.max(pinTop, Math.min(target, maxStick))
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    window.scrollTo({ top: clamped, behavior: reduce ? 'auto' : 'smooth' })
-  }
-
-  const Panel = ({ it }) => (
-    <>
-      {it.eyebrow}
-      <h3>{it.title}</h3>
-      <p>{it.desc}</p>
-      <ul className="bullets">
-        {it.bullets.map(b => (<li key={b}><span className="check">✓</span> {b}</li>))}
-      </ul>
-      {it.ctaLabel && (
-        <a href={it.ctaHref === 'SIGNUP' ? SIGNUP_URL : it.ctaHref} className="btn btn-primary" style={{ marginTop: 28 }}>{it.ctaLabel}</a>
-      )}
-    </>
-  )
-
-  return (
-    <section className="section-white sec-block showcase" id="how">
-      <div className="showcase-pin" ref={pinRef}>
-        <div className="showcase-stage">
-          <div className="wrap showcase-grid">
-            <div className="showcase-left">
-              {items.map((it, i) => (
-                <div key={it.id} className={`showcase-panel col-text${active === i ? ' on' : ''}`}>
-                  <Panel it={it} />
-                </div>
-              ))}
-            </div>
-            <div className="showcase-right">
-              {items.map((it, i) => (
-                <div key={it.id} className={`showcase-mock${active === i ? ' on' : ''}`}>
-                  {it.mock}
-                </div>
-              ))}
-            </div>
-          </div>
-          <nav className="showcase-dots" aria-label="Feature navigation">
-            {items.map((it, i) => (
-              <button
-                key={it.id}
-                type="button"
-                className={`showcase-dot${active === i ? ' on' : ''}`}
-                aria-label={`Go to ${dotLabel(it, i)}`}
-                aria-current={active === i ? 'true' : undefined}
-                onClick={() => goToFeature(i)}
-              />
-            ))}
-          </nav>
-        </div>
-        <div className="showcase-trigs" aria-hidden="true">
-          {items.map((_, i) => (
-            <div
-              key={i}
-              ref={el => (trigRefs.current[i] = el)}
-              data-idx={i}
-              className="showcase-trig"
-              style={{ top: `${i * 80}vh` }}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="wrap showcase-mobile">
-        {items.map(it => (
-          <div key={it.id} className="showcase-mitem">
-            <div className="col-text"><Panel it={it} /></div>
-            <div className="showcase-mitem-mock">{it.mock}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-/** "Download App" pill + QR popover with auto-flip placement.
- *
- * Defaults to popover-below-button. On pointer/keyboard activation we
- * measure how much space is below the wrapper in the viewport and
- * flip the popover above the button when there isn't enough room.
- * Why on activation rather than at mount: the visitor may scroll
- * between renders and the popover's correct placement depends on the
- * button's *current* viewport position, not its position when the
- * page first painted.
- *
- * The pill is a <button>, not a link — clicking does nothing. The
- * QR is the affordance. type="button" keeps it Tab-focusable, so
- * keyboard users can also reveal the popover via :focus-within.
+/**
+ * QR-on-hover download link — the behaviour carried over from the previous
+ * site. Wrapper is the hover/focus zone; the popover shows the App Store QR
+ * and flips above the trigger when there isn't ~200px free below (recomputed
+ * on every pointer/keyboard entry, since scroll changes the answer). Touch
+ * devices never see the popover (CSS hover gate) — a tap just navigates.
  */
-function DownloadQR({ preferUp = false }) {
-  const wrapperRef = useRef(null)
-  const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
-
+function QrLink({ href, className, children, ariaLabel }) {
+  const wrapRef = useRef(null)
+  const [placement, setPlacement] = useState('bottom')
   const recompute = () => {
-    const el = wrapperRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    // ~200 = popover height (182) + gap (12) + small buffer.
-    const NEED = 200
-    if (preferUp) {
-      // Used inside the bottom CTA card, which has overflow:hidden — a
-      // downward popover would be clipped by the card edge. Open upward
-      // (into the card, over the heading) and only fall back to below if
-      // there genuinely isn't room above.
-      setPlacement(rect.top < NEED ? 'bottom' : 'top')
-    } else {
-      // If less than NEED fits below the button before the viewport edge,
-      // flip the popover above the button instead.
-      setPlacement(window.innerHeight - rect.bottom < NEED ? 'top' : 'bottom')
-    }
+    const node = wrapRef.current
+    if (!node) return
+    const rect = node.getBoundingClientRect()
+    setPlacement(window.innerHeight - rect.bottom < 200 ? 'top' : 'bottom')
   }
-
   return (
-    <span
-      ref={wrapperRef}
-      className="download-pill-wrapper"
-      data-placement={placement}
-      onMouseEnter={recompute}
-      onFocus={recompute}
-    >
-      <a
-        href={APP_STORE_URL}
-        className="btn btn-primary download-pill"
-        aria-label="Download Housemait on the App Store, or hover to scan the QR code"
-      >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ flexShrink: 0 }}>
-          <path d="M17.05 12.54c-.03-3.05 2.49-4.51 2.6-4.58-1.42-2.07-3.62-2.36-4.4-2.39-1.87-.19-3.66 1.1-4.6 1.1-.95 0-2.42-1.07-3.98-1.04-2.05.03-3.94 1.19-4.99 3.02-2.13 3.7-.54 9.17 1.53 12.17 1.02 1.47 2.23 3.12 3.81 3.06 1.54-.06 2.12-.99 3.97-.99 1.85 0 2.38.99 3.99.96 1.65-.03 2.7-1.5 3.7-2.97 1.17-1.7 1.65-3.35 1.67-3.43-.04-.02-3.2-1.23-3.3-4.91zM14.02 3.6c.84-1.02 1.41-2.43 1.25-3.85-1.21.05-2.68.81-3.55 1.83-.78.9-1.46 2.35-1.28 3.73 1.36.11 2.74-.69 3.58-1.71z" />
-        </svg>
-        Download on the App Store
-      </a>
-      <span className="qr-popover" role="tooltip">
-        <img src="/assets/app-store-qr.svg" alt="QR code linking to the Housemait App Store page" width="150" height="150" />
+    <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} onMouseEnter={recompute} onFocus={recompute}>
+      <a href={href} className={className} aria-label={ariaLabel}>{children}</a>
+      <span className="lv-qrpop" role="tooltip" aria-hidden="true">
+        <img src="/assets/app-store-qr.svg" alt="" width="150" height="150" loading="lazy" />
       </span>
     </span>
   )
 }
 
-// Waveform bar heights for the voice-note bubble (px); the first 9 are
-// "played" (filled), the rest are upcoming (faint).
-const WA_WAVE = [5, 12, 7, 16, 9, 4, 14, 8, 11, 6, 15, 10, 7, 13, 5, 17, 9, 12, 6, 10, 14, 8]
-
-// The scripted WhatsApp exchange shown in the phone mock. `think` is how
-// long the bot "types" (ms) before an incoming reply appears.
-const WA_MESSAGES = [
-  { side: 'out', time: '7:42 ✓✓', body: 'Can you add milk, bread and eggs to the shopping list?' },
-  { side: 'in', time: '7:42', think: 1200, body: (
-    <>
-      <div className="sys">✓ Added to list</div>
-      Done! I've added 3 items:<br />• Milk (dairy)<br />• Bread (bakery)<br />• Eggs (dairy)<br /><br />Anything else?
-    </>
-  ) },
-  { side: 'out', time: '7:43 ✓✓', body: "What's for dinner tonight?" },
-  { side: 'in', time: '7:43', think: 1200, body: (
-    <>Tonight's meal plan: Chicken stir-fry 🥢<br /><br />Need me to add the ingredients to your shopping list?</>
-  ) },
-  { side: 'out', time: '7:44 ✓✓', voice: true },
-  { side: 'in', time: '7:44', think: 1300, body: 'Got it! I\'ve added "Pick up dry cleaning" to Sarah\'s tasks for tomorrow.' },
-]
-
-/** Animated WhatsApp phone mock. When the phone scrolls into view the
- *  scripted exchange plays out one message at a time — a typing indicator
- *  precedes each bot reply — with the log anchored to the newest message
- *  so older ones scroll off the top like a real thread. Under
- *  prefers-reduced-motion the full thread renders at once, no timers. */
-function WhatsAppPhone() {
-  const [shown, setShown] = useState(0)
-  const [typing, setTyping] = useState(false)
-  const phoneRef = useRef(null)
-  const logRef = useRef(null)
-  const timers = useRef([])
-
-  // Keep the thread pinned to the newest message as it plays out (and on
-  // the reduced-motion path, open on the latest). The log stays freely
-  // scrollable afterwards so you can read back to the start.
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
-  }, [shown, typing])
-
-  useEffect(() => {
-    const reduce = typeof window !== 'undefined'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduce) { setShown(WA_MESSAGES.length); return }
-
-    const el = phoneRef.current
-    if (!el) return
-    let started = false
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting || started) return
-        started = true
-        let delay = 450
-        WA_MESSAGES.forEach((m, i) => {
-          if (m.side === 'in') {
-            timers.current.push(setTimeout(() => setTyping(true), delay))
-            delay += m.think || 1100
-            timers.current.push(setTimeout(() => { setTyping(false); setShown(i + 1) }, delay))
-            delay += 650
-          } else {
-            timers.current.push(setTimeout(() => setShown(i + 1), delay))
-            delay += 800
-          }
-        })
-      })
-    }, { threshold: 0.35 })
-    io.observe(el)
-    return () => { io.disconnect(); timers.current.forEach(clearTimeout) }
-  }, [])
-
-  return (
-    <div className="wa-phone" ref={phoneRef}>
-      <div className="wa-head">
-        <img className="wa-avatar" src="/housemait-iOS-icon.png" alt="housemait" />
-        <div>
-          <div className="wa-name">housemait</div>
-          <div className="wa-status">Family Bot · online</div>
-        </div>
-      </div>
-      <div className="wa-log" ref={logRef}>
-        {WA_MESSAGES.slice(0, shown).map((m, i) => (
-          <div key={i} className={`wa-bubble ${m.side}`} style={m.voice ? { padding: '8px 12px' } : undefined}>
-            {m.voice ? (
-              <div className="wa-voice">
-                <span className="mic">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2" /></svg>
-                </span>
-                <span className="wave">
-                  {WA_WAVE.map((h, j) => (<span key={j} className={j < 9 ? 'played' : ''} style={{ height: h }} />))}
-                </span>
-                <span className="dur">0:03</span>
-              </div>
-            ) : m.body}
-            <span className="t">{m.time}</span>
-          </div>
-        ))}
-        {typing && (
-          <div className="wa-bubble in wa-typing">
-            <span className="wa-dots"><i /><i /><i /></span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+/* ── Page ─────────────────────────────────────────────────────────── */
 
 export default function LandingPage() {
   const locale = useLocale()
-  const [billing, setBilling] = useState('monthly')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [showFab, setShowFab] = useState(false)
-  // iOS detection drives the hero CTA swap (App Store as primary,
-  // trial as secondary). We compute on mount rather than at render to
-  // avoid SSR/hydration mismatches if we ever pre-render. Hidden
-  // entirely until the App Store ID is configured so we never ship a
-  // broken Apple link to production.
-  const [iosVisitor, setIosVisitor] = useState(false)
-  useEffect(() => {
-    if (APP_STORE_CONFIGURED) setIosVisitor(isIos())
-  }, [])
-  const pricing = buildPricing(locale)
-  const price = pricing[billing]
-  const faqs = buildFaqs(locale)
-  const planFeatures = buildPlanFeatures(locale)
-  // Feature scrollytelling - three locale-aware overrides on the
-  // SHOWCASE entries:
-  //   • cal:   the assignee meta line on two events ("Mum" vs "Mom")
-  //   • tasks: the line-through completed task ("Book MOT for the Volvo"
-  //            vs locale-specific equivalent), plus the recurring-tasks
-  //            bullet ("(bins, vet, MOT)" vs locale-specific)
-  // Everything else stays universal.
-  const universalItems = SHOWCASE.map(it => {
-    if (it.id === 'cal') {
-      return { ...it, mock: <CalendarMock parentTerm={locale.demo.parentTerm} /> }
-    }
-    if (it.id === 'tasks') {
-      return {
-        ...it,
-        mock: <TasksMock completedTask={locale.demo.completedTaskExample} />,
-        bullets: it.bullets.map(b =>
-          b.startsWith('Recurring tasks (')
-            ? `Recurring tasks (${locale.demo.recurringTasksExample})`
-            : b
-        ),
-      }
-    }
-    return it
-  })
-  const termsItem = buildSchoolTermsItem(locale)
-  const showcaseItems = termsItem ? [...universalItems, termsItem] : universalItems
+  const [openFaq, setOpenFaq] = useState(null)
+  const [navOver, setNavOver] = useState(true)
 
+  const el = useRef({})
+  const setEl = (name) => (node) => { el.current[name] = node }
+  const marqueePaused = useRef(false)
+
+  const na = isNA(locale)
+  const reviews = useMemo(() => buildReviews(locale), [locale])
+  const faqs = useMemo(() => buildFaqs(locale), [locale])
+  const receipt = RECEIPTS[locale.stripeCurrency] || RECEIPTS.usd
+  const school = schoolCard(locale)
+  const p = locale.pricing
+
+  // SEO title stays the established one (indexed); smooth in-page anchors.
   useEffect(() => {
     document.title = 'AI Family Organiser - Calendar, Tasks, Meals & Lists | Housemait'
+    const prev = document.documentElement.style.scrollBehavior
+    document.documentElement.style.scrollBehavior = 'smooth'
+    return () => { document.documentElement.style.scrollBehavior = prev }
   }, [])
 
+  // Reveal-on-scroll: tag [data-lv-reveal] elements below the fold with
+  // .pre, then flip to .in the first time they intersect. The data value
+  // is the stagger index (delay = i × 0.09s).
   useEffect(() => {
-    const onScroll = () => setShowFab(window.scrollY > 1500)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const nodes = Array.from(document.querySelectorAll('.lv [data-lv-reveal]'))
+    nodes.forEach((node) => {
+      const i = parseInt(node.getAttribute('data-lv-reveal') || '0', 10)
+      node.style.transitionDelay = `${i * 0.09}s, ${i * 0.09}s`
+      if (node.getBoundingClientRect().top > window.innerHeight * 0.9) node.classList.add('pre')
+    })
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target) }
+      })
+    }, { threshold: 0.1, rootMargin: '0px 0px -6% 0px' })
+    nodes.forEach((node) => io.observe(node))
+    return () => io.disconnect()
   }, [])
 
-  // Scroll-reveal: elements tagged .reveal fade-up the first time they
-  // enter the viewport, then unobserve (one-shot, no re-animation on
-  // scroll-back). The showcase section is deliberately untagged — it has
-  // its own IntersectionObserver choreography and a position:sticky pin
-  // that shouldn't gain ancestors with transforms. prefers-reduced-motion
-  // is handled in CSS (reveal elements render fully visible, no
-  // transition), so this observer is a harmless no-op there.
+  // The single rAF loop: nav two-state, scroll-story scrubbing, marquee.
+  // Ported from the prototype's applyScroll()/loop() — maths unchanged.
   useEffect(() => {
-    const els = document.querySelectorAll('.lp-v2 .reveal')
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(e => {
-          if (e.isIntersecting) {
-            e.target.classList.add('in')
-            obs.unobserve(e.target)
-          }
-        })
-      },
-      { threshold: 0.12 }
-    )
-    els.forEach(el => obs.observe(el))
-    return () => obs.disconnect()
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const E = el.current
+    let raf
+    let mqX = 0
+    let mqLast = 0
+    let over = null
+
+    const inv = (v, a, b) => Math.min(1, Math.max(0, (v - a) / (b - a)))
+    const ease = (t) => t * t * (3 - 2 * t)
+
+    const applyScroll = () => {
+      // Nav state: glassy-dark while the hero is still behind the pill.
+      const nav = E.nav
+      const hero = E.hero
+      let navBottom = 86
+      if (nav && hero) {
+        navBottom = nav.getBoundingClientRect().bottom
+        const isOver = hero.getBoundingClientRect().bottom > navBottom
+        if (isOver !== over) { over = isOver; setNavOver(isOver) }
+      }
+
+      const st = E.story
+      if (!st) return
+      const vh = window.innerHeight
+      const vw = window.innerWidth
+      const total = st.offsetHeight - vh
+      if (total <= 0) return
+      const prog = Math.min(1, Math.max(0, -st.getBoundingClientRect().top / total))
+      const narrow = vw < 1080
+
+      const rx = Math.min(vw * 0.42, 520)
+      const ry = vh * 0.33
+      const maxX = vw / 2 - 70
+      const fh = E.frame ? E.frame.offsetHeight / 2 : vh * 0.3
+
+      // Narrow: the whole cluster rises 50% → 38% as the story begins —
+      // clamped so the phone's top never tucks under the nav pill on
+      // short viewports.
+      const topPct = narrow ? 50 - 12 * ease(inv(prog, 0.15, 0.22)) : 50
+      let centrePx = (topPct / 100) * vh
+      if (narrow) centrePx = Math.max(centrePx, navBottom + 16 + fh * 1.05)
+      const tp = `${centrePx.toFixed(0)}px`
+      if (E.phoneWrap) E.phoneWrap.style.top = narrow ? tp : '50%'
+      if (E.glow) E.glow.style.top = narrow ? tp : '50%'
+      for (let i = 0; i < 8; i++) { const ic = E[`ic${i}`]; if (ic) ic.style.top = narrow ? tp : '50%' }
+
+      // Icon tiles converge into the phone. On desktop, spread positions
+      // come from the unit vectors but are pushed clear of the phone
+      // horizontally (short viewports otherwise drop them onto it).
+      const rxN = Math.min(fh * 1.19 * 0.479 + 30, vw / 2 - 58)
+      const minX = fh * 0.479 + 64 // phone half-width (h × 828/1728 / 2) + tile half + gap
+      for (let i = 0; i < 8; i++) {
+        const ic = E[`ic${i}`]
+        if (!ic) continue
+        const s0 = 0.045 + i * 0.009
+        const e0 = 0.125 + i * 0.009
+        const c = ease(inv(prog, s0, e0))
+        const v = ICON_VECS[i]
+        let bx, by
+        if (narrow) { bx = Math.sign(v[0]) * rxN + JIT[i]; by = SLOT_Y[i] * fh }
+        else {
+          bx = v[0] * rx; by = v[1] * ry
+          if (Math.abs(bx) < minX) bx = Math.sign(bx) * minX
+          if (Math.abs(bx) > maxX) bx = Math.sign(bx) * maxX
+        }
+        ic.style.transform = `translate(-50%,-50%) translate(${(bx * (1 - c)).toFixed(1)}px,${(by * (1 - c)).toFixed(1)}px) scale(${(1 - 0.85 * c).toFixed(3)})`
+        ic.style.opacity = (1 - inv(prog, e0 - 0.02, e0)).toFixed(3)
+      }
+
+      // Purple glow + phone scale bump as the icons land.
+      const bump = Math.max(0, 1 - Math.abs(prog - 0.175) / 0.055)
+      if (E.glow) E.glow.style.opacity = (bump * 0.85).toFixed(3)
+      const introScale = narrow ? 0.19 * (1 - ease(inv(prog, 0.15, 0.22))) : 0
+      if (E.frame) E.frame.style.transform = `scale(${((1 + introScale) * (1 + 0.035 * ease(bump))).toFixed(4)})`
+
+      // Five chapters: screens swap on the phone, text cards enter/exit.
+      // Narrow: the card sits just below the phone's actual bottom edge
+      // (cluster centre + scaled half-height + gap) rather than a fixed
+      // 71%, so a big phone on a short viewport never overlaps the text.
+      const A = 0.2
+      const W = 0.16
+      const cardTopNarrow = centrePx + fh * 1.05 + 26
+      for (let i = 0; i < 5; i++) {
+        const t = inv(prog, A + i * W, A + (i + 1) * W)
+        const enter = ease(inv(t, 0, 0.22))
+        const exit = i < 4 ? ease(inv(t, 0.82, 1)) : 0
+        const screen = i <= 3 ? E[`s${i}`] : E.chat
+        if (screen) {
+          screen.style.opacity = enter.toFixed(3)
+          screen.style.transform = `translateY(${((1 - enter) * 34).toFixed(1)}px)`
+        }
+        const card = E[`c${i}`]
+        if (card) {
+          card.style.top = narrow ? `${cardTopNarrow.toFixed(0)}px` : ''
+          card.style.opacity = (enter * (1 - exit)).toFixed(3)
+          const base = narrow ? 'translateX(-50%)' : 'translateY(-50%)'
+          card.style.transform = `${base} translateY(${(((1 - enter) * 26) - (exit * 26)).toFixed(1)}px)`
+        }
+      }
+
+      // Companion phone (desktop, chapters 1–4): tilted mock behind the
+      // main phone on the opposite side of the text card.
+      if (E.compWrap && !narrow) {
+        const compSides = { 0: 1, 1: -1, 2: 1, 3: -1 }
+        let vis = 0
+        let act = -1
+        for (const k of [0, 1, 2, 3]) {
+          const t = inv(prog, A + k * W, A + (k + 1) * W)
+          const v = ease(inv(t, 0, 0.22)) * (1 - ease(inv(t, 0.82, 1)))
+          if (v > vis) { vis = v; act = k }
+        }
+        for (const k of [0, 1, 2, 3]) { const layer = E[`cp${k}`]; if (layer) layer.style.opacity = (k === act && vis > 0) ? '1' : '0' }
+        const cw = E.frame ? E.frame.offsetWidth : 320
+        const side = act >= 0 ? compSides[act] : 1
+        E.compWrap.style.opacity = vis.toFixed(3)
+        E.compWrap.style.transform = `translate(-50%,-50%) translate(${(side * cw * 0.52).toFixed(1)}px,${(34 + (1 - vis) * 22).toFixed(1)}px) rotate(${side * 5}deg) scale(0.86)`
+      }
+    }
+
+    const loop = (ts) => {
+      raf = requestAnimationFrame(loop)
+      try { applyScroll() } catch { /* keep the loop alive */ }
+      // Reviews marquee: ~32px/s, pauses on hover, wraps at half width.
+      const mq = E.marquee
+      if (mq && !reduced) {
+        const dt = mqLast ? Math.min(ts - mqLast, 50) : 16
+        if (!marqueePaused.current) {
+          mqX -= dt * 0.032
+          const half = mq.scrollWidth / 2
+          if (half > 0 && -mqX >= half) mqX += half
+          mq.style.transform = `translateX(${mqX.toFixed(2)}px)`
+        }
+      }
+      mqLast = ts
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
   }, [])
+
+  const organised = na ? 'organized' : 'organised'
 
   return (
-    <div className="lp-v2">
+    <div className="lv">
       <HreflangTags locale={locale} />
-      {/* NAV */}
-      <nav className="top">
-        <div className="wrap inner">
-          <a className="logo" href="#">
-            <img src="/housemait-logo-web.svg" alt="housemait" />
+
+      {/* ── Nav pill ── */}
+      <div className="lv-navwrap">
+        <nav ref={setEl('nav')} className={`lv-nav${navOver ? ' over' : ''}`}>
+          <a href="#top" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flex: 'none' }}>
+            <img className="lv-nav-logo" src="/housemait-logo-web.svg" alt="Housemait" />
           </a>
-          <ul>
-            {NAV_LINKS.map(l => (
-              <li key={l.href}><a href={l.href}>{l.label}</a></li>
-            ))}
-          </ul>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <a href={SIGNIN_URL} className="btn btn-ghost">Sign in</a>
-            <a href={SIGNUP_URL} className="btn btn-primary">Start free trial</a>
-            <button
-              type="button"
-              className="nav-toggle"
-              aria-label="Toggle menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen(v => !v)}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                {menuOpen ? (
-                  <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
-                ) : (
-                  <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
-                )}
-              </svg>
-            </button>
+          <div className="lv-nav-links">
+            <a href="#story">Features</a>
+            <a href="#reviews">Reviews</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#faq">FAQ</a>
           </div>
-        </div>
-        <div className={`mobile-menu${menuOpen ? ' open' : ''}`}>
-          {NAV_LINKS.map(l => (
-            <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}>{l.label}</a>
-          ))}
-          <a href={SIGNIN_URL} onClick={() => setMenuOpen(false)}>Sign in</a>
-          {/* On iPhone visitors we still drop the trial CTA from the mobile
-              menu — they're pushed toward the App Store instead (hero badge +
-              'Get Housemait' FAB) and an in-Safari signup would just create an
-              account they'd re-authenticate inside the native app. Sign in,
-              though, stays for everyone: existing users need a way back in
-              regardless of platform. */}
-          {!iosVisitor && (
-            <a href={SIGNUP_URL} className="btn btn-primary" style={{ marginTop: 12, justifyContent: 'center' }} onClick={() => setMenuOpen(false)}>Start 30-day free trial</a>
-          )}
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <header className="hero">
-        <div className="wrap hero-grid">
-          <div>
-            <span className="eyebrow">
-              <span className="dot" style={{ background: '#25D366', boxShadow: '0 0 0 4px rgba(37,211,102,.22)' }} />
-              New · WhatsApp assistant for your household
-            </span>
-            <h1 className="display">
-              The quiet hum<br />
-              of <em>family life</em>,<br />
-              made easy with&nbsp;AI.
-            </h1>
-            <p className="lede">
-              Housemait restores calm and order to family life. It holds the calendar, shopping, tasks and meals in one place, and answers on WhatsApp, so the mental load stops landing on one person.
-            </p>
-            <div className="hero-cta">
-              {/* Hero CTA — the styled "Download on the App Store" pill
-                  shows on every device (on desktop it reveals a QR popover
-                  on hover to scan straight to a phone; on touch it opens
-                  the App Store directly). The "Try it on the web" fallback
-                  is shown to desktop/Android but hidden for iPhone visitors
-                  — they're already on the device the app installs to. The
-                  pill is only rendered when the App Store ID has been
-                  configured in lib/app-store.js. */}
-              {APP_STORE_CONFIGURED && <DownloadQR />}
-              {!iosVisitor && (
-                <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                  Try it on the web
-                </a>
-              )}
-            </div>
-            <div className="hero-price">
-              Free 30-day trial. No card to start. Cancel anytime.
-            </div>
+          <div className="lv-nav-right">
+            <Link to={SIGNIN_URL} className="lv-nav-signin">Sign in</Link>
+            <Link to={SIGNUP_URL} className="lv-nav-cta">Get started</Link>
           </div>
+        </nav>
+      </div>
 
-          <div className="collage" aria-hidden="false">
-            <div className="blob" />
-            <div className="blob2" />
-            <div className="photo">
-              <img src="/assets/family-hero.png" alt="Family laughing together in the kitchen" />
-            </div>
-            <div className="app">
-              <div className="app-mock">
-                <div className="app-mock-head">
-                  <div className="kicker">Tuesday · 21 April</div>
-                  <div className="greet">Good morning, <em>everyone.</em></div>
-                </div>
-                <div className="app-mock-sec">
-                  <div className="app-mock-sec-head"><span>Today</span><span className="meta">4 events</span></div>
-                  <div className="app-mock-row">
-                    <span className="bar" style={{ background: 'var(--purple)' }} />
-                    <span className="time">08:30</span>
-                    <span className="title">School run · Ben</span>
-                  </div>
-                  <div className="app-mock-row">
-                    <span className="bar" style={{ background: 'var(--coral)' }} />
-                    <span className="time">10:00</span>
-                    <span className="title">Vet · Luna</span>
-                  </div>
-                  <div className="app-mock-row">
-                    <span className="bar" style={{ background: 'var(--sage)' }} />
-                    <span className="time">15:45</span>
-                    <span className="title">Swimming · Sofia</span>
-                  </div>
-                </div>
-                <div className="app-mock-sec">
-                  <div className="app-mock-sec-head"><span>Tonight</span></div>
-                  <div className="app-mock-meal">
-                    <span className="em">🍝</span>
-                    <span className="mt">One-pot pasta</span>
-                    <span className="ready">Ready</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="sticker s1">
-              <div className="ic">✓</div>
-              <div>Bananas<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>Added to shopping list</span></div>
-            </div>
-            <div className="sticker s2">
-              <div className="ic">🍝</div>
-              <div>Pasta night<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>Planned for Tuesday</span></div>
-            </div>
-            <div className="sticker s3">
-              <div className="ic">✦</div>
-              <div>Grocery receipt scanned<br /><span style={{ color: 'var(--ink-soft)', fontSize: 11 }}>6 items marked as bought</span></div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* FEATURE STRIP */}
-      <section className="strip" id="features">
-        <div className="wrap">
-          <div className="reveal" style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', marginBottom: 40, flexWrap: 'wrap', gap: 20 }}>
-            <div>
-              <div className="eyebrow-sec">Everything in one place</div>
-              <h2 className="sec" style={{ margin: 0 }}>
-                Family life <em>intelligently&nbsp;organised.</em>
-              </h2>
-            </div>
-            <p style={{ maxWidth: 360, color: 'var(--ink-soft)', margin: 0 }}>
-              One parent holding every date, list and dinner plan in their head isn't a system. Housemait is.
-            </p>
-          </div>
-          {/* Pain-led feature cards: each opens with the thing families
-              actually say out loud (the pain), then the one-line fix.
-              The kicker keeps the feature name for scannability. */}
-          <div className="feat-grid">
-            <div className="feat c1 reveal">
-              <div className="ic">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-              </div>
-              <div className="kicker">Shared calendar</div>
-              <h3>"You never told me about that."</h3>
-              <p>Now everyone sees the same month: colour-coded per person, with a heads-up the moment two plans collide.</p>
-            </div>
-            <div className="feat c2 reveal">
-              <div className="ic">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" /></svg>
-              </div>
-              <div className="kicker">Smart shopping</div>
-              <h3>"We're out of milk. Again."</h3>
-              <p>One live list everyone adds to, sorted into aisles, and checked off by snapping the receipt.</p>
-            </div>
-            <div className="feat c3 reveal">
-              <div className="ic">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-              </div>
-              <div className="kicker">Family tasks</div>
-              <h3>"Why am I the one who remembers the bins?"</h3>
-              <p>Chores assigned by name, repeating on schedule, with Housemait doing the chasing instead of you.</p>
-            </div>
-            <div className="feat c4 reveal">
-              <div className="ic">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 11h.01M11 15h.01M16 16h.01M3 3h7v7H3z" /><path d="M14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" /></svg>
-              </div>
-              <div className="kicker">Meal planning</div>
-              <h3>"It's 5pm. What's for dinner?"</h3>
-              <p>Plan the week in minutes on Sunday. The shopping list builds itself from the ingredients.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* AI PROMPT SHOWCASE */}
-      <section className="sec-block">
-        <div className="wrap">
-          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
-            <div className="eyebrow-sec">The AI that gets the brief</div>
-            <h2 className="sec" style={{ margin: '0 auto 16px' }}>
-              Just say it. <em>It's&nbsp;sorted.</em>
-            </h2>
-            <p className="sec-lede" style={{ margin: '0 auto' }}>
-              Type it, snap it, or forward the email, and Housemait files real life into the right calendar entry, shopping line, task or meal.
-            </p>
-          </div>
-
-          <div className="ai-demo reveal">
-            <div className="ai-input">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
-              <div className="txt">"Finn has a dentist on Thursday at 4, we're out of milk, and let's plan three easy dinners this week"</div>
-              <div className="send">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2z" /></svg>
-              </div>
-            </div>
-
-            <div className="ai-results">
-              <div className="aicard">
-                <div className="head">
-                  <span className="pill" style={{ background: 'var(--purple-soft)', color: 'var(--purple-deep)' }}>Calendar</span>
-                  Thu 30 April
-                </div>
-                <div className="title">Finn · Dentist</div>
-                <div style={{ fontSize: 14, color: 'var(--ink-soft)' }}>4:00 PM · 45 min<br />📍 {locale.demo.dentistLocation}</div>
-                <div style={{ marginTop: 8, paddingTop: 12, borderTop: '1px solid rgba(27,20,36,.06)', fontSize: 13, color: 'var(--ink-soft)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--purple)' }} />
-                  Reminder set for 30 min before
-                </div>
-              </div>
-              <div className="aicard">
-                <div className="head">
-                  <span className="pill" style={{ background: 'var(--sage-soft)', color: '#3f6b3a' }}>Shopping</span>
-                  Added to list
-                </div>
-                <div className="title">2 items auto-categorised</div>
-                <ul>
-                  <li>
-                    <span className="cb" />
-                    <span style={{ background: 'var(--sky-soft)', padding: '2px 8px', borderRadius: 4, fontSize: 11, textTransform: 'uppercase', color: '#4a6a94' }}>Dairy</span>
-                    Milk · {locale.demo.milkSize}
-                  </li>
-                  <li>
-                    <span className="cb" />
-                    <span style={{ background: 'var(--coral-soft)', padding: '2px 8px', borderRadius: 4, fontSize: 11, textTransform: 'uppercase', color: '#a84522' }}>Meat</span>
-                    Chicken · {locale.demo.chickenSize}
-                  </li>
-                </ul>
-              </div>
-              <div className="aicard">
-                <div className="head">
-                  <span className="pill" style={{ background: 'var(--butter-soft)', color: '#8a5c1a' }}>Meals</span>
-                  This week
-                </div>
-                <div className="title">3 dinners planned</div>
-                <ul>
-                  <li>🍝 Tue · One-pot pasta</li>
-                  <li>🌮 Wed · Sheet-pan fajitas</li>
-                  <li>🍛 Thu · Quick butter chicken</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* WHATSAPP */}
-      <section id="whatsapp" className="section-white sec-block">
-        <div className="wrap">
-          <div className="wa-section reveal">
-            <div className="wa-grid">
-              <div>
-                <span className="wa-badge">
-                  <span className="ic">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="#fff"><path d="M20.52 3.48A11.9 11.9 0 0 0 12.05 0C5.46 0 .1 5.34.1 11.9c0 2.1.55 4.15 1.6 5.96L0 24l6.3-1.65a11.9 11.9 0 0 0 5.75 1.47h.01c6.59 0 11.94-5.34 11.94-11.9a11.8 11.8 0 0 0-3.48-8.44z" /></svg>
-                  </span>
-                  WhatsApp AI Assistant
-                </span>
-                <h3 style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 'clamp(36px,4.4vw,56px)', lineHeight: 1.05, letterSpacing: '-.015em', margin: '18px 0' }}>
-                  Your family's assistant, <em style={{ fontStyle: 'normal', color: 'var(--purple)' }}>right in WhatsApp.</em>
-                </h3>
-                <p style={{ color: 'var(--ink-soft)', fontSize: 17, maxWidth: 480, margin: 0 }}>
-                  Your family already lives in WhatsApp, so Housemait does too. No new app for the household to ignore: message the bot the way you'd message each other, and everything lands in the right place, filed and remembered.
-                </p>
-                <ul className="bullets" style={{ marginTop: 28 }}>
-                  <li><span className="check">✓</span> Add items to your shopping list by just texting</li>
-                  <li><span className="check">✓</span> Create and assign tasks to family members</li>
-                  <li><span className="check">✓</span> Plan meals and get recipe suggestions</li>
-                  <li><span className="check">✓</span> Send voice notes and we'll transcribe them into actions</li>
-                </ul>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <WhatsAppPhone />
-                <div className="wa-float-sticker" style={{ top: -14, right: '6%', transform: 'rotate(4deg)', background: 'var(--coral-soft)', color: '#a84522' }}>3 items added ✓</div>
-                <div className="wa-float-sticker" style={{ top: '34%', left: '-6%', transform: 'rotate(-4deg)', background: 'var(--sage-soft)', color: '#2e5a2a' }}>Meal planned 🍽️</div>
-                <div className="wa-float-sticker" style={{ bottom: '8%', right: '-4%', transform: 'rotate(3deg)', background: 'var(--purple-soft)', color: 'var(--purple-deep)' }}>Task assigned to Dad</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Showcase items={showcaseItems} />
-
-      {/* TESTIMONIALS */}
-      <section id="stories" className="section-cream sec-block">
-        <div className="wrap">
-          <div className="reveal" style={{ textAlign: 'center', marginBottom: 48 }}>
-            <div className="eyebrow-sec">Loved by actual parents</div>
-            <h2 className="sec" style={{ margin: '0 auto' }}>
-              A little more <em>calm,</em><br />a lot fewer group&nbsp;chats.
-            </h2>
-          </div>
-          <div className="testis">
-            {locale.reviews.map((r, i) => (
-              <div key={r.name} className={`testi reveal${i === 1 ? ' hl' : ''}`}>
-                <div className="stars">★★★★★</div>
-                <blockquote>"{REVIEW_QUOTES[i]}"</blockquote>
-                <div className="who">
-                  <div className="avatar">{r.initials}</div>
-                  <div>
-                    <div className="name">{r.name}</div>
-                    <div className="role">{r.role}{r.city ? ` · ${r.city}` : ''}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-
-      {/* PRICING */}
-      <section id="pricing" className="section-white sec-block">
-        <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div className="eyebrow-sec">Pricing</div>
-            <h2 className="sec" style={{ margin: '0 auto' }}>
-              Less than <em>{locale.pricing.compareReference}</em> a month.
-            </h2>
-            <p className="sec-lede" style={{ margin: '14px auto 0' }}>
-              One plan with everything in it, covering your whole household. No tiers to compare, nothing to unlock. 30-day free trial, cancel any time.
-            </p>
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <div className="billing-toggle" role="tablist">
-              <button
-                type="button"
-                className={billing === 'monthly' ? 'active' : ''}
-                onClick={() => setBilling('monthly')}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                className={billing === 'annual' ? 'active' : ''}
-                onClick={() => setBilling('annual')}
-              >
-                Annual <span className="save">SAVE 17%</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="single-plan reveal">
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Housemait</div>
-              <div style={{ color: 'var(--ink-soft)', fontSize: 14.5 }}>Everything your household needs</div>
-              <div className="price-display">
-                <span className="amount">{price.amount}</span>
-                <span className="per">{price.per}</span>
-              </div>
-              <div className="billed">{price.billed}</div>
-            </div>
-            <ul>
-              {planFeatures.map(f => (
-                <li key={f}><span className="check">✓</span> {f}</li>
-              ))}
-            </ul>
-            {/* Hidden on iPhone visitors — they're funnelled to the App
-                Store via the hero badge / Smart Banner / FAB, and an
-                in-Safari signup would create an account they'd have to
-                re-authenticate inside the native app. */}
-            {!iosVisitor && (
-              <a href={SIGNUP_URL} className="btn btn-primary">Start your free 30-day trial</a>
+      {/* ── Hero ── */}
+      <section id="top" className="lv-hero" ref={setEl('hero')}>
+        <img className="lv-hero-img" src="/landing/hero-family.jpg" alt="A family laughing together over dinner at home" fetchPriority="high" />
+        <div className="lv-hero-scrim" />
+        <div className="lv-hero-noise" />
+        <div className="lv-hero-inner">
+          <h1>Family life,<br />{organised} with AI.</h1>
+          <p className="lv-hero-sub">One home for the family calendar, meals, lists and chores, with an AI assistant in WhatsApp that does it all for you.</p>
+          <div className="lv-hero-ctas">
+            {APP_STORE_CONFIGURED ? (
+              <QrLink href={APP_STORE_URL} className="lv-btn-cream" ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
+                Get the app
+              </QrLink>
+            ) : (
+              <Link to={SIGNUP_URL} className="lv-btn-cream">Get started</Link>
             )}
+            <a href="#story" className="lv-btn-ghost">
+              See how it works
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
+            </a>
+          </div>
+          <div className="lv-hero-trial">Free 30-day trial · No card to start&nbsp;<span style={{ letterSpacing: '0.27px' }}>· Cancel anytime</span></div>
+        </div>
+      </section>
+
+      {/* ── Intro ── */}
+      <section className="lv-intro">
+        <div className="lv-intro-inner" data-lv-reveal="0">
+          <h2>Your family&rsquo;s operating&nbsp;system.</h2>
+          <p className="lv-sub" style={{ fontSize: 'clamp(15px,1.5vw,17.5px)' }}>Calendar, meals, lists, chores and school life. One app that keeps everyone in&nbsp;sync.</p>
+        </div>
+      </section>
+
+      {/* ── Scroll story ── */}
+      <section id="story" className="lv-story" ref={setEl('story')}>
+        <div className="lv-stage">
+          <div className="lv-glow" ref={setEl('glow')} />
+
+          {/* Companion phone (desktop only) */}
+          <div className="lv-compwrap" ref={setEl('compWrap')}>
+            <div className="lv-comp-frame">
+              <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
+              <div className="lv-screen">
+                {COMPANIONS.map((src, i) => (
+                  <img key={src} ref={setEl(`cp${i}`)} src={src} alt={COMPANION_ALTS[i]} />
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 28, justifyContent: 'center', flexWrap: 'wrap', marginTop: 36, color: 'var(--ink-soft)', fontSize: 14 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓</span> 30-day free trial</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓</span> No credit card to start</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓</span> Cancel anytime</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ color: 'var(--sage)', fontWeight: 700 }}>✓</span> GDPR compliant</span>
+          {/* Main phone */}
+          <div className="lv-phonewrap" ref={setEl('phoneWrap')}>
+            <div className="lv-frame" ref={setEl('frame')}>
+              <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
+              <div className="lv-screen">
+                <img className="lv-s-base" src="/landing/app-home.jpg" alt="Housemait family home screen with today&rsquo;s schedule" />
+                {SCREENS.map((src, i) => (
+                  <img key={src} ref={setEl(`s${i}`)} className="lv-s-layer" src={src} alt={SCREEN_ALTS[i]} style={{ zIndex: 2 + i }} />
+                ))}
+                <img ref={setEl('chat')} className="lv-s-layer" src="/landing/app-whatsapp.jpg" alt="WhatsApp conversation with the Housemait assistant" style={{ zIndex: 6 }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Floating icon tiles */}
+          {ICONS.map(([src, pad, dur, delay], i) => (
+            <div key={src} className="lv-icon-tile" ref={setEl(`ic${i}`)}>
+              <div style={{ animationDuration: `${dur}s`, animationDelay: `${delay}s` }}>
+                <img className="lv-icon" src={src} alt="" style={{ padding: pad }} />
+              </div>
+            </div>
+          ))}
+
+          {/* Chapter text cards */}
+          {STORY_CHAPTERS.map((ch, i) => (
+            <div key={ch.p} className={`lv-story-card ${i % 2 === 0 ? 'side-l' : 'side-r'}`} ref={setEl(`c${i}`)}>
+              <h3>{ch.h[0]}<br />{ch.h[1]}</h3>
+              <p>{ch.p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Features grid ── */}
+      <section id="touches" className="lv-touches">
+        <div className="lv-touch-head" data-lv-reveal="0">
+          <h2 className="lv-h2">The little things, handled.</h2>
+          <p className="lv-sub">Housemait quietly takes care of the admin around the edges of family life, so nothing slips.</p>
+        </div>
+        <div className="lv-cards">
+          <div className="lv-card" data-lv-reveal="0">
+            <h3>{school.title}</h3>
+            <p>{school.desc}</p>
+            <div className="lv-rows">
+              <div className="lv-chip">{school.chip}</div>
+              {school.rows.map(([k, v]) => (
+                <div className="lv-row" key={k}><span className="k">{k}</span><span className="v">{v}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className="lv-card crop" data-lv-reveal="1">
+            <h3>Kids build healthy habits</h3>
+            <p>Child Mode lets kids see their day, tick off their tasks, earn stars and spend them on rewards.</p>
+            <div className="lv-kidphone-well">
+              <div className="lv-kidphone">
+                <img src="/landing/app-kid-quests.jpg" alt="Housemait Child Mode, today&rsquo;s quests" loading="lazy" />
+              </div>
+            </div>
+          </div>
+          <div className="lv-card" data-lv-reveal="0">
+            <h3>Store documents &amp; moments</h3>
+            <p>Keep school letters, consent forms, insurance, passports and precious memories in a single, searchable place.</p>
+            <div className="lv-rows">
+              <div className="lv-docrow"><span className="ic"><FileIcon /></span><span className="k">Swimming consent form</span><span className="tag">School</span></div>
+              <div className="lv-docrow"><span className="ic"><FileIcon /></span><span className="k">Home insurance policy</span><span className="tag">Home</span></div>
+              <div className="lv-docrow"><span className="ic"><FileIcon /></span><span className="k">Passports × 4</span><span className="tag">Travel</span></div>
+            </div>
+          </div>
+          <div className="lv-card" data-lv-reveal="1">
+            <h3>Receipts, read for you</h3>
+            <p>Snap your grocery receipt and Housemait automatically checks items off your shopping list.</p>
+            <div className="lv-receipt-well">
+              <div className="lv-receipt">
+                <div className="store">GREEN &amp; GROCER</div>
+                <div className="rule" />
+                {receipt.items.map(([k, v]) => (
+                  <div className="line" key={k}><span>{k}</span><span>{v}</span></div>
+                ))}
+                <div className="rule" />
+                <div className="total"><span>TOTAL</span><span>{receipt.total}</span></div>
+                <div className="lv-scanline" />
+              </div>
+              <div className="lv-chip" style={{ alignSelf: 'center' }}>Filed → Groceries · {receipt.total} ✓</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="section-cream sec-block">
-        <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <div className="eyebrow-sec">FAQ</div>
-            <h2 className="sec" style={{ margin: '0 auto' }}>Questions, <em>answered.</em></h2>
-          </div>
-          <div className="faq">
-            {faqs.map((f, i) => (
-              <details key={f.q} open={i === 0}>
-                <summary>{f.q}</summary>
-                <div className="answer">{f.a}</div>
-              </details>
+      {/* ── Reviews marquee ── */}
+      <section id="reviews" className="lv-reviews">
+        <div className="lv-reviews-head" data-lv-reveal="0">
+          <h2 className="lv-h2">Loved by busy families.</h2>
+        </div>
+        <div className="lv-marquee-outer" data-lv-reveal="1">
+          <div
+            className="lv-marquee"
+            ref={setEl('marquee')}
+            onMouseEnter={() => { marqueePaused.current = true }}
+            onMouseLeave={() => { marqueePaused.current = false }}
+          >
+            {[...reviews, ...reviews].map((r, i) => (
+              <div className="lv-review" key={`${r.n}-${i}`} aria-hidden={i >= reviews.length || undefined}>
+                <div className="stars">★★★★★</div>
+                <p>{r.q}</p>
+                <div className="who">{r.n} <span>· {r.r}</span></div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="sec-block" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <div className="cta reveal">
-            <div className="bg1" />
-            <div className="bg2" />
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <h2>Try Housemait <em>free</em><br />for 30&nbsp;days.</h2>
-              <p>Set Housemait up in under 5 minutes. Your calmer family life starts here.</p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {APP_STORE_CONFIGURED && <DownloadQR preferUp />}
-                {!iosVisitor && (
-                  <a href={SIGNUP_URL} className="btn btn-outline try-online-pill">
-                    Try it on the web
-                  </a>
-                )}
-              </div>
+      {/* ── Privacy ── */}
+      <section id="privacy" className="lv-privacy">
+        <div className="lv-privacy-panel">
+          <div className="lv-privacy-glow" />
+          <div data-lv-reveal="0" style={{ position: 'relative' }}>
+            <h2>Private by design.</h2>
+            <p className="lv-privacy-sub">Housemait is where your family lives: plans, paperwork, little notes home. We treat that with the care it deserves.</p>
+          </div>
+          <div className="lv-privacy-grid">
+            <div data-lv-reveal="0">
+              <span className="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg></span>
+              <h4>No ads, no data sales</h4>
+              <p>Your family&rsquo;s data is yours. We never share, sell it, or use it to train AI models.</p>
+            </div>
+            <div data-lv-reveal="1">
+              <span className="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></span>
+              <h4>Encrypted, always</h4>
+              <p>All data is&nbsp;protected with industry standard encryption in transit and at rest.</p>
+            </div>
+            <div data-lv-reveal="2">
+              <span className="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></svg></span>
+              <h4>Yours to take or delete</h4>
+              <p>Export everything, or delete your account and every trace of it, any time you like.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="site">
-        <div className="wrap">
-          <div className="fgrid">
-            <div>
-              <img src="/housemait-logo-web.svg" alt="housemait" style={{ height: 26 }} />
-              <p className="tag">Family life, organised. AI-powered household management for {locale.audienceTagline}.</p>
-              <div className="social">
-                <a href="https://linkedin.com/company/housemait/" target="_blank" rel="noopener noreferrer" aria-label="Housemait on LinkedIn">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M20.5 2h-17A1.5 1.5 0 0 0 2 3.5v17A1.5 1.5 0 0 0 3.5 22h17a1.5 1.5 0 0 0 1.5-1.5v-17A1.5 1.5 0 0 0 20.5 2zM8 19H5v-9h3v9zM6.5 8.25A1.75 1.75 0 1 1 8.25 6.5 1.75 1.75 0 0 1 6.5 8.25zM19 19h-3v-4.74c0-1.42-.6-1.93-1.38-1.93A1.74 1.74 0 0 0 13 14.19a.66.66 0 0 0 0 .14V19h-3v-9h2.9v1.3a3.11 3.11 0 0 1 2.7-1.4c1.55 0 3.36.86 3.36 3.66z" />
-                  </svg>
-                </a>
-                <a href="https://www.facebook.com/housemait" target="_blank" rel="noopener noreferrer" aria-label="Housemait on Facebook">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.89 3.77-3.89 1.09 0 2.24.19 2.24.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.88h2.78l-.45 2.9h-2.33v7A9.96 9.96 0 0 0 22 12.06z" />
-                  </svg>
-                </a>
+      {/* ── Pricing ── */}
+      <section id="pricing" className="lv-pricing">
+        <div className="lv-pricing-head" data-lv-reveal="0">
+          <h2 className="lv-h2">One plan, whole household.</h2>
+          <p className="lv-sub">Every feature, every family member, one subscription. Cancel anytime.</p>
+        </div>
+        <div className="lv-plans">
+          <div className="lv-plan" data-lv-reveal="0">
+            <div className="plan-k">MONTHLY</div>
+            <div className="price-row"><span className="price">{p.monthly}</span><span className="per">/ month</span></div>
+            <p className="plan-sub">Billed monthly. Flexible if you&rsquo;re just settling in.</p>
+            <Link to={SIGNUP_URL} className="lv-plan-btn">Start monthly</Link>
+          </div>
+          <div className="lv-plan annual" data-lv-reveal="1">
+            <div className="lv-plan-badge">2 MONTHS FREE</div>
+            <div className="plan-k">ANNUAL</div>
+            <div className="price-row"><span className="price">{p.annual}</span><span className="per">/ year</span></div>
+            <p className="plan-sub">That&rsquo;s {p.monthlyEquivalent} a month, for the calmest year yet.</p>
+            <Link to={SIGNUP_URL} className="lv-plan-btn fill">Start annual</Link>
+          </div>
+        </div>
+        <div className="lv-plan-notes" data-lv-reveal="2">
+          <span><Check />Whole family included</span>
+          <span><Check />All features, no tiers</span>
+          <span><Check />WhatsApp assistant</span>
+          <span><Check />Cancel anytime</span>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="lv-faq">
+        <div data-lv-reveal="0" style={{ textAlign: 'center' }}>
+          <h2 className="lv-h2">Questions, answered.</h2>
+        </div>
+        <div className="lv-faq-list" data-lv-reveal="1">
+          {faqs.map((f, i) => (
+            <div className={`lv-faq-item${openFaq === i ? ' open' : ''}`} key={f.q}>
+              <button type="button" className="lv-faq-q" aria-expanded={openFaq === i} onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+                <span className="q">{f.q}</span>
+                <span className="chev"><Chevron /></span>
+              </button>
+              <div className="lv-faq-a">
+                <div><p>{f.a}</p></div>
               </div>
             </div>
-            <div>
-              <h4>Product</h4>
-              <ul>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#whatsapp">WhatsApp Bot</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="#faq">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4>Company</h4>
-              <ul>
-                <li><a href="https://housemait.com/privacy">Privacy Policy</a></li>
-                <li><a href="https://housemait.com/terms">Terms of Service</a></li>
-                <li><a href="/support">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4>Get Started</h4>
-              <ul>
-                <li><a href={SIGNUP_URL}>Sign Up</a></li>
-                <li><a href={SIGNIN_URL}>Log In</a></li>
-              </ul>
-            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Download CTA ── */}
+      <section id="download" className="lv-cta">
+        <div className="lv-cta-panel" data-lv-reveal="0">
+          <img className="lv-cta-img" src="/landing/cta-family.jpg" alt="" loading="lazy" />
+          <div className="lv-cta-scrim" />
+          <h2>Ready for calmer weeks?</h2>
+          <p className="lv-cta-sub">Set Housemait up in just a few minutes. Free to get started. The {na ? 'coffee' : 'kettle'} will still be warm.</p>
+          <div className="lv-cta-btns">
+            <QrLink href={APP_STORE_URL} className="lv-appstore" ariaLabel="Download Housemait on the App Store — or hover to scan the QR code">
+              <svg width="22" height="22" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" /></svg>
+              <span className="lines">
+                <span className="l1">DOWNLOAD ON THE</span>
+                <span className="l2">App Store</span>
+              </span>
+            </QrLink>
+            <span className="lv-android">Android coming soon</span>
           </div>
-          <div className="bottom">
-            <span>© {new Date().getFullYear()} Housemait. All rights reserved.</span>
-            <span>{locale.footerNote}</span>
+          <div className="lv-cta-web">
+            <Link to={SIGNUP_URL}>or try Housemait on the web →</Link>
           </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="lv-footer">
+        <div className="left">
+          <img src="/housemait-logo-web.svg" alt="Housemait" />
+          <span className="copy">© 2026 Housemait</span>
+        </div>
+        <div className="links">
+          <Link to="/privacy">Privacy</Link>
+          <Link to="/terms">Terms</Link>
+          <Link to="/support">Contact</Link>
         </div>
       </footer>
-
-      {/* Mobile-only floating CTA. iOS visitors get a 'Get Housemait'
-          button that deep-links to the App Store, since the phone they're
-          browsing on is also the phone they'd install the app on. Android
-          visitors keep the 'Get Started' web signup path because they
-          can't install the iOS app on their device. */}
-      <a
-        href={iosVisitor ? APP_STORE_URL : SIGNUP_URL}
-        className={`fab-cta${showFab ? ' show' : ''}`}
-      >
-        {iosVisitor ? 'Get Housemait' : 'Get Started'} <ArrowRight />
-      </a>
     </div>
   )
 }
