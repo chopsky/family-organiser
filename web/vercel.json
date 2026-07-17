@@ -14,8 +14,8 @@
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://api.housemait.com/api/:path*" },
-    { "source": "/school-term-dates/", "destination": "https://api.housemait.com/la-term-dates/" },
-    { "source": "/school-term-dates/:path*", "destination": "https://api.housemait.com/la-term-dates/:path*" },
+    { "source": "/school-term-dates/", "destination": "https://api.housemait.com/school-term-dates/" },
+    { "source": "/school-term-dates/:path*", "destination": "https://api.housemait.com/school-term-dates/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

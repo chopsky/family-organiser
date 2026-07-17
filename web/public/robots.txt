@@ -54,3 +54,4 @@ User-agent: Google-Extended
 Disallow: /
 
 Sitemap: https://housemait.com/sitemap.xml
+Sitemap: https://housemait.com/school-term-dates/sitemap.xml
