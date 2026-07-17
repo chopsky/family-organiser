@@ -23,15 +23,21 @@
  *                 vercel.json's catch-all rewrite points here so app
  *                 routes like /dashboard never flash landing content)
  *
- * Runs as part of `npm run build`, locally and on Vercel (puppeteer
- * downloads its own Chrome during npm install).
+ * Runs as part of `npm run build`, locally and on Vercel. Chrome
+ * sourcing differs by environment: Vercel's Amazon Linux build image
+ * lacks Chrome's shared system libraries (a stock download dies with
+ * "libnspr4.so: cannot open shared object file", exit 127), so on
+ * Vercel we launch @sparticuz/chromium - a Chromium compiled for that
+ * exact environment with its libraries bundled. Locally we use the
+ * system-installed Chrome via puppeteer-core's channel resolution.
  */
 
 import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, copyFileSync, existsSync, statSync } from 'node:fs';
 import { join, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 const DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 
@@ -96,11 +102,19 @@ const { server, port } = await serveDist();
 // overwrites index.html. vercel.json rewrites app routes here.
 copyFileSync(join(DIST, 'index.html'), join(DIST, 'app.html'));
 
-const browser = await puppeteer.launch({
-  headless: true,
-  // Vercel's build container runs as root without a user namespace.
-  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-});
+const browser = await puppeteer.launch(
+  process.env.VERCEL === '1'
+    ? {
+        headless: true,
+        args: chromium.args, // includes --no-sandbox etc. for the root build container
+        executablePath: await chromium.executablePath(),
+      }
+    : {
+        headless: true,
+        channel: 'chrome', // locally: the system-installed Chrome
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+      },
+);
 
 try {
   const page = await browser.newPage();

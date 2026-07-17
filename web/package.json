@@ -43,6 +43,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.39.4",
+    "@sparticuz/chromium": "^149.0.0",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -53,7 +54,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "postcss": "^8.5.8",
-    "puppeteer": "^25.3.0",
+    "puppeteer-core": "^25.3.0",
     "tailwindcss": "^4.2.1",
     "vite": "^8.0.0"
   }
