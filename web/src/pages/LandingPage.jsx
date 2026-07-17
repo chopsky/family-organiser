@@ -17,7 +17,6 @@ import { APP_STORE_URL, APP_STORE_CONFIGURED } from '../lib/app-store'
  */
 
 const SIGNUP_URL = '/signup'
-const SIGNIN_URL = '/login'
 
 /* ── Locale-derived copy ──────────────────────────────────────────── */
 
@@ -368,7 +367,6 @@ export default function LandingPage() {
             <a href="#faq">FAQ</a>
           </div>
           <div className="lv-nav-right">
-            <Link to={SIGNIN_URL} className="lv-nav-signin">Sign in</Link>
             <Link to={SIGNUP_URL} className="lv-nav-cta">Get started</Link>
           </div>
         </nav>

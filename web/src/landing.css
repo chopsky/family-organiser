@@ -72,8 +72,6 @@
 .lv-nav-links a { color: var(--lv-ink); text-decoration: none; font-size: 15px; font-weight: 400; transition: color 0.35s ease; }
 .lv-nav-links a:hover { color: var(--lv-purple); }
 .lv-nav-right { display: flex; align-items: center; gap: 18px; flex: none; }
-.lv-nav-signin { color: var(--lv-ink); text-decoration: none; font-size: 15px; font-weight: 500; transition: color 0.35s ease; }
-.lv-nav-signin:hover { color: var(--lv-purple); }
 .lv-nav-cta {
   background: var(--lv-purple); color: var(--lv-cream-txt) !important; padding: 12px 23px; border-radius: 999px;
   font-size: 14.5px; font-weight: 700; text-decoration: none; transition: background 0.2s ease; flex: none;
@@ -87,8 +85,8 @@
   box-shadow: rgba(255, 255, 255, 0.4) 1px 1px 1px 0 inset, rgba(255, 255, 255, 0.2) -1px -1px 1px 0 inset;
 }
 .lv-nav.over .lv-nav-logo { filter: brightness(0) invert(1); }
-.lv-nav.over .lv-nav-links a, .lv-nav.over .lv-nav-signin { color: #fff; }
-.lv-nav.over .lv-nav-links a:hover, .lv-nav.over .lv-nav-signin:hover { color: rgba(255, 255, 255, 0.75); }
+.lv-nav.over .lv-nav-links a { color: #fff; }
+.lv-nav.over .lv-nav-links a:hover { color: rgba(255, 255, 255, 0.75); }
 
 /* ── Hero ── */
 .lv-hero {
@@ -134,7 +132,7 @@
 .lv-glow {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: min(640px, 86vw); height: min(640px, 86vw); border-radius: 50%;
-  background: radial-gradient(circle, rgba(109, 56, 173, 0.54) 0%, rgba(109, 56, 173, 0.12) 42%, rgba(109, 56, 173, 0) 70%);
+  background: radial-gradient(circle, #6d38adcf 0%, #6d38ad40 42%, #6d38ad00 70%);
   opacity: 0; z-index: 1; pointer-events: none;
 }
 .lv-phonewrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; }
@@ -149,7 +147,7 @@
 .lv-screen .lv-s-base { z-index: 1; }
 .lv-screen .lv-s-layer { opacity: 0; transform: translateY(34px); will-change: transform, opacity; }
 .lv-compwrap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; opacity: 0; pointer-events: none; will-change: transform, opacity; }
-.lv-comp-frame { position: relative; height: min(70vh, 690px, calc(100vh - 210px)); aspect-ratio: 828/1728; filter: drop-shadow(0 26px 48px rgba(23, 17, 38, 0.25)); }
+.lv-comp-frame { position: relative; height: min(70vh, 690px, calc(100vh - 210px)); aspect-ratio: 828/1728; }
 .lv-comp-frame .lv-screen img { opacity: 0; transition: opacity 0.25s ease; }
 .lv-icon-tile { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 12; pointer-events: none; will-change: transform, opacity; }
 .lv-icon-tile > div { animation: lvFloat 4.6s ease-in-out infinite; }
