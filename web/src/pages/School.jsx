@@ -799,37 +799,6 @@ export default function School() {
     }
   }
 
-  // ── "This term" header strip ───────────────────────────────────────
-  // The next upcoming term boundary across every school with dates:
-  // half-term (with range), term end, or term start — whichever comes
-  // first from today. One muted line under the page title; null (and
-  // hidden) when no school has any dates.
-  const termStrip = (() => {
-    const today = new Date().toLocaleDateString('en-CA');
-    const schoolsWithDates = householdSchools.filter(s => (s.term_dates || []).length > 0);
-    let best = null;
-    for (const school of schoolsWithDates) {
-      for (const td of school.term_dates) {
-        if (!['term_start', 'term_end', 'half_term_start'].includes(td.event_type)) continue;
-        if (!td.date || td.date < today) continue;
-        if (!best || td.date < best.td.date) best = { school, td };
-      }
-    }
-    if (!best) return null;
-    const f = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-    const { td, school } = best;
-    let text;
-    if (td.event_type === 'half_term_start') {
-      text = td.end_date && td.end_date !== td.date
-        ? `Half term ${f(td.date)} – ${f(td.end_date)}`
-        : `Half term ${f(td.date)}`;
-    } else if (td.event_type === 'term_end') {
-      text = `Term ends ${f(td.date)}`;
-    } else {
-      text = `Term starts ${f(td.date)}`;
-    }
-    return schoolsWithDates.length > 1 ? `${school.school_name} · ${text}` : text;
-  })();
 
   // ── Non-supported countries: coming-soon card, nothing else ────────
   if (!showSchools) {
@@ -837,7 +806,6 @@ export default function School() {
       <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
         <PageHeader title="School" />
         <section>
-          <h2 className="text-lg font-semibold text-charcoal mb-1">Schools</h2>
           <p className="text-sm text-[var(--ink-2)] max-w-[560px]">
             School directory and term-date imports are currently available
             in the UK and South Africa. Coming soon to more countries -
@@ -892,7 +860,12 @@ export default function School() {
 
   return (
     <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
-      <PageHeader title="School" subtitle={termStrip || undefined} />
+      <PageHeader
+        title="School"
+        actions={isAdmin && (
+          <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddSchool}>Add a school</PillBtn>
+        )}
+      />
 
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {success && (
@@ -902,12 +875,6 @@ export default function School() {
       {/* Schools - manage each school and its term dates here (decoupled
           from individual children, for privacy). */}
       <section>
-        <div className="flex items-end justify-between gap-3 mb-1">
-          <h2 className="text-lg font-semibold text-charcoal">Schools</h2>
-          {isAdmin && (
-            <PillBtn icon={<IconPlus className="h-3.5 w-3.5" />} onClick={openAddSchool}>Add a school</PillBtn>
-          )}
-        </div>
         <p className="text-sm text-[var(--ink-2)] mb-4 max-w-[560px]">
           Import term dates once and Housemait keeps half-term reminders and
           term-only activities in sync for everyone at that school.
