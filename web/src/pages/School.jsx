@@ -1157,7 +1157,7 @@ export default function School() {
         };
         return (
           <section>
-            <h2 className="text-lg font-semibold text-charcoal mb-0.5">Activities</h2>
+            <h2 className="text-lg font-semibold text-charcoal mb-0.5">Extracurricular Activities</h2>
             <p className="text-sm text-[var(--ink-2)] mb-4">Everyone&apos;s after-school clubs in one place — times and who&apos;s on pickup.</p>
             {loadingMembers ? <Spinner /> : activityKids.length === 0 ? (
               <p className="text-sm text-warm-grey">Add a child to start tracking after-school activities.</p>
