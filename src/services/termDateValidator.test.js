@@ -47,6 +47,37 @@ describe('validateTermDates', () => {
     expect(row.warnings.filter(w => /says Monday/i.test(w))).toEqual([]);
   });
 
+  it('handles ordinal day numbers ("10th") in range quotes without false-flagging', () => {
+    // Real user case (Immanuel College spring term): the term-END row quotes
+    // the whole header "Monday 5th January 2026 – Friday 10th April 2026".
+    // 2026-04-10 IS a Friday, but `\b10\b` never matched "10th" (no word
+    // boundary between digit and letter), so the matcher fell back to the
+    // FIRST weekday (Monday) and false-flagged a correct date.
+    const rows = validateTermDates(
+      [
+        { event_type: 'term_start', date: '2026-01-05', label: 'Spring Term starts', academic_year: '2025-2026', source_quote: 'Monday 5th January 2026 – Friday 10th April 2026' },
+        { event_type: 'term_end', date: '2026-04-10', label: 'End of Spring Term', academic_year: '2025-2026', source_quote: 'Monday 5th January 2026 – Friday 10th April 2026' },
+      ],
+      'Spring Term 2026 Monday 5th January 2026 – Friday 10th April 2026',
+      NOW
+    );
+    expect(rows[0].warnings).toEqual([]);
+    expect(rows[1].warnings).toEqual([]);
+  });
+
+  it('still flags a genuinely wrong date in an ordinal range quote', () => {
+    // 2026-04-09 is a Thursday; the quote pins the 9th... nothing - the
+    // quote only mentions the 5th (Monday) and 10th (Friday). A date of
+    // the 9th claiming this quote anchors to neither, falls back to the
+    // first weekday (Monday), and correctly draws a warning.
+    const [row] = validateTermDates(
+      [{ event_type: 'term_end', date: '2026-04-09', label: 'End of Spring Term', academic_year: '2025-2026', source_quote: 'Monday 5th January 2026 – Friday 10th April 2026' }],
+      'Spring Term 2026 Monday 5th January 2026 – Friday 10th April 2026',
+      NOW
+    );
+    expect(row.warnings.length).toBeGreaterThan(0);
+  });
+
   it('still flags a real mismatch when the range contains the right weekday', () => {
     // Range quote, but for date 25 June (which IS a Thursday — no
     // mismatch — but we want to confirm the disambiguator picks

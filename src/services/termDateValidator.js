@@ -93,8 +93,13 @@ function checkDayOfWeek(row) {
     const lower = row.source_quote.toLowerCase();
     // Find every standalone occurrence of the day number in the quote;
     // pick the weekday whose start-position is nearest one of them.
-    // `\b` so we match "13" but not "131" inside another number.
-    const numRe = new RegExp(`\\b${dayNum}\\b`, 'g');
+    // `\b` so we match "13" but not "131" inside another number. The
+    // optional ordinal suffix matters: UK schools write "10th April", and
+    // there is no \b between "10" and "th", so without it the day number
+    // is never found, the code falls back to the FIRST weekday in the
+    // quote, and every end-date in a "Monday 5th – Friday 10th" range
+    // quote gets false-flagged against the range's START weekday.
+    const numRe = new RegExp(`\\b${dayNum}(?:st|nd|rd|th)?\\b`, 'g');
     const dayPositions = [];
     let nm;
     while ((nm = numRe.exec(lower)) !== null) dayPositions.push(nm.index);
