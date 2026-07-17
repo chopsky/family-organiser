@@ -83,6 +83,30 @@ export async function loadCached(key, fetcher, setData) {
 }
 
 /**
+ * Drop a single cache entry. Used by the members-changed listener
+ * below; exported for any future targeted invalidation.
+ */
+export function removeCache(key) {
+  if (!isNative()) return;
+  try { localStorage.removeItem(PREFIX + key); } catch { /* best-effort */ }
+}
+
+// Member mutations must not leave member-derived pages painting stale
+// rosters from this cache. FamilySetup dispatches
+// 'housemait:members-changed' after add/remove; drop every key whose
+// payload embeds the member list so the next page mount paints fresh
+// (observed: a removed child lingering on the School page for a minute
+// when the background refresh was slow - stale-while-revalidate kept
+// the old paint and swallowed the error because a cache entry existed).
+if (typeof window !== 'undefined') {
+  window.addEventListener('housemait:members-changed', () => {
+    removeCache('household:members');
+    removeCache('schools');
+    removeCache('household:activities');
+  });
+}
+
+/**
  * Clear all v1 cache entries. Useful on logout so the next user
  * doesn't see the previous user's data flash before their own
  * loads.
