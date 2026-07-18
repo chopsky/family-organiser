@@ -1326,11 +1326,20 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
   const isYmd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: userTz }); // YYYY-MM-DD
+  // Named-thing question ("what dates are we at Nici Bournemouth?"): the
+  // router/classifier passes the subject through as query_topic. Extracted
+  // BEFORE the range maths because it changes the search horizon below.
+  const topic = typeof result.query_topic === 'string' ? result.query_topic.trim().slice(0, 80) : '';
   const start = isYmd(result.query_start) ? result.query_start : todayStr;
   let end = isYmd(result.query_end) ? result.query_end : null;
+  // A topic question WITHOUT any dates asks "when is X?", not "what's on
+  // soon?" - the answer may live months out, so search a year ahead. The
+  // 14-day default only applies to undated browse questions ("what's on?")
+  // and topic questions that named a period ("tennis next week?").
+  const topicWideSearch = !!topic && !isYmd(result.query_start) && !isYmd(result.query_end);
   if (!end || end < start) {
     const d = new Date(`${start}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + 14);
+    d.setUTCDate(d.getUTCDate() + (topicWideSearch ? 365 : 14));
     end = d.toISOString().slice(0, 10);
   }
 
@@ -1367,10 +1376,11 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
     .concat(activityRows.filter((a) => a.show_on_calendar))
     .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
 
-  // Named-thing question ("what time is Mason's tennis today?"): the router/
-  // classifier passes the subject through as query_topic. Filter to it and be
-  // HONEST when nothing matches - a generic day-dump is a non-answer.
-  const topic = typeof result.query_topic === 'string' ? result.query_topic.trim().slice(0, 80) : '';
+  // Topic filter - and be HONEST when nothing matches. No schedule dump on a
+  // miss: the user asked about ONE thing, so listing unrelated events is a
+  // non-answer (real complaint, 2026-07-20 "nici bournemouth": the event sat
+  // in August beyond the old 14-day window and the bot answered with a dump
+  // of the next fortnight).
   if (topic) {
     const searchable = events.concat(activityRows.filter((a) => !a.show_on_calendar));
     const matches = searchable.filter((ev) => topicMatchesTitle(topic, ev.title));
@@ -1382,12 +1392,11 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
       const intro = result.response_message?.trim() || `Here's what I found for "${topic}":`;
       return { response: `${intro}\n${lines.join('\n')}`, actions };
     }
-    let body = `I can't see anything matching "${topic}" on the calendar for that period.`;
-    if (events.length > 0) {
-      const lines = events.slice(0, 10).map((ev) => `• ${formatEventWhen(ev, userTz) || ''} — ${ev.title}`);
-      body += `\n\nHere's what is on:\n${lines.join('\n')}`;
-    }
-    return { response: body, actions };
+    const horizon = topicWideSearch ? ' in the next 12 months' : ' for that period';
+    return {
+      response: `I can't see anything matching "${topic}" on the calendar${horizon}. It might be saved under a different name - or tell me the details and I'll add it.`,
+      actions,
+    };
   }
 
   if (!events.length) {

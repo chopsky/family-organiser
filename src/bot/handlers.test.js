@@ -138,7 +138,7 @@ describe('handleCalendarQuery', () => {
     expect(res.response).not.toMatch(/cupcakes|Jess dog/);
   });
 
-  test('query_topic with no match admits it and shows what IS on', async () => {
+  test('query_topic with no match admits it - no unrelated-schedule dump', async () => {
     db.getCalendarEvents.mockResolvedValue([
       { title: 'See Jess dog', start_time: '2026-12-15T09:00:00Z', end_time: '2026-12-15T10:00:00Z', assigned_to_names: [] },
     ]);
@@ -146,7 +146,35 @@ describe('handleCalendarQuery', () => {
       { query_start: '2026-12-15', query_end: '2026-12-15', query_topic: 'tennis' }, household, user, TZ, {},
     );
     expect(res.response).toMatch(/can't see anything matching "tennis"/i);
-    expect(res.response).toMatch(/Jess dog/); // still helpful: shows the day
+    // The user asked about ONE thing; listing unrelated events is a
+    // non-answer (real complaint: "nici bournemouth" miss answered with a
+    // fortnight of other people's plans).
+    expect(res.response).not.toMatch(/Jess dog/);
+  });
+
+  test('undated topic question searches a year ahead and finds far-future events', async () => {
+    // "What dates are we at nici bournemouth?" carries no dates - the answer
+    // may be months out. The 14-day default window hid an August event.
+    db.getCalendarEvents.mockResolvedValue([
+      { title: 'Nici Bournemouth', start_time: '2026-08-14T14:00:00Z', end_time: '2026-08-16T10:00:00Z', assigned_to_names: [] },
+    ]);
+    const res = await handlers.handleCalendarQuery(
+      { query_topic: 'nici bournemouth' }, household, user, TZ, {},
+    );
+    const [, startArg, endArg] = db.getCalendarEvents.mock.calls[0];
+    const days = (new Date(endArg) - new Date(startArg)) / 86400000;
+    expect(days).toBeGreaterThan(360);
+    expect(res.response).toMatch(/Nici Bournemouth/);
+  });
+
+  test('dated topic question keeps the asked-about window (no year-wide override)', async () => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    await handlers.handleCalendarQuery(
+      { query_start: '2026-12-14', query_end: '2026-12-20', query_topic: 'tennis' }, household, user, TZ, {},
+    );
+    expect(db.getCalendarEvents).toHaveBeenCalledWith(
+      'h1', '2026-12-14T00:00:00Z', '2026-12-20T23:59:59Z', expect.anything(),
+    );
   });
 
   test('weekly activities are merged into calendar answers and findable by topic', async () => {
