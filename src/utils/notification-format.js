@@ -148,6 +148,22 @@ function summariseEventChanges(prev, updates, tz = 'Europe/London') {
       parts.push(`now ${nextHHMM}`);
     }
   }
+  // end_time: a range extension ("change it to 23-26 Aug") or a new finish
+  // time. Without this branch an end-only change produced an EMPTY summary
+  // and the user saw a bare '✏️ Updated "X".' with no idea what changed
+  // (real 2026-07-22 Nici Bournemouth transcript).
+  if (updates.end_time !== undefined && updates.end_time !== prev.end_time) {
+    const prevEndDate = prev.end_time ? String(prev.end_time).slice(0, 10) : null;
+    const nextEndDate = String(updates.end_time).slice(0, 10);
+    const startIso = updates.start_time !== undefined ? updates.start_time : prev.start_time;
+    const startDate = startIso ? String(startIso).slice(0, 10) : null;
+    const nextEndHHMM = formatHHMM(updates.end_time, tz);
+    if (prevEndDate !== nextEndDate && nextEndDate !== startDate) {
+      parts.push(`now until ${formatDateLabel(nextEndDate, tz)}`);
+    } else if (prevEndDate === nextEndDate && formatHHMM(prev.end_time, tz) !== nextEndHHMM) {
+      parts.push(`now ends ${nextEndHHMM}`);
+    }
+  }
   if (updates.location !== undefined && updates.location !== prev.location) {
     parts.push(updates.location ? `now at ${updates.location}` : 'location cleared');
   }

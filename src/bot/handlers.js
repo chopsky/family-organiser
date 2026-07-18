@@ -839,6 +839,21 @@ function confirmIfWeakTarget({ intent, kind, hit, updates, user, household, orig
 }
 
 /**
+ * Voice layer seam: rephrase `template` conversationally when BOT_VOICE=1
+ * (see services/reply-voice.js). The template is the fallback on any
+ * trouble, so truth never depends on the model - only tone does.
+ */
+async function voicedOrTemplate(template, facts, anchor) {
+  try {
+    const { composeVoicedReply } = require('../services/reply-voice');
+    const voiced = await composeVoicedReply({ facts, template, anchor });
+    return voiced || template;
+  } catch {
+    return template;
+  }
+}
+
+/**
  * Execute the chosen modify action against a single candidate row.
  * Used by both the single-match path in handleModifyIntent and the
  * disambiguation-reply path in handleTextMessage.
@@ -863,7 +878,8 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         await db.softDeleteCalendarEvent(hit.id, household.id);
         rememberMutation(user.id, { kind: 'event', op: 'delete', id: hit.id, label: hit.title });
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
-        return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`, actions };
+        const delTemplate = `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`;
+        return { response: await voicedOrTemplate(delTemplate, { action: 'cancelled calendar event', item: hit.title, recurring_note: hit.recurrence ? 'only this instance cancelled; "cancel all" stops the series' : null, undo_hint: 'reply undo to restore' }, hit.title), actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
       // Drop no-op fields (value equals what's already stored). The classifier
@@ -917,7 +933,8 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       }).catch((err) => console.error('[handlers] update_event push failed:', err.message));
       // Tell the user exactly what changed, not just "updated" - e.g.
       // 'Updated "Mason Piano" - moved to Thu 18 Jun at 16:00.'
-      return { response: `✏️ Updated "${updated.title}"${eventTail}.`, actions };
+      const updTemplate = `✏️ Updated "${updated.title}"${eventTail}.`;
+      return { response: await voicedOrTemplate(updTemplate, { action: 'updated calendar event', item: updated.title, what_changed: eventDiff || 'details', undo_hint: 'reply undo to revert' }, updated.title), actions };
     }
 
     if (isTask) {
@@ -926,7 +943,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         // Task deletes are hard - keep the whole row so undo can re-insert it.
         rememberMutation(user.id, { kind: 'task', op: 'delete', id: hit.id, preImage: hit, label: hit.title });
         broadcast.toHousehold(user.id, household.members, `📋 ${user.name} cancelled task: ${hit.title}`);
-        return { response: `🗑️ Cancelled task "${hit.title}". Reply *undo* to restore it.`, actions };
+        return { response: await voicedOrTemplate(`🗑️ Cancelled task "${hit.title}". Reply *undo* to restore it.`, { action: 'cancelled to-do', item: hit.title, undo_hint: 'reply undo to restore' }, hit.title), actions };
       }
       const taskUpdates = buildTaskUpdates(updates, hit, household);
       for (const k of Object.keys(taskUpdates)) {
@@ -949,7 +966,8 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       const taskDiff = summariseTaskChanges(hit, taskUpdates, household.timezone || 'Europe/London');
       const taskTail = taskDiff ? ` - ${taskDiff}` : '';
       broadcast.toHousehold(user.id, household.members, `📋 ${user.name} updated task: ${updated.title}${taskTail}`);
-      return { response: `✏️ Updated "${updated.title}"${taskTail}.`, actions };
+      const taskTemplate = `✏️ Updated "${updated.title}"${taskTail}.`;
+      return { response: await voicedOrTemplate(taskTemplate, { action: 'updated to-do', item: updated.title, what_changed: taskTail ? taskTail.replace(/^ - /, '') : 'details', undo_hint: 'reply undo to revert' }, updated.title), actions };
     }
 
     // shopping
@@ -957,7 +975,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       await db.deleteShoppingItem(hit.id, household.id);
       rememberMutation(user.id, { kind: 'shopping', op: 'delete', id: hit.id, preImage: hit, label: hit.item });
       broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} removed: ${hit.item}`);
-      return { response: `🗑️ Removed "${hit.item}" from the shopping list. Reply *undo* to restore it.`, actions };
+      return { response: await voicedOrTemplate(`🗑️ Removed "${hit.item}" from the shopping list. Reply *undo* to restore it.`, { action: 'removed shopping item', item: hit.item, undo_hint: 'reply undo to restore' }, hit.item), actions };
     }
     const shopUpdates = buildShoppingUpdates(updates);
     for (const k of Object.keys(shopUpdates)) {
@@ -969,7 +987,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     const updated = await db.updateShoppingItem(hit.id, household.id, shopUpdates);
     rememberMutation(user.id, { kind: 'shopping', op: 'update', id: hit.id, preImage: pickPreImage(hit, shopUpdates), label: hit.item });
     broadcast.toHousehold(user.id, household.members, `🛒 ${user.name} updated: ${updated.item}`);
-    return { response: `✏️ Updated "${updated.item}".`, actions };
+    return { response: await voicedOrTemplate(`✏️ Updated "${updated.item}".`, { action: 'updated shopping item', item: updated.item }, updated.item), actions };
   } catch (err) {
     console.error(`[handlers] ${intent} failed:`, err.message);
     return { response: "⚠️ I found it but couldn't save the change just now. Mind trying again in a minute?", actions };
@@ -1476,12 +1494,29 @@ async function handleCalendarQuery(result, household, user, userTz, actions, ori
         .filter((ev) => ev.id && !ev.activity_id)
         .slice(0, REFERENT_CAP)
         .map((ev) => ({ kind: 'event', id: ev.id, label: ev.title })));
+      // A single match answers as a SENTENCE, not a one-bullet list - the
+      // bullet-dump format read as robotic (founder feedback 2026-07-22).
+      if (matches.length === 1) {
+        const only = matches[0];
+        const when = formatEventWhen(only, userTz);
+        const template = `📅 ${only.title}${when ? ` — ${when}` : ''}.`;
+        return {
+          response: await voicedOrTemplate(template,
+            { question_about: topic, item: only.title, when: when || 'date unknown' }, only.title),
+          actions,
+        };
+      }
       const lines = matches.slice(0, 10).map((ev) => {
         const when = formatEventWhen(ev, userTz);
         return `• ${when ? `${when} — ` : ''}${ev.title}`;
       });
       const intro = result.response_message?.trim() || `Here's what I found for "${topic}":`;
-      return { response: `${intro}\n${lines.join('\n')}`, actions };
+      const listTemplate = `${intro}\n${lines.join('\n')}`;
+      return {
+        response: await voicedOrTemplate(listTemplate,
+          { question_about: topic, matches: lines }, null),
+        actions,
+      };
     }
     const horizon = topicWideSearch ? ' in the next 12 months' : ' for that period';
     return {
