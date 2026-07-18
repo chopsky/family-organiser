@@ -44,7 +44,19 @@ function formatEventWhen(event, tz = 'Europe/London') {
       });
     }
 
-    if (event.all_day) return `${dateLabel}, all day`;
+    if (event.all_day) {
+      // Multi-day stays ("Staying at Nici Bournemouth", 23-26 Aug) must
+      // show the RANGE - answering "when are we staying at X?" with only
+      // the start date reads as wrong once the end was extended.
+      const end = event.end_time ? new Date(event.end_time) : null;
+      if (end && !isNaN(end.getTime()) && !isSameDay(start, end)) {
+        const endLabel = end.toLocaleDateString('en-GB', {
+          weekday: 'short', day: 'numeric', month: 'short', timeZone: tz,
+        });
+        return `${dateLabel} - ${endLabel}, all day`;
+      }
+      return `${dateLabel}, all day`;
+    }
 
     const formatHM = (iso) => new Date(iso).toLocaleTimeString('en-GB', {
       hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz,

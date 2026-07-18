@@ -115,6 +115,13 @@ app.get('/health', (req, res) => {
     flags: {
       calendarInbound: process.env.GOOGLE_CALENDAR_ENABLED === 'true',
       calendarWrites: process.env.GOOGLE_CALENDAR_WRITES_ENABLED === 'true',
+      // Bot pipeline flags - exposed so "did the Railway flip actually
+      // land?" is a curl, not a guess (the 2026-07-22 robotic-reply
+      // report turned out to be exactly that question).
+      botPipelineV2: process.env.BOT_PIPELINE === 'v2',
+      botRouter: process.env.BOT_ROUTER === '1',
+      botAgent: process.env.BOT_AGENT === '1',
+      botVoice: process.env.BOT_VOICE === '1',
     },
   });
 });
