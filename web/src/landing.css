@@ -60,7 +60,7 @@
 .lv-nav {
   pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 18px;
   width: min(1120px, 100%);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   border: 1px solid var(--lv-border-2); border-radius: 50vw;
   padding: 9px 9px 9px 20px;
   background: rgba(250, 246, 239, 0.82);
@@ -69,19 +69,19 @@
 }
 .lv-nav .lv-nav-logo { height: 25px; display: block; transition: filter 0.35s ease; }
 .lv-nav-links { display: flex; align-items: center; gap: 26px; }
-.lv-nav-links a { color: var(--lv-ink); text-decoration: none; font-size: 15px; font-weight: 400; transition: color 0.35s ease; }
+.lv-nav-links a { color: var(--lv-ink); text-decoration: none; font-size: 16px; font-weight: 400; transition: color 0.35s ease; }
 .lv-nav-links a:hover { color: var(--lv-purple); }
 .lv-nav-right { display: flex; align-items: center; gap: 18px; flex: none; }
 .lv-nav-cta {
   background: var(--lv-purple); color: var(--lv-cream-txt) !important; padding: 12px 23px; border-radius: 999px;
-  font-size: 14.5px; font-weight: 700; text-decoration: none; transition: background 0.2s ease; flex: none;
+  font-size: 16px; font-weight: 700; text-decoration: none; transition: background 0.2s ease; flex: none;
 }
 .lv-nav-cta:hover { background: var(--lv-purple-deep); }
 /* Over-hero state — glassy dark, white links, inverted logo */
 .lv-nav.over {
   background-color: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
-  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(3px);
+  border: 0;
   box-shadow: rgba(255, 255, 255, 0.4) 1px 1px 1px 0 inset, rgba(255, 255, 255, 0.2) -1px -1px 1px 0 inset;
 }
 .lv-nav.over .lv-nav-logo { filter: brightness(0) invert(1); }
