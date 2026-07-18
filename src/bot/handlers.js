@@ -1381,7 +1381,7 @@ function topicMatchesTitle(topic, title) {
   return hits(tTopic, tTitle) || hits(tTitle, tTopic);
 }
 
-async function handleCalendarQuery(result, household, user, userTz, actions) {
+async function handleCalendarQuery(result, household, user, userTz, actions, originalText = '') {
   const { formatEventWhen } = require('../utils/event-when');
   const { expandActivityOccurrences } = require('../services/activity-occurrences');
   const isYmd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -1391,6 +1391,28 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
   // router/classifier passes the subject through as query_topic. Extracted
   // BEFORE the range maths because it changes the search horizon below.
   const topic = typeof result.query_topic === 'string' ? result.query_topic.trim().slice(0, 80) : '';
+
+  // ── Agentic path (BOT_AGENT=1, ships dark) ────────────────────────────
+  // Topic questions get a model-driven search: Claude iterates the read-only
+  // search_calendar tool (narrow → wide → past) instead of relying on this
+  // handler's hand-coded horizon rules. Null on any trouble → the
+  // deterministic path below runs unchanged, so the agent can only improve
+  // answers, never block them. Browse questions (no topic) stay fully
+  // deterministic - trivial reads don't need a reasoning loop.
+  if (topic) {
+    const { agentEnabled, agentCalendarAnswer } = require('../services/agent-loop');
+    if (agentEnabled()) {
+      const agent = await agentCalendarAnswer({
+        text: originalText || `When is ${topic}?`,
+        user, household, userTz,
+      });
+      if (agent?.response) {
+        // The agent NAMED these events - same referent contract as below.
+        rememberReferents(user.id, agent.referents || []);
+        return { response: agent.response, actions };
+      }
+    }
+  }
   const start = isYmd(result.query_start) ? result.query_start : todayStr;
   let end = isYmd(result.query_end) ? result.query_end : null;
   // A topic question WITHOUT any dates asks "when is X?", not "what's on
@@ -1854,7 +1876,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       if (routed.route === 'query_calendar') {
         return await handleCalendarQuery(
           { query_start: routed.query_start, query_end: routed.query_end, query_topic: routed.query_topic },
-          household, user, userTz, actions
+          household, user, userTz, actions, text
         );
       }
       if (routed.route === 'subscription_list') {
@@ -2001,7 +2023,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // Handle calendar queries - AI already has calendar context and answered in response_message
   if (result.intent === 'query_calendar') {
-    return await handleCalendarQuery(result, household, user, userTz, actions);
+    return await handleCalendarQuery(result, household, user, userTz, actions, text);
   }
 
   // Handle web search - real-time questions the classifier can't

@@ -54,6 +54,7 @@ jest.mock('../services/term-date-extract', () => ({
   academicYearsForCountry: jest.fn(() => ({ currentAY: '2025-2026', nextAY: '2026-2027' })),
 }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), get: jest.fn(), set: jest.fn() }));
+jest.mock('../services/agent-loop', () => ({ agentEnabled: jest.fn(() => false), agentCalendarAnswer: jest.fn() }));
 
 const handlers = require('./handlers');
 const db = require('../db/queries');
@@ -658,5 +659,58 @@ describe('handleTextMessage — conversational referents + stateful offers', () 
     // exported store helpers behave (TTL/dedupe smoke).
     handlers.rememberReferents('user-forget', [{ kind: 'event', id: 'e1', label: 'X' }]);
     expect(handlers.isRecentReferent('user-forget', 'event', 'e2')).toBe(false);
+  });
+});
+
+describe('handleCalendarQuery — agentic path (BOT_AGENT)', () => {
+  const agent = require('../services/agent-loop');
+  const nici = {
+    id: 'ev-nici2', title: 'Staying at Nici Bournemouth',
+    start_time: '2026-08-23T00:00:00Z', end_time: '2026-08-23T23:59:59Z',
+    all_day: true, assigned_to_names: [],
+  };
+
+  test('flag off: agent never invoked, deterministic answer unchanged', async () => {
+    agent.agentEnabled.mockReturnValue(false);
+    db.getCalendarEvents.mockResolvedValue([nici]);
+    const res = await handlers.handleCalendarQuery(
+      { query_topic: 'nici bournemouth' }, household, user, TZ, {}, 'when is nici bournemouth?',
+    );
+    expect(agent.agentCalendarAnswer).not.toHaveBeenCalled();
+    expect(res.response).toMatch(/Nici Bournemouth/);
+  });
+
+  test('flag on: agent answer wins and its referents ground a follow-up modify', async () => {
+    agent.agentEnabled.mockReturnValue(true);
+    agent.agentCalendarAnswer.mockResolvedValue({
+      response: "You're at Nici Bournemouth Sun 23 - Wed 26 Aug.",
+      referents: [{ kind: 'event', id: 'ev-nici2', label: nici.title }],
+    });
+    const userAg = { id: 'user-agent-a', name: 'Grant' };
+    const res = await handlers.handleCalendarQuery(
+      { query_topic: 'nici bournemouth' }, { ...household, members: [] }, userAg, TZ, {}, 'when is nici bournemouth?',
+    );
+    expect(res.response).toMatch(/Sun 23 - Wed 26 Aug/);
+    expect(db.getCalendarEvents).not.toHaveBeenCalled();
+    // The agent's referents feed the same grounding store.
+    expect(handlers.isRecentReferent('user-agent-a', 'event', 'ev-nici2')).toBe(true);
+  });
+
+  test('flag on but agent returns null: deterministic path answers (fallback intact)', async () => {
+    agent.agentEnabled.mockReturnValue(true);
+    agent.agentCalendarAnswer.mockResolvedValue(null);
+    db.getCalendarEvents.mockResolvedValue([nici]);
+    const res = await handlers.handleCalendarQuery(
+      { query_topic: 'nici bournemouth' }, household, user, TZ, {}, 'when is nici bournemouth?',
+    );
+    expect(res.response).toMatch(/Nici Bournemouth/);
+  });
+
+  test('browse questions (no topic) never touch the agent even when enabled', async () => {
+    agent.agentEnabled.mockReturnValue(true);
+    agent.agentCalendarAnswer.mockClear();
+    db.getCalendarEvents.mockResolvedValue([]);
+    await handlers.handleCalendarQuery({}, household, user, TZ, {});
+    expect(agent.agentCalendarAnswer).not.toHaveBeenCalled();
   });
 });
