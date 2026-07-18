@@ -714,3 +714,28 @@ describe('handleCalendarQuery — agentic path (BOT_AGENT)', () => {
     expect(agent.agentCalendarAnswer).not.toHaveBeenCalled();
   });
 });
+
+describe('handleTextMessage — already-set updates', () => {
+  const ai = require('../services/ai');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [{ id: 'u1', name: 'Grant' }] };
+
+  test('restating the current dates confirms instead of phantom-updating (tz-format immune)', async () => {
+    const userE = { id: 'user-already-e', name: 'Grant' };
+    const nici = {
+      id: 'ev-nici3', title: 'Staying at Nici Bournemouth',
+      start_time: '2026-08-23T00:00:00+00:00', // stored with offset format
+      end_time: '2026-08-26T23:59:59+00:00',
+      all_day: true, assigned_to_names: [],
+    };
+    db.findEventsByFuzzyTitle.mockResolvedValue([nici]);
+    ai.classify.mockResolvedValue({
+      intent: 'update_event',
+      target: { title: 'nici bournemouth' },
+      // classifier emits Z-format instants for the SAME dates
+      updates: { start_date: '2026-08-23', end_date: '2026-08-26' },
+    });
+    const res = await handlers.handleTextMessage('Change nici bournemouth to 23-26 August', userE, hh, {});
+    expect(res.response).toMatch(/already/i);
+    expect(db.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+});

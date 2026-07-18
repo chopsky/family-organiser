@@ -885,9 +885,21 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       // Drop no-op fields (value equals what's already stored). The classifier
       // sometimes echoes the existing title/date back as an "update", which
       // used to survive the empty-check and produce a phantom "✏️ Updated"
-      // that changed nothing (real 2026-07-16 transcript).
+      // that changed nothing (real 2026-07-16 transcript). Timestamps compare
+      // SEMANTICALLY - '...Z' vs '...+00:00' are the same instant but
+      // different strings, which let a repeat of an already-applied change
+      // slip through as a "change" with an empty diff ("I've updated the
+      // details", real 2026-07-22 transcript).
+      let droppedSubstantive = false;
       for (const k of Object.keys(eventUpdates)) {
-        if (String(eventUpdates[k] ?? '') === String(hit[k] ?? '')) delete eventUpdates[k];
+        const isTime = k === 'start_time' || k === 'end_time';
+        const equal = isTime
+          ? Date.parse(eventUpdates[k]) === Date.parse(hit[k])
+          : String(eventUpdates[k] ?? '') === String(hit[k] ?? '');
+        if (equal) {
+          if (k !== 'title') droppedSubstantive = true;
+          delete eventUpdates[k];
+        }
       }
       // Reminders are stored in a separate table (event_reminders), so they
       // aren't part of the column patch. Treat updates.reminders as a full
@@ -902,6 +914,19 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       }
       const hasReminderUpdate = Array.isArray(reminderSet);
       if (Object.keys(eventUpdates).length === 0 && !hasReminderUpdate) {
+        // The user restated values the event ALREADY has ("change it to
+        // 23-26 Aug" when it already runs 23-26): confirm the current state
+        // instead of asking what to change - that's the human answer.
+        if (droppedSubstantive) {
+          const { formatEventWhen } = require('../utils/event-when');
+          const when = formatEventWhen(hit, household.timezone || 'Europe/London');
+          const alreadyTemplate = `👍 "${hit.title}" is already set to that${when ? ` — ${when}` : ''}. Nothing to change.`;
+          return {
+            response: await voicedOrTemplate(alreadyTemplate,
+              { action: 'no change needed - the event already matches the request', item: hit.title, current_schedule: when || 'unchanged' }, hit.title),
+            actions,
+          };
+        }
         return { response: `What would you like to change about "${hit.title}"? (time, date, location…)`, actions };
       }
       const updated = Object.keys(eventUpdates).length > 0
