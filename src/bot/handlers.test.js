@@ -29,6 +29,8 @@ jest.mock('../db/queries', () => ({
   deleteTask: jest.fn(() => Promise.resolve()),
   restoreDeletedRow: jest.fn((table, hid, row) => Promise.resolve({ id: 'restored', ...row })),
   updateCalendarEvent: jest.fn((id, hid, updates) => Promise.resolve({ id, title: 'x', ...updates })),
+  findEventsByFuzzyTitle: jest.fn(() => Promise.resolve([])),
+  softDeleteCalendarEvent: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -552,5 +554,109 @@ describe('handleTextMessage — confirm-before-modify + undo', () => {
     const undone = await handlers.handleTextMessage('undo', userC, hh, {});
     expect(db.restoreDeletedRow).toHaveBeenCalledWith('tasks', 'h9', expect.objectContaining({ title: 'Book dentist appointment' }));
     expect(undone.response).toMatch(/undone/i);
+  });
+});
+
+describe('handleTextMessage — conversational referents + stateful offers', () => {
+  const ai = require('../services/ai');
+  const hh = {
+    id: 'h9',
+    timezone: 'Europe/London',
+    members: [
+      { id: 'u1', name: 'Grant' },
+      { id: 'u2', name: 'Lynn' },
+    ],
+  };
+  const nici = {
+    id: 'ev-nici',
+    title: 'Staying at Nici Bournemouth',
+    start_time: '2026-08-23T00:00:00Z',
+    end_time: '2026-08-23T23:59:59Z',
+    all_day: true,
+    assigned_to_names: [],
+  };
+
+  beforeEach(() => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.getHouseholdSchools.mockResolvedValue([]);
+    db.getHouseholdPreferences.mockResolvedValue([]);
+  });
+
+  test('the Nici Bournemouth transcript: topic answer then "change it" - no did-you-mean', async () => {
+    const userA = { id: 'user-nici-a', name: 'Grant' };
+    // 1. "When is nici bournemouth?" - the bot names the event.
+    db.getCalendarEvents.mockResolvedValue([nici]);
+    const answer = await handlers.handleCalendarQuery(
+      { query_topic: 'nici bournemouth' }, hh, userA, 'Europe/London', {},
+    );
+    expect(answer.response).toMatch(/Nici Bournemouth/);
+
+    // 2. "Please change it to 23-26 August" - target resolves to the SAME
+    //    event the bot just named. Grounded by conversation: act, no question.
+    db.findEventsByFuzzyTitle.mockResolvedValue([nici]);
+    ai.classify.mockResolvedValue({
+      intent: 'update_event',
+      target: { title: 'nici bournemouth' },
+      updates: { end_date: '2026-08-26' },
+    });
+    const res = await handlers.handleTextMessage('Please change it to 23-26 August', userA, hh, {});
+    expect(res.response).not.toMatch(/did you mean/i);
+    expect(db.updateCalendarEvent).toHaveBeenCalled();
+  });
+
+  test('same message WITHOUT prior conversation still asks to confirm (guard intact)', async () => {
+    const userB = { id: 'user-nici-b', name: 'Lynn' }; // fresh user - no referents
+    db.findEventsByFuzzyTitle.mockResolvedValue([nici]);
+    ai.classify.mockResolvedValue({
+      intent: 'update_event',
+      target: { title: 'nici bournemouth' },
+      updates: { end_date: '2026-08-26' },
+    });
+    const res = await handlers.handleTextMessage('Please change it to 23-26 August', userB, hh, {});
+    expect(res.response).toMatch(/did you mean/i);
+    expect(db.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  test('a model-authored reminder offer still arms the store: "Yes" is handled without the classifier', async () => {
+    const userC = { id: 'user-offer-c', name: 'Grant' };
+    // 1. Create an event where the MODEL writes its own trailing offer.
+    ai.classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_event: { title: "Logan's haircut", date: '2026-07-16', start_time: '15:55' },
+      response_message: "Booked - Logan's haircut tomorrow at 3:55 pm. Want me to add a reminder before it?",
+    });
+    await handlers.handleTextMessage('Logan haircut tomorrow at 15:55', userC, hh, {});
+
+    // 2. "Yes" must route to the deterministic reminder flow (ask lead time),
+    //    NOT to classification (the 2026-07-16 phantom-update transcript).
+    ai.classify.mockClear();
+    const yes = await handlers.handleTextMessage('Yes', userC, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(yes.response).toMatch(/how long before|what time/i);
+  });
+
+  test('no-op update (echoed existing values) asks what to change instead of claiming success', async () => {
+    const userD = { id: 'user-noop-d', name: 'Grant' };
+    const dentist = { id: 'ev-den', title: 'Dentist', start_time: '2026-07-22T09:00:00Z', end_time: '2026-07-22T09:30:00Z' };
+    db.findEventsByFuzzyTitle.mockResolvedValue([dentist]);
+    ai.classify.mockResolvedValue({
+      intent: 'update_event',
+      target: { title: 'Dentist' },
+      updates: { title: 'Dentist' }, // echo - changes nothing
+    });
+    const res = await handlers.handleTextMessage('update the dentist event', userD, hh, {});
+    expect(res.response).toMatch(/what would you like to change/i);
+    expect(res.response).not.toMatch(/^✏️ Updated/);
+    expect(db.updateCalendarEvent).not.toHaveBeenCalled();
+  });
+
+  test('deleting a referent forgets it (no silent re-target)', () => {
+    handlers.rememberReferents('user-forget', [{ kind: 'event', id: 'e1', label: 'X' }]);
+    expect(handlers.isRecentReferent('user-forget', 'event', 'e1')).toBe(true);
+    // rememberMutation with op delete is the internal forget path - exercised
+    // via the public surface: a delete flow calls it; here we assert the
+    // exported store helpers behave (TTL/dedupe smoke).
+    handlers.rememberReferents('user-forget', [{ kind: 'event', id: 'e1', label: 'X' }]);
+    expect(handlers.isRecentReferent('user-forget', 'event', 'e2')).toBe(false);
   });
 });

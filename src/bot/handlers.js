@@ -106,6 +106,11 @@ const MUTATION_UNDO_WINDOW_MS = 10 * 60 * 1000;
 function rememberMutation(userId, entry) {
   if (!userId || !entry) return;
   recentMutations.set(userId, { ...entry, timestamp: Date.now() });
+  // Keep the conversational-referent set in step: a row the bot just updated
+  // remains a valid "it" for the next message; a deleted row must never
+  // silently re-target a follow-up modify.
+  if (entry.op === 'delete') forgetReferent(userId, entry.kind, entry.id);
+  else if (entry.id) rememberReferents(userId, [{ kind: entry.kind, id: entry.id, label: entry.label }]);
 }
 
 // Pre-image of only the columns an update touches - enough to revert the
@@ -176,6 +181,41 @@ function isGroundedTarget(originalText, itemTitle, memberNames = []) {
     w === t
     || (t.length >= 4 && w.startsWith(t.slice(0, 4)))
     || (w.length >= 4 && t.startsWith(w.slice(0, 4)))));
+}
+
+// Recently referenced items - whenever the bot NAMES specific rows (a topic
+// answer, a create/update confirmation), their ids are remembered briefly.
+// A follow-up modify ("change it to 23-26 August") that resolves to one of
+// them is conversationally grounded: the user is replying to something the
+// bot itself just said, so the did-you-mean confirmation would read as
+// amnesia (real 2026-07-21 transcript - the bot listed "Staying at Nici
+// Bournemouth" and then asked "did you mean...?" about the same event one
+// message later). Grounded targets act immediately; undo stays available.
+const recentReferents = new Map(); // userId → { items: [{kind, id, label}], timestamp }
+const REFERENT_TTL_MS = 15 * 60 * 1000;
+const REFERENT_CAP = 8;
+
+function rememberReferents(userId, items) {
+  if (!userId || !Array.isArray(items) || items.length === 0) return;
+  const fresh = peekFresh(recentReferents, userId, REFERENT_TTL_MS);
+  const existing = fresh?.items || [];
+  const merged = [...items.filter((i) => i && i.id), ...existing]
+    .filter((i, idx, arr) => arr.findIndex((o) => o.kind === i.kind && o.id === i.id) === idx)
+    .slice(0, REFERENT_CAP);
+  recentReferents.set(userId, { items: merged, timestamp: Date.now() });
+}
+
+function isRecentReferent(userId, kind, id) {
+  if (!userId || !id) return false;
+  const fresh = peekFresh(recentReferents, userId, REFERENT_TTL_MS);
+  return !!fresh?.items?.some((i) => i.kind === kind && i.id === id);
+}
+
+function forgetReferent(userId, kind, id) {
+  const fresh = peekFresh(recentReferents, userId, REFERENT_TTL_MS);
+  if (!fresh?.items) return;
+  const items = fresh.items.filter((i) => !(i.kind === kind && i.id === id));
+  recentReferents.set(userId, { items, timestamp: fresh.timestamp });
 }
 
 // Pending "did you mean X?" confirmation for a weak-target update/delete.
@@ -775,6 +815,14 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
  */
 function confirmIfWeakTarget({ intent, kind, hit, updates, user, household, originalText, actions }) {
   const label = kind === 'shopping' ? hit.item : hit.title;
+  // Conversational grounding: the bot itself named this exact row within the
+  // last few minutes (topic answer, create/update confirmation). The user's
+  // "change it..." is a reply to that - asking "did you mean X?" about the
+  // thing we just said reads as amnesia. Act; undo remains one word away.
+  if (hit?.id && isRecentReferent(user?.id, kind, hit.id)) {
+    console.log(`[handlers] ${intent} target "${label}" grounded by recent referent - acting without confirmation`);
+    return null;
+  }
   const memberNames = (household.members || []).map((m) => m.name);
   if (isGroundedTarget(originalText, label, memberNames)) return null;
 
@@ -818,6 +866,13 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`, actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
+      // Drop no-op fields (value equals what's already stored). The classifier
+      // sometimes echoes the existing title/date back as an "update", which
+      // used to survive the empty-check and produce a phantom "✏️ Updated"
+      // that changed nothing (real 2026-07-16 transcript).
+      for (const k of Object.keys(eventUpdates)) {
+        if (String(eventUpdates[k] ?? '') === String(hit[k] ?? '')) delete eventUpdates[k];
+      }
       // Reminders are stored in a separate table (event_reminders), so they
       // aren't part of the column patch. Treat updates.reminders as a full
       // replacement set: a non-null array (even []) replaces existing
@@ -831,7 +886,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       }
       const hasReminderUpdate = Array.isArray(reminderSet);
       if (Object.keys(eventUpdates).length === 0 && !hasReminderUpdate) {
-        return { response: "Got it, but I didn't see any field to change. Tell me what to update (time, date, location…).", actions };
+        return { response: `What would you like to change about "${hit.title}"? (time, date, location…)`, actions };
       }
       const updated = Object.keys(eventUpdates).length > 0
         ? await db.updateCalendarEvent(hit.id, household.id, eventUpdates)
@@ -874,6 +929,9 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         return { response: `🗑️ Cancelled task "${hit.title}". Reply *undo* to restore it.`, actions };
       }
       const taskUpdates = buildTaskUpdates(updates, hit, household);
+      for (const k of Object.keys(taskUpdates)) {
+        if (String(taskUpdates[k] ?? '') === String(hit[k] ?? '')) delete taskUpdates[k];
+      }
       // Reminder-only update backstop: if the classifier didn't emit a
       // notification but the message asks for one ("set a 1-hour reminder on
       // it"), parse + snap it to the task notification enum.
@@ -883,7 +941,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         if (snap?.value) taskUpdates.notification = snap.value;
       }
       if (Object.keys(taskUpdates).length === 0) {
-        return { response: "Got it, but I didn't see any field to change. Tell me what to update (due date, assignee, priority…).", actions };
+        return { response: `What would you like to change about "${hit.title}"? (due date, assignee, priority…)`, actions };
       }
       const updated = await db.updateTask(hit.id, household.id, taskUpdates);
       rememberMutation(user.id, { kind: 'task', op: 'update', id: hit.id, preImage: pickPreImage(hit, taskUpdates), label: hit.title });
@@ -902,8 +960,11 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       return { response: `🗑️ Removed "${hit.item}" from the shopping list. Reply *undo* to restore it.`, actions };
     }
     const shopUpdates = buildShoppingUpdates(updates);
+    for (const k of Object.keys(shopUpdates)) {
+      if (String(shopUpdates[k] ?? '') === String(hit[k] ?? '')) delete shopUpdates[k];
+    }
     if (Object.keys(shopUpdates).length === 0) {
-      return { response: "Got it, but I didn't see any field to change.", actions };
+      return { response: `What would you like to change about "${hit.item}"?`, actions };
     }
     const updated = await db.updateShoppingItem(hit.id, household.id, shopUpdates);
     rememberMutation(user.id, { kind: 'shopping', op: 'update', id: hit.id, preImage: pickPreImage(hit, shopUpdates), label: hit.item });
@@ -911,7 +972,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
     return { response: `✏️ Updated "${updated.item}".`, actions };
   } catch (err) {
     console.error(`[handlers] ${intent} failed:`, err.message);
-    return { response: `⚠️ I found it but couldn't save the change: ${err.message}`, actions };
+    return { response: "⚠️ I found it but couldn't save the change just now. Mind trying again in a minute?", actions };
   }
 }
 
@@ -1385,6 +1446,14 @@ async function handleCalendarQuery(result, household, user, userTz, actions) {
     const searchable = events.concat(activityRows.filter((a) => !a.show_on_calendar));
     const matches = searchable.filter((ev) => topicMatchesTitle(topic, ev.title));
     if (matches.length > 0) {
+      // The bot is about to NAME these events - remember them so a follow-up
+      // "change/cancel it" is grounded and skips the did-you-mean question.
+      // Activity occurrences carry activity_id (not id) and have their own
+      // modify flows, so the filter naturally captures calendar events only.
+      rememberReferents(user.id, matches
+        .filter((ev) => ev.id && !ev.activity_id)
+        .slice(0, REFERENT_CAP)
+        .map((ev) => ({ kind: 'event', id: ev.id, label: ev.title })));
       const lines = matches.slice(0, 10).map((ev) => {
         const when = formatEventWhen(ev, userTz);
         return `• ${when ? `${when} — ` : ''}${ev.title}`;
@@ -2165,13 +2234,45 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       };
     }
     if (outcome.kind === 'error') {
-      return { response: `⚠️ I understood the event but couldn't save it: ${outcome.message}`, actions };
+      return { response: "⚠️ I understood the event but couldn't save it just now. Mind trying again in a minute?", actions };
     }
     // Appointment graduation: if this event fulfils an open "Book X appointment"
     // to-do, tick it off and say so. Soft-fail so it never blocks the event.
     let eventReply = result.response_message || '📅 Event added! ✅';
     const ticked = await graduateAppointmentTodo(singleEvent.title, household, actions).catch(() => null);
     if (ticked) eventReply += `\n\n✓ Also ticked off "${ticked}" from your to-do list.`;
+
+    // This branch returns EARLY - it never reaches the follow-up
+    // reconciliation tail - so the reminder offer/arming has to happen here.
+    // Historically it didn't: only the model's own response_message offer
+    // appeared, with NO pending state behind it, so the user's "Yes" fell
+    // through to classification and misrouted into a phantom update (real
+    // 2026-07-16 "Logan haircut" transcript).
+    const createdEv = (actions.eventsAdded || [])[0];
+    if (createdEv?.id) {
+      // The reply names the new event - it's a valid "it" for follow-ups.
+      rememberReferents(user.id, [{ kind: 'event', id: createdEv.id, label: createdEv.title }]);
+      const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
+      if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
+        // Deterministic offer backstop when the model didn't ask anything
+        // (same trailing-question test as the reconciliation tail's
+        // alreadyAsks - "...time?)" counts as already-asking).
+        if (!/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
+          eventReply += `\n\nWant me to add a reminder for it?`;
+        }
+        // Arm the pending store whenever the outgoing reply asks a reminder
+        // question - ours or the model's - so "Yes" resolves deterministically.
+        if (/remind[^.!\n]*\?/i.test(eventReply)) {
+          rememberReminderTarget(user.id, {
+            itemId: createdEv.id,
+            itemType: 'event',
+            label: createdEv.title,
+            startTime: createdEv.start_time,
+            householdId: household.id,
+          });
+        }
+      }
+    }
     return { response: eventReply, actions };
   }
 
@@ -2263,7 +2364,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       }
     } catch (err) {
       console.error('School activity update failed:', err.message);
-      return { response: `⚠️ I understood the activity but couldn't save it: ${err.message}`, actions };
+      return { response: "⚠️ I understood the activity but couldn't save it just now. Mind trying again in a minute?", actions };
     }
     return { response: result.response_message || '🏫 Activity updated! ✅', actions };
   }
@@ -2334,7 +2435,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       }
     } catch (err) {
       console.error('School event creation failed:', err.message);
-      return { response: `⚠️ I understood the event but couldn't save it: ${err.message}`, actions };
+      return { response: "⚠️ I understood the event but couldn't save it just now. Mind trying again in a minute?", actions };
     }
     return { response: result.response_message || '🏫 School event added! ✅', actions };
   }
@@ -2721,23 +2822,40 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       followUp = eventAdded
         ? 'Want me to add a reminder for it?'
         : 'Want me to set a reminder time?';
-      // Stash the just-created item so a "yes, 1 hour before" / "9am" reply
-      // resolves deterministically against it (see popReminderTarget at the
-      // top of handleTextMessage).
-      const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
-      const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
-      const target = ev
-        ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time }
-        : tk
-          ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
-          : null;
-      if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id });
     }
     if (followUp) {
       response += `\n\n${followUp}`;
       actions.followUpAppended = true;
     }
   }
+
+  // Arm the pending-reminder store whenever the OUTGOING reply asks a
+  // reminder question - whether we appended it above or the model wrote its
+  // own ("Want me to add a reminder before it?" in response_message). The
+  // arming used to live inside the !alreadyAsks branch, so a model-authored
+  // offer skipped it and the user's "Yes" fell through to classification,
+  // where it misrouted into a phantom update (real 2026-07-16 transcript).
+  // The reply flow at the top of handleTextMessage handles the answer
+  // deterministically either way.
+  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent
+      && /remind[^.!\n]*\?/i.test(response)) {
+    const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
+    const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
+    const target = ev
+      ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time }
+      : tk
+        ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
+        : null;
+    if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id });
+  }
+
+  // The reply is about to NAME the created rows - remember them so an
+  // immediate follow-up modify ("actually make it 5pm") is conversationally
+  // grounded and skips the did-you-mean question.
+  rememberReferents(user.id, [
+    ...(actions.eventsAdded || []).filter((e) => e?.id).map((e) => ({ kind: 'event', id: e.id, label: e.title })),
+    ...(actions.tasksAddedRows || []).filter((t) => t?.id).map((t) => ({ kind: 'task', id: t.id, label: t.title })),
+  ]);
 
   return {
     response,
@@ -3408,6 +3526,8 @@ function formatRecipeResponse(recipe) {
 module.exports = {
   handleTextMessage,
   isGroundedTarget,
+  rememberReferents,
+  isRecentReferent,
   createCalendarEventFromResult,
   graduateAppointmentTodo,
   parseTimeOfDay,
