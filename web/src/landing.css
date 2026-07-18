@@ -81,8 +81,8 @@
 .lv-nav.over {
   background-color: rgba(255, 255, 255, 0.15);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-  border: 0;
-  box-shadow: rgba(255, 255, 255, 0.4) 1px 1px 1px 0 inset, rgba(255, 255, 255, 0.2) -1px -1px 1px 0 inset;
+  border: 1px solid #ffffff36;
+  box-shadow: none;
 }
 .lv-nav.over .lv-nav-logo { filter: brightness(0) invert(1); }
 .lv-nav.over .lv-nav-links a { color: #fff; }
