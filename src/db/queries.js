@@ -4843,6 +4843,39 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
   return map;
 }
 
+/**
+ * Last INBOUND WhatsApp message per user - i.e. when they last actually
+ * engaged with the bot, not when we last broadcast at them.
+ *
+ * One limit-1 query per user rather than a bulk .in() fetch: a bulk select
+ * over whatsapp_message_log would pull every row for the page's users and,
+ * worse, PostgREST silently caps unpaginated selects at 1000 rows - a user
+ * whose last message predates the cap's window would wrongly show "Never".
+ * Page size is <= 100 so the parallel fan-out stays bounded.
+ *
+ * Returns Map<userId, ISO timestamp>; absent = never messaged.
+ */
+async function fetchLastWhatsAppByUserIds(userIds, db = supabase) {
+  if (!userIds || userIds.length === 0) return new Map();
+  const results = await Promise.all(
+    userIds.map((id) =>
+      db
+        .from('whatsapp_message_log')
+        .select('created_at')
+        .eq('user_id', id)
+        .eq('direction', 'inbound')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then((res) => ({ id, ts: res.data?.[0]?.created_at || null }))
+    )
+  );
+  const map = new Map();
+  for (const { id, ts } of results) {
+    if (ts) map.set(id, ts);
+  }
+  return map;
+}
+
 const { parsePlatformFromUserAgent } = require('../utils/platform-detect');
 
 /**
@@ -5125,17 +5158,19 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
 
   if (error) throw error;
 
-  // Attach last_active_at (MAX refresh_tokens.last_used_at per user) and
-  // platform usage (iOS app / web) - both queries are bounded by the
-  // current page's user IDs so they stay cheap.
+  // Attach last_active_at (MAX refresh_tokens.last_used_at per user),
+  // platform usage (iOS app / web), and last inbound WhatsApp message -
+  // all bounded by the current page's user IDs so they stay cheap.
   const ids = (data || []).map((u) => u.id);
-  const [lastActiveMap, platformsMap] = await Promise.all([
+  const [lastActiveMap, platformsMap, lastWhatsAppMap] = await Promise.all([
     fetchLastActiveByUserIds(ids, db),
     getPlatformsByUserIds(ids, db),
+    fetchLastWhatsAppByUserIds(ids, db),
   ]);
   for (const u of data || []) {
     u.last_active_at = lastActiveMap.get(u.id) || null;
     u.platforms = platformsMap.get(u.id) || null;
+    u.last_whatsapp_at = lastWhatsAppMap.get(u.id) || null;
   }
 
   return { users: data, total: count };
@@ -5188,9 +5223,12 @@ async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db
   if (rowErr) throw rowErr;
 
   // 6. Preserve the sorted order (Postgres .in() doesn't return rows in
-  //    the order we asked for) + attach last_active_at and platforms to
-  //    the response
-  const platformsMap = await getPlatformsByUserIds(pageIds, db);
+  //    the order we asked for) + attach last_active_at, platforms, and
+  //    last WhatsApp to the response
+  const [platformsMap, lastWhatsAppMap] = await Promise.all([
+    getPlatformsByUserIds(pageIds, db),
+    fetchLastWhatsAppByUserIds(pageIds, db),
+  ]);
   const byId = new Map((rows || []).map((r) => [r.id, r]));
   const ordered = pageIds
     .map((id) => byId.get(id))
@@ -5199,6 +5237,7 @@ async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db
       ...u,
       last_active_at: lastActiveMap.get(u.id) || null,
       platforms: platformsMap.get(u.id) || null,
+      last_whatsapp_at: lastWhatsAppMap.get(u.id) || null,
     }));
 
   return { users: ordered, total: count || 0 };
