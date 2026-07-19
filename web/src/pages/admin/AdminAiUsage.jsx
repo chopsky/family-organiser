@@ -124,6 +124,11 @@ export default function AdminAiUsage() {
                 {botFailures.recent.map((f, i) => (
                   <div key={i} className="text-xs bg-cream rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5">
                     <span className="text-warm-grey shrink-0">{formatRelativeTime(f.at)}</span>
+                    {f.userId && (
+                      <Link to={`/admin/users/${f.userId}`} className="font-medium text-plum hover:underline shrink-0">
+                        {f.userName}
+                      </Link>
+                    )}
                     {f.intent && <span className="font-mono text-plum shrink-0">{f.intent}</span>}
                     <span className="text-charcoal truncate">&ldquo;{f.bodyPreview}&rdquo;</span>
                     <span className="text-coral basis-full truncate">{f.error}</span>

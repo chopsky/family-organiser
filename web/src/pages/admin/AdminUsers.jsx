@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
@@ -10,7 +10,16 @@ import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const PAGE_SIZE = 20;
 
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'disabled', label: 'Disabled' },
+  { value: 'platform_admin', label: 'Platform admins' },
+  { value: 'unverified', label: 'Unverified email' },
+];
+
 export default function AdminUsers() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -19,6 +28,7 @@ export default function AdminUsers() {
   // only the form submit applies the term.
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
   const [sort, setSort] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
@@ -30,6 +40,7 @@ export default function AdminUsers() {
     try {
       const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
+      if (statusFilter) params.status = statusFilter;
       const { data } = await api.get('/admin/users', { params });
       setUsers(data.users || []);
       setTotal(data.total || 0);
@@ -39,7 +50,7 @@ export default function AdminUsers() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, sort, sortDir]);
+  }, [page, search, statusFilter, sort, sortDir]);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
@@ -47,6 +58,14 @@ export default function AdminUsers() {
     e.preventDefault();
     setPage(1);
     setSearch(searchInput.trim());
+  }
+
+  function handleStatusChange(e) {
+    setPage(1);
+    setStatusFilter(e.target.value);
+    const next = new URLSearchParams(searchParams);
+    if (e.target.value) next.set('status', e.target.value); else next.delete('status');
+    setSearchParams(next, { replace: true });
   }
 
   function handleSort(column, direction) {
@@ -72,22 +91,33 @@ export default function AdminUsers() {
       <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Users</h1>
       <p className="text-warm-grey text-sm mt-1">{total} total user{total !== 1 ? 's' : ''}</p>
 
-      {/* Search */}
-      <form onSubmit={handleSearch} className="mt-4 flex gap-2">
-        <div className="relative flex-1 max-w-md">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
-          />
-        </div>
-        <button type="submit" className="px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum-dark transition-colors">
-          Search
-        </button>
-      </form>
+      {/* Search + Filter */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[280px]">
+          <div className="relative flex-1 max-w-md">
+            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
+            />
+          </div>
+          <button type="submit" className="px-4 py-2.5 bg-plum text-white rounded-xl text-sm font-semibold hover:bg-plum-dark transition-colors">
+            Search
+          </button>
+        </form>
+        <select
+          value={statusFilter}
+          onChange={handleStatusChange}
+          className="px-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm font-medium text-charcoal focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
+        >
+          {STATUS_OPTIONS.map(({ value, label }) => (
+            <option key={value || 'all'} value={value}>{label}</option>
+          ))}
+        </select>
+      </div>
 
       <div className="mt-4">
         <ErrorBanner message={error} onRetry={loadUsers} />

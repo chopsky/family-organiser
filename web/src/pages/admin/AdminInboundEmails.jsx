@@ -17,6 +17,7 @@
  */
 
 import { Fragment, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 
 const STATUS_STYLES = {
@@ -41,21 +42,46 @@ function formatTimestamp(iso) {
   return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+const PAGE_SIZE = 100;
+
 export default function AdminInboundEmails() {
   const [emails, setEmails] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [failedOnly, setFailedOnly] = useState(false);
 
   useEffect(() => {
-    api.get('/admin/inbound-emails', { params: { limit: 100 } })
-      .then(({ data }) => setEmails(data.emails || []))
+    setLoading(true);
+    setError('');
+    api.get('/admin/inbound-emails', { params: { limit: PAGE_SIZE, failedOnly } })
+      .then(({ data }) => {
+        setEmails(data.emails || []);
+        setTotal(data.total || 0);
+      })
       .catch((err) => setError(err.response?.data?.error || 'Failed to load.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [failedOnly]);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const { data } = await api.get('/admin/inbound-emails', {
+        params: { limit: PAGE_SIZE, offset: emails.length, failedOnly },
+      });
+      setEmails((prev) => [...prev, ...(data.emails || [])]);
+      setTotal(data.total || 0);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load more.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   if (loading) return <p className="text-sm text-warm-grey p-6">Loading…</p>;
-  if (error) return <p className="text-sm text-coral p-6">{error}</p>;
+  if (error && emails.length === 0) return <p className="text-sm text-coral p-6">{error}</p>;
 
   const undoneCount = emails.filter((e) => e.undone_at).length;
   const failedCount = emails.filter((e) => e.status === 'failed').length;
@@ -65,11 +91,22 @@ export default function AdminInboundEmails() {
       <h1 className="text-3xl font-normal text-charcoal mb-2" style={{ fontFamily: 'var(--font-serif-display)' }}>
         Inbound emails
       </h1>
-      <p className="text-sm text-warm-grey mb-6">
-        Last 100 forwarded emails processed by the AI pipeline.
-        {failedCount > 0 && ` ${failedCount} failed.`}
-        {undoneCount > 0 && ` ${undoneCount} were undone by the user.`}
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
+        <p className="text-sm text-warm-grey">
+          Showing {emails.length} of {total} forwarded email{total !== 1 ? 's' : ''}.
+          {failedCount > 0 && ` ${failedCount} failed shown.`}
+          {undoneCount > 0 && ` ${undoneCount} were undone by the user.`}
+        </p>
+        <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={failedOnly}
+            onChange={(e) => setFailedOnly(e.target.checked)}
+            className="accent-plum"
+          />
+          Failed only
+        </label>
+      </div>
 
       <div className="bg-white rounded-2xl border border-light-grey overflow-hidden" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
         <div className="overflow-x-auto">
@@ -107,7 +144,19 @@ export default function AdminInboundEmails() {
                 <Fragment key={row.id}>
                   <tr className="border-b border-light-grey hover:bg-cream/30 cursor-pointer" onClick={() => setExpandedId(expanded ? null : row.id)}>
                     <td className="px-4 py-3 text-xs text-warm-grey whitespace-nowrap">{formatTimestamp(row.created_at)}</td>
-                    <td className="px-4 py-3 text-charcoal whitespace-nowrap">{row.household_name || row.household_id}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {row.household_id ? (
+                        <Link
+                          to={`/admin/households/${row.household_id}`}
+                          className="text-charcoal hover:text-plum"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {row.household_name || row.household_id}
+                        </Link>
+                      ) : (
+                        <span className="text-warm-grey">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-charcoal text-xs truncate" style={{ maxWidth: 200 }}>{row.from_email}</td>
                     <td className="px-4 py-3 text-charcoal text-xs truncate" style={{ maxWidth: 300 }}>{row.subject || '(no subject)'}</td>
                     <td className="px-4 py-3"><StatusPill status={row.status} /></td>
@@ -177,6 +226,23 @@ export default function AdminInboundEmails() {
         </table>
         </div>
       </div>
+
+      {error && emails.length > 0 && (
+        <p className="text-sm text-coral mt-3">{error}</p>
+      )}
+
+      {emails.length < total && (
+        <div className="flex justify-center mt-4">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-4 py-2 rounded-xl border border-light-grey text-sm font-medium text-charcoal hover:bg-cream disabled:opacity-50 transition-colors"
+          >
+            {loadingMore ? 'Loading…' : `Load more (${total - emails.length} remaining)`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

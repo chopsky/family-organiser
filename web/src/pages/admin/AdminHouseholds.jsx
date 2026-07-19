@@ -34,9 +34,11 @@ export default function AdminHouseholds() {
   const [page, setPage] = useState(1);
   // searchInput is the live text field; search is the APPLIED term the
   // fetch depends on. Splitting them stops every keystroke refetching -
-  // only the form submit applies the term.
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  // only the form submit applies the term. Both seed from the URL so a
+  // searched view survives refresh / back-button like the filters do.
+  const initialSearch = searchParams.get('q') || '';
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch);
   const [planFilter, setPlanFilter] = useState(initialPlan);
   const [activityFilter, setActivityFilter] = useState(initialActivity);
   const [sort, setSort] = useState('created_at');
@@ -68,7 +70,11 @@ export default function AdminHouseholds() {
   function handleSearch(e) {
     e.preventDefault();
     setPage(1);
-    setSearch(searchInput.trim());
+    const term = searchInput.trim();
+    setSearch(term);
+    const next = new URLSearchParams(searchParams);
+    if (term) next.set('q', term); else next.delete('q');
+    setSearchParams(next, { replace: true });
   }
 
   function handleSort(column, direction) {

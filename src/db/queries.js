@@ -4349,9 +4349,14 @@ async function deleteFeedToken(userId, householdId, db = supabase) {
  * the page stays O(1) round-trips regardless of household count.
  */
 async function getCalendarSyncHealthAdmin(db = supabase) {
+  // Cap the payload: newest 500 of each is far beyond current volume but
+  // stops the endpoint growing unbounded (and PostgREST would silently
+  // truncate at 1000 anyway - better an explicit, chosen cap). If we ever
+  // approach it, this page needs real pagination instead.
+  const CAP = 500;
   const [feedsRes, tokensRes] = await Promise.all([
-    db.from('external_calendar_feeds').select().order('created_at', { ascending: false }),
-    db.from('calendar_feed_tokens').select().order('created_at', { ascending: false }),
+    db.from('external_calendar_feeds').select().order('created_at', { ascending: false }).limit(CAP),
+    db.from('calendar_feed_tokens').select().order('created_at', { ascending: false }).limit(CAP),
   ]);
 
   const feeds = feedsRes.data || [];
@@ -5127,7 +5132,20 @@ async function getChannelCohortStats(db = supabase) {
   });
 }
 
-async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc' } = {}, db = supabase) {
+/**
+ * Apply the admin Users status filter to a PostgREST query builder.
+ * Shared by both the SQL-sorted path and the last-active-sorted path so
+ * the filter behaves identically regardless of sort.
+ */
+function applyUserStatusFilter(query, status) {
+  if (status === 'disabled') return query.not('disabled_at', 'is', null);
+  if (status === 'active') return query.is('disabled_at', null);
+  if (status === 'platform_admin') return query.eq('is_platform_admin', true);
+  if (status === 'unverified') return query.eq('email_verified', false);
+  return query;
+}
+
+async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc', status } = {}, db = supabase) {
   // Sorting by last_active_at can't be done in a single SQL query because
   // it's a derived value (MAX refresh_tokens.last_used_at). For that sort
   // we go two-step: fetch all matching IDs (no range), join the activity
@@ -5135,7 +5153,7 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
   // base is small enough (hundreds, not millions) that the extra
   // round-trip is fine.
   if (sort === 'last_active_at') {
-    return getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db);
+    return getAllUsersAdminByLastActive({ search, page, limit, sortDir, status }, db);
   }
 
   let query = db
@@ -5146,6 +5164,7 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
     const s = sanitizeOrFilterValue(search);
     query = query.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
   }
+  query = applyUserStatusFilter(query, status);
 
   // Whitelist sort columns to prevent injection
   const sortColumn = sort === 'name' ? 'name' : 'created_at';
@@ -5182,13 +5201,14 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
  * in surface at the bottom regardless of direction), then fetches full
  * rows for just the requested page.
  */
-async function getAllUsersAdminByLastActive({ search, page, limit, sortDir }, db) {
+async function getAllUsersAdminByLastActive({ search, page, limit, sortDir, status }, db) {
   // 1. All matching IDs (no range, no full payload yet)
   let idQuery = db.from('users').select('id', { count: 'exact' });
   if (search) {
     const s = sanitizeOrFilterValue(search);
     idQuery = idQuery.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
   }
+  idQuery = applyUserStatusFilter(idQuery, status);
   const { data: idRows, error: idErr, count } = await idQuery;
   if (idErr) throw idErr;
   const allIds = (idRows || []).map((r) => r.id);
@@ -5808,22 +5828,36 @@ async function getBotUserVisibleFailures({ days = 7 } = {}, db = supabase) {
       .eq('direction', 'inbound').gte('created_at', since),
     db.from('whatsapp_message_log').select('id', { count: 'exact', head: true })
       .eq('direction', 'inbound').not('error', 'is', null).gte('created_at', since),
-    db.from('whatsapp_message_log').select('created_at, intent, error, body')
+    db.from('whatsapp_message_log').select('created_at, intent, error, body, user_id, household_id')
       .eq('direction', 'inbound').not('error', 'is', null).gte('created_at', since)
       .order('created_at', { ascending: false }).limit(5),
   ]);
   if (samplesRes.error) throw samplesRes.error;
   const total = totalRes.count || 0;
   const failures = failedRes.count || 0;
+
+  // Resolve who hit the failure so the admin can jump straight to the
+  // affected user/household instead of guessing from the message preview.
+  const samples = samplesRes.data || [];
+  const userIds = [...new Set(samples.map((r) => r.user_id).filter(Boolean))];
+  const userMap = new Map();
+  if (userIds.length > 0) {
+    const { data: users } = await db.from('users').select('id, name').in('id', userIds);
+    for (const u of users || []) userMap.set(u.id, u.name);
+  }
+
   return {
     totalInbound: total,
     failures,
     failureRate: total > 0 ? Math.round((failures / total) * 1000) / 10 : 0, // one decimal, %
-    recent: (samplesRes.data || []).map((r) => ({
+    recent: samples.map((r) => ({
       at: r.created_at,
       intent: r.intent || null,
       error: r.error,
       bodyPreview: (r.body || '').slice(0, 60),
+      userId: r.user_id || null,
+      userName: r.user_id ? userMap.get(r.user_id) || 'Unknown' : null,
+      householdId: r.household_id || null,
     })),
   };
 }
@@ -6802,19 +6836,24 @@ async function getRejectedInboundSenders(householdId, limit = 5, db = supabase) 
 // Admin-wide view of recent inbound-email activity. Joins on
 // households so the UI can show which household forwarded each email
 // without firing N+1 lookups.
-async function getRecentInboundEmailsAdmin({ limit = 100 } = {}, db = supabase) {
+async function getRecentInboundEmailsAdmin({ limit = 100, offset = 0, failedOnly = false } = {}, db = supabase) {
   const cap = Math.min(Math.max(1, limit), 500);
-  const { data, error } = await db
+  const from = Math.max(0, offset);
+  let query = db
     .from('inbound_email_log')
-    .select('*, households!inner(id, name)')
-    .order('created_at', { ascending: false })
-    .limit(cap);
+    .select('*, households!inner(id, name)', { count: 'exact' })
+    .order('created_at', { ascending: false });
+  if (failedOnly) query = query.eq('status', 'failed');
+  const { data, error, count } = await query.range(from, from + cap - 1);
   if (error) throw error;
-  return (data || []).map((row) => ({
-    ...row,
-    household_name: row.households?.name,
-    households: undefined,
-  }));
+  return {
+    emails: (data || []).map((row) => ({
+      ...row,
+      household_name: row.households?.name,
+      households: undefined,
+    })),
+    total: count || 0,
+  };
 }
 
 async function getInboundEmailLogByUndoToken(undoToken, db = supabase) {

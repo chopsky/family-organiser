@@ -50,13 +50,14 @@ router.get('/stats', async (req, res) => {
 
 router.get('/users', async (req, res) => {
   try {
-    const { search, page = 1, limit = 50, sort, sortDir } = req.query;
+    const { search, page = 1, limit = 50, sort, sortDir, status } = req.query;
     const result = await db.getAllUsersAdmin({
       search,
       page: parseInt(page, 10),
       limit: Math.min(parseInt(limit, 10) || 50, 100),
       sort,
       sortDir,
+      status,
     });
     return res.json(result);
   } catch (err) {
@@ -249,7 +250,9 @@ router.get('/households/:id', async (req, res) => {
 
 router.get('/households/:id/ai-usage', async (req, res) => {
   try {
-    const days = parseInt(req.query.days, 10) || 30;
+    // Clamp to [1, 36500]; 36500 (~100y) is the DateRangeToggle's "All"
+    // sentinel, so anything larger is garbage input, not a bigger window.
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 36500);
     const usage = await db.getHouseholdAiUsage(req.params.id, { days });
     return res.json(usage);
   } catch (err) {
@@ -410,8 +413,10 @@ router.get('/analytics', async (req, res) => {
 router.get('/inbound-emails', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
-    const rows = await db.getRecentInboundEmailsAdmin({ limit });
-    return res.json({ emails: rows });
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const failedOnly = req.query.failedOnly === 'true';
+    const { emails, total } = await db.getRecentInboundEmailsAdmin({ limit, offset, failedOnly });
+    return res.json({ emails, total });
   } catch (err) {
     console.error('GET /api/admin/inbound-emails error:', err);
     return res.status(500).json({ error: 'Internal server error' });
