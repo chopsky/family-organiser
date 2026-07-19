@@ -47,7 +47,7 @@ function emailTemplate(title, body) {
       ${body}
     </div>
     <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
-      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - shopping lists, tasks &amp; reminders, together.</p>
+      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - the AI that runs your family admin.</p>
     </div>
   </div>
 </body>
@@ -234,6 +234,7 @@ async function sendInviteEmail(to, inviterName, householdName, token) {
   const url = `${BASE_URL}/signup?invite=${token}`;
   const html = emailTemplate(`You're invited!`, `
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">${inviterName} has invited you to join <strong>${householdName}</strong> on Housemait.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Housemait keeps your family's calendar, shopping lists, meals and tasks in one place - with a WhatsApp assistant that does the typing for you.</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click below to create your account and join the household.</p>
     <div style="text-align:center;">${button('Join household', url)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">This invite expires in 7 days.</p>
@@ -402,7 +403,7 @@ async function sendWeeklyDigestEmail(to, memberName, householdName, data) {
 
     <!-- Footer -->
     <div style="padding:16px 24px;background:${BRAND.cream};text-align:center;border-radius:0 0 16px 16px;">
-      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - shopping lists, tasks &amp; reminders, together.</p>
+      <p style="color:${BRAND.inkLight};font-size:12px;margin:0;">Housemait - the AI that runs your family admin.</p>
     </div>
   </div>
 </body>
