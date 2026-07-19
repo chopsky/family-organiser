@@ -140,8 +140,8 @@ export default function AdminAnnouncements() {
   }
 
   return (
-    <div className="p-6 max-w-5xl">
-      <h1 className="text-2xl font-semibold text-charcoal mb-6" style={{ fontFamily: 'var(--font-display)' }}>
+    <div>
+      <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight mb-6">
         Announcements
       </h1>
 

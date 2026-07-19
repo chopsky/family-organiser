@@ -8,6 +8,7 @@ import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import PlatformBadges from '../../components/PlatformBadges';
 import ErrorBanner from '../../components/ErrorBanner';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 function rangeLabel(days) {
@@ -102,22 +103,29 @@ export default function AdminUserDetail() {
     }
   }
 
-  async function handleForceLogout() {
+  // Force-logout flows through the styled ConfirmDialog instead of
+  // window.confirm/alert. Success shows briefly inside the dialog copy via
+  // logoutResult; errors render in the dialog's error slot.
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [logoutError, setLogoutError] = useState(null);
+  const [logoutResult, setLogoutResult] = useState(null);
+
+  function requestForceLogout() {
     if (isSelf || actionLoading) return;
-    const ok = window.confirm(
-      `Force ${user.name || 'this user'} to log out?\n\n` +
-      'All their active sessions will be revoked. They will be redirected ' +
-      'to login within the next hour (or instantly if they log out manually). ' +
-      'Use this after a data fix that invalidates their cached household, ' +
-      'or to kick them off a lost device.'
-    );
-    if (!ok) return;
+    setLogoutError(null);
+    setLogoutResult(null);
+    setShowLogoutConfirm(true);
+  }
+
+  async function handleForceLogout() {
     setActionLoading(true);
+    setLogoutError(null);
     try {
       const { data } = await api.post(`/admin/users/${id}/force-logout`);
-      window.alert(data.message || 'Sessions revoked.');
+      setLogoutResult(data.message || 'Sessions revoked.');
+      setShowLogoutConfirm(false);
     } catch (err) {
-      window.alert(`Force logout failed: ${err.response?.data?.error || err.message}`);
+      setLogoutError(err.response?.data?.error || err.message);
     } finally {
       setActionLoading(false);
     }
@@ -266,7 +274,7 @@ export default function AdminUserDetail() {
               {user.disabled_at ? <><IconCheckCircle className="h-4 w-4" /> Enable</> : <><IconBan className="h-4 w-4" /> Disable</>}
             </button>
             <button
-              onClick={handleForceLogout}
+              onClick={requestForceLogout}
               disabled={actionLoading}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-[1.5px] border-warm-grey text-warm-grey text-sm font-semibold hover:bg-cream transition-colors disabled:opacity-50"
               title="Revoke all active sessions"
@@ -282,7 +290,22 @@ export default function AdminUserDetail() {
             </button>
           </div>
         )}
+        {logoutResult && (
+          <p className="mt-3 text-xs text-sage">{logoutResult}</p>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Force logout"
+        message={`Revoke all of ${user.name || 'this user'}'s active sessions? They'll be redirected to login within the next hour (or instantly if they log out manually). Use after a data fix that invalidates their cached household, or to kick them off a lost device.`}
+        confirmLabel="Revoke sessions"
+        busy={actionLoading}
+        busyLabel="Revoking…"
+        error={logoutError}
+        onConfirm={handleForceLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (

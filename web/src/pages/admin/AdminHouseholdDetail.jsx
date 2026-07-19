@@ -8,6 +8,7 @@ import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import PlatformBadges from '../../components/PlatformBadges';
 import ErrorBanner from '../../components/ErrorBanner';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
@@ -81,55 +82,79 @@ export default function AdminHouseholdDetail() {
       .finally(() => setActivityLoading(false));
   }, [id, activityDays]);
 
-  async function patchSubscription(updates) {
+  // Confirmable actions all flow through one ConfirmDialog. pendingAction
+  // carries the copy + the mutation to run; errors render inside the dialog
+  // (no more browser alert()/confirm()).
+  const [pendingAction, setPendingAction] = useState(null);
+  const [actionError, setActionError] = useState(null);
+
+  function requestAction(action) {
+    setActionError(null);
+    setPendingAction(action);
+  }
+
+  async function runPendingAction() {
+    if (!pendingAction) return;
+    setActionError(null);
     setSaving(true);
     try {
-      const { data } = await api.patch(`/admin/households/${id}/subscription`, updates);
-      setHousehold((prev) => ({ ...prev, ...data }));
+      await pendingAction.run();
+      setPendingAction(null);
     } catch (err) {
-      console.error('Failed to update subscription:', err);
-      alert('Failed to update subscription. See console for details.');
+      console.error(`Admin action failed (${pendingAction.title}):`, err);
+      setActionError(err.response?.data?.error || err.message || 'Something went wrong');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleToggleInternal() {
-    if (!household) return;
-    const next = !household.is_internal;
-    const verb = next ? 'mark as internal (free unlimited access)' : 'remove internal flag';
-    if (!confirm(`Are you sure you want to ${verb}?`)) return;
-    await patchSubscription({ is_internal: next });
+  async function patchSubscription(updates) {
+    const { data } = await api.patch(`/admin/households/${id}/subscription`, updates);
+    setHousehold((prev) => ({ ...prev, ...data }));
   }
 
-  async function handleExtendTrial() {
+  function handleToggleInternal() {
+    if (!household) return;
+    const next = !household.is_internal;
+    requestAction({
+      title: next ? 'Mark as internal' : 'Remove internal flag',
+      message: next
+        ? `Give ${household.name} free unlimited access? They bypass all subscription checks until the flag is removed.`
+        : `Remove the internal flag from ${household.name}? Their normal subscription state applies again.`,
+      confirmLabel: next ? 'Mark internal' : 'Remove flag',
+      run: () => patchSubscription({ is_internal: next }),
+    });
+  }
+
+  function handleExtendTrial() {
     if (!household) return;
     // Extend from whichever is later - current trial end or now
     const base = household.trial_ends_at && new Date(household.trial_ends_at) > new Date()
       ? new Date(household.trial_ends_at)
       : new Date();
     const newEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    if (!confirm(`Extend trial by 30 days (until ${new Date(newEnd).toLocaleDateString()})?`)) return;
-    await patchSubscription({ trial_ends_at: newEnd });
+    requestAction({
+      title: 'Extend trial',
+      message: `Extend ${household.name}'s trial by 30 days, until ${new Date(newEnd).toLocaleDateString()}?`,
+      confirmLabel: 'Extend 30 days',
+      run: () => patchSubscription({ trial_ends_at: newEnd }),
+    });
   }
 
-  async function handleTrialPause() {
+  function handleTrialPause() {
     if (!household) return;
     const next = !household.trial_paused_at;
-    const msg = next
-      ? "Pause this trial? The clock freezes (they keep access) until you resume - no trial days are used."
-      : 'Resume this trial? The paused time gets added back onto their trial end date.';
-    if (!confirm(msg)) return;
-    setSaving(true);
-    try {
-      const { data } = await api.post(`/admin/households/${id}/trial-pause`, { paused: next });
-      setHousehold((prev) => ({ ...prev, ...data }));
-    } catch (err) {
-      console.error('Failed to pause/resume trial:', err);
-      alert('Failed to update the trial. See console for details.');
-    } finally {
-      setSaving(false);
-    }
+    requestAction({
+      title: next ? 'Pause trial' : 'Resume trial',
+      message: next
+        ? 'Pause this trial? The clock freezes (they keep access) until you resume - no trial days are used.'
+        : 'Resume this trial? The paused time gets added back onto their trial end date.',
+      confirmLabel: next ? 'Pause' : 'Resume',
+      run: async () => {
+        const { data } = await api.post(`/admin/households/${id}/trial-pause`, { paused: next });
+        setHousehold((prev) => ({ ...prev, ...data }));
+      },
+    });
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
@@ -328,6 +353,19 @@ export default function AdminHouseholdDetail() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingAction}
+        title={pendingAction?.title}
+        message={pendingAction?.message}
+        confirmLabel={pendingAction?.confirmLabel}
+        danger={pendingAction?.danger}
+        busy={saving}
+        busyLabel="Saving…"
+        error={actionError}
+        onConfirm={runPendingAction}
+        onCancel={() => setPendingAction(null)}
+      />
     </div>
   );
 }

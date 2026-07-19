@@ -4,6 +4,7 @@ import { IconMessageCircle } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import ErrorBanner from '../../components/ErrorBanner';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 function rangeLabel(days) {
   if (days === DAYS_ALL) return 'all time';
@@ -71,17 +72,28 @@ export default function AdminWhatsApp() {
     }
   }
 
-  async function handleNudgeSendAll() {
+  const [showNudgeConfirm, setShowNudgeConfirm] = useState(false);
+  const [nudgeSending, setNudgeSending] = useState(false);
+  const [nudgeConfirmError, setNudgeConfirmError] = useState(null);
+
+  function requestNudgeSendAll() {
     if (!nudge || !nudge.total) return;
-    // eslint-disable-next-line no-alert
-    if (!window.confirm(`Send the setup nudge to all ${nudge.total} members (${nudge.viaPush} push, ${nudge.viaWhatsApp} WhatsApp)?`)) return;
-    setNudgeStatus({ kind: 'ok', message: 'Sending…' });
+    setNudgeConfirmError(null);
+    setShowNudgeConfirm(true);
+  }
+
+  async function handleNudgeSendAll() {
+    setNudgeSending(true);
+    setNudgeConfirmError(null);
     try {
       const { data: d } = await api.post('/admin/tools/setup-nudge/send');
       setNudgeStatus({ kind: 'ok', message: `Done. ${d.pushSent} push, ${d.whatsappSent} WhatsApp, ${d.skipped} skipped, ${d.failed} failed.` });
+      setShowNudgeConfirm(false);
       loadNudgePreview();
     } catch (err) {
-      setNudgeStatus({ kind: 'err', message: err.response?.data?.error || err.message });
+      setNudgeConfirmError(err.response?.data?.error || err.message);
+    } finally {
+      setNudgeSending(false);
     }
   }
 
@@ -353,7 +365,7 @@ export default function AdminWhatsApp() {
               </div>
             )}
             {nudge.total > 0 && (
-              <button type="button" onClick={handleNudgeSendAll}
+              <button type="button" onClick={requestNudgeSendAll}
                 className="mt-3 h-10 px-4 rounded-lg bg-plum hover:bg-plum/90 text-white text-sm font-semibold">
                 Send to all {nudge.total}
               </button>
@@ -457,6 +469,18 @@ export default function AdminWhatsApp() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showNudgeConfirm}
+        title="Send setup nudge to everyone"
+        message={nudge ? `Send the setup nudge to all ${nudge.total} members (${nudge.viaPush} push, ${nudge.viaWhatsApp} WhatsApp)?` : ''}
+        confirmLabel={`Send to ${nudge?.total ?? 0}`}
+        busy={nudgeSending}
+        busyLabel="Sending…"
+        error={nudgeConfirmError}
+        onConfirm={handleNudgeSendAll}
+        onCancel={() => setShowNudgeConfirm(false)}
+      />
     </div>
   );
 }

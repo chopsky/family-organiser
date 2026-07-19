@@ -87,8 +87,8 @@ export default function AdminInboundEmails() {
   const failedCount = emails.filter((e) => e.status === 'failed').length;
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-normal text-charcoal mb-2" style={{ fontFamily: 'var(--font-serif-display)' }}>
+    <div>
+      <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight mb-2">
         Inbound emails
       </h1>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
@@ -142,7 +142,19 @@ export default function AdminInboundEmails() {
               const expanded = expandedId === row.id;
               return (
                 <Fragment key={row.id}>
-                  <tr className="border-b border-light-grey hover:bg-cream/30 cursor-pointer" onClick={() => setExpandedId(expanded ? null : row.id)}>
+                  <tr
+                    className="border-b border-light-grey hover:bg-cream/30 cursor-pointer focus-within:bg-cream/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-plum/40"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expanded}
+                    onClick={() => setExpandedId(expanded ? null : row.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedId(expanded ? null : row.id);
+                      }
+                    }}
+                  >
                     <td className="px-4 py-3 text-xs text-warm-grey whitespace-nowrap">{formatTimestamp(row.created_at)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {row.household_id ? (

@@ -70,8 +70,8 @@ export default function AdminAuditLog() {
 
   return (
     <div>
-      <h1 style={{ fontSize: 24, fontWeight: 600, color: '#2D2A33', marginBottom: 4 }}>Audit log</h1>
-      <p style={{ color: '#6B6774', fontSize: 14, marginBottom: 20 }}>
+      <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight mb-1">Audit log</h1>
+      <p className="text-warm-grey text-sm mb-5">
         Every successful admin action, newest first. {total} recorded.
       </p>
 
@@ -85,7 +85,17 @@ export default function AdminAuditLog() {
             return (
               <div key={e.id} style={{ background: '#FFF', border: '1px solid #E8E5EC', borderRadius: 12, padding: '10px 14px' }}>
                 <div
+                  role={hasDetail ? 'button' : undefined}
+                  tabIndex={hasDetail ? 0 : undefined}
+                  aria-expanded={hasDetail ? isOpen : undefined}
                   onClick={() => hasDetail && setExpanded(isOpen ? null : e.id)}
+                  onKeyDown={(ev) => {
+                    if (hasDetail && (ev.key === 'Enter' || ev.key === ' ')) {
+                      ev.preventDefault();
+                      setExpanded(isOpen ? null : e.id);
+                    }
+                  }}
+                  className={hasDetail ? 'focus:outline-none focus-visible:ring-2 focus-visible:ring-plum/40 rounded-lg' : undefined}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: hasDetail ? 'pointer' : 'default', flexWrap: 'wrap' }}
                 >
                   <MethodPill method={e.method} />
