@@ -318,6 +318,52 @@ async function findUsersAwaitingWhatsAppFollowup(db = supabase) {
 }
 
 /**
+ * Candidates for the WhatsApp capture-opener sequence (day 1-3 activation
+ * questions): linked in the last ~5 days, real accounts, not disabled. The
+ * job applies the finer rules (local send window, per-day cap, opener
+ * eligibility, opt-out preference).
+ */
+async function findCaptureOpenerCandidates(db = supabase) {
+  const cutoff5d = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, household_id, timezone, whatsapp_phone, whatsapp_linked, whatsapp_linked_at, whatsapp_last_inbound_at')
+    .eq('whatsapp_linked', true)
+    .eq('member_type', 'account')
+    .is('disabled_at', null)
+    .gt('whatsapp_linked_at', cutoff5d)
+    .not('whatsapp_phone', 'is', null);
+  if (error) {
+    console.error('[findCaptureOpenerCandidates] query failed:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Opener keys already sent to a user. Missing-table tolerant (the
+ * whatsapp_capture_log migration may not have run yet) - returning null
+ * tells the job to skip sending rather than risk repeats it can't record.
+ */
+async function getCaptureOpenerKeys(userId, db = supabase) {
+  const { data, error } = await db
+    .from('whatsapp_capture_log')
+    .select('opener_key, sent_at')
+    .eq('user_id', userId);
+  if (error) return null;
+  return (data || []).map((r) => r.opener_key);
+}
+
+async function recordCaptureOpener(userId, openerKey, db = supabase) {
+  const { error } = await db
+    .from('whatsapp_capture_log')
+    .insert({ user_id: userId, opener_key: openerKey });
+  if (error && error.code !== '23505') {
+    console.error('[recordCaptureOpener] insert failed:', error.message);
+  }
+}
+
+/**
  * Stamp users.whatsapp_followup_sent_at on a user after the re-engagement
  * email is sent. Idempotent - second call is a no-op since the cron only
  * picks up users with the column still NULL.
@@ -9276,4 +9322,7 @@ module.exports = {
   // WhatsApp re-engagement (T+24h email for signups who never linked)
   findUsersAwaitingWhatsAppFollowup,
   markWhatsAppFollowupSent,
+  findCaptureOpenerCandidates,
+  getCaptureOpenerKeys,
+  recordCaptureOpener,
 };

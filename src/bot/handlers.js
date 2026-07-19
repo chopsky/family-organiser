@@ -626,6 +626,25 @@ async function completeSchoolAdd(gias, user, household, ctx, actions) {
   };
 }
 
+// Armed when the capture opener asks "which school do the kids go to?" -
+// the reply is usually a bare school name ("Ashfield Primary Leeds") that
+// classify could misread as chat. One-shot: consumed by the next message;
+// only actually enters the school flow when GIAS recognises the words, so
+// an unrelated reply ("add milk") falls through to classify untouched.
+const pendingOpenerSchoolAnswer = new Map(); // userId → { timestamp }
+const OPENER_ANSWER_TTL_MS = 20 * 60 * 60 * 1000;
+function armOpenerSchoolAnswer(userId) {
+  if (!userId) return;
+  pendingOpenerSchoolAnswer.set(userId, { timestamp: Date.now() });
+}
+function popOpenerSchoolAnswer(userId) {
+  const entry = pendingOpenerSchoolAnswer.get(userId);
+  if (!entry) return null;
+  pendingOpenerSchoolAnswer.delete(userId);
+  if (Date.now() - entry.timestamp > OPENER_ANSWER_TTL_MS) return null;
+  return entry;
+}
+
 // Resolve the "which of the kids goes there?" answer: names (one or many),
 // "all"/"both", or a number. Returns the matched children ([] = no match).
 function resolveChildLinkAnswer(text, children) {
@@ -2023,6 +2042,34 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         };
       }
     }
+  }
+
+  // Opener school answer: the capture question "which school do the kids go
+  // to?" was the last thing we sent, so try the reply against GIAS. Only a
+  // recognised school enters the confirm flow; anything else (including
+  // yes/no and short noise) falls straight through to normal handling.
+  if (popOpenerSchoolAnswer(user.id)) {
+    const t = String(text || '').trim();
+    const looksAnswerable = t.length >= 4 && !parseAffirmative(t) && !/^https?:\/\//i.test(t);
+    if (looksAnswerable) {
+      try {
+        const schoolAddSvc = require('../services/school-add');
+        const candidates = await schoolAddSvc.searchGiasCandidates(t);
+        if (candidates.length > 0) {
+          const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+          rememberSchoolConfirm(user.id, { candidates, householdId: household.id });
+          ctx.intent = 'school_add_confirm';
+          if (candidates.length === 1) {
+            return { response: `Found ${schoolAddSvc.candidateLabel(candidates[0])} - is that the one?`, actions: noActions };
+          }
+          const list = candidates.map((c, i) => `${i + 1}. ${schoolAddSvc.candidateLabel(c)}`).join('\n');
+          return { response: `I found a few schools matching that - which one?\n${list}\n\nReply with the number (or "none of these").`, actions: noActions };
+        }
+      } catch (err) {
+        console.warn('[handlers] opener school lookup failed, classifying normally:', err.message);
+      }
+    }
+    // No GIAS match - the user said something else; classify normally.
   }
 
   // Trivial messages - greetings, thanks, emoji-only - get canned replies.
@@ -3913,4 +3960,5 @@ module.exports = {
   rememberSchoolChildLink,
   rememberSchoolSource,
   peekSchoolSource,
+  armOpenerSchoolAnswer,
 };

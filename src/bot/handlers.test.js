@@ -892,3 +892,45 @@ describe('school-add conversation', () => {
     expect(db.updateUser).not.toHaveBeenCalled();
   });
 });
+
+// ─── Capture-opener school answer (AC2) ─────────────────────────────────────
+describe('opener school answer', () => {
+  const schoolAdd = require('../services/school-add');
+  const ai = require('../services/ai');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [] };
+  const parent = { id: 'u9', name: 'Louise' };
+  const GIAS = { urn: 100001, name: 'Ashfield Primary School', type: 'Community school', local_authority: 'Leeds', address: 'Moor Road, Leeds', postcode: 'LS12 3SE' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.getHouseholdMembers.mockResolvedValue([]);
+  });
+
+  test('armed + recognisable school name → straight to the confirm question, no LLM call', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    handlers.armOpenerSchoolAnswer(parent.id);
+    const reply = await handlers.handleTextMessage('Ashfield Primary Leeds', parent, hh, {});
+    expect(reply.response).toMatch(/is that the one\?/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  test('armed + unrelated reply → GIAS misses, falls through to classify untouched', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([]);
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'Of course!' });
+    handlers.armOpenerSchoolAnswer(parent.id);
+    const reply = await handlers.handleTextMessage('what else can you do?', parent, hh, {});
+    expect(ai.classify).toHaveBeenCalled();
+    expect(reply.response).toMatch(/Of course!/);
+  });
+
+  test('one-shot: the armed state is consumed by the first message', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([]);
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    handlers.armOpenerSchoolAnswer(parent.id);
+    await handlers.handleTextMessage('random message', parent, hh, {});
+    schoolAdd.searchGiasCandidates.mockClear();
+    await handlers.handleTextMessage('Ashfield Primary Leeds', parent, hh, {});
+    // Second message is NOT tried against GIAS via the opener path.
+    expect(schoolAdd.searchGiasCandidates).not.toHaveBeenCalled();
+  });
+});

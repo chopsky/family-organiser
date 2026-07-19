@@ -11,6 +11,7 @@ const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
+const { runCaptureOpenerCheck } = require('./capture-openers');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -750,6 +751,12 @@ function startScheduler() {
   // the email" under 15 min.
   cron.schedule('*/15 * * * *', () => runWhatsAppFollowupCheck());
   console.log('✓ WhatsApp re-engagement check scheduled (every 15 min)');
+
+  // ── Capture openers: every 15 min ──────────────────────────────────────────
+  // Day 1-3 activation questions for newly linked WhatsApp users, sent in
+  // their local 11:00 window. Per-user daily scheduler lock inside the job.
+  cron.schedule('*/15 * * * *', () => runCaptureOpenerCheck());
+  console.log('✓ WhatsApp capture-opener check scheduled (every 15 min)');
 
   // ── AI provider health check: every hour at :05 ────────────────────────────
   // Detects "Gemini went dark" failure modes (key unset, quota exhausted,
