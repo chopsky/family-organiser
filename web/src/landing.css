@@ -55,38 +55,25 @@
 .lv .lv-h2 { font-size: clamp(34px, 4.2vw, 54px); line-height: 1.08; }
 .lv .lv-sub { color: var(--lv-ink-2); font-size: 17px; line-height: 1.6; margin: 16px auto 0; max-width: 46ch; }
 
-/* ── Nav pill ── */
-.lv-navwrap { position: fixed; top: 0; left: 0; right: 0; z-index: 90; display: flex; justify-content: center; padding: 14px 14px 0; pointer-events: none; }
+/* ── Nav — minimal floating (UPDATE-hero-nav.md): no pill chrome in any
+      state, absolute so it scrolls away with the hero, logo + Get started
+      only. ── */
+.lv-navwrap { position: absolute; top: 0; left: 0; right: 0; z-index: 90; display: flex; justify-content: center; padding: 10px 14px 0; pointer-events: none; }
 .lv-nav {
   pointer-events: auto; display: flex; align-items: center; justify-content: space-between; gap: 18px;
   width: min(1120px, 100%);
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  border: 1px solid var(--lv-border-2); border-radius: 50vw;
   padding: 9px 9px 9px 20px;
-  background: rgba(250, 246, 239, 0.82);
-  box-shadow: 0 10px 34px rgba(36, 30, 51, 0.10);
-  transition: background 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease, backdrop-filter 0.35s ease;
 }
-.lv-nav .lv-nav-logo { height: 25px; display: block; transition: filter 0.35s ease; }
-.lv-nav-links { display: flex; align-items: center; gap: 26px; }
-.lv-nav-links a { color: var(--lv-ink); text-decoration: none; font-size: 16px; font-weight: 400; transition: color 0.35s ease; }
-.lv-nav-links a:hover { color: var(--lv-purple); }
+.lv-nav .lv-nav-logo { height: 25px; display: block; filter: brightness(0) invert(1); }
 .lv-nav-right { display: flex; align-items: center; gap: 18px; flex: none; }
+/* Frosted-glass Get started */
 .lv-nav-cta {
-  background: var(--lv-purple); color: var(--lv-cream-txt) !important; padding: 12px 23px; border-radius: 999px;
-  font-size: 16px; font-weight: 700; text-decoration: none; transition: background 0.2s ease; flex: none;
+  background-color: #fff3; border: 1px solid #ffffff59;
+  box-shadow: 0 2px 8px -2px #00000014, inset 0 1px #ffffff80;
+  color: var(--lv-cream-txt) !important; padding: 11px 22px; border-radius: 999px;
+  font-size: 14.5px; font-weight: 700; text-decoration: none; transition: background-color 0.2s ease; flex: none;
 }
-.lv-nav-cta:hover { background: var(--lv-purple-deep); }
-/* Over-hero state — glassy dark, white links, inverted logo */
-.lv-nav.over {
-  background-color: rgba(255, 255, 255, 0.15);
-  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-  border: 1px solid #ffffff36;
-  box-shadow: none;
-}
-.lv-nav.over .lv-nav-logo { filter: brightness(0) invert(1); }
-.lv-nav.over .lv-nav-links a { color: #fff; }
-.lv-nav.over .lv-nav-links a:hover { color: rgba(255, 255, 255, 0.75); }
+.lv-nav-cta:hover { background-color: rgb(255 255 255 / 30%); }
 
 /* ── Hero ── */
 .lv-hero {
@@ -95,8 +82,10 @@
   display: flex; flex-direction: column; justify-content: flex-end;
   background: #262626;
 }
-.lv-hero-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.8; filter: blur(2px); }
-.lv-hero-scrim { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.6; background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.88) 100%); }
+/* The img bleeds 8px past the section so the blur's transparent edge
+   never exposes the dark fallback as a band at the viewport top. */
+.lv-hero-img { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); object-fit: cover; opacity: 0.8; filter: blur(3px); }
+.lv-hero-scrim { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.6; background: linear-gradient(rgb(0 0 0 / 76%) 0%, rgb(0 0 0 / 30%) 45%, rgba(0, 0, 0, 0.88) 100%); }
 .lv-hero-noise { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.04; background-image: url('/landing/noise.png'); background-size: 160px 160px; }
 .lv-hero-inner {
   position: relative; z-index: 3; width: 100%; max-width: 1240px; margin: 0 auto;
@@ -106,19 +95,29 @@
 .lv-hero h1 { color: var(--lv-cream); color: #FAF6EF; font-size: clamp(40px, 6.4vw, 86px); line-height: 1.02; letter-spacing: -0.015em; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.05s both; }
 .lv-hero-sub { color: #FAF6EF; font-size: clamp(16px, 1.6vw, 19.5px); line-height: 1.6; margin: 0; max-width: 52ch; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.18s both; }
 .lv-hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both; }
-.lv-btn-cream {
-  display: inline-block; background: #FAF6EF; color: var(--lv-ink) !important; padding: 15px 30px; border-radius: 999px;
-  font-weight: 700; font-size: 16px; text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* Primary "Get the app": purple with a gleam that sweeps across on hover. */
+.lv-btn-shine {
+  display: inline-block; background-color: rgb(109, 56, 173);
+  background-image: linear-gradient(115deg, transparent 30%, #ffffff40 50%, transparent 70%);
+  background-repeat: no-repeat; background-size: 220% 100%; background-position: -160% 0;
+  border: 1px solid #ffffff1f;
+  box-shadow: 0 4px 24px -2px #60208d66, 0 0 0 1px #20808d33, inset 0 1px #ffffff26;
+  color: var(--lv-cream-txt) !important; padding: 13px 27px; border-radius: 999px;
+  font-weight: 700; font-size: 16px; text-decoration: none;
+  transition: background-position 0.55s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
-.lv-btn-cream:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(18, 12, 28, 0.35); }
+.lv-btn-shine:hover {
+  background-position: 160% 0; transform: translateY(-2px);
+  box-shadow: 0 8px 32px -2px #60208d99, 0 0 0 1px #20808d33, inset 0 1px #ffffff26;
+}
 .lv-btn-ghost {
   display: inline-flex; align-items: center; gap: 9px; color: #FAF6EF !important;
   border: 1.5px solid rgba(250, 246, 239, 0.55); padding: 13.5px 26px; border-radius: 999px;
   font-weight: 600; font-size: 15.5px; text-decoration: none;
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
-.lv-btn-ghost:hover { background: rgba(250, 246, 239, 0.14); }
+.lv-btn-ghost:hover { background: rgba(250, 246, 239, 0.14); transform: translateY(-2px); }
 .lv-hero-trial { color: #FAF6EFB9; font-size: 13.5px; font-weight: 500; letter-spacing: 0.02em; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.4s both; }
 
 /* ── Section shells ── */
@@ -330,7 +329,7 @@
 
 /* ── Compact (<800) ── */
 @media (max-width: 799px) {
-  .lv-nav-links { display: none; }
+  .lv-nav { padding: 10px 8px 0px; }
 }
 
 /* ── Reduced motion ── */

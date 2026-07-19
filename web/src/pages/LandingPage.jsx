@@ -11,9 +11,11 @@ import { APP_STORE_URL, APP_STORE_CONFIGURED } from '../lib/app-store'
  *
  * One component serves / and every locale path (/gb /us /eu /au /ca /za):
  * copy, currency and demo content adapt via useLocale(). The scroll story,
- * nav two-state, marquee and reveals are driven from a single rAF loop —
- * the progress maths is ported verbatim from the prototype's behaviour
- * class, which the handoff calls directly portable.
+ * marquee and reveals are driven from a single rAF loop — the progress
+ * maths is ported verbatim from the prototype's behaviour class, which
+ * the handoff calls directly portable. Nav is minimal per
+ * UPDATE-hero-nav.md: absolute (scrolls away with the hero), logo +
+ * Get started only, no scrolled state.
  */
 
 const SIGNUP_URL = '/signup'
@@ -170,7 +172,6 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false }) {
 export default function LandingPage() {
   const locale = useLocale()
   const [openFaq, setOpenFaq] = useState(null)
-  const [navOver, setNavOver] = useState(true)
 
   const el = useRef({})
   const setEl = (name) => (node) => { el.current[name] = node }
@@ -272,22 +273,11 @@ export default function LandingPage() {
     let raf
     let mqX = 0
     let mqLast = 0
-    let over = null
 
     const inv = (v, a, b) => Math.min(1, Math.max(0, (v - a) / (b - a)))
     const ease = (t) => t * t * (3 - 2 * t)
 
     const applyScroll = () => {
-      // Nav state: glassy-dark while the hero is still behind the pill.
-      const nav = E.nav
-      const hero = E.hero
-      let navBottom = 86
-      if (nav && hero) {
-        navBottom = nav.getBoundingClientRect().bottom
-        const isOver = hero.getBoundingClientRect().bottom > navBottom
-        if (isOver !== over) { over = isOver; setNavOver(isOver) }
-      }
-
       const st = E.story
       if (!st) return
       const vh = window.innerHeight
@@ -303,11 +293,12 @@ export default function LandingPage() {
       const fh = E.frame ? E.frame.offsetHeight / 2 : vh * 0.3
 
       // Narrow: the whole cluster rises 50% → 38% as the story begins —
-      // clamped so the phone's top never tucks under the nav pill on
-      // short viewports.
+      // clamped so the phone's top keeps a margin from the viewport top
+      // on short screens (the nav scrolls away with the hero, so it's
+      // no longer a factor here).
       const topPct = narrow ? 50 - 12 * ease(inv(prog, 0.15, 0.22)) : 50
       let centrePx = (topPct / 100) * vh
-      if (narrow) centrePx = Math.max(centrePx, navBottom + 16 + fh * 1.05)
+      if (narrow) centrePx = Math.max(centrePx, 20 + fh * 1.05)
       const tp = `${centrePx.toFixed(0)}px`
       if (E.phoneWrap) E.phoneWrap.style.top = narrow ? tp : '50%'
       if (E.glow) E.glow.style.top = narrow ? tp : '50%'
@@ -412,18 +403,13 @@ export default function LandingPage() {
     <div className="lv">
       <HreflangTags locale={locale} />
 
-      {/* ── Nav pill ── */}
+      {/* ── Nav — minimal floating: logo + Get started, scrolls away with
+            the hero (no fixed position, no scrolled state). ── */}
       <div className="lv-navwrap">
-        <nav ref={setEl('nav')} className={`lv-nav${navOver ? ' over' : ''}`}>
+        <nav className="lv-nav">
           <a href="#top" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flex: 'none' }}>
             <img className="lv-nav-logo" src="/housemait-logo-web.svg" alt="Housemait" />
           </a>
-          <div className="lv-nav-links">
-            <a href="#story">Features</a>
-            <a href="#reviews">Reviews</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-          </div>
           <div className="lv-nav-right">
             <Link to={SIGNUP_URL} className="lv-nav-cta">Get started</Link>
           </div>
@@ -431,7 +417,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── Hero ── */}
-      <section id="top" className="lv-hero" ref={setEl('hero')}>
+      <section id="top" className="lv-hero">
         <img className="lv-hero-img" src="/landing/hero-family.jpg" alt="A family laughing together over dinner at home" fetchPriority="high" />
         <div className="lv-hero-scrim" />
         <div className="lv-hero-noise" />
@@ -440,11 +426,11 @@ export default function LandingPage() {
           <p className="lv-hero-sub">One home for the family calendar, meals, lists and chores, with an AI assistant in WhatsApp that does it all for you.</p>
           <div className="lv-hero-ctas">
             {APP_STORE_CONFIGURED ? (
-              <QrLink href={APP_STORE_URL} className="lv-btn-cream" preferUp ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
+              <QrLink href={APP_STORE_URL} className="lv-btn-shine" preferUp ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
                 Get the app
               </QrLink>
             ) : (
-              <Link to={SIGNUP_URL} className="lv-btn-cream">Get started</Link>
+              <Link to={SIGNUP_URL} className="lv-btn-shine">Get started</Link>
             )}
             <a href="#story" className="lv-btn-ghost">
               See how it works
