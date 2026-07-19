@@ -70,7 +70,10 @@ export const KID_AVATARS = ['🦖', '🦄', '🐱', '🐶', '🦊', '🐼', '�
 export const KIDS_INK = { ink: '#312B4B', ink2: '#6C6690', ink3: '#A6A1C4', paper: '#FFFDF8', sun: '#FBB733', grape: '#8B5CF6' };
 
 // A child is a dependent member record (same rule as the Rewards page).
-export const isKidMember = (m) => m?.member_type === 'dependent';
+// Pets share member_type='dependent' but must never appear as selectable
+// kids (Kids Mode, star charts, kid notes). Null dependent_kind = legacy
+// row, treated as child (pre-split behaviour).
+export const isKidMember = (m) => m?.member_type === 'dependent' && m?.dependent_kind !== 'pet';
 
 const presetByKey = Object.fromEntries(KID_COLOR_PRESETS.map((p) => [p.key, p]));
 

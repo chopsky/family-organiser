@@ -367,6 +367,10 @@ export default function FamilySetup() {
   const [removingMemberIds, setRemovingMemberIds] = useState(() => new Set());
   const [depName, setDepName] = useState('');
   const [depRole, setDepRole] = useState('');
+  // 'child' | 'pet' - explicit, because children and pets share
+  // member_type='dependent' and every kid-gated surface (Kids Mode, school
+  // links, WhatsApp capture questions) needs to tell them apart reliably.
+  const [depKind, setDepKind] = useState('child');
   const [depBirthday, setDepBirthday] = useState('');
   const [depColor, setDepColor] = useState('teal');
   const [addingDependent, setAddingDependent] = useState(false);
@@ -388,6 +392,7 @@ export default function FamilySetup() {
 
   // Edit profile state
   const [editingMember, setEditingMember] = useState(null);
+  const [profileKind, setProfileKind] = useState('child'); // dependents only: 'child' | 'pet'
   const [profileName, setProfileName] = useState('');
   const [profileRole, setProfileRole] = useState('');
   const [profileBirthday, setProfileBirthday] = useState('');
@@ -508,6 +513,7 @@ export default function FamilySetup() {
   function openAddDependent() {
     setDepName('');
     setDepRole('');
+    setDepKind('child');
     setDepBirthday('');
     // Pre-pick the next colour not yet used in this household so a
     // newly-added child gets a distinct avatar by default. Admin can
@@ -543,6 +549,7 @@ export default function FamilySetup() {
         birthday: depBirthday || null,
         color_theme: depColor,
         school_id: schoolId,
+        dependent_kind: depKind,
       });
       setShowAddDependent(false);
       await loadMembers();
@@ -602,6 +609,7 @@ export default function FamilySetup() {
     setEditingMember(member);
     setProfileName(member.name || '');
     setProfileRole(member.family_role || '');
+    setProfileKind(member.dependent_kind === 'pet' ? 'pet' : 'child');
     setProfileBirthday(member.birthday || '');
     setProfileColor(member.color_theme || 'sage');
     setProfileAvatar(member.avatar_url || null);
@@ -722,6 +730,12 @@ export default function FamilySetup() {
       // When admin edits another member, include target user_id
       if (!isEditingSelf) {
         payload.user_id = targetId;
+      }
+
+      // Child/pet split only exists on dependents; the backend ignores it
+      // for account members anyway, but don't send noise.
+      if (editingMember?.member_type === 'dependent') {
+        payload.dependent_kind = profileKind;
       }
 
       await api.patch('/household/profile', payload);
@@ -1531,13 +1545,41 @@ export default function FamilySetup() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
-                <input type="text" value={depName} onChange={(e) => setDepName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Luna, Baby Oliver" />
+                <label className="block text-sm font-medium text-bark mb-1.5">Who are you adding?</label>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Child or pet">
+                  {[['child', '🧒 Child'], ['pet', '🐾 Pet']].map(([kind, label]) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="radio"
+                      aria-checked={depKind === kind}
+                      onClick={() => {
+                        setDepKind(kind);
+                        // Sensible role default when flipping - never overwrite
+                        // something the user actually picked.
+                        if (kind === 'pet' && !depRole) setDepRole('Pet');
+                        if (kind === 'child' && depRole === 'Pet') setDepRole('');
+                      }}
+                      className={`py-2.5 rounded-lg border text-sm font-medium transition-colors ${depKind === kind ? 'border-accent bg-accent/10 text-bark' : 'border-cream-border text-cocoa hover:bg-sand'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-bark mb-1">Role</label>
-                <input type="text" value={depRole} onChange={(e) => setDepRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder="e.g. Baby, Dog, Toddler" />
+                <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
+                <input type="text" value={depName} onChange={(e) => setDepName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder={depKind === 'pet' ? 'e.g. Luna' : 'e.g. Sofia, Baby Oliver'} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-bark mb-1">Family role</label>
+                <select value={depRole} onChange={(e) => setDepRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white">
+                  <option value="">Select role…</option>
+                  {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {depRole && !FAMILY_ROLES.includes(depRole) && <option value={depRole}>{depRole}</option>}
+                </select>
               </div>
 
               <div>
@@ -1788,6 +1830,26 @@ export default function FamilySetup() {
                   placeholder="Your name"
                 />
               </div>
+
+              {editingMember?.member_type === 'dependent' && (
+                <div>
+                  <label className="block text-sm font-medium text-bark mb-1.5">Child or pet?</label>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Child or pet">
+                    {[['child', '🧒 Child'], ['pet', '🐾 Pet']].map(([kind, label]) => (
+                      <button
+                        key={kind}
+                        type="button"
+                        role="radio"
+                        aria-checked={profileKind === kind}
+                        onClick={() => setProfileKind(kind)}
+                        className={`py-2.5 rounded-lg border text-sm font-medium transition-colors ${profileKind === kind ? 'border-accent bg-accent/10 text-bark' : 'border-cream-border text-cocoa hover:bg-sand'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Family role</label>

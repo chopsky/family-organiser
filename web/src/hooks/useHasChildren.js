@@ -40,7 +40,10 @@ function refresh(force = false) {
   if (inFlight) return;
   inFlight = api.get('/household')
     .then((r) => {
-      const has = (r.data?.members || []).some((m) => m.member_type === 'dependent');
+      // Pets are dependents too (same member_type) - only actual children
+      // count. Legacy rows without dependent_kind (migration not yet run)
+      // keep the old all-dependents-are-kids behaviour.
+      const has = (r.data?.members || []).some((m) => m.member_type === 'dependent' && m.dependent_kind !== 'pet');
       try { localStorage.setItem(KEY, has ? '1' : '0'); } catch { /* private browsing */ }
       lastFetchTs = Date.now();
       window.dispatchEvent(new CustomEvent('housemait:has-children', { detail: has }));

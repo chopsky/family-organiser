@@ -634,22 +634,26 @@ async function deleteHouseholdPreference(id, householdId, db = supabase) {
 
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
-async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id }, db = supabase) {
-  const { data, error } = await db
-    .from('users')
-    .insert({
-      household_id: householdId,
-      name,
-      family_role: family_role || null,
-      birthday: birthday || null,
-      color_theme: color_theme || 'sage',
-      school_id: school_id || null,
-      member_type: 'dependent',
-      role: 'member',
-      email_verified: false,
-    })
-    .select()
-    .single();
+async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, dependent_kind }, db = supabase) {
+  const row = {
+    household_id: householdId,
+    name,
+    family_role: family_role || null,
+    birthday: birthday || null,
+    color_theme: color_theme || 'sage',
+    school_id: school_id || null,
+    member_type: 'dependent',
+    role: 'member',
+    email_verified: false,
+    dependent_kind: dependent_kind === 'pet' ? 'pet' : 'child',
+  };
+  let { data, error } = await db.from('users').insert(row).select().single();
+  if (error && error.code === 'PGRST204') {
+    // dependent_kind column not migrated yet (migration-dependent-kind.sql
+    // pending) - insert without it rather than failing the add.
+    delete row.dependent_kind;
+    ({ data, error } = await db.from('users').insert(row).select().single());
+  }
   if (error) throw error;
   return data;
 }

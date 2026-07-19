@@ -221,10 +221,11 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   // household (guards IDOR). Personal notification/locale/location settings stay
   // self-only and are skipped below when editing someone else.
   let targetUserId = req.user.id;
+  let targetMember = null;
   if (user_id && user_id !== req.user.id) {
     const members = await db.getHouseholdMembers(req.householdId);
-    const target = members.find(m => m.id === user_id);
-    if (!target) {
+    targetMember = members.find(m => m.id === user_id);
+    if (!targetMember) {
       return res.status(404).json({ error: 'Member not found in this household.' });
     }
     targetUserId = user_id;
@@ -232,6 +233,16 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const editingOther = targetUserId !== req.user.id;
 
   const updates = {};
+
+  // Child/pet split - only meaningful on dependent members (account holders
+  // are never children), so it's silently ignored for self-edits and
+  // validated when editing a dependent.
+  if (req.body.dependent_kind !== undefined && targetMember?.member_type === 'dependent') {
+    if (!['child', 'pet'].includes(req.body.dependent_kind)) {
+      return res.status(400).json({ error: "dependent_kind must be 'child' or 'pet'." });
+    }
+    updates.dependent_kind = req.body.dependent_kind;
+  }
 
   if (name !== undefined) {
     if (!name.trim()) return res.status(400).json({ error: 'Name cannot be empty.' });
@@ -314,7 +325,21 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
       oldSchoolId = targetMember?.school_id || null;
     }
 
-    const updated = await db.updateUser(targetUserId, updates);
+    let updated;
+    try {
+      updated = await db.updateUser(targetUserId, updates);
+    } catch (err) {
+      if (err?.code === 'PGRST204' && updates.dependent_kind !== undefined) {
+        // dependent_kind column not migrated yet - apply the rest of the
+        // edit rather than failing the whole profile save.
+        delete updates.dependent_kind;
+        updated = Object.keys(updates).length > 0
+          ? await db.updateUser(targetUserId, updates)
+          : await db.getUserById(targetUserId);
+      } else {
+        throw err;
+      }
+    }
 
     // Clean up orphaned schools - but ONLY when the old school is genuinely
     // empty: no remaining children AND no imported term dates AND no iCal
@@ -521,10 +546,13 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
  * Add a dependent (infant, pet, etc.) to the household. Admin only.
  */
 router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, family_role, birthday, color_theme, school_id } = req.body;
+  const { name, family_role, birthday, color_theme, school_id, dependent_kind } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Name is required.' });
+  }
+  if (dependent_kind !== undefined && !['child', 'pet'].includes(dependent_kind)) {
+    return res.status(400).json({ error: "dependent_kind must be 'child' or 'pet'." });
   }
 
   try {
@@ -539,6 +567,9 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
       birthday: birthday || null,
       color_theme: finalColor,
       school_id: school_id || null,
+      // Older app builds don't send dependent_kind; default those to
+      // 'child' (the pre-split behaviour) rather than leaving it null.
+      dependent_kind: dependent_kind || 'child',
     });
     cache.invalidate(`members:${req.householdId}`);
     cache.invalidate(`digest:${req.householdId}`);
