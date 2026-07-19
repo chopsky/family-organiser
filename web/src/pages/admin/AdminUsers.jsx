@@ -138,7 +138,7 @@ export default function AdminUsers() {
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">Role</th>
                   <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Last WhatsApp</th>
+                  <SortableHeader column="last_whatsapp_at" label="Last WhatsApp" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Platform</th>
                   <SortableHeader column="created_at" label="Joined" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />
                 </tr>

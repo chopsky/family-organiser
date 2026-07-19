@@ -14,7 +14,7 @@ export default function SortableHeader({ column, label, sort, sortDir, onSort, c
       // First click on a new column defaults to descending for timestamp
       // columns (most-recent first feels natural for activity / dates),
       // ascending for text columns (names look natural A→Z first).
-      const isTimestampCol = column === 'created_at' || column === 'last_active_at';
+      const isTimestampCol = column === 'created_at' || column === 'last_active_at' || column === 'last_whatsapp_at';
       onSort(column, isTimestampCol ? 'desc' : 'asc');
     }
   }

@@ -4856,27 +4856,37 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
  * over whatsapp_message_log would pull every row for the page's users and,
  * worse, PostgREST silently caps unpaginated selects at 1000 rows - a user
  * whose last message predates the cap's window would wrongly show "Never".
- * Page size is <= 100 so the parallel fan-out stays bounded.
+ * Each lookup rides the (user_id, created_at DESC) index.
+ *
+ * Chunked because the sort-by-last-whatsapp path calls this over EVERY
+ * matching user id, not just one page - 25 concurrent lookups per wave
+ * keeps the PostgREST fan-out bounded at any user-base size. (If the base
+ * ever reaches thousands, replace with a GROUP BY MAX() SQL function -
+ * same shape as migration-ai-usage-timeline-rpc.sql.)
  *
  * Returns Map<userId, ISO timestamp>; absent = never messaged.
  */
 async function fetchLastWhatsAppByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
-  const results = await Promise.all(
-    userIds.map((id) =>
-      db
-        .from('whatsapp_message_log')
-        .select('created_at')
-        .eq('user_id', id)
-        .eq('direction', 'inbound')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .then((res) => ({ id, ts: res.data?.[0]?.created_at || null }))
-    )
-  );
+  const CHUNK = 25;
   const map = new Map();
-  for (const { id, ts } of results) {
-    if (ts) map.set(id, ts);
+  for (let i = 0; i < userIds.length; i += CHUNK) {
+    const chunk = userIds.slice(i, i + CHUNK);
+    const results = await Promise.all(
+      chunk.map((id) =>
+        db
+          .from('whatsapp_message_log')
+          .select('created_at')
+          .eq('user_id', id)
+          .eq('direction', 'inbound')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .then((res) => ({ id, ts: res.data?.[0]?.created_at || null }))
+      )
+    );
+    for (const { id, ts } of results) {
+      if (ts) map.set(id, ts);
+    }
   }
   return map;
 }
@@ -5152,8 +5162,8 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
   // map, sort in memory, then page through the sorted ID list. The user
   // base is small enough (hundreds, not millions) that the extra
   // round-trip is fine.
-  if (sort === 'last_active_at') {
-    return getAllUsersAdminByLastActive({ search, page, limit, sortDir, status }, db);
+  if (sort === 'last_active_at' || sort === 'last_whatsapp_at') {
+    return getAllUsersAdminByDerivedSort({ search, page, limit, sortDir, status, sortKey: sort }, db);
   }
 
   let query = db
@@ -5196,12 +5206,14 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
 }
 
 /**
- * Two-step path for sort=last_active_at. Fetches all matching user IDs
- * + last_active_at, sorts (nulls always last so users who've never logged
- * in surface at the bottom regardless of direction), then fetches full
- * rows for just the requested page.
+ * Two-step path for the derived sort columns (last_active_at,
+ * last_whatsapp_at) - values computed from other tables that Postgres
+ * can't ORDER BY directly. Fetches all matching user IDs, builds the
+ * sort-key map for every id, sorts in memory (nulls always last so
+ * never-logged-in / never-messaged users sit at the bottom regardless
+ * of direction), then fetches full rows for just the requested page.
  */
-async function getAllUsersAdminByLastActive({ search, page, limit, sortDir, status }, db) {
+async function getAllUsersAdminByDerivedSort({ search, page, limit, sortDir, status, sortKey }, db) {
   // 1. All matching IDs (no range, no full payload yet)
   let idQuery = db.from('users').select('id', { count: 'exact' });
   if (search) {
@@ -5214,16 +5226,15 @@ async function getAllUsersAdminByLastActive({ search, page, limit, sortDir, stat
   const allIds = (idRows || []).map((r) => r.id);
   if (allIds.length === 0) return { users: [], total: 0 };
 
-  // 2. last_active_at for each
-  const lastActiveMap = await fetchLastActiveByUserIds(allIds, db);
+  // 2. The sort key for every matching user
+  const sortMap = sortKey === 'last_whatsapp_at'
+    ? await fetchLastWhatsAppByUserIds(allIds, db)
+    : await fetchLastActiveByUserIds(allIds, db);
 
-  // 3. Sort. Nulls always go last regardless of direction - if we're sorting
-  //    most-recent-first the never-logged-in users sit at the bottom; if
-  //    oldest-first they still sit at the bottom (rather than spuriously
-  //    leading the list with "earliest" = null).
+  // 3. Sort. Nulls always go last regardless of direction.
   const sortedIds = allIds.slice().sort((a, b) => {
-    const ta = lastActiveMap.get(a);
-    const tb = lastActiveMap.get(b);
+    const ta = sortMap.get(a);
+    const tb = sortMap.get(b);
     if (!ta && !tb) return 0;
     if (!ta) return 1;
     if (!tb) return -1;
@@ -5243,12 +5254,18 @@ async function getAllUsersAdminByLastActive({ search, page, limit, sortDir, stat
   if (rowErr) throw rowErr;
 
   // 6. Preserve the sorted order (Postgres .in() doesn't return rows in
-  //    the order we asked for) + attach last_active_at, platforms, and
-  //    last WhatsApp to the response
-  const [platformsMap, lastWhatsAppMap] = await Promise.all([
+  //    the order we asked for) + attach the display enrichments. The
+  //    sort-key map already covers all ids; the OTHER derived column only
+  //    needs the current page.
+  const [platformsMap, otherMap] = await Promise.all([
     getPlatformsByUserIds(pageIds, db),
-    fetchLastWhatsAppByUserIds(pageIds, db),
+    sortKey === 'last_whatsapp_at'
+      ? fetchLastActiveByUserIds(pageIds, db)
+      : fetchLastWhatsAppByUserIds(pageIds, db),
   ]);
+  const lastActiveMap = sortKey === 'last_whatsapp_at' ? otherMap : sortMap;
+  const lastWhatsAppMap = sortKey === 'last_whatsapp_at' ? sortMap : otherMap;
+
   const byId = new Map((rows || []).map((r) => [r.id, r]));
   const ordered = pageIds
     .map((id) => byId.get(id))
