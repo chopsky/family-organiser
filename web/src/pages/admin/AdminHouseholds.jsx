@@ -5,6 +5,7 @@ import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
 import SortableHeader from '../../components/SortableHeader';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
@@ -31,15 +32,21 @@ export default function AdminHouseholds() {
   const [households, setHouseholds] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  // searchInput is the live text field; search is the APPLIED term the
+  // fetch depends on. Splitting them stops every keystroke refetching -
+  // only the form submit applies the term.
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState(initialPlan);
   const [activityFilter, setActivityFilter] = useState(initialActivity);
   const [sort, setSort] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadHouseholds = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
@@ -50,6 +57,7 @@ export default function AdminHouseholds() {
       setTotal(data.total || 0);
     } catch (err) {
       console.error('Failed to load households:', err);
+      setError('Could not load households. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +68,7 @@ export default function AdminHouseholds() {
   function handleSearch(e) {
     e.preventDefault();
     setPage(1);
-    loadHouseholds();
+    setSearch(searchInput.trim());
   }
 
   function handleSort(column, direction) {
@@ -99,8 +107,8 @@ export default function AdminHouseholds() {
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search by household name..."
               className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
             />
@@ -129,9 +137,14 @@ export default function AdminHouseholds() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="mt-4 bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
-        {loading ? (
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={loadHouseholds} />
+      </div>
+
+      {/* Table - keeps previous rows visible (dimmed) during refetch; the
+          full spinner only shows on the very first load. */}
+      <div className={`mt-4 bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden ${loading && households.length > 0 ? 'opacity-60 pointer-events-none' : ''}`}>
+        {loading && households.length === 0 ? (
           <div className="flex justify-center py-12"><Spinner /></div>
         ) : (
           <div className="overflow-x-auto">

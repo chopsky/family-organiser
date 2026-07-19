@@ -16,7 +16,7 @@
  * No edits / actions from this page. It's read-only diagnostics.
  */
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import api from '../../lib/api';
 
 const STATUS_STYLES = {
@@ -72,6 +72,7 @@ export default function AdminInboundEmails() {
       </p>
 
       <div className="bg-white rounded-2xl border border-light-grey overflow-hidden" style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-cream border-b border-light-grey">
             <tr className="text-left text-xs text-warm-grey uppercase tracking-wide">
@@ -103,8 +104,8 @@ export default function AdminInboundEmails() {
               const total = counts.checked + counts.added + counts.events + counts.tasks;
               const expanded = expandedId === row.id;
               return (
-                <>
-                  <tr key={row.id} className="border-b border-light-grey hover:bg-cream/30 cursor-pointer" onClick={() => setExpandedId(expanded ? null : row.id)}>
+                <Fragment key={row.id}>
+                  <tr className="border-b border-light-grey hover:bg-cream/30 cursor-pointer" onClick={() => setExpandedId(expanded ? null : row.id)}>
                     <td className="px-4 py-3 text-xs text-warm-grey whitespace-nowrap">{formatTimestamp(row.created_at)}</td>
                     <td className="px-4 py-3 text-charcoal whitespace-nowrap">{row.household_name || row.household_id}</td>
                     <td className="px-4 py-3 text-charcoal text-xs truncate" style={{ maxWidth: 200 }}>{row.from_email}</td>
@@ -169,11 +170,12 @@ export default function AdminInboundEmails() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

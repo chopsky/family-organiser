@@ -5,6 +5,7 @@ import { IconCpu } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 function rangeLabel(days) {
@@ -36,13 +37,20 @@ export default function AdminAiUsage() {
     }
   }
 
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
   useEffect(() => {
     setLoading(true);
+    setError(null);
     api.get('/admin/ai-usage', { params: { days } })
       .then(({ data }) => setData(data))
-      .catch((err) => console.error('Failed to load AI usage:', err))
+      .catch((err) => {
+        console.error('Failed to load AI usage:', err);
+        setError('Could not load AI usage. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, reloadKey]);
 
   if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
@@ -70,6 +78,10 @@ export default function AdminAiUsage() {
           <p className="text-warm-grey text-sm">API calls across Gemini, Claude, and GPT-4o</p>
         </div>
         <DateRangeToggle value={days} onChange={setDays} />
+      </div>
+
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
 
       {/* ── Bot health — the strip the founder checks after any bot change.

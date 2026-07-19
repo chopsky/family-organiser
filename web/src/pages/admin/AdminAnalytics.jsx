@@ -3,6 +3,7 @@ import api from '../../lib/api';
 import { IconTrendingUp } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+import ErrorBanner from '../../components/ErrorBanner';
 
 function rangeLabel(days) {
   if (days === DAYS_ALL) return 'all time';
@@ -13,14 +14,20 @@ export default function AdminAnalytics() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     api.get('/admin/analytics', { params: { days } })
       .then(({ data }) => setData(data))
-      .catch((err) => console.error('Failed to load analytics:', err))
+      .catch((err) => {
+        console.error('Failed to load analytics:', err);
+        setError('Could not load analytics. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, reloadKey]);
 
   if (loading && !data) return <div className="flex justify-center py-20"><Spinner /></div>;
 
@@ -46,6 +53,10 @@ export default function AdminAnalytics() {
           <p className="text-warm-grey text-sm">User activity, feature usage, and onboarding</p>
         </div>
         <DateRangeToggle value={days} onChange={setDays} />
+      </div>
+
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
 
       {/* Stat Cards */}

@@ -4,15 +4,20 @@ import api from '../../lib/api';
 import { IconUsers, IconHome, IconTrendingUp } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
+import ErrorBanner from '../../components/ErrorBanner';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [recentUsers, setRecentUsers] = useState([]);
   const [recentHouseholds, setRecentHouseholds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError(null);
       try {
         const [statsRes, usersRes, householdsRes] = await Promise.all([
           api.get('/admin/stats'),
@@ -24,12 +29,13 @@ export default function AdminDashboard() {
         setRecentHouseholds(householdsRes.data.households || []);
       } catch (err) {
         console.error('Failed to load admin stats:', err);
+        setError('Could not load platform stats. Check your connection and try again.');
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
+  }, [reloadKey]);
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
 
@@ -52,6 +58,10 @@ export default function AdminDashboard() {
     <div>
       <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Platform Overview</h1>
       <p className="text-warm-grey text-sm mt-1">Key metrics at a glance</p>
+
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { IconRefresh } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 // A "partial-pull:" marker is the two-cycle delete-confirmation bookkeeping
@@ -43,16 +44,23 @@ export default function AdminCalendarSync() {
   const [feeds, setFeeds] = useState([]);
   const [outboundTokens, setOutboundTokens] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.get('/admin/calendar-sync')
       .then(({ data }) => {
         setFeeds(data.feeds || []);
         setOutboundTokens(data.outboundTokens || []);
       })
-      .catch((err) => console.error('Failed to load calendar sync:', err))
+      .catch((err) => {
+        console.error('Failed to load calendar sync:', err);
+        setError('Could not load calendar sync data. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [reloadKey]);
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
 
@@ -74,6 +82,10 @@ export default function AdminCalendarSync() {
         <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Calendar Sync</h1>
       </div>
       <p className="text-warm-grey text-sm">External iCal subscriptions (inbound) and shared feed tokens (outbound)</p>
+
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} />
+      </div>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">

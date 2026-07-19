@@ -7,6 +7,7 @@ import SubscriptionBadge from '../../components/SubscriptionBadge';
 import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import PlatformBadges from '../../components/PlatformBadges';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatBytes } from '../../lib/formatBytes';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
@@ -43,12 +44,20 @@ export default function AdminHouseholdDetail() {
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityDays, setActivityDays] = useState(30);
 
+  const [loadError, setLoadError] = useState(null);
+
   const loadHousehold = useCallback(async () => {
+    setLoadError(null);
     try {
       const { data } = await api.get(`/admin/households/${id}`);
       setHousehold(data);
     } catch (err) {
       console.error('Failed to load household:', err);
+      // A 404 is genuinely "not found"; anything else is a load failure
+      // and must not masquerade as "household doesn't exist".
+      if (err.response?.status !== 404) {
+        setLoadError('Could not load this household. Check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -124,6 +133,13 @@ export default function AdminHouseholdDetail() {
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+  if (!household && loadError) {
+    return (
+      <div className="py-10">
+        <ErrorBanner message={loadError} onRetry={() => { setLoading(true); loadHousehold(); }} />
+      </div>
+    );
+  }
   if (!household) return <p className="text-warm-grey py-10 text-center">Household not found</p>;
 
   return (
@@ -243,7 +259,7 @@ export default function AdminHouseholdDetail() {
           <h3 className="font-display text-lg font-semibold text-charcoal">AI Usage ({rangeLabel(aiUsageDays)})</h3>
           <DateRangeToggle value={aiUsageDays} onChange={setAiUsageDays} />
         </div>
-        <AiUsageCard usage={aiUsage} loading={aiUsageLoading} />
+        <AiUsageCard usage={aiUsage} loading={aiUsageLoading} days={aiUsageDays} />
       </div>
 
       {/* Product Activity */}
@@ -378,7 +394,7 @@ function QuotaBar({ label, used, limit, pct }) {
   );
 }
 
-function AiUsageCard({ usage, loading }) {
+function AiUsageCard({ usage, loading, days }) {
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
@@ -387,9 +403,10 @@ function AiUsageCard({ usage, loading }) {
     );
   }
   if (!usage || usage.totalCalls === 0) {
+    const windowLabel = days === DAYS_ALL ? 'ever' : `in the last ${days} days`;
     return (
       <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
-        <p className="text-sm text-warm-grey">No AI calls in the last 30 days</p>
+        <p className="text-sm text-warm-grey">No AI calls {windowLabel}</p>
       </div>
     );
   }

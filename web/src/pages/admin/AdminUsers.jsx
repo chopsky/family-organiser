@@ -5,6 +5,7 @@ import { IconSearch, IconChevronLeft, IconChevronRight } from '../../components/
 import Spinner from '../../components/Spinner';
 import SortableHeader from '../../components/SortableHeader';
 import PlatformBadges from '../../components/PlatformBadges';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 const PAGE_SIZE = 20;
@@ -13,13 +14,19 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  // searchInput is the live text field; search is the APPLIED term the
+  // fetch depends on. Splitting them stops every keystroke refetching -
+  // only the form submit applies the term.
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('created_at');
   const [sortDir, setSortDir] = useState('desc');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = { page, limit: PAGE_SIZE, sort, sortDir };
       if (search.trim()) params.search = search.trim();
@@ -28,6 +35,7 @@ export default function AdminUsers() {
       setTotal(data.total || 0);
     } catch (err) {
       console.error('Failed to load users:', err);
+      setError('Could not load users. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -38,7 +46,7 @@ export default function AdminUsers() {
   function handleSearch(e) {
     e.preventDefault();
     setPage(1);
-    loadUsers();
+    setSearch(searchInput.trim());
   }
 
   function handleSort(column, direction) {
@@ -70,8 +78,8 @@ export default function AdminUsers() {
           <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-warm-grey" />
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search by name or email..."
             className="w-full pl-10 pr-4 py-2.5 bg-cream border border-light-grey rounded-xl text-sm focus:outline-none focus:border-plum focus:ring-2 focus:ring-plum/20 transition-all"
           />
@@ -81,9 +89,14 @@ export default function AdminUsers() {
         </button>
       </form>
 
-      {/* Table */}
-      <div className="mt-4 bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden">
-        {loading ? (
+      <div className="mt-4">
+        <ErrorBanner message={error} onRetry={loadUsers} />
+      </div>
+
+      {/* Table - keeps previous rows visible (dimmed) during refetch; the
+          full spinner only shows on the very first load. */}
+      <div className={`mt-4 bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden ${loading && users.length > 0 ? 'opacity-60 pointer-events-none' : ''}`}>
+        {loading && users.length === 0 ? (
           <div className="flex justify-center py-12"><Spinner /></div>
         ) : (
           <div className="overflow-x-auto">

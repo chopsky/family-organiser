@@ -3,6 +3,7 @@ import api from '../../lib/api';
 import { IconMessageCircle } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
+import ErrorBanner from '../../components/ErrorBanner';
 
 function rangeLabel(days) {
   if (days === DAYS_ALL) return 'all time';
@@ -84,13 +85,20 @@ export default function AdminWhatsApp() {
     }
   }
 
+  const [statsError, setStatsError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
   useEffect(() => {
     setLoading(true);
+    setStatsError(null);
     api.get('/admin/whatsapp-stats', { params: { days } })
       .then(({ data }) => setData(data))
-      .catch((err) => console.error('Failed to load WhatsApp stats:', err))
+      .catch((err) => {
+        console.error('Failed to load WhatsApp stats:', err);
+        setStatsError('Could not load WhatsApp stats. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, reloadKey]);
 
   async function handleTriggerMorningBrief() {
     setTriggering(true);
@@ -134,6 +142,10 @@ export default function AdminWhatsApp() {
           <p className="text-warm-grey text-sm">Message processing and intent breakdown</p>
         </div>
         <DateRangeToggle value={days} onChange={setDays} />
+      </div>
+
+      <div className="mt-4">
+        <ErrorBanner message={statsError} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
 
       {/* Test tools - admin-only manual digest trigger */}

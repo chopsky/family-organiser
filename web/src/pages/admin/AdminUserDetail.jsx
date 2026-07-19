@@ -7,6 +7,7 @@ import Spinner from '../../components/Spinner';
 import DailyChart from '../../components/DailyChart';
 import DateRangeToggle, { DAYS_ALL } from '../../components/DateRangeToggle';
 import PlatformBadges from '../../components/PlatformBadges';
+import ErrorBanner from '../../components/ErrorBanner';
 import { formatRelativeTime, staleness } from '../../lib/formatRelativeTime';
 
 function rangeLabel(days) {
@@ -37,12 +38,20 @@ export default function AdminUserDetail() {
   const [featureSpread, setFeatureSpread] = useState(null);
   const [featureSpreadLoading, setFeatureSpreadLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState(null);
+
   const loadUser = useCallback(async () => {
+    setLoadError(null);
     try {
       const { data } = await api.get(`/admin/users/${id}`);
       setUser(data);
     } catch (err) {
       console.error('Failed to load user:', err);
+      // A 404 is genuinely "not found"; anything else is a load failure
+      // and must not masquerade as "user doesn't exist".
+      if (err.response?.status !== 404) {
+        setLoadError('Could not load this user. Check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -136,6 +145,13 @@ export default function AdminUserDetail() {
   }
 
   if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+  if (!user && loadError) {
+    return (
+      <div className="py-10">
+        <ErrorBanner message={loadError} onRetry={() => { setLoading(true); loadUser(); }} />
+      </div>
+    );
+  }
   if (!user) return <p className="text-warm-grey py-10 text-center">User not found</p>;
 
   const ac = avatarColors[user.color_theme] || avatarColors.sage;
