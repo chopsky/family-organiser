@@ -455,6 +455,194 @@ function resolveSchoolChoice(text, schools) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+// ─── School-add conversation (school_add intent + activation opener) ─────────
+//
+// Trust rule: the bot NEVER acts on a name match alone - "Queen Elizabeth's
+// School" is dozens of schools. Every path shows the candidate (full name +
+// address + postcode) and waits for an explicit confirmation, mirroring the
+// confirm-before-modify architecture. Each question arms pending state so a
+// bare "yes" / "2" / child-name reply resolves deterministically.
+
+const pendingSchoolConfirm = new Map();   // userId → { candidates:[gias], householdId, timestamp }
+const pendingSchoolChildLink = new Map(); // userId → { schoolId, schoolName, children:[{id,name}], householdId, timestamp }
+const pendingSchoolSource = new Map();    // userId → { schoolId, schoolName, householdId, timestamp }
+// The source ask ("send me a photo/link/PDF") realistically gets answered
+// hours later - when the letter is dug out of the school bag - so it lives
+// far longer than the 5-minute conversational windows.
+const SCHOOL_SOURCE_TTL_MS = 48 * 60 * 60 * 1000;
+
+function rememberSchoolConfirm(userId, entry) {
+  if (!userId || !Array.isArray(entry?.candidates) || !entry.candidates.length) return;
+  pendingSchoolConfirm.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popSchoolConfirm(userId) {
+  const entry = pendingSchoolConfirm.get(userId);
+  if (!entry) return null;
+  pendingSchoolConfirm.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+function rememberSchoolChildLink(userId, entry) {
+  if (!userId || !Array.isArray(entry?.children) || !entry.children.length) return;
+  pendingSchoolChildLink.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popSchoolChildLink(userId) {
+  const entry = pendingSchoolChildLink.get(userId);
+  if (!entry) return null;
+  pendingSchoolChildLink.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+function rememberSchoolSource(userId, entry) {
+  if (!userId || !entry?.schoolId) return;
+  pendingSchoolSource.set(userId, { ...entry, timestamp: Date.now() });
+}
+function peekSchoolSource(userId) {
+  const entry = pendingSchoolSource.get(userId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > SCHOOL_SOURCE_TTL_MS) {
+    pendingSchoolSource.delete(userId);
+    return null;
+  }
+  return entry;
+}
+
+// Resolve a shortlist reply against GIAS candidates: number / ordinal / a
+// distinguishing substring of the name, address or postcode.
+function resolveSchoolCandidate(text, candidates) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t || !Array.isArray(candidates) || !candidates.length) return null;
+  const numMatch = t.match(/^(?:#|option\s+|number\s+)?(\d+)\.?$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    return (n >= 1 && n <= candidates.length) ? candidates[n - 1] : null;
+  }
+  const ordinals = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+  const ordMatch = t.match(/^(?:the\s+)?(first|second|third|fourth|fifth)(?:\s+one)?$/);
+  if (ordMatch) {
+    const n = ordinals[ordMatch[1]];
+    return n <= candidates.length ? candidates[n - 1] : null;
+  }
+  const hay = (c) => [c.name, c.address, c.postcode, c.local_authority].filter(Boolean).join(' ').toLowerCase();
+  const matches = candidates.filter((c) => hay(c).includes(t));
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Entry point for the school_add intent (and the opener's school answer):
+ * GIAS-search the user's words, then ask for confirmation - one candidate
+ * gets a yes/no, several get a numbered shortlist. Never imports here.
+ */
+async function handleSchoolAdd(schoolQuery, user, household, ctx, actions) {
+  const schoolAdd = require('../services/school-add');
+  const q = String(schoolQuery || '').trim();
+  if (!q) {
+    ctx.intent = 'school_add';
+    return { response: 'Which school is it? Give me the name and town - e.g. "Ashfield Primary, Leeds".', actions };
+  }
+  let candidates = [];
+  try {
+    candidates = await schoolAdd.searchGiasCandidates(q);
+  } catch (err) {
+    console.error('[handlers] school search failed:', err.message);
+    ctx.intent = 'school_add_error';
+    return { response: "I couldn't reach the schools register just now - mind trying again in a minute?", actions };
+  }
+  if (candidates.length === 0) {
+    ctx.intent = 'school_add_no_match';
+    return { response: `Hmm, I couldn't find "${q}" in the schools register. Try the full official name with the town - e.g. "Ashfield Primary School, Leeds".`, actions };
+  }
+  rememberSchoolConfirm(user.id, { candidates, householdId: household.id });
+  ctx.intent = 'school_add_confirm';
+  if (candidates.length === 1) {
+    return { response: `Found ${schoolAdd.candidateLabel(candidates[0])} - is that the one?`, actions };
+  }
+  const list = candidates.map((c, i) => `${i + 1}. ${schoolAdd.candidateLabel(c)}`).join('\n');
+  return { response: `I found a few schools matching that - which one?\n${list}\n\nReply with the number (or "none of these").`, actions };
+}
+
+/**
+ * The user confirmed a specific school. Create it, try to fill its term
+ * dates (council import / directory adopt), link the child where it's
+ * unambiguous, and - crucially - ask at most ONE follow-up question.
+ */
+async function completeSchoolAdd(gias, user, household, ctx, actions) {
+  const schoolAdd = require('../services/school-add');
+  let outcome;
+  try {
+    outcome = await schoolAdd.addConfirmedSchool({ householdId: household.id, userId: user.id, gias });
+  } catch (err) {
+    console.error('[handlers] school add failed:', err.message);
+    ctx.intent = 'school_add_error';
+    return { response: `I couldn't save ${gias.name} just now. Mind trying again in a minute?`, actions };
+  }
+  const { school, outcome: kind, imported, years, reason } = outcome;
+
+  // Children only (pets share member_type='dependent'; legacy rows with no
+  // dependent_kind are treated as children, matching the app).
+  const members = await db.getHouseholdMembers(household.id).catch(() => []);
+  const children = members.filter((m) => m.member_type === 'dependent' && m.dependent_kind !== 'pet');
+
+  // Auto-link when there's exactly one child - no question needed.
+  let linkedLine = '';
+  if (children.length === 1) {
+    await db.updateUser(children[0].id, { school_id: school.id }).catch(() => {});
+    linkedLine = ` I've linked it to ${children[0].name}.`;
+  }
+
+  const yearsLabel = years?.length ? ` for ${years.join(' and ')}` : '';
+
+  if (kind === 'needs_source') {
+    // One question at a time: the source ask wins; child-linking can happen
+    // any time later in the app (it only disambiguates multi-school homes).
+    rememberSchoolSource(user.id, { schoolId: school.id, schoolName: school.school_name, householdId: household.id });
+    ctx.intent = 'school_add_needs_source';
+    const why = reason
+      ? `${reason}`
+      : `${school.school_name} sets its own term dates, so I won't guess from the council's - wrong dates are worse than no dates!`;
+    return {
+      response: `✅ ${school.school_name} added.${linkedLine} ${why}\n\n📸 Send me a photo of their term-dates letter, the link to the dates page on their website, or the PDF - whatever's easiest - and I'll load them in.`,
+      actions,
+    };
+  }
+
+  const how = kind === 'directory_adopted'
+    ? `It sets its own dates, but I already have them on file - kept up to date by other ${school.school_name} families on Housemait.`
+    : `It follows ${school.local_authority} council dates.`;
+  let childAsk = '';
+  if (children.length > 1) {
+    rememberSchoolChildLink(user.id, {
+      schoolId: school.id,
+      schoolName: school.school_name,
+      children: children.map((c) => ({ id: c.id, name: c.name })),
+      householdId: household.id,
+    });
+    childAsk = `\n\nWhich of the kids goes there? (${children.map((c) => c.name).join(', ')} - or "all")`;
+  }
+  ctx.intent = 'school_add_imported';
+  return {
+    response: `✅ ${school.school_name} added.${linkedLine} ${how} I've loaded ${imported} term date${imported === 1 ? '' : 's'}${yearsLabel} onto your family calendar - term starts, half terms, holidays, the lot.${childAsk}`,
+    actions,
+  };
+}
+
+// Resolve the "which of the kids goes there?" answer: names (one or many),
+// "all"/"both", or a number. Returns the matched children ([] = no match).
+function resolveChildLinkAnswer(text, children) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t || !Array.isArray(children) || !children.length) return [];
+  if (/^(all|both|everyone|all of them|both of them)$/.test(t)) return children;
+  const numMatch = t.match(/^(\d+)$/);
+  if (numMatch) {
+    const n = parseInt(numMatch[1], 10);
+    return (n >= 1 && n <= children.length) ? [children[n - 1]] : [];
+  }
+  return children.filter((c) => {
+    const name = String(c.name || '').toLowerCase();
+    return name && (t === name || t.split(/[\s,]+and\s+|[\s,]+/).includes(name));
+  });
+}
+
 /**
  * Given a user message and a pending disambiguation entry, resolve which
  * candidate the user picked. Returns the candidate object, or null if the
@@ -1764,6 +1952,79 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     // Couldn't map to a school - drop and classify normally.
   }
 
+  // School confirmation ("is that the one?" / numbered shortlist). Armed by
+  // handleSchoolAdd; a yes / number / distinguishing detail completes the
+  // add, an explicit no invites a better search - anything else falls
+  // through to classify (the user moved on).
+  const pendingSchool = popSchoolConfirm(user.id);
+  if (pendingSchool && pendingSchool.householdId === household.id) {
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    const ans = parseAffirmative(text);
+    if (pendingSchool.candidates.length === 1 && ans === 'yes') {
+      return await completeSchoolAdd(pendingSchool.candidates[0], user, household, ctx, noActions);
+    }
+    const chosen = resolveSchoolCandidate(text, pendingSchool.candidates);
+    if (chosen) {
+      return await completeSchoolAdd(chosen, user, household, ctx, noActions);
+    }
+    if (ans === 'no' || /^none( of (these|them))?$/i.test(String(text).trim().replace(/[!.?]+$/, ''))) {
+      ctx.intent = 'school_add_retry';
+      return { response: 'No problem - tell me the school name with the town or postcode (e.g. "Queen Elizabeth\'s School, Barnet") and I\'ll look again.', actions: noActions };
+    }
+    // Not an answer to the school question - classify normally.
+  }
+
+  // "Which of the kids goes there?" answer after a school import.
+  const pendingChildLink = popSchoolChildLink(user.id);
+  if (pendingChildLink && pendingChildLink.householdId === household.id) {
+    const picked = resolveChildLinkAnswer(text, pendingChildLink.children);
+    if (picked.length > 0) {
+      for (const child of picked) {
+        await db.updateUser(child.id, { school_id: pendingChildLink.schoolId }).catch(() => {});
+      }
+      cache.invalidate(`members:${household.id}`);
+      ctx.intent = 'school_child_link';
+      const names = picked.map((c) => c.name).join(' and ');
+      return {
+        response: `Done - ${pendingChildLink.schoolName} is linked to ${names}. Term dates and holidays will show against their days. 🎒`,
+        actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] },
+      };
+    }
+    // Not a child answer - classify normally.
+  }
+
+  // A link sent while we're waiting for an own-calendar school's term-dates
+  // source ("send me a photo, link or PDF"). Calendar feed URLs (ics/webcal)
+  // keep their existing subscribe path below.
+  const schoolSource = peekSchoolSource(user.id);
+  if (schoolSource && schoolSource.householdId === household.id && !detectCalendarFeedUrl(text)) {
+    const urlMatch = String(text || '').match(/https?:\/\/\S+/i);
+    if (urlMatch) {
+      const schoolAddSvc = require('../services/school-add');
+      const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+      try {
+        const school = ((await db.getHouseholdSchools(household.id).catch(() => [])) || []).find((s) => s.id === schoolSource.schoolId);
+        if (!school) throw Object.assign(new Error('school gone'), { userMessage: "that school isn't on your account any more." });
+        const { imported, years } = await schoolAddSvc.importTermDatesFromUrl({
+          school, url: urlMatch[0], householdId: household.id, userId: user.id,
+        });
+        pendingSchoolSource.delete(user.id);
+        ctx.intent = 'school_source_imported';
+        return {
+          response: `Perfect, got them 🎉 ${imported} term date${imported === 1 ? '' : 's'}${years.length ? ` for ${years.join(' and ')}` : ''} for ${schoolSource.schoolName}, now on your family calendar. I'll keep them safe for the next ${schoolSource.schoolName} family too.`,
+          actions: noActions,
+        };
+      } catch (err) {
+        console.error('[handlers] school source import failed:', err.message);
+        ctx.intent = 'school_source_failed';
+        return {
+          response: `${err.userMessage || "I couldn't read term dates from that link."} A photo of the term-dates letter or the PDF works too - or try the exact page on the school site that lists the dates.`,
+          actions: noActions,
+        };
+      }
+    }
+  }
+
   // Trivial messages - greetings, thanks, emoji-only - get canned replies.
   const trivial = matchTrivialMessage(text);
   if (trivial) {
@@ -2373,6 +2634,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // Broadcasts fire on success so other household members see the change.
   if (['update_event', 'delete_event', 'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item'].includes(result.intent)) {
     return await handleModifyIntent(result, user, household, { openTasks, calendarEvents, originalText: text });
+  }
+
+  // Adding/tracking a school: GIAS search + always-confirm flow. The model
+  // only supplies the user's words (school_query); it never picks a school.
+  if (result.intent === 'school_add') {
+    return await handleSchoolAdd(result.school_query || text, user, household, ctx, actions);
   }
 
   // Handle school activity add/remove
@@ -3637,4 +3904,13 @@ module.exports = {
   formatRecipeResponse,
   CATEGORY_EMOJI,
   capitalise,
+  // School-add conversation (exported for tests)
+  handleSchoolAdd,
+  completeSchoolAdd,
+  resolveSchoolCandidate,
+  resolveChildLinkAnswer,
+  rememberSchoolConfirm,
+  rememberSchoolChildLink,
+  rememberSchoolSource,
+  peekSchoolSource,
 };

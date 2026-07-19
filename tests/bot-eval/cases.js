@@ -667,4 +667,29 @@ module.exports = [
       return null;
     },
   },
+
+  // ── 2026-07-20: school_add intent (activation opener). The model must
+  // carry the user's words into school_query and NEVER answer as if it
+  // matched a school itself - the handler owns GIAS search + confirmation.
+  {
+    name: 'school_add: naming the kids\' school routes to school_add with the words preserved',
+    message: 'The kids go to Ashfield Primary in Leeds',
+    ctx: { sender: 'Louise', memberNames: ['Louise', 'Sofia', 'Max'] },
+    check: (r) => {
+      if (r.intent !== 'school_add') return `intent ${r.intent}`;
+      if (!/ashfield/i.test(r.school_query || '')) return `school_query "${r.school_query}" lost the name`;
+      if (!/leeds/i.test(r.school_query || '')) return `school_query "${r.school_query}" dropped the town`;
+      return null;
+    },
+  },
+  {
+    name: 'school_add control: a one-off school trip stays school_event, not school_add',
+    message: 'Jake has a school trip next Thursday',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Jake'] },
+    check: (r) => {
+      if (r.intent === 'school_add') return 'misrouted to school_add';
+      if (!['school_event', 'create_event'].includes(r.intent)) return `intent ${r.intent}`;
+      return null;
+    },
+  },
 ];

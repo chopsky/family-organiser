@@ -69,7 +69,7 @@ const INTENTS = [
   'subscription_list', 'create_event', 'update_event', 'delete_event',
   'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item',
   'recipe', 'recipe_followup', 'weather', 'school_activity', 'school_event',
-  'web_search', 'chat',
+  'school_add', 'web_search', 'chat',
 ];
 const SHOPPING_CATEGORIES = [
   'Dairy & Eggs', 'Produce', 'Meat & Seafood', 'Pantry & Grains', 'Bakery',
@@ -192,6 +192,10 @@ const CLASSIFY_SCHEMA = obj({
   // query_calendar only: the specific event/activity asked about ("tennis"),
   // so the handler can filter to it and answer honestly on no match.
   query_topic: opt(str),
+  // school_add: the school name as the user gave it, location words included
+  // ("Ashfield Primary in Leeds"). The handler runs the GIAS search and the
+  // always-confirm flow; the model never picks a school itself.
+  school_query: opt(str),
 });
 
 // ── per-provider adapters ────────────────────────────────────────────────────

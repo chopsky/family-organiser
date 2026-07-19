@@ -31,6 +31,7 @@ jest.mock('../db/queries', () => ({
   updateCalendarEvent: jest.fn((id, hid, updates) => Promise.resolve({ id, title: 'x', ...updates })),
   findEventsByFuzzyTitle: jest.fn(() => Promise.resolve([])),
   softDeleteCalendarEvent: jest.fn(() => Promise.resolve()),
+  updateUser: jest.fn(() => Promise.resolve({})),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -55,6 +56,16 @@ jest.mock('../services/term-date-extract', () => ({
 }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), get: jest.fn(), set: jest.fn() }));
 jest.mock('../services/agent-loop', () => ({ agentEnabled: jest.fn(() => false), agentCalendarAnswer: jest.fn() }));
+jest.mock('../services/school-add', () => ({
+  searchGiasCandidates: jest.fn(),
+  addConfirmedSchool: jest.fn(),
+  importTermDatesFromUrl: jest.fn(),
+  // Real (trivial) implementation so confirmation copy carries the address.
+  candidateLabel: (c) => {
+    const where = [c.address, c.postcode].filter(Boolean).join(' ');
+    return where ? `${c.name} - ${where}` : c.name;
+  },
+}));
 
 const handlers = require('./handlers');
 const db = require('../db/queries');
@@ -765,5 +776,119 @@ describe('createCalendarEventFromResult — multi-day ranges', () => {
     );
     const row = db.createCalendarEvent.mock.calls[0][1];
     expect(row.end_time).toBe('2026-09-05T23:59:59Z');
+  });
+});
+
+// ─── School-add conversation (AC1) ──────────────────────────────────────────
+describe('school-add conversation', () => {
+  const schoolAdd = require('../services/school-add');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [] };
+  const parent = { id: 'u9', name: 'Louise' };
+  const emptyActions = () => ({ shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] });
+  const GIAS = {
+    urn: 100001, name: 'Ashfield Primary School', type: 'Community school',
+    local_authority: 'Leeds', address: 'Moor Road, Leeds', postcode: 'LS12 3SE',
+  };
+  const SCHOOL = { id: 'sc1', school_name: 'Ashfield Primary School', local_authority: 'Leeds' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.getHouseholdMembers.mockResolvedValue([]);
+  });
+
+  test('single candidate → confirm with full address, then "yes" completes and auto-links the only child', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: ['2026-2027'] });
+    db.getHouseholdMembers.mockResolvedValue([
+      { id: 'k1', name: 'Sofia', member_type: 'dependent', dependent_kind: 'child' },
+      { id: 'a1', name: 'Louise', member_type: 'account' },
+    ]);
+
+    const ask = await handlers.handleSchoolAdd('Ashfield Primary in Leeds', parent, hh, {}, emptyActions());
+    expect(ask.response).toMatch(/Moor Road, Leeds LS12 3SE/);
+    expect(ask.response).toMatch(/is that the one\?/i);
+    expect(schoolAdd.addConfirmedSchool).not.toHaveBeenCalled();
+
+    const done = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(schoolAdd.addConfirmedSchool).toHaveBeenCalledWith(
+      expect.objectContaining({ householdId: 'h9', gias: expect.objectContaining({ urn: 100001 }) })
+    );
+    expect(done.response).toMatch(/27 term dates/);
+    expect(done.response).toMatch(/Leeds council/);
+    expect(db.updateUser).toHaveBeenCalledWith('k1', { school_id: 'sc1' });
+  });
+
+  test('several candidates → numbered shortlist; "2" picks the second', async () => {
+    const c2 = { ...GIAS, urn: 100002, name: "Queen Elizabeth's Grammar School", address: 'Darwen Road, Blackburn', postcode: 'BB2 7DU' };
+    const c3 = { ...GIAS, urn: 100003, name: "Queen Elizabeth's School", address: 'High St, Barnet', postcode: 'EN5 5RR' };
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS, c2, c3]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 12, years: [] });
+
+    const ask = await handlers.handleSchoolAdd("Queen Elizabeth's", parent, hh, {}, emptyActions());
+    expect(ask.response).toMatch(/1\. /);
+    expect(ask.response).toMatch(/3\. /);
+
+    await handlers.handleTextMessage('2', parent, hh, {});
+    expect(schoolAdd.addConfirmedSchool).toHaveBeenCalledWith(
+      expect.objectContaining({ gias: expect.objectContaining({ urn: 100002 }) })
+    );
+  });
+
+  test('"none of these" → invites a better search, imports nothing', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    await handlers.handleSchoolAdd('Ashfield', parent, hh, {}, emptyActions());
+    const reply = await handlers.handleTextMessage('none of these', parent, hh, {});
+    expect(reply.response).toMatch(/look again/i);
+    expect(schoolAdd.addConfirmedSchool).not.toHaveBeenCalled();
+  });
+
+  test('own-calendar school with no directory dates → asks for photo/link/PDF, then a URL imports', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([{ ...GIAS, type: 'Academy converter' }]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'needs_source', imported: 0, years: [] });
+    schoolAdd.importTermDatesFromUrl.mockResolvedValue({ imported: 12, years: ['2026-2027'] });
+    db.getHouseholdSchools.mockResolvedValue([SCHOOL]);
+
+    await handlers.handleSchoolAdd("St Bede's Academy York", parent, hh, {}, emptyActions());
+    const asked = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(asked.response).toMatch(/photo|link|PDF/i);
+    expect(asked.response).toMatch(/won't guess/i);
+
+    const imported = await handlers.handleTextMessage('https://stbedes.example.sch.uk/term-dates', parent, hh, {});
+    expect(schoolAdd.importTermDatesFromUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://stbedes.example.sch.uk/term-dates' })
+    );
+    expect(imported.response).toMatch(/12 term dates/);
+  });
+
+  test('multiple children → asks which kid; a name answer links just that child', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: [] });
+    db.getHouseholdMembers.mockResolvedValue([
+      { id: 'k1', name: 'Sofia', member_type: 'dependent', dependent_kind: 'child' },
+      { id: 'k2', name: 'Max', member_type: 'dependent', dependent_kind: 'child' },
+    ]);
+
+    await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, emptyActions());
+    const done = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(done.response).toMatch(/Which of the kids/i);
+    expect(db.updateUser).not.toHaveBeenCalled();
+
+    const linked = await handlers.handleTextMessage('Sofia', parent, hh, {});
+    expect(db.updateUser).toHaveBeenCalledWith('k1', { school_id: 'sc1' });
+    expect(db.updateUser).not.toHaveBeenCalledWith('k2', expect.anything());
+    expect(linked.response).toMatch(/Sofia/);
+  });
+
+  test('pets never count as children: pet-only household gets no which-kid question and no link', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: [] });
+    db.getHouseholdMembers.mockResolvedValue([
+      { id: 'p1', name: 'Luna', member_type: 'dependent', dependent_kind: 'pet' },
+    ]);
+
+    await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, emptyActions());
+    const done = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(done.response).not.toMatch(/Which of the kids/i);
+    expect(db.updateUser).not.toHaveBeenCalled();
   });
 });
