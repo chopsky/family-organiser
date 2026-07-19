@@ -304,6 +304,7 @@ UPDATE & DELETE field population (only when you DO pick an update_*/delete_* int
 - When the user says "move X to Tuesday" (single-day event), set updates.date to the resolved YYYY-MM-DD for Tuesday; leave start_time/end_time null unless they also said a time. updates.date shifts the WHOLE event to that day.
 - When the user says "change the start date to X" (multi-day event), set updates.start_date to the resolved YYYY-MM-DD; leave updates.end_date and updates.date null. This changes ONLY the start day, preserving the end day.
 - When the user says "change the end date to X" (multi-day event), set updates.end_date; leave updates.start_date and updates.date null.
+- CREATING a multi-day event ("add camping from 5-10 Sept", "we're away Fri to Sun"): calendar_event.date = the FIRST day, calendar_event.end_date = the LAST day. Single-day events leave end_date null. Never describe a date range in response_message unless end_date carries it.
 - When the user says "change X to 3pm", set updates.start_time to "15:00"; leave date null.
 - When the user says "reassign X to Lynn", set updates.assigned_to_names to ["Lynn"].
 - response_message should be short and NOT confirm the change yet - the handler will decide whether to act or ask for disambiguation and will send its own confirmation. Leave response_message as an empty string "" for update_*/delete_* intents.
@@ -400,6 +401,7 @@ Respond only with valid JSON matching this schema:
   "calendar_event": {
     "title": string,
     "date": "YYYY-MM-DD",
+    "end_date": "YYYY-MM-DD" | null,
     "start_time": "HH:MM" | null,
     "end_time": "HH:MM" | null,
     "all_day": boolean,

@@ -1246,12 +1246,16 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
       : null;
 
     const userTz = user.timezone || household.timezone || 'Europe/London';
+    // Multi-day range: end on end_date when the classifier supplied a
+    // valid later day; otherwise single-day as before.
+    const isYmdDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
+    const lastDay = isYmdDate(ev.end_date) && ev.end_date > ev.date ? ev.end_date : ev.date;
     const startTime = ev.all_day
       ? `${ev.date}T00:00:00Z`
       : localToUTC(ev.date, ev.start_time || '09:00', userTz);
     const endTime = ev.all_day
-      ? `${ev.date}T23:59:59Z`
-      : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', userTz);
+      ? `${lastDay}T23:59:59Z`
+      : localToUTC(lastDay, ev.end_time || ev.start_time || '10:00', userTz);
 
     // Dupe detection - skipped when classifier set force:true (user
     // affirmatively confirmed a duplicate in a prior turn).

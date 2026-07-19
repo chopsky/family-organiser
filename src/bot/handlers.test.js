@@ -739,3 +739,31 @@ describe('handleTextMessage — already-set updates', () => {
     expect(db.updateCalendarEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('createCalendarEventFromResult — multi-day ranges', () => {
+  const hh = { id: 'h1', timezone: 'Europe/London', members: [] };
+  const u = { id: 'u1', name: 'Grant' };
+
+  test('all-day event with end_date stores the FULL range (real 5-10 Sept transcript)', async () => {
+    db.findSimilarEvent.mockResolvedValue(null);
+    const actions = { eventsAdded: [], shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    await handlers.createCalendarEventFromResult(
+      { title: 'Testing', date: '2026-09-05', end_date: '2026-09-10', all_day: true },
+      u, hh, actions, 'Add testing event from 5-10 Sept',
+    );
+    const row = db.createCalendarEvent.mock.calls[0][1];
+    expect(row.start_time).toBe('2026-09-05T00:00:00Z');
+    expect(row.end_time).toBe('2026-09-10T23:59:59Z');
+  });
+
+  test('invalid/earlier end_date is ignored (single-day)', async () => {
+    db.findSimilarEvent.mockResolvedValue(null);
+    const actions = { eventsAdded: [], shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
+    await handlers.createCalendarEventFromResult(
+      { title: 'Testing', date: '2026-09-05', end_date: '2026-09-01', all_day: true },
+      u, hh, actions, '',
+    );
+    const row = db.createCalendarEvent.mock.calls[0][1];
+    expect(row.end_time).toBe('2026-09-05T23:59:59Z');
+  });
+});

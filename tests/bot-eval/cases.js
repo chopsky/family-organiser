@@ -651,4 +651,20 @@ module.exports = [
       return null;
     },
   },
+
+  // ── 2026-07-23: multi-day create carried only its first day (schema had no
+  // end_date on creation - the model NARRATED "5 to 10 Sept" but stored one day).
+  {
+    name: 'multi-day create: "camping from 5-10 Sept" carries end_date',
+    message: 'Add camping trip from 5-10 September',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent !== 'create_event') return `intent ${r.intent}`;
+      const ev = r.calendar_event || (Array.isArray(r.calendar_events) ? r.calendar_events[0] : null);
+      if (!ev) return 'no calendar_event';
+      if (!/09-05$/.test(ev.date || '')) return `date ${ev.date}`;
+      if (!/09-10$/.test(ev.end_date || '')) return `end_date ${ev.end_date} (range lost)`;
+      return null;
+    },
+  },
 ];

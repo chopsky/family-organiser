@@ -87,6 +87,10 @@ const reminders = arr(obj({ time: num, unit: en(['minutes', 'hours', 'days']) })
 const calendarEventShape = () => obj({
   title: str,
   date: str,
+  // Multi-day events ("camping from 5-10 Sept"): last day of the range.
+  // Null/absent = single-day. Without this field the model could only
+  // NARRATE the range while storing one day (real 2026-07-23 transcript).
+  end_date: opt(str),
   all_day: bool,
   start_time: opt(str),
   end_time: opt(str),
