@@ -214,12 +214,12 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, avatar_id } = req.body;
 
-  // Determine target user. Housemait is collaborative — any household member
-  // (every authenticated member is a managing adult) may edit another member's
-  // PROFILE: name, family role, birthday, colour and school link, whether that
-  // member is a child or another account-holder. The target must belong to this
-  // household (guards IDOR). Personal notification/locale/location settings stay
-  // self-only and are skipped below when editing someone else.
+  // Determine target user. Personal profiles are private: a member edits
+  // their OWN profile; dependents (no login) are editable by any adult; only
+  // ADMINS may edit another account-holder's profile. This mirrors the
+  // Family-page rule (FamilySetup canEditProfile) - previously the API was
+  // looser than the UI, which stopped being tolerable once older kids could
+  // hold their own accounts. The household check guards IDOR as before.
   let targetUserId = req.user.id;
   let targetMember = null;
   if (user_id && user_id !== req.user.id) {
@@ -227,6 +227,9 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     targetMember = members.find(m => m.id === user_id);
     if (!targetMember) {
       return res.status(404).json({ error: 'Member not found in this household.' });
+    }
+    if (targetMember.member_type !== 'dependent' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only the household admin can edit another member\'s profile.' });
     }
     targetUserId = user_id;
   }
