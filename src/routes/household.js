@@ -223,12 +223,10 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
   const VALID_COLORS = ['red', 'burnt-orange', 'amber', 'gold', 'leaf', 'emerald', 'teal', 'sky', 'cobalt', 'indigo', 'purple', 'magenta', 'rose', 'terracotta', 'moss', 'slate', 'sage', 'plum', 'coral', 'lavender'];
   const { name, family_role, birthday, color_theme, reminder_time, timezone, user_id, school_id, avatar_id } = req.body;
 
-  // Determine target user. Personal profiles are private: a member edits
-  // their OWN profile; dependents (no login) are editable by any adult; only
-  // ADMINS may edit another account-holder's profile. This mirrors the
-  // Family-page rule (FamilySetup canEditProfile) - previously the API was
-  // looser than the UI, which stopped being tolerable once older kids could
-  // hold their own accounts. The household check guards IDOR as before.
+  // Determine target user. Account profiles are SOVEREIGN (2026-07-20,
+  // Nori-parity): only the member themselves edits their profile - not even
+  // the admin. Dependents (no login) stay editable by any account member.
+  // The household check guards IDOR as before.
   let targetUserId = req.user.id;
   let targetMember = null;
   if (user_id && user_id !== req.user.id) {
@@ -237,8 +235,8 @@ router.patch('/profile', requireAuth, requireHousehold, async (req, res) => {
     if (!targetMember) {
       return res.status(404).json({ error: 'Member not found in this household.' });
     }
-    if (targetMember.member_type !== 'dependent' && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the household admin can edit another member\'s profile.' });
+    if (targetMember.member_type !== 'dependent') {
+      return res.status(403).json({ error: 'Members manage their own profiles - only child and pet profiles can be edited by others.' });
     }
     targetUserId = user_id;
   }
@@ -403,15 +401,20 @@ router.post('/profile/avatar', requireAuth, requireHousehold, avatarUpload.singl
   }
 
   // Target the member being edited (e.g. a child's profile on the Family page),
-  // defaulting to the caller's own profile. Editing another member is fine for
-  // any household member, but the target MUST belong to this household (IDOR).
+  // defaulting to the caller's own profile. Sovereign-profiles rule: another
+  // member's avatar is only editable when they're a dependent (no login);
+  // account members own their photo. Household membership guards IDOR.
   const targetId = req.body.userId || req.user.id;
 
   try {
     if (targetId !== req.user.id) {
       const members = await db.getHouseholdMembers(req.householdId);
-      if (!members.some((m) => m.id === targetId)) {
+      const target = members.find((m) => m.id === targetId);
+      if (!target) {
         return res.status(404).json({ error: 'Member not found in this household.' });
+      }
+      if (target.member_type !== 'dependent') {
+        return res.status(403).json({ error: 'Members manage their own profile photo.' });
       }
     }
 
@@ -462,8 +465,14 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
   try {
     if (targetId !== req.user.id) {
       const members = await db.getHouseholdMembers(req.householdId);
-      if (!members.some((m) => m.id === targetId)) {
+      const target = members.find((m) => m.id === targetId);
+      if (!target) {
         return res.status(404).json({ error: 'Member not found in this household.' });
+      }
+      // Sovereign-profiles rule: only a dependent's photo is removable by
+      // another member (matches POST /profile/avatar).
+      if (target.member_type !== 'dependent') {
+        return res.status(403).json({ error: 'Members manage their own profile photo.' });
       }
     }
 

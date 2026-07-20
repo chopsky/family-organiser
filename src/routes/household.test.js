@@ -82,7 +82,7 @@ describe('PATCH /api/household/profile — kid_color premium-theme gating', () =
 
 describe('POST /api/household/profile/avatar', () => {
   it('updates the targeted member (not the caller) when userId is in the household', async () => {
-    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason' }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason', member_type: 'dependent' }]);
     db.updateUser.mockResolvedValue({ avatar_url: 'https://cdn/a.jpg?t=1' });
 
     const res = await request(makeApp())
@@ -127,7 +127,7 @@ describe('POST /api/household/profile/avatar', () => {
 
 describe('DELETE /api/household/profile/avatar', () => {
   it('clears the targeted member when userId is in the household', async () => {
-    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason' }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason', member_type: 'dependent' }]);
     db.updateUser.mockResolvedValue({ avatar_url: null });
 
     const res = await request(makeApp()).delete('/api/household/profile/avatar?userId=mason');
@@ -145,7 +145,7 @@ describe('DELETE /api/household/profile/avatar', () => {
   });
 
   it('removes ONLY the target member\'s files, never other members\' avatars', async () => {
-    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason' }]);
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'me' }, { id: 'mason', member_type: 'dependent' }]);
     db.updateUser.mockResolvedValue({ avatar_url: null });
     // storage list() ignores `prefix`, so the route gets the WHOLE folder back
     // and must filter to the target's files itself.

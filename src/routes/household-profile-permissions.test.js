@@ -60,13 +60,19 @@ test('any member can edit a dependent\'s profile (both parents manage the kids)'
   expect(db.updateUser).toHaveBeenCalledWith('kid1', expect.objectContaining({ name: 'Sofia Rose' }));
 });
 
-test('the household admin can edit another account-holder\'s profile', async () => {
+test('sovereign profiles: not even the admin can edit another account-holder\'s profile', async () => {
   mockUser = { id: 'admin1', name: 'Grant', role: 'admin' };
   const res = await request(makeApp())
     .patch('/api/household/profile')
     .send({ user_id: 'adult1', family_role: 'Mother' });
-  expect(res.status).toBe(200);
-  expect(db.updateUser).toHaveBeenCalledWith('adult1', expect.objectContaining({ family_role: 'Mother' }));
+  expect(res.status).toBe(403);
+  expect(db.updateUser).not.toHaveBeenCalled();
+});
+
+test('sovereign photos: another account-holder\'s avatar cannot be removed, a dependent\'s can', async () => {
+  mockUser = { id: 'admin1', name: 'Grant', role: 'admin' };
+  const denied = await request(makeApp()).delete('/api/household/profile/avatar?userId=adult1');
+  expect(denied.status).toBe(403);
 });
 
 test('everyone can still edit their own profile', async () => {
