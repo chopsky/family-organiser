@@ -32,6 +32,7 @@ jest.mock('../db/queries', () => ({
   findEventsByFuzzyTitle: jest.fn(() => Promise.resolve([])),
   softDeleteCalendarEvent: jest.fn(() => Promise.resolve()),
   updateUser: jest.fn(() => Promise.resolve({})),
+  upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -932,5 +933,47 @@ describe('opener school answer', () => {
     await handlers.handleTextMessage('Ashfield Primary Leeds', parent, hh, {});
     // Second message is NOT tried against GIAS via the opener path.
     expect(schoolAdd.searchGiasCandidates).not.toHaveBeenCalled();
+  });
+});
+
+// ─── In-thread brief stop/start (AC4) ───────────────────────────────────────
+describe('in-thread brief stop/start', () => {
+  const ai = require('../services/ai');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [] };
+  const parent = { id: 'u9', name: 'Louise' };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  test.each([
+    'stop',
+    'STOP',
+    'unsubscribe',
+    'stop the morning messages',
+    'please stop messaging me',
+    'turn off the briefs',
+    'stop sending me these',
+    "don't message me",
+  ])('"%s" opts out, replies with the way back in, no LLM call', async (msg) => {
+    const reply = await handlers.handleTextMessage(msg, parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: false });
+    expect(reply.response).toMatch(/start briefs/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  test('"start briefs" opts back in', async () => {
+    const reply = await handlers.handleTextMessage('start briefs', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: true });
+    expect(reply.response).toMatch(/back on/i);
+  });
+
+  test.each([
+    "stop Logan's swimming club",
+    'remove wraparound care today only',
+    'stop buying oat milk',
+  ])('"%s" is NOT an opt-out - classifies normally', async (msg) => {
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    await handlers.handleTextMessage(msg, parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(ai.classify).toHaveBeenCalled();
   });
 });

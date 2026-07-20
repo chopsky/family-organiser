@@ -626,6 +626,27 @@ async function completeSchoolAdd(gias, user, household, ctx, actions) {
   };
 }
 
+// ─── In-thread brief stop/start ──────────────────────────────────────────────
+//
+// A person irritated by proactive messages acts IN WhatsApp, not in the app's
+// Settings - and if "stop" doesn't work in-thread, the block button becomes
+// the stop button (which poisons the number's quality rating for everyone).
+// Deterministic and conservative: bare "stop"/"unsubscribe", or a stop verb
+// paired with a messaging noun. "Stop Logan's swimming club" has neither and
+// classifies normally.
+function matchBriefStopStart(text) {
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t || t.split(/\s+/).length > 8) return null;
+  if (/^(stop|unsubscribe|opt out)$/.test(t)) return 'stop';
+  const noun = /\b(morning\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates)\b/;
+  if (/^(please\s+)?(stop|turn off|switch off|no more|quit)\b/.test(t)
+      && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return 'stop';
+  if (/^(please\s+)?stop\s+send(ing)?(\s+me)?\s+(these|those|them|this stuff|stuff)\b/.test(t)) return 'stop';
+  if (/^(don'?t|do not)\s+(message|text|whatsapp)\s+me\b/.test(t)) return 'stop';
+  if (/^(please\s+)?(start|restart|resume|turn on|switch on)\b/.test(t) && noun.test(t)) return 'start';
+  return null;
+}
+
 // Armed when the capture opener asks "which school do the kids go to?" -
 // the reply is usually a bare school name ("Ashfield Primary Leeds") that
 // classify could misread as chat. One-shot: consumed by the next message;
@@ -2042,6 +2063,29 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         };
       }
     }
+  }
+
+  // In-thread stop/start for the morning brief + proactive messages. Honour
+  // it instantly and warmly - the alternative outcome is a block.
+  const briefToggle = matchBriefStopStart(text);
+  if (briefToggle) {
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    try {
+      await db.upsertNotificationPreferences(user.id, { whatsapp_daily_reminder: briefToggle === 'start' });
+    } catch (err) {
+      console.error('[handlers] brief toggle failed:', err.message);
+      ctx.intent = 'brief_toggle_error';
+      return { response: "I couldn't update that just now - mind trying again in a minute? You can also manage it in Settings → Notifications.", actions: noActions };
+    }
+    if (briefToggle === 'stop') {
+      ctx.intent = 'brief_optout';
+      return {
+        response: `Done - no more morning messages from me. 👍\n\nI'm still right here whenever you need me: lists, calendar, reminders - just text. Reply *start briefs* if you'd like the mornings back, or manage it in Settings → Notifications.`,
+        actions: noActions,
+      };
+    }
+    ctx.intent = 'brief_optin';
+    return { response: `Lovely - you're back on. I'll include you in the morning brief from tomorrow. ☀️`, actions: noActions };
   }
 
   // Opener school answer: the capture question "which school do the kids go
