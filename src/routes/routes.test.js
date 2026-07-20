@@ -393,23 +393,35 @@ describe('PATCH /api/household/profile', () => {
     expect(db.updateUser).toHaveBeenCalledWith('u-2', expect.objectContaining({ name: 'Lynne' }));
   });
 
-  test('a member CAN edit another account-holder\'s profile identity', async () => {
+  // Contract change 2026-07-20: personal profiles are private. Only the
+  // household ADMIN may edit another account-holder's profile (matches the
+  // Family-page UI rule; teen accounts made the open API untenable).
+  test('a non-admin member can NOT edit another account-holder\'s profile', async () => {
     db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
-    db.updateUser.mockResolvedValue({ id: 'u-1', name: 'Grant B' });
     const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
     const res = await request(app).patch('/api/household/profile')
       .set({ Authorization: `Bearer ${lynn}` }).send({ user_id: 'u-1', name: 'Grant B', family_role: 'Father' });
+    expect(res.status).toBe(403);
+    expect(db.updateUser).not.toHaveBeenCalled();
+  });
+
+  test('the admin CAN edit another account-holder\'s profile identity', async () => {
+    db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
+    db.updateUser.mockResolvedValue({ id: 'u-2', name: 'Lynne' });
+    const grant = signToken({ userId: 'u-1', householdId: 'hh-1', name: 'Grant', role: 'admin' });
+    const res = await request(app).patch('/api/household/profile')
+      .set({ Authorization: `Bearer ${grant}` }).send({ user_id: 'u-2', name: 'Lynne', family_role: 'Mother' });
     expect(res.status).not.toBe(403);
-    expect(db.updateUser).toHaveBeenCalledWith('u-1', expect.objectContaining({ name: 'Grant B', family_role: 'Father' }));
+    expect(db.updateUser).toHaveBeenCalledWith('u-2', expect.objectContaining({ name: 'Lynne', family_role: 'Mother' }));
   });
 
   test('editing another member never changes their personal settings', async () => {
     db.getHouseholdMembers.mockResolvedValue(PROFILE_MEMBERS);
-    db.updateUser.mockResolvedValue({ id: 'u-1', name: 'Grant' });
-    const lynn = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Lynn', role: 'member' });
+    db.updateUser.mockResolvedValue({ id: 'u-2', name: 'Lynn' });
+    const grant = signToken({ userId: 'u-1', householdId: 'hh-1', name: 'Grant', role: 'admin' });
     await request(app).patch('/api/household/profile')
-      .set({ Authorization: `Bearer ${lynn}` })
-      .send({ user_id: 'u-1', name: 'Grant', reminder_time: '23:00', timezone: 'Pacific/Auckland' });
+      .set({ Authorization: `Bearer ${grant}` })
+      .send({ user_id: 'u-2', name: 'Lynn', reminder_time: '23:00', timezone: 'Pacific/Auckland' });
     const updates = db.updateUser.mock.calls[0][1];
     expect(updates).not.toHaveProperty('reminder_time');
     expect(updates).not.toHaveProperty('timezone');
