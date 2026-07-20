@@ -13,6 +13,11 @@ export const FAMILY_ROLES = [
   'Father',
   'Parent',
   'Partner',
+  // Older kids with their own logins are ACCOUNT members (invited like any
+  // adult), so the dependent Child/Pet toggle never applies to them - this
+  // is the only place a teen's account can be labelled as a child. Display
+  // + chat-AI context only; it does NOT gate kid features or permissions.
+  'Child',
   'Grandmother',
   'Grandfather',
   'Guardian',
