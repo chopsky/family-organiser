@@ -90,7 +90,7 @@ export default function InviteStep({ auth, form, update, next, setError }) {
     }
     setAddingKid(true);
     try {
-      await api.post('/household/dependents', { name: n, family_role: 'Child' });
+      await api.post('/household/dependents', { name: n, dependent_kind: 'child' });
       addInvited({ kind: 'kid', label: n });
       setChildName('');
     } catch (err) {

@@ -59,7 +59,7 @@ export default function InviteFamily({ user, household, next, setError }) {
     setError('');
     setAddingKid(true);
     try {
-      await api.post('/household/dependents', { name: n, family_role: 'Child' });
+      await api.post('/household/dependents', { name: n, dependent_kind: 'child' });
       setKids((prev) => [...prev, n]);
       setChildName('');
     } catch (err) {
