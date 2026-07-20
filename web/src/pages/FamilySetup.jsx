@@ -48,7 +48,9 @@ function roleMeta(m) {
     : (m.member_type === 'dependent'
       ? { cls: 'text-warm-grey', style: { background: SOFT } }
       : { cls: 'bg-sage-light text-sage' });
-  const fallback = isAdmin ? 'Admin' : (m.member_type === 'dependent' ? 'Kid' : 'Parent');
+  const fallback = isAdmin
+    ? 'Admin'
+    : (m.member_type === 'dependent' ? (m.dependent_kind === 'pet' ? 'Pet' : 'Kid') : 'Parent');
   const role = (m.family_role || '').trim();
   let label;
   if (isAdmin) {
@@ -366,10 +368,10 @@ export default function FamilySetup() {
   // optimistically before the request fires.
   const [removingMemberIds, setRemovingMemberIds] = useState(() => new Set());
   const [depName, setDepName] = useState('');
-  const [depRole, setDepRole] = useState('');
   // 'child' | 'pet' - explicit, because children and pets share
   // member_type='dependent' and every kid-gated surface (Kids Mode, school
   // links, WhatsApp capture questions) needs to tell them apart reliably.
+  // Dependents carry no family_role - the kind toggle replaced it.
   const [depKind, setDepKind] = useState('child');
   const [depBirthday, setDepBirthday] = useState('');
   const [depColor, setDepColor] = useState('teal');
@@ -512,7 +514,6 @@ export default function FamilySetup() {
 
   function openAddDependent() {
     setDepName('');
-    setDepRole('');
     setDepKind('child');
     setDepBirthday('');
     // Pre-pick the next colour not yet used in this household so a
@@ -545,7 +546,6 @@ export default function FamilySetup() {
 
       await api.post('/household/dependents', {
         name: depName.trim(),
-        family_role: depRole.trim() || null,
         birthday: depBirthday || null,
         color_theme: depColor,
         school_id: schoolId,
@@ -1553,13 +1553,7 @@ export default function FamilySetup() {
                       type="button"
                       role="radio"
                       aria-checked={depKind === kind}
-                      onClick={() => {
-                        setDepKind(kind);
-                        // Sensible role default when flipping - never overwrite
-                        // something the user actually picked.
-                        if (kind === 'pet' && !depRole) setDepRole('Pet');
-                        if (kind === 'child' && depRole === 'Pet') setDepRole('');
-                      }}
+                      onClick={() => setDepKind(kind)}
                       className={`py-2.5 rounded-lg border text-sm font-medium transition-colors ${depKind === kind ? 'border-accent bg-accent/10 text-bark' : 'border-cream-border text-cocoa hover:bg-sand'}`}
                     >
                       {label}
@@ -1571,15 +1565,6 @@ export default function FamilySetup() {
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Name <span className="text-error">*</span></label>
                 <input type="text" value={depName} onChange={(e) => setDepName(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white" placeholder={depKind === 'pet' ? 'e.g. Luna' : 'e.g. Sofia, Baby Oliver'} />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-bark mb-1">Family role</label>
-                <select value={depRole} onChange={(e) => setDepRole(e.target.value)} className="w-full border border-cream-border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent bg-white">
-                  <option value="">Select role…</option>
-                  {FAMILY_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                  {depRole && !FAMILY_ROLES.includes(depRole) && <option value={depRole}>{depRole}</option>}
-                </select>
               </div>
 
               <div>
@@ -1851,6 +1836,11 @@ export default function FamilySetup() {
                 </div>
               )}
 
+              {/* Family role only means something for ADULTS (card label +
+                  the chat AI's member context: "Lynn (Mother)"). Dependents
+                  carry Child/Pet instead; their stored role, if any, is left
+                  untouched (profileRole round-trips unchanged). */}
+              {editingMember?.member_type !== 'dependent' && (
               <div>
                 <label className="block text-sm font-medium text-bark mb-1">Family role</label>
                 <div className="relative">
@@ -1866,6 +1856,7 @@ export default function FamilySetup() {
                   <svg className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-cocoa" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                 </div>
               </div>
+              )}
 
               {/* Native iOS date/time inputs have an intrinsic min-width that
                   can exceed narrow modal widths, causing horizontal overflow.
