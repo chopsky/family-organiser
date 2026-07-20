@@ -12,7 +12,10 @@ jest.mock('../db/queries', () => ({
 }));
 jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
 jest.mock('../middleware/auth', () => ({
-  requireAuth: (req, _res, next) => { req.user = { id: 'u-1' }; next(); },
+  // Admin role: PIN set/clear became admin-only (2026-07-20); these tests
+  // exercise the hashing/cache logic, permissions are pinned separately in
+  // household-profile-permissions.test.js.
+  requireAuth: (req, _res, next) => { req.user = { id: 'u-1', role: 'admin' }; next(); },
   requireHousehold: (req, _res, next) => { req.householdId = 'hh-1'; next(); },
   requireAdmin: (_req, _res, next) => next(),
   signToken: () => 'tok',

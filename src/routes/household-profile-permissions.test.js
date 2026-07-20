@@ -77,3 +77,36 @@ test('everyone can still edit their own profile', async () => {
   expect(res.status).toBe(200);
   expect(db.updateUser).toHaveBeenCalledWith('teen1', expect.objectContaining({ name: 'Ella S' }));
 });
+
+// ─── Parental controls + destructive membership changes (Nori-parity) ───────
+describe('admin-only protections', () => {
+  test('a non-admin member cannot change the Child Mode PIN', async () => {
+    mockUser = { id: 'teen1', name: 'Ella', role: 'member' };
+    const res = await request(makeApp())
+      .post('/api/household/child-mode/pin')
+      .send({ pin: '1234' });
+    expect(res.status).toBe(403);
+  });
+
+  test('a non-admin member cannot remove the Child Mode PIN', async () => {
+    mockUser = { id: 'teen1', name: 'Ella', role: 'member' };
+    const res = await request(makeApp()).delete('/api/household/child-mode/pin');
+    expect(res.status).toBe(403);
+  });
+
+  test('the admin can set the Child Mode PIN', async () => {
+    mockUser = { id: 'admin1', name: 'Grant', role: 'admin' };
+    db.setChildModePinHash.mockResolvedValue();
+    const res = await request(makeApp())
+      .post('/api/household/child-mode/pin')
+      .send({ pin: '1234' });
+    expect(res.status).toBe(200);
+  });
+
+  test('a non-admin member cannot remove another member', async () => {
+    mockUser = { id: 'teen1', name: 'Ella', role: 'member' };
+    const res = await request(makeApp()).delete('/api/household/members/adult1');
+    expect(res.status).toBe(403);
+    expect(db.deleteUser).not.toHaveBeenCalled();
+  });
+});

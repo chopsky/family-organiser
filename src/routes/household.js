@@ -71,6 +71,12 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { pin: '4-6 digits' }
  */
 router.post('/child-mode/pin', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  // Parental control: the PIN gate must not be controllable by the people it
+  // gates. requireAdmin is deliberately permissive (shared management), so
+  // the real check lives here - admin role only (2026-07-20, Nori-parity).
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the household admin can change the Child Mode PIN.' });
+  }
   const pin = String(req.body?.pin || '');
   if (!PIN_RE.test(pin)) {
     return res.status(400).json({ error: 'PIN must be 4 to 6 digits.' });
@@ -91,6 +97,9 @@ router.post('/child-mode/pin', requireAuth, requireHousehold, requireAdmin, asyn
  * Remove the Child Mode PIN. Adult only.
  */
 router.delete('/child-mode/pin', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the household admin can change the Child Mode PIN.' });
+  }
   try {
     await db.clearChildModePinHash(req.householdId);
     cache.invalidate(`members:${req.householdId}`);
@@ -487,6 +496,13 @@ router.delete('/profile/avatar', requireAuth, requireHousehold, async (req, res)
  */
 router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   const { userId } = req.params;
+
+  // Removing a member is a hard cascade delete - admin role only. (The
+  // shared-management model keeps day-to-day actions open to every account
+  // member, but destructive membership changes are not day-to-day.)
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Only the household admin can remove a member.' });
+  }
 
   if (userId === req.user.id) {
     return res.status(400).json({ error: 'You cannot remove yourself from the household.' });

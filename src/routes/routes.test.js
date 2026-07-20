@@ -479,13 +479,15 @@ describe('DELETE /api/household/members/:userId', () => {
     expect(db.deleteUser).toHaveBeenCalledWith('u-2', 'hh-1');
   });
 
-  test('any household member can remove a member (collaborative)', async () => {
+  // Contract change 2026-07-20: member removal is a hard cascade delete and
+  // is admin-only again (day-to-day management stays open to all members).
+  test('a non-admin member can NOT remove a member', async () => {
     db.getHouseholdMembers.mockResolvedValue(MEMBERS);
-    db.deleteUser.mockResolvedValue();
     const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
     const res = await request(app).delete('/api/household/members/u-1')
       .set({ Authorization: `Bearer ${memberToken}` });
-    expect(res.status).not.toBe(403);
+    expect(res.status).toBe(403);
+    expect(db.deleteUser).not.toHaveBeenCalled();
   });
 
   test('admin cannot remove themselves', async () => {
@@ -494,12 +496,11 @@ describe('DELETE /api/household/members/:userId', () => {
     expect(res.body.error).toContain('cannot remove yourself');
   });
 
-  test('the household owner (created_by) cannot be removed by a co-member', async () => {
-    db.getHouseholdById.mockResolvedValue({ ...HOUSEHOLD, created_by: 'u-1' });
+  test('the household owner (created_by) cannot be removed, even by an admin', async () => {
+    db.getHouseholdById.mockResolvedValue({ ...HOUSEHOLD, created_by: 'u-2' });
     db.getHouseholdMembers.mockResolvedValue(MEMBERS);
-    const memberToken = signToken({ userId: 'u-2', householdId: 'hh-1', name: 'Jake', role: 'member' });
-    const res = await request(app).delete('/api/household/members/u-1')
-      .set({ Authorization: `Bearer ${memberToken}` });
+    // u-1 is an admin (AUTH) but u-2 owns the billing relationship.
+    const res = await request(app).delete('/api/household/members/u-2').set(AUTH);
     expect(res.status).toBe(403);
     expect(res.body.error).toContain('owner');
   });
