@@ -173,6 +173,12 @@ export default function LandingPage() {
   const locale = useLocale()
   const [openFaq, setOpenFaq] = useState(null)
 
+  // Screenshot-only mode (?flat=1): the scroll story renders as normal
+  // stacked sections so a full-page capture shows every chapter. Never
+  // linked from anywhere; visitors and the prerender see the sticky
+  // story as usual.
+  const flat = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('flat')
+
   const el = useRef({})
   const setEl = (name) => (node) => { el.current[name] = node }
   const marqueePaused = useRef(false)
@@ -449,7 +455,68 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── Scroll story — flat variant for full-page screenshots ── */}
+      {flat && (
+        <section id="story" className="lv-story-flat">
+          {/* The story's opening frame: home screen with the icon swarm
+              spread around it (static rendition of the p=0 state). */}
+          <div className="lv-flat-intro">
+            <div className="lv-frame" style={{ height: 560, transform: 'none' }}>
+              <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
+              <div className="lv-screen">
+                <img src="/landing/app-home.jpg" alt="Housemait family home screen with today&rsquo;s schedule" style={{ opacity: 1, transform: 'none', position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            </div>
+            {ICONS.map(([src, pad], i) => {
+              const bx = Math.round(ICON_VECS[i][0] * 430)
+              const by = Math.round(ICON_VECS[i][1] * 250)
+              return (
+                <span key={src} className="lv-flat-icon" style={{ left: `calc(50% + ${bx}px)`, top: `calc(50% + ${by}px)` }}>
+                  <img className="lv-icon" src={src} alt="" style={{ padding: pad }} />
+                </span>
+              )
+            })}
+          </div>
+          {STORY_CHAPTERS.map((ch, i) => {
+            // Mirror the live chapter geometry: centred main phone, the
+            // companion tilted behind on the side opposite the text
+            // (±52% of phone width, +34px, ±5°, 0.86 scale), text beside
+            // at the live ±215px offset. Chapter 5 has no companion.
+            const textLeft = i % 2 === 0
+            const compSide = textLeft ? 1 : -1
+            const compOffset = Math.round(560 * 0.479 * 0.52) * compSide
+            return (
+              <div key={ch.p} className="lv-flat-stage">
+                {i <= 3 && (
+                  <div className="lv-flat-comp" style={{ transform: `translate(-50%,-50%) translate(${compOffset}px, 34px) rotate(${compSide * 5}deg) scale(0.86)` }}>
+                    <div className="lv-frame" style={{ height: 560, transform: 'none' }}>
+                      <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
+                      <div className="lv-screen">
+                        <img src={COMPANIONS[i]} alt={COMPANION_ALTS[i]} style={{ opacity: 1, position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="lv-flat-main">
+                  <div className="lv-frame" style={{ height: 560, transform: 'none' }}>
+                    <img className="lv-frame-img" src="/landing/phone-frame.webp" alt="" />
+                    <div className="lv-screen">
+                      <img src={i <= 3 ? SCREENS[i] : '/landing/app-whatsapp.jpg'} alt={i <= 3 ? SCREEN_ALTS[i] : 'WhatsApp conversation with the Housemait assistant'} style={{ opacity: 1, transform: 'none', position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  </div>
+                </div>
+                <div className={`lv-flat-side ${textLeft ? 'side-l' : 'side-r'}`}>
+                  <h3>{ch.h[0]}<br />{ch.h[1]}</h3>
+                  <p>{ch.p}</p>
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
       {/* ── Scroll story ── */}
+      {!flat && (
       <section id="story" className="lv-story" ref={setEl('story')}>
         <div className="lv-stage">
           <div className="lv-glow" ref={setEl('glow')} />
@@ -498,6 +565,7 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* ── Features grid ── */}
       <section id="touches" className="lv-touches">

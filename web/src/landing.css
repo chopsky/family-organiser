@@ -161,6 +161,24 @@
 .lv-story-card h3 { font-size: clamp(28px, 2.8vw, 40px); line-height: 1.12; margin: 0 0 12px; }
 .lv-story-card p { color: var(--lv-ink-2); font-size: 16px; line-height: 1.6; margin: 0; }
 
+/* ── Flat story (?flat=1, screenshot-only): each chapter reproduced
+      with the LIVE stage geometry — centred main phone, companion
+      tilted behind on the side opposite the text, text at the live
+      ±215px offset. ── */
+.lv-story-flat { margin: 0 auto; padding: 90px 0 0; display: flex; flex-direction: column; gap: 80px; }
+/* Opening frame: centred home-screen phone with the icon swarm spread
+   around it — a static rendition of the scroll story's p=0 state. */
+.lv-flat-intro { position: relative; height: 660px; display: flex; align-items: center; justify-content: center; }
+.lv-flat-icon { position: absolute; transform: translate(-50%, -50%); }
+.lv-flat-stage { position: relative; height: 700px; }
+.lv-flat-main { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; }
+.lv-flat-comp { position: absolute; left: 50%; top: 50%; z-index: 6; }
+.lv-flat-side { position: absolute; top: 50%; transform: translateY(-50%); width: min(385px, calc(50vw - 245px)); z-index: 20; }
+.lv-flat-side.side-l { right: calc(50% + 215px); text-align: right; }
+.lv-flat-side.side-r { left: calc(50% + 215px); text-align: left; }
+.lv-flat-side h3 { font-size: clamp(28px, 2.8vw, 40px); line-height: 1.12; margin: 0 0 12px; }
+.lv-flat-side p { color: var(--lv-ink-2); font-size: 16px; line-height: 1.6; margin: 0; }
+
 /* ── Reveal-on-scroll ── */
 .lv [data-lv-reveal] { transition: opacity 0.7s ease, transform 0.85s cubic-bezier(0.2, 0.7, 0.2, 1); }
 .lv [data-lv-reveal].pre { opacity: 0; transform: translateY(28px); }
