@@ -189,7 +189,7 @@ router.post('/webhook', async (req, res) => {
                   '',
                   `I can also help with recipes, weather, school dates, receipts, and lots more. I'll show you new tricks over the next few days.`,
                   '',
-                  `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
+                  `Reply /help any time — and it's worth pinning this chat so I'm easy to find. 📌`,
                 ];
                 if (displaced.length > 0) {
                   welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);

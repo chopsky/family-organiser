@@ -33,6 +33,9 @@ jest.mock('../db/queries', () => ({
   softDeleteCalendarEvent: jest.fn(() => Promise.resolve()),
   updateUser: jest.fn(() => Promise.resolve({})),
   upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
+  // Default: pin nudge already claimed (false) so most assertions match on
+  // the base copy; the pin-nudge tests opt in by returning true.
+  claimPinNudge: jest.fn(() => Promise.resolve(false)),
 }));
 jest.mock('../services/ai', () => ({
   classify: jest.fn(), scanReceipt: jest.fn(), matchReceiptToList: jest.fn(),
@@ -975,5 +978,70 @@ describe('in-thread brief stop/start', () => {
     await handlers.handleTextMessage(msg, parent, hh, {});
     expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
     expect(ai.classify).toHaveBeenCalled();
+  });
+});
+
+// ─── One-shot pin nudge on delight moments ──────────────────────────────────
+describe('pin nudge', () => {
+  const schoolAdd = require('../services/school-add');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [] };
+  const parent = { id: 'u9', name: 'Louise' };
+  const GIAS = { urn: 1, name: 'Ashfield Primary School', type: 'Community school', local_authority: 'Leeds', address: 'Moor Road, Leeds', postcode: 'LS12 3SE' };
+  const SCHOOL = { id: 'sc1', school_name: 'Ashfield Primary School', local_authority: 'Leeds' };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    db.claimPinNudge.mockResolvedValue(true); // unclaimed → append on first delight
+  });
+
+  test('rides a single-child school import (no which-kid question)', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: [] });
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'k1', name: 'Sofia', member_type: 'dependent', dependent_kind: 'child' }]);
+    await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, {});
+    const done = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(done.response).toMatch(/pin this chat/i);
+    expect(db.claimPinNudge).toHaveBeenCalledWith('u9');
+  });
+
+  test('does NOT ride the multi-child import message (which ends in a question) - rides the which-kid answer instead', async () => {
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: [] });
+    db.getHouseholdMembers.mockResolvedValue([
+      { id: 'k1', name: 'Sofia', member_type: 'dependent', dependent_kind: 'child' },
+      { id: 'k2', name: 'Max', member_type: 'dependent', dependent_kind: 'child' },
+    ]);
+    await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, {});
+    const imported = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(imported.response).toMatch(/Which of the kids/i);
+    expect(imported.response).not.toMatch(/pin this chat/i);
+
+    const linked = await handlers.handleTextMessage('both', parent, hh, {});
+    expect(linked.response).toMatch(/pin this chat/i);
+  });
+
+  test('rides a "sorted your week" multi-event create', async () => {
+    const ai = require('../services/ai');
+    ai.classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_events: [
+        { title: 'Dentist', date: '2026-07-23', start_time: '14:00' },
+        { title: 'Dinner with Alex', date: '2026-07-24', start_time: '19:30' },
+      ],
+      response_message: '',
+    });
+    const res = await handlers.handleTextMessage('dentist Thursday 2pm and MOT Friday 9am', parent, hh, {});
+    expect(res.response).toMatch(/Added 2 events/);
+    expect(res.response).toMatch(/pin this chat/i);
+  });
+
+  test('claimed already (false) → no pin line', async () => {
+    db.claimPinNudge.mockResolvedValue(false);
+    schoolAdd.searchGiasCandidates.mockResolvedValue([GIAS]);
+    schoolAdd.addConfirmedSchool.mockResolvedValue({ school: SCHOOL, outcome: 'la_imported', imported: 27, years: [] });
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'k1', name: 'Sofia', member_type: 'dependent', dependent_kind: 'child' }]);
+    await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, {});
+    const done = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(done.response).not.toMatch(/pin this chat/i);
   });
 });

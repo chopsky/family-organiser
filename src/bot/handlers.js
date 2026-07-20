@@ -528,6 +528,24 @@ function resolveSchoolCandidate(text, candidates) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+// One-shot "pin this chat" nudge. There is NO pin API - pinning is a
+// client-side action in the user's WhatsApp - so the only lever is to ASK,
+// and the ask converts best riding a genuine delight moment (a year of term
+// dates appearing; a whole week sorted at once) rather than a cold welcome
+// line or a standalone reminder. claimPinNudge flips a per-user flag exactly
+// once, so this appears a single time across all delight moments and never
+// repeats. Missing column (migration pending) → claim returns false → no
+// nudge, reply unchanged.
+const PIN_NUDGE_LINE = '📌 Handy tip: pin this chat (swipe right on iOS, press-and-hold on Android) so I\'m always easy to find.';
+async function maybeAppendPinNudge(userId, text) {
+  try {
+    if (!(await db.claimPinNudge(userId))) return text;
+    return `${text}\n\n${PIN_NUDGE_LINE}`;
+  } catch {
+    return text;
+  }
+}
+
 /**
  * Entry point for the school_add intent (and the opener's school answer):
  * GIAS-search the user's words, then ask for confirmation - one candidate
@@ -620,10 +638,11 @@ async function completeSchoolAdd(gias, user, household, ctx, actions) {
     childAsk = `\n\nWhich of the kids goes there? (${children.map((c) => c.name).join(', ')} - or "all")`;
   }
   ctx.intent = 'school_add_imported';
-  return {
-    response: `✅ ${school.school_name} added.${linkedLine} ${how} I've loaded ${imported} term date${imported === 1 ? '' : 's'}${yearsLabel} onto your family calendar - term starts, half terms, holidays, the lot.${childAsk}`,
-    actions,
-  };
+  let response = `✅ ${school.school_name} added.${linkedLine} ${how} I've loaded ${imported} term date${imported === 1 ? '' : 's'}${yearsLabel} onto your family calendar - term starts, half terms, holidays, the lot.${childAsk}`;
+  // Pin nudge only when this message doesn't end in the which-kid question
+  // (single child, or none) - otherwise it rides the which-kid answer below.
+  if (!childAsk) response = await maybeAppendPinNudge(user.id, response);
+  return { response, actions };
 }
 
 // ─── In-thread brief stop/start ──────────────────────────────────────────────
@@ -2025,8 +2044,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       cache.invalidate(`members:${household.id}`);
       ctx.intent = 'school_child_link';
       const names = picked.map((c) => c.name).join(' and ');
+      const linkedResponse = await maybeAppendPinNudge(
+        user.id,
+        `Done - ${pendingChildLink.schoolName} is linked to ${names}. Term dates and holidays will show against their days. 🎒`,
+      );
       return {
-        response: `Done - ${pendingChildLink.schoolName} is linked to ${names}. Term dates and holidays will show against their days. 🎒`,
+        response: linkedResponse,
         actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] },
       };
     }
@@ -2050,10 +2073,11 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         });
         pendingSchoolSource.delete(user.id);
         ctx.intent = 'school_source_imported';
-        return {
-          response: `Perfect, got them 🎉 ${imported} term date${imported === 1 ? '' : 's'}${years.length ? ` for ${years.join(' and ')}` : ''} for ${schoolSource.schoolName}, now on your family calendar. I'll keep them safe for the next ${schoolSource.schoolName} family too.`,
-          actions: noActions,
-        };
+        const sourceResponse = await maybeAppendPinNudge(
+          user.id,
+          `Perfect, got them 🎉 ${imported} term date${imported === 1 ? '' : 's'}${years.length ? ` for ${years.join(' and ')}` : ''} for ${schoolSource.schoolName}, now on your family calendar. I'll keep them safe for the next ${schoolSource.schoolName} family too.`,
+        );
+        return { response: sourceResponse, actions: noActions };
       } catch (err) {
         console.error('[handlers] school source import failed:', err.message);
         ctx.intent = 'school_source_failed';
@@ -2651,6 +2675,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
     let reply = `📅 Added ${added.length} events:\n${added.join('\n')}`;
     if (skipped.length) reply += `\n\nSkipped ${skipped.join('; ')}.`;
+    // "Sorted your whole week" is a delight moment - the pin ask rides it
+    // (once ever), covering households that never hit the school import.
+    reply = await maybeAppendPinNudge(user.id, reply);
     return { response: reply, actions };
   }
   const singleEvent = result.calendar_event || (multiEvents.length === 1 ? multiEvents[0] : null);

@@ -364,6 +364,25 @@ async function recordCaptureOpener(userId, openerKey, db = supabase) {
 }
 
 /**
+ * Atomically claim the one-shot "pin this chat" nudge for a user. Returns
+ * true only for the caller that flips whatsapp_pin_nudge_sent_at from NULL,
+ * so the pin ask rides exactly ONE delight moment and never repeats.
+ * Returns false on any error (incl. the column not being migrated yet) - so
+ * a missing column just means no pin nudge, never a broken reply.
+ */
+async function claimPinNudge(userId, db = supabase) {
+  if (!userId) return false;
+  const { data, error } = await db
+    .from('users')
+    .update({ whatsapp_pin_nudge_sent_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('whatsapp_pin_nudge_sent_at', null)
+    .select('id');
+  if (error) return false;
+  return (data || []).length > 0;
+}
+
+/**
  * Stamp users.whatsapp_followup_sent_at on a user after the re-engagement
  * email is sent. Idempotent - second call is a no-op since the cron only
  * picks up users with the column still NULL.
@@ -9325,4 +9344,5 @@ module.exports = {
   findCaptureOpenerCandidates,
   getCaptureOpenerKeys,
   recordCaptureOpener,
+  claimPinNudge,
 };
