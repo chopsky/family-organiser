@@ -34,6 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null,
+    acquisition = null,
   } = data || {};
 
   // Calculate DAU average
@@ -135,6 +136,46 @@ export default function AdminAnalytics() {
           </div>
         </div>
       </div>
+
+      {/* Acquisition by platform — the ad-relevant cut. iOS column maps to
+          Apple Search Ads installs; web_only is the browser cohort. */}
+      {acquisition && acquisition.total > 0 && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Acquisition by platform (last {acquisition.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            Apple Search Ads drives <strong>iOS</strong> installs only — compare that column against Apple&rsquo;s install count.
+            &ldquo;Web only&rdquo; = signed up in a browser, never opened the native app. Sub-counts are of that segment&rsquo;s sign-ups.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { key: 'ios', label: '📱 iOS app' },
+              { key: 'web_only', label: '🌐 Web only' },
+              { key: 'android', label: '🤖 Android app' },
+            ].map(({ key, label }) => {
+              const s = acquisition.segments?.[key] || { signups: 0, verified: 0, onboarded: 0, whatsapp: 0, subscribed: 0 };
+              const pct = (n) => (s.signups ? Math.round((n / s.signups) * 100) : 0);
+              const rows = [
+                ['Verified', s.verified], ['Onboarded', s.onboarded],
+                ['WhatsApp linked', s.whatsapp], ['Subscribed', s.subscribed],
+              ];
+              return (
+                <div key={key} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+                  <div className="flex items-baseline justify-between mb-3">
+                    <span className="text-sm font-medium text-charcoal">{label}</span>
+                    <span className="text-2xl font-bold text-plum">{s.signups}<span className="text-xs font-medium text-warm-grey ml-1">sign-ups</span></span>
+                  </div>
+                  {rows.map(([lbl, val]) => (
+                    <div key={lbl} className="flex items-center justify-between text-sm mt-1.5">
+                      <span className="text-warm-grey">{lbl}</span>
+                      <span className="font-medium text-charcoal">{val} <span className="text-warm-grey">({pct(val)}%)</span></span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Retention cohorts */}
       <div className="mt-8">

@@ -6091,6 +6091,59 @@ async function getWhatsAppDeliveryStats({ days = 30 } = {}, db = supabase) {
 }
 
 /**
+ * Acquisition funnel for a recent window, SEGMENTED BY PLATFORM - the cut
+ * that maps to ad channels. Apple Search Ads drives iOS installs only, so the
+ * `ios` column is what you compare against Apple's install count; `web_only`
+ * is the browser cohort (incl. anyone the verification-email stranding sent to
+ * Safari and never back to the native app); `android` is Play. Each segment
+ * carries the signup→verified→onboarded→WhatsApp-linked→subscribed funnel.
+ * Injectable db for tests.
+ */
+async function getAcquisitionFunnel({ days = 14 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const seg = () => ({ signups: 0, verified: 0, onboarded: 0, whatsapp: 0, subscribed: 0 });
+  const out = { days, total: 0, segments: { ios: seg(), android: seg(), web_only: seg() } };
+
+  const { data: users, error } = await db.from('users')
+    .select('id, email, created_at, email_verified, onboarded_at, whatsapp_linked, household_id')
+    .eq('member_type', 'account').gte('created_at', since).limit(3000);
+  if (error) return out;
+  const real = (users || []).filter((u) => u.email && !/@example\.com/i.test(u.email));
+  out.total = real.length;
+  if (!real.length) return out;
+
+  const ids = real.map((u) => u.id);
+  const platform = {}; // userId → 'ios' | 'android'  (native app opened)
+  try {
+    const { data: toks } = await db.from('device_tokens').select('user_id, platform').in('user_id', ids).eq('active', true);
+    for (const t of (toks || [])) {
+      if (t.platform === 'ios') platform[t.user_id] = 'ios';        // iOS wins the label
+      else if (!platform[t.user_id]) platform[t.user_id] = 'android';
+    }
+  } catch { /* no device data → all web_only */ }
+
+  const hhIds = [...new Set(real.map((u) => u.household_id).filter(Boolean))];
+  const subByHh = {};
+  if (hhIds.length) {
+    try {
+      const { data: hhs } = await db.from('households').select('id, subscription_status').in('id', hhIds);
+      for (const h of (hhs || [])) subByHh[h.id] = h.subscription_status;
+    } catch { /* subscription optional */ }
+  }
+
+  for (const u of real) {
+    const key = platform[u.id] === 'ios' ? 'ios' : (platform[u.id] ? 'android' : 'web_only');
+    const s = out.segments[key];
+    s.signups += 1;
+    if (u.email_verified) s.verified += 1;
+    if (u.onboarded_at) s.onboarded += 1;
+    if (u.whatsapp_linked) s.whatsapp += 1;
+    if (subByHh[u.household_id] === 'active') s.subscribed += 1;
+  }
+  return out;
+}
+
+/**
  * Fetch the most recent WhatsApp turns for a user, to replay as conversation
  * context for the AI. Only returns messages within `windowMinutes` of the most
  * recent one (so an old thread doesn't bleed into a brand-new conversation).
@@ -9445,4 +9498,5 @@ module.exports = {
   recordWhatsAppSend,
   recordWhatsAppDeliveryStatus,
   getWhatsAppDeliveryStats,
+  getAcquisitionFunnel,
 };
