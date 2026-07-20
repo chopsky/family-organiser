@@ -160,21 +160,69 @@ describe('buildDailyReminderMessage()', () => {
 });
 
 describe('chooseDailyBriefChannel()', () => {
-  test('prefers push when the app is installed (even if WhatsApp is also linked)', () => {
+  test('legacy contract (no waState): push when the app is installed, else whatsapp', () => {
     expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false })).toBe('push');
     expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: false, briefDisabled: false })).toBe('push');
-  });
-
-  test('falls back to WhatsApp when there is no app but WhatsApp is linked', () => {
     expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: false })).toBe('whatsapp');
   });
 
-  test('returns null when the member has opted out, regardless of channels', () => {
+  test('active users get WhatsApp even with the app installed, content or not', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'active', hasContent: true })).toBe('whatsapp');
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'active', hasContent: false })).toBe('whatsapp');
+  });
+
+  test('new users: WhatsApp on content days; NEVER a contentless WhatsApp brief', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'new', hasContent: true })).toBe('whatsapp');
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'new', hasContent: false })).toBe('push');
+    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: false, waState: 'new', hasContent: false })).toBeNull();
+  });
+
+  test('lapsed users taper: WhatsApp with content, push on quiet days', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'lapsed', hasContent: true })).toBe('whatsapp');
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'lapsed', hasContent: false })).toBe('push');
+  });
+
+  test('dormant users never get WhatsApp briefs - push only', () => {
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: false, waState: 'dormant', hasContent: true })).toBe('push');
+    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: false, waState: 'dormant', hasContent: true })).toBeNull();
+  });
+
+  test('returns null when the member has opted out, regardless of channels or state', () => {
     expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: true })).toBeNull();
-    expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: true, briefDisabled: true })).toBeNull();
+    expect(chooseDailyBriefChannel({ hasDevices: true, whatsappLinked: true, briefDisabled: true, waState: 'active', hasContent: true })).toBeNull();
   });
 
   test('returns null when there is no channel at all', () => {
     expect(chooseDailyBriefChannel({ hasDevices: false, whatsappLinked: false, briefDisabled: false })).toBeNull();
+  });
+});
+
+describe('whatsappBriefState()', () => {
+  const { whatsappBriefState } = require('./reminders');
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const iso = (msAgo) => new Date(now - msAgo).toISOString();
+
+  test('not linked → null', () => {
+    expect(whatsappBriefState({}, now)).toBeNull();
+  });
+  test('inbound within 14 days → active (regardless of link age)', () => {
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(60 * DAY), whatsapp_last_inbound_at: iso(3 * DAY) }, now)).toBe('active');
+  });
+  test('linked <30 days, never really messaged → new', () => {
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(10 * DAY) }, now)).toBe('new');
+  });
+  test('the pairing inbound (2 min after linking) does not make a user active', () => {
+    const linked = 10 * DAY;
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(linked), whatsapp_last_inbound_at: iso(linked - 2 * 60 * 1000) }, now)).toBe('new');
+  });
+  test('was active, quiet 20 days, linked long ago → lapsed', () => {
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(90 * DAY), whatsapp_last_inbound_at: iso(20 * DAY) }, now)).toBe('lapsed');
+  });
+  test('linked 40 days, never messaged → dormant', () => {
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(40 * DAY) }, now)).toBe('dormant');
+  });
+  test('quiet 45 days → dormant', () => {
+    expect(whatsappBriefState({ whatsapp_linked_at: iso(90 * DAY), whatsapp_last_inbound_at: iso(45 * DAY) }, now)).toBe('dormant');
   });
 });

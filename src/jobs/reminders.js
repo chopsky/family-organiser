@@ -7,22 +7,76 @@ const { buildDigestWeatherLine } = require('../utils/weather-line');
 const { fetchTodayForecastForHousehold } = require('../services/digest-weather');
 
 /**
+ * WhatsApp engagement state for brief routing (activation redesign,
+ * 2026-07-20). Chat-list position is attention: a WhatsApp brief re-ranks
+ * Housemait to the top of the user's chats every morning, which push can
+ * never do - so WhatsApp wins while the habit is forming or alive, and
+ * retires when the user has plainly ignored it (cost + block-risk live
+ * almost entirely in messaging the long-silent).
+ *
+ *   'active'  - inbound message in the last 14 days. Their home surface,
+ *               and usually FREE (their replies keep the 24h window open).
+ *   'new'     - linked <30 days, not (yet) active. The habit-formation
+ *               window; WhatsApp carries content-full briefs.
+ *   'lapsed'  - was active, quiet 14-30 days. Taper, not cliff.
+ *   'dormant' - 30+ days without a real inbound message. One sign-off,
+ *               then push-only; any inbound flips straight back to active.
+ *
+ * The pairing flow itself produces one inbound message ("Link 482913"), so
+ * inbound within 15 minutes of linking doesn't count as engagement.
+ */
+const BRIEF_ENGAGEMENT_GRACE_MS = 15 * 60 * 1000;
+function whatsappBriefState(member, nowMs = Date.now()) {
+  const linkedMs = new Date(member?.whatsapp_linked_at || 0).getTime();
+  if (!Number.isFinite(linkedMs) || !linkedMs) return null;
+  const inboundMs = new Date(member?.whatsapp_last_inbound_at || 0).getTime();
+  const engagedInbound = Number.isFinite(inboundMs) && inboundMs - linkedMs > BRIEF_ENGAGEMENT_GRACE_MS
+    ? inboundMs
+    : null;
+  const DAY = 24 * 60 * 60 * 1000;
+  const daysSinceInbound = engagedInbound ? (nowMs - engagedInbound) / DAY : Infinity;
+  const daysSinceLinked = (nowMs - linkedMs) / DAY;
+  if (daysSinceInbound <= 14) return 'active';
+  if (daysSinceLinked <= 30) return 'new';
+  if (daysSinceInbound <= 30) return 'lapsed';
+  return 'dormant';
+}
+
+/**
  * Pick the delivery channel for a member's morning brief.
  *
- * The brief is ONE notification delivered on the member's best channel:
- *   - app installed (has device tokens) → iOS push (free, free-form, tappable)
- *   - otherwise WhatsApp (the legacy path)
- * If the member has turned the brief off, or has no channel at all, returns
- * null (skip). Pure + exported for testing.
+ * With a WhatsApp state supplied (the daily cron always supplies one for
+ * linked members):
+ *   - active  → whatsapp always (content or not - the ritual is theirs)
+ *   - new     → whatsapp on content days; a contentless brief is NEVER sent
+ *               to someone who's never replied (that's the block generator -
+ *               the capture openers carry their quiet days instead), so
+ *               content-free days fall back to push/skip
+ *   - lapsed  → whatsapp on content days, push on quiet days
+ *   - dormant → push only (the one-time sign-off is handled by the caller)
+ * Without a state (member not linked, or legacy callers): push if the app
+ * is installed, else whatsapp if linked, else skip - the old behaviour.
  *
  * @param {object} p
  * @param {boolean} p.hasDevices     - member has ≥1 active push device token
  * @param {boolean} p.whatsappLinked - member has WhatsApp linked + a phone
  * @param {boolean} p.briefDisabled  - member opted out of the daily brief
+ * @param {'active'|'new'|'lapsed'|'dormant'|null} [p.waState]
+ * @param {boolean} [p.hasContent]   - brief carries real schedule/dinner/
+ *                                     reminder content (weather/tips aside)
  * @returns {'push'|'whatsapp'|null}
  */
-function chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled }) {
+function chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent }) {
   if (briefDisabled) return null;
+  if (whatsappLinked && waState) {
+    if (waState === 'active') return 'whatsapp';
+    if (waState === 'new' || waState === 'lapsed') {
+      if (hasContent) return 'whatsapp';
+      return hasDevices ? 'push' : null;
+    }
+    // dormant
+    return hasDevices ? 'push' : null;
+  }
   if (hasDevices) return 'push';
   if (whatsappLinked) return 'whatsapp';
   return null;
@@ -160,6 +214,9 @@ function buildDailyReminderParts(user, opts = {}) {
   const hasSchool = Array.isArray(schoolActivities) && schoolActivities.length > 0;
   if (!hasSchool && eventsArr.length === 0) {
     lines.push('✨ Nothing scheduled today.');
+    // Quiet days still earn their place: an empty brief must invite a reply,
+    // not read as "this app does nothing".
+    lines.push('Anything I should add? Just tell me - "dentist Thursday 2pm" is all it takes.');
     lines.push('');
   }
 
@@ -507,12 +564,6 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     try { deviceTokens = (await db.getActiveDeviceTokens(member.id)) || []; } catch { deviceTokens = []; }
     const hasDevices = deviceTokens.length > 0;
 
-    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled });
-    if (!channel) {
-      console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled})`);
-      continue;
-    }
-
     // Get today's school activities for children in this household
     // Only include if today is during term time (not holidays, half term, INSET, or bank holiday)
     const schoolActivities = [];
@@ -551,6 +602,38 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
         }
       }
     } catch { /* silently skip school activities on error */ }
+
+    // Real content = schedule/dinner/reminders. Weather and tips are garnish
+    // and never justify a business-initiated message on their own.
+    const hasContent = (todayEvents || []).length > 0
+      || schoolActivities.length > 0
+      || !!dinner?.meal_name
+      || (taskReminders || []).length > 0
+      || (billReminders || []).length > 0;
+    const waState = whatsappLinked ? whatsappBriefState(member) : null;
+
+    // One-time dormant sign-off: tell the long-silent user the morning
+    // messages are stopping (and how to restart) at exactly the moment an
+    // annoyed user would otherwise block. Stamp FIRST - if the column
+    // isn't migrated yet the update fails and we skip, which can repeat
+    // nothing; sending first could repeat the sign-off daily.
+    if (waState === 'dormant' && whatsappLinked && !member.whatsapp_brief_signoff_sent_at && !briefDisabled) {
+      try {
+        await db.updateUser(member.id, { whatsapp_brief_signoff_sent_at: new Date().toISOString() });
+        const { sendBroadcastToMember } = require('../services/whatsapp-templates');
+        await sendBroadcastToMember(member,
+          `I'll stop the morning messages here, ${(member.name || '').split(/\s+/)[0] || 'there'} - I don't want to clutter your chats. 👋\n\nReply any time and I'll pick straight back up. You can also switch the daily brief on or off in Settings → Notifications.`);
+        console.log(`[reminders] Sent dormant sign-off to ${member.name}`);
+      } catch (err) {
+        console.warn('[reminders] dormant sign-off skipped:', err.message);
+      }
+    }
+
+    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent });
+    if (!channel) {
+      console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled}, state=${waState}, content=${hasContent})`);
+      continue;
+    }
 
     const buildOpts = {
       todayEvents,
@@ -668,5 +751,6 @@ module.exports = {
   buildDailyReminderParts,
   buildDailyReminderTemplateVars,
   chooseDailyBriefChannel,
+  whatsappBriefState,
   sendDailyReminders,
 };
