@@ -124,6 +124,14 @@ function splitForWhatsApp(text, limit = WHATSAPP_MAX_CHARS) {
   return chunks;
 }
 
+// Absolute URL Twilio POSTs delivery-status updates to (see
+// routes/whatsapp.js POST /status). Only added when API_URL is set, so local
+// dev without a public URL simply doesn't request callbacks.
+function statusCallbackUrl() {
+  const base = process.env.API_URL;
+  return base ? `${base.replace(/\/+$/, '')}/api/whatsapp/status` : null;
+}
+
 async function sendOneMessage(to, bodyText, msid) {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -133,6 +141,8 @@ async function sendOneMessage(to, bodyText, msid) {
   } else {
     params.From = formatPhone(process.env.TWILIO_WHATSAPP_NUMBER);
   }
+  const cb = statusCallbackUrl();
+  if (cb) params.StatusCallback = cb;
 
   console.log('[WhatsApp] Sending via REST API:', JSON.stringify(params));
 
@@ -156,7 +166,19 @@ async function sendOneMessage(to, bodyText, msid) {
     throw err;
   }
   console.log('[WhatsApp] Message sent:', data.sid, data.status);
+  recordDelivery(data.sid, to, 'freeform', data.status);
   return data;
+}
+
+// Fire-and-forget delivery tracking. Lazy-require db to avoid a load-time
+// cycle, and never let telemetry throw into the send path.
+function recordDelivery(sid, to, messageType, status) {
+  if (!sid) return;
+  try {
+    require('../db/queries').recordWhatsAppSend({ sid, toPhone: to, messageType, status });
+  } catch (err) {
+    console.error('[WhatsApp] delivery record skipped:', err.message);
+  }
 }
 
 /**
@@ -295,6 +317,8 @@ async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
     ContentSid: contentSid,
     ContentVariables: JSON.stringify(contentVars),
   };
+  const cb = statusCallbackUrl();
+  if (cb) params.StatusCallback = cb;
 
   console.log('[WhatsApp] Sending template via REST API:', JSON.stringify({ To: to, ContentSid: contentSid, vars: Object.keys(contentVars) }));
 
@@ -320,6 +344,7 @@ async function sendTemplate(phone, contentSidOrBody, contentVars = {}) {
   }
 
   console.log('[WhatsApp] Template sent:', data.sid, data.status);
+  recordDelivery(data.sid, to, 'template', data.status);
   return data;
 }
 

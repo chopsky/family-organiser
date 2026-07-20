@@ -117,6 +117,38 @@ export default function AdminAiUsage() {
               <p className="text-xs text-warm-grey font-medium mt-0.5">p95 latency (recent sample)</p>
             </div>
           </div>
+          {(() => {
+            const d = data?.deliveryStats;
+            if (!d || !d.total) return null;
+            const bad = (d.byStatus?.undelivered || 0) + (d.byStatus?.failed || 0);
+            return (
+              <div className="mt-4 pt-4 border-t border-light-grey">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-xs font-semibold text-charcoal">WhatsApp delivery</p>
+                  <span className={`inline-block w-2 h-2 rounded-full ${bad > 0 ? 'bg-coral' : 'bg-sage'}`} />
+                  <span className="text-xs text-warm-grey">
+                    {d.total} sent · delivered {d.byStatus?.delivered || 0} · undelivered/failed {bad} ({d.undeliveredRate}%)
+                  </span>
+                </div>
+                <p className="text-[11px] text-warm-grey mb-2">
+                  WhatsApp gives no &ldquo;who blocked you&rdquo; list — repeated undelivered to a linked member is the closest proxy for a block or a dead number.
+                </p>
+                {d.problems?.length > 0 && (
+                  <div className="space-y-1.5">
+                    {d.problems.slice(0, 8).map((p, i) => (
+                      <div key={i} className="text-xs bg-cream rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-0.5">
+                        <span className="text-warm-grey shrink-0">{formatRelativeTime(p.sent_at)}</span>
+                        <span className="font-medium text-charcoal shrink-0">{p.name || p.phone || 'unknown'}</span>
+                        <span className="text-coral font-mono shrink-0">{p.status}{p.error_code ? ` (${p.error_code})` : ''}</span>
+                        {p.message_type && <span className="text-warm-grey shrink-0">{p.message_type}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {botFailures.recent?.length > 0 && (
             <div className="mt-4 pt-4 border-t border-light-grey">
               <p className="text-xs font-semibold text-charcoal mb-2">Recent failures</p>

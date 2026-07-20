@@ -5993,6 +5993,103 @@ async function logWhatsAppMessage({ householdId, userId, direction, messageType,
     .catch((err) => console.error('[whatsapp-log] Failed to log message:', err.message));
 }
 
+// ─── WhatsApp delivery tracking (Twilio StatusCallback) ─────────────────────
+//
+// recordWhatsAppSend: called at the low-level send site with the Twilio SID.
+// Insert-or-ignore so a status callback that raced ahead of us isn't clobbered
+// back to 'sent'. recordWhatsAppDeliveryStatus: called by the /status webhook;
+// upsert so it wins regardless of ordering. Both fire-and-forget - delivery
+// telemetry must never break a send or a webhook ack.
+
+function normalisePhone(p) {
+  return String(p || '').replace(/^whatsapp:/i, '').replace(/[^\d+]/g, '') || null;
+}
+
+async function recordWhatsAppSend({ sid, toPhone, messageType, status }, db = supabase) {
+  if (!sid) return;
+  try {
+    await db.from('whatsapp_delivery_log')
+      .upsert({
+        twilio_sid: sid,
+        to_phone: normalisePhone(toPhone),
+        message_type: messageType || null,
+        status: status || 'sent',
+      }, { onConflict: 'twilio_sid', ignoreDuplicates: true });
+  } catch (err) {
+    console.error('[wa-delivery] record send failed:', err.message);
+  }
+}
+
+async function recordWhatsAppDeliveryStatus({ sid, toPhone, status, errorCode }, db = supabase) {
+  if (!sid || !status) return;
+  try {
+    await db.from('whatsapp_delivery_log')
+      .upsert({
+        twilio_sid: sid,
+        to_phone: normalisePhone(toPhone) || undefined,
+        status,
+        error_code: errorCode != null && errorCode !== '' ? parseInt(errorCode, 10) : null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'twilio_sid' });
+  } catch (err) {
+    console.error('[wa-delivery] record status failed:', err.message);
+  }
+}
+
+/**
+ * Delivery health over the last `days`: status breakdown + the undelivered/
+ * failed messages joined to the linked user they were headed for (the
+ * closest thing to a "who might have blocked us / churned" signal, plus
+ * genuinely failed sends). Missing table (migration pending) → empty shape.
+ */
+async function getWhatsAppDeliveryStats({ days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const empty = { total: 0, byStatus: {}, undeliveredRate: 0, problems: [] };
+  let rows;
+  try {
+    const { data, error } = await db.from('whatsapp_delivery_log')
+      .select('twilio_sid, to_phone, message_type, status, error_code, sent_at')
+      .gte('sent_at', since).limit(5000);
+    if (error) return empty;
+    rows = data || [];
+  } catch { return empty; }
+
+  const byStatus = {};
+  for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+  const bad = rows.filter((r) => r.status === 'undelivered' || r.status === 'failed');
+
+  // Resolve the failed/undelivered phones to linked members by name.
+  const phones = [...new Set(bad.map((r) => r.to_phone).filter(Boolean))];
+  const nameByPhone = {};
+  if (phones.length) {
+    try {
+      const { data: us } = await db.from('users')
+        .select('name, whatsapp_phone').in('whatsapp_phone', phones);
+      for (const u of (us || [])) nameByPhone[u.whatsapp_phone] = u.name;
+    } catch { /* names are best-effort */ }
+  }
+  const problems = bad
+    .sort((a, b) => String(b.sent_at).localeCompare(String(a.sent_at)))
+    .slice(0, 50)
+    .map((r) => ({
+      name: nameByPhone[r.to_phone] || null,
+      phone: r.to_phone ? r.to_phone.replace(/(\d{4})\d+/, '$1…') : null,
+      status: r.status,
+      error_code: r.error_code,
+      message_type: r.message_type,
+      sent_at: r.sent_at,
+    }));
+
+  const total = rows.length;
+  const undelivered = (byStatus.undelivered || 0) + (byStatus.failed || 0);
+  return {
+    total,
+    byStatus,
+    undeliveredRate: total ? Math.round((undelivered / total) * 1000) / 10 : 0,
+    problems,
+  };
+}
+
 /**
  * Fetch the most recent WhatsApp turns for a user, to replay as conversation
  * context for the AI. Only returns messages within `windowMinutes` of the most
@@ -9345,4 +9442,7 @@ module.exports = {
   getCaptureOpenerKeys,
   recordCaptureOpener,
   claimPinNudge,
+  recordWhatsAppSend,
+  recordWhatsAppDeliveryStatus,
+  getWhatsAppDeliveryStats,
 };

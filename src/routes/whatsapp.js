@@ -84,6 +84,34 @@ function buildExpiredUpgradeMessage(webUrl) {
  *   - MediaUrl0, MediaContentType0: first media attachment
  *   - ProfileName: sender's WhatsApp display name
  */
+/**
+ * POST /whatsapp/status
+ * Twilio delivery-status callbacks for outbound messages (requested via the
+ * StatusCallback param on send). Records delivered/undelivered/failed +
+ * error code against the Twilio SID so we can see what happened after a send
+ * - undelivered-to-a-linked-user is the closest available proxy for a block,
+ * and it surfaces genuinely failed sends we'd otherwise be blind to.
+ *
+ * Same signature guard as the inbound webhook: reject forged callbacks that
+ * could poison the delivery data. Always ack 200 for real Twilio traffic.
+ */
+router.post('/status', async (req, res) => {
+  if (!verifyTwilioSignature(req)) {
+    return res.status(403).send('Invalid signature');
+  }
+  try {
+    await db.recordWhatsAppDeliveryStatus({
+      sid: req.body.MessageSid || req.body.SmsSid,
+      toPhone: req.body.To,
+      status: req.body.MessageStatus || req.body.SmsStatus,
+      errorCode: req.body.ErrorCode,
+    });
+  } catch (err) {
+    console.error('[whatsapp-status] record failed:', err.message);
+  }
+  return res.status(204).end();
+});
+
 router.post('/webhook', async (req, res) => {
   // SECURITY: reject anything not signed by Twilio BEFORE the 200 ack or any
   // processing. Real Twilio traffic always carries a valid signature, so this
