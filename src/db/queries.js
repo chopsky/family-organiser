@@ -244,7 +244,7 @@ async function getUserByEmail(email, db = supabase) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null }, db = supabase) {
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null, signupSource = null }, db = supabase) {
   const row = {
     email,
     password_hash: passwordHash,
@@ -266,6 +266,16 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
     .select()
     .single();
   if (error) throw error;
+  // Acquisition attribution (e.g. 'rsvp' from an invite page's pitch card).
+  // Written as a separate best-effort update, NOT in the insert row: the
+  // signup_source column ships in a pending migration, and a missing column
+  // must never fail account creation itself.
+  if (signupSource && data?.id) {
+    try {
+      await db.from('users').update({ signup_source: signupSource }).eq('id', data.id);
+      data.signup_source = signupSource;
+    } catch { /* column not migrated yet - attribution is best-effort */ }
+  }
   return data;
 }
 
@@ -6090,6 +6100,245 @@ async function getWhatsAppDeliveryStats({ days = 30 } = {}, db = supabase) {
   };
 }
 
+// ─── Event invites + RSVPs (party loop) ─────────────────────────────────────
+
+/**
+ * Create (or return the existing live) invite link for an event. One link
+ * per event: re-tapping "Invite families" must hand back the SAME url, or a
+ * host who shares twice splits their RSVPs across two rosters.
+ * Token: 128-bit random, base64url (~22 chars) - unguessable, no auth.
+ */
+async function createOrGetEventInviteLink({ eventId, householdId, createdBy }, db = supabase) {
+  const { data: existing } = await db
+    .from('event_invite_links')
+    .select('*')
+    .eq('event_id', eventId)
+    .is('revoked_at', null)
+    .limit(1);
+  if (existing && existing.length) return existing[0];
+
+  const { data: ev, error: evErr } = await db
+    .from('calendar_events')
+    .select('id, household_id, end_time, start_time')
+    .eq('id', eventId)
+    .single();
+  if (evErr || !ev || ev.household_id !== householdId) {
+    const e = new Error('event not found in household');
+    e.code = 'EVENT_NOT_FOUND';
+    throw e;
+  }
+  const basis = ev.end_time || ev.start_time;
+  const expiresAt = new Date(new Date(basis).getTime() + 7 * 86400000).toISOString();
+  const token = require('crypto').randomBytes(16).toString('base64url');
+  const { data, error } = await db
+    .from('event_invite_links')
+    .insert({ event_id: eventId, household_id: householdId, token, created_by: createdBy || null, expires_at: expiresAt })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Public lookup by token. Returns ONLY invitee-safe fields - notably the
+ * address (location) is NOT included here; it's revealed by the RSVP
+ * response. Null when the token is unknown, revoked, expired, or the event
+ * was deleted. Bumps view_count fire-and-forget (funnel: opens) - pass
+ * bumpView:false from non-pageview callers (RSVP submit, .ics download) so
+ * the opens metric stays honest.
+ */
+async function getEventInviteByToken(token, { bumpView = true } = {}, db = supabase) {
+  if (!token) return null;
+  const { data: link, error } = await db
+    .from('event_invite_links')
+    .select('id, event_id, household_id, token, expires_at, revoked_at, view_count, created_by')
+    .eq('token', token)
+    .single();
+  if (error || !link) return null;
+  if (link.revoked_at) return null;
+  if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) return { expired: true };
+
+  const { data: ev } = await db
+    .from('calendar_events')
+    .select('id, title, start_time, end_time, all_day, location, deleted_at')
+    .eq('id', link.event_id)
+    .single();
+  if (!ev || ev.deleted_at) return null;
+
+  let hostFirstName = null;
+  if (link.created_by) {
+    try {
+      const { data: host } = await db.from('users').select('name').eq('id', link.created_by).single();
+      hostFirstName = (host?.name || '').trim().split(/\s+/)[0] || null;
+    } catch { /* host name is garnish */ }
+  }
+
+  if (bumpView) {
+    db.from('event_invite_links')
+      .update({ view_count: (link.view_count || 0) + 1 })
+      .eq('id', link.id)
+      .then(() => {})
+      .catch(() => {});
+  }
+
+  return {
+    linkId: link.id,
+    householdId: link.household_id,
+    hostFirstName,
+    event: {
+      id: ev.id,
+      title: ev.title,
+      start_time: ev.start_time,
+      end_time: ev.end_time,
+      all_day: ev.all_day,
+      // location deliberately withheld - revealed post-RSVP
+      hasLocation: !!ev.location,
+    },
+    location: ev.location || null, // for the route to reveal AFTER an RSVP
+  };
+}
+
+/**
+ * Insert-or-update a family's RSVP on a link. Same family name (case-
+ * insensitive) updates in place so "actually we CAN come" doesn't duplicate.
+ */
+async function upsertEventRsvp({ inviteLinkId, familyName, status, kidsCount, adultsCount, dietaryNotes, userId }, db = supabase) {
+  const clean = (s, max) => String(s || '').replace(/<[^>]*>/g, '').trim().slice(0, max);
+  const name = clean(familyName, 80);
+  if (!name) { const e = new Error('name required'); e.code = 'NAME_REQUIRED'; throw e; }
+  const row = {
+    invite_link_id: inviteLinkId,
+    family_name: name,
+    status: status === 'no' ? 'no' : 'yes',
+    kids_count: Math.max(0, Math.min(20, parseInt(kidsCount, 10) || 0)),
+    adults_count: Math.max(0, Math.min(20, parseInt(adultsCount, 10) || 0)),
+    dietary_notes: clean(dietaryNotes, 500) || null,
+    user_id: userId || null,
+  };
+  const { data: existing } = await db
+    .from('event_rsvps')
+    .select('id, family_name')
+    .eq('invite_link_id', inviteLinkId)
+    .ilike('family_name', name)
+    .limit(1);
+  if (existing && existing.length) {
+    const { data, error } = await db
+      .from('event_rsvps')
+      .update({ ...row, updated_at: new Date().toISOString() })
+      .eq('id', existing[0].id)
+      .select()
+      .single();
+    if (error) throw error;
+    return { rsvp: data, updated: true };
+  }
+  const { data, error } = await db.from('event_rsvps').insert(row).select().single();
+  if (error) throw error;
+  return { rsvp: data, updated: false };
+}
+
+/**
+ * Host roster for an event: every RSVP plus the rollups the mock leads with
+ * (going/declined, kids/adults totals, the allergy list). Empty shape when
+ * the event has no live link or the tables aren't migrated yet.
+ */
+async function getEventRsvps(eventId, householdId, db = supabase) {
+  const empty = { hasLink: false, going: 0, declined: 0, kids: 0, adults: 0, dietary: [], rsvps: [] };
+  try {
+    const { data: links, error } = await db
+      .from('event_invite_links')
+      .select('id, token, expires_at, revoked_at, view_count')
+      .eq('event_id', eventId)
+      .eq('household_id', householdId)
+      .is('revoked_at', null)
+      .limit(1);
+    if (error || !links || !links.length) return empty;
+    const link = links[0];
+    const { data: rsvps } = await db
+      .from('event_rsvps')
+      .select('family_name, status, kids_count, adults_count, dietary_notes, user_id, created_at')
+      .eq('invite_link_id', link.id)
+      .order('created_at', { ascending: true });
+    const rows = rsvps || [];
+    const going = rows.filter((r) => r.status === 'yes');
+    return {
+      hasLink: true,
+      token: link.token,
+      viewCount: link.view_count || 0,
+      going: going.length,
+      declined: rows.length - going.length,
+      kids: going.reduce((s, r) => s + (r.kids_count || 0), 0),
+      adults: going.reduce((s, r) => s + (r.adults_count || 0), 0),
+      dietary: going
+        .filter((r) => r.dietary_notes)
+        .map((r) => ({ family: r.family_name, note: r.dietary_notes })),
+      rsvps: rows,
+    };
+  } catch { return empty; }
+}
+
+/**
+ * Events in a household that have a live invite link and haven't long
+ * finished (yesterday onwards) - the bot's referent set for "who's coming?".
+ * Nearest first. Empty on missing tables (migration pending) or none.
+ */
+async function getUpcomingInviteEvents(householdId, db = supabase) {
+  try {
+    const { data: links } = await db
+      .from('event_invite_links')
+      .select('id, event_id')
+      .eq('household_id', householdId)
+      .is('revoked_at', null);
+    if (!links || !links.length) return [];
+    const { data: evs } = await db
+      .from('calendar_events')
+      .select('id, title, start_time, end_time')
+      .in('id', [...new Set(links.map((l) => l.event_id))])
+      .is('deleted_at', null)
+      .gte('end_time', new Date(Date.now() - 86400000).toISOString())
+      .order('start_time', { ascending: true })
+      .limit(3);
+    return evs || [];
+  } catch { return []; }
+}
+
+/**
+ * The party-loop funnel: links created → link opens → RSVPs → signups
+ * attributed to the RSVP pitch card (users.signup_source = 'rsvp'). All
+ * within a recent window. Zeroed shape when the tables aren't migrated.
+ */
+async function getInviteLoopFunnel({ days = 30 } = {}, db = supabase) {
+  const out = { days, links: 0, views: 0, rsvps: 0, rsvpYes: 0, families: 0, signups: 0 };
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  try {
+    const { data: links } = await db
+      .from('event_invite_links')
+      .select('id, view_count, created_at')
+      .gte('created_at', since);
+    out.links = (links || []).length;
+    out.views = (links || []).reduce((s, l) => s + (l.view_count || 0), 0);
+    if (out.links) {
+      const { data: rsvps } = await db
+        .from('event_rsvps')
+        .select('id, status, family_name, invite_link_id')
+        .in('invite_link_id', links.map((l) => l.id));
+      const rows = rsvps || [];
+      out.rsvps = rows.length;
+      out.rsvpYes = rows.filter((r) => r.status === 'yes').length;
+      out.families = new Set(rows.map((r) => `${r.invite_link_id}:${(r.family_name || '').toLowerCase()}`)).size;
+    }
+  } catch { /* tables not migrated yet */ }
+  try {
+    const { data: signups } = await db
+      .from('users')
+      .select('id')
+      .eq('signup_source', 'rsvp')
+      .gte('created_at', since)
+      .limit(1000);
+    out.signups = (signups || []).length;
+  } catch { /* signup_source column not migrated yet */ }
+  return out;
+}
+
 /**
  * Acquisition funnel for a recent window, SEGMENTED BY PLATFORM - the cut
  * that maps to ad channels. Apple Search Ads drives iOS installs only, so the
@@ -9499,4 +9748,10 @@ module.exports = {
   recordWhatsAppDeliveryStatus,
   getWhatsAppDeliveryStats,
   getAcquisitionFunnel,
+  createOrGetEventInviteLink,
+  getEventInviteByToken,
+  upsertEventRsvp,
+  getEventRsvps,
+  getUpcomingInviteEvents,
+  getInviteLoopFunnel,
 };

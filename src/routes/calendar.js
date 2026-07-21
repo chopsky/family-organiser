@@ -989,6 +989,50 @@ router.delete('/events/:id/skips/:date', async (req, res) => {
   }
 });
 
+// ─── Party invites (the organic-growth loop, host side) ─────────────────────
+
+/**
+ * POST /api/calendar/events/:id/invite-link
+ * Create - or return the existing live - public invite link for an event.
+ * One link per event so a host who shares twice never splits the roster.
+ */
+router.post('/events/:id/invite-link', async (req, res) => {
+  try {
+    const link = await db.createOrGetEventInviteLink({
+      eventId: req.params.id,
+      householdId: req.householdId,
+      createdBy: req.user.id,
+    });
+    const base = process.env.WEB_URL || 'https://housemait.com';
+    return res.json({
+      url: `${base}/p/${link.token}`,
+      token: link.token,
+      expiresAt: link.expires_at,
+    });
+  } catch (err) {
+    if (err?.code === 'EVENT_NOT_FOUND') return res.status(404).json({ error: 'Event not found' });
+    // 42P01 = relation missing: the event-invites migration hasn't run yet.
+    if (err?.code === '42P01') return res.status(503).json({ error: 'Invites are not available yet' });
+    console.error('POST /api/calendar/events/:id/invite-link error:', err?.message || err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/calendar/events/:id/rsvps
+ * The host's roster + rollups (going/declined, headcounts, allergy list).
+ * Returns the calm empty shape when the event has no live link.
+ */
+router.get('/events/:id/rsvps', async (req, res) => {
+  try {
+    const roster = await db.getEventRsvps(req.params.id, req.householdId);
+    return res.json(roster);
+  } catch (err) {
+    console.error('GET /api/calendar/events/:id/rsvps error:', err?.message || err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 /**
  * GET /api/calendar/deleted
  * List soft-deleted calendar events for the household.

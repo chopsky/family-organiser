@@ -390,15 +390,16 @@ router.get('/analytics', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
     const cohortWeeks = Math.min(parseInt(req.query.cohortWeeks, 10) || 12, 26);
-    const [analytics, retention, channelCohorts, calendarConnection, acquisition] = await Promise.all([
+    const [analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop] = await Promise.all([
       db.getAnalytics({ days }),
       db.getRetentionCohorts({ weeks: cohortWeeks }),
       db.getChannelCohortStats(),
       db.getCalendarConnectionStats(),
       db.getAcquisitionFunnel({ days: Math.min(days, 30) }),
+      db.getInviteLoopFunnel({ days: Math.min(days, 30) }),
     ]);
     return res.json({
-      ...analytics, retention, channelCohorts, calendarConnection, acquisition,
+      ...analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop,
     });
   } catch (err) {
     console.error('GET /api/admin/analytics error:', err);

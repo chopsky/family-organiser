@@ -29,6 +29,7 @@ import ErrorBanner from '../../components/ErrorBanner';
 import AuthHeader from '../../components/AuthHeader';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
+import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
 import WelcomeNotifications from './steps/WelcomeNotifications';
 import AccountStep from './steps/AccountStep';
 import HouseholdStep from './steps/HouseholdStep';
@@ -113,6 +114,7 @@ export default function OnboardingFlow() {
     pains: ['head', 'nag'],   // sensible defaults so the plan screen is never empty
     accName: '',
     promoCode: resolveSignupPromo(searchParams),
+    signupSource: resolveSignupSource(searchParams),
     hhMode: 'new', hhName: '', joinCode: '',
     invited: [],
     calProvider: null, calUrl: '',
@@ -165,6 +167,7 @@ export default function OnboardingFlow() {
   // to the dashboard); a fresh account goes to the household step.
   const goAfterAuth = (data) => {
     clearSignupPromo();
+    clearSignupSource();
     auth.login(data);
     setIdx(STEPS.indexOf(data?.household ? 'invite' : 'household'));
   };
@@ -190,7 +193,7 @@ export default function OnboardingFlow() {
     form, update,
     next, back, setError,
     goAfterAuth, finish, finishing,
-    inviteToken, promoCode: form.promoCode,
+    inviteToken, promoCode: form.promoCode, signupSource: form.signupSource,
     firstName: firstNameOf(auth.user),
   };
 
@@ -271,7 +274,7 @@ export default function OnboardingFlow() {
 function renderStep(key, ctx) {
   switch (key) {
     case 'account':
-      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} navigate={ctx.navigate} />;
+      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} signupSource={ctx.signupSource} navigate={ctx.navigate} />;
     case 'household':
       return <HouseholdStep auth={ctx.auth} form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'invite':

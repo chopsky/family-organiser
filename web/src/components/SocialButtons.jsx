@@ -54,7 +54,7 @@ function isCancelError(err) {
   return false;
 }
 
-export default function SocialButtons({ inviteToken, promoCode, onSuccess, onError }) {
+export default function SocialButtons({ inviteToken, promoCode, signupSource, onSuccess, onError }) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
   // Holds Google's OAuth code client (web), initialised once the GIS SDK loads.
@@ -80,12 +80,13 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
         code: response.code,
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
+        source: signupSource || undefined,
       });
       onSuccess(data);
     } catch (err) {
       onError(err.response?.data?.error || 'Google sign-in failed.');
     }
-  }, [inviteToken, promoCode, onSuccess, onError]);
+  }, [inviteToken, promoCode, signupSource, onSuccess, onError]);
 
   // On iOS native: initialise the Capgo Social Login plugin once on mount so
   // the Google SDK is ready by the time the user taps the button. The plugin
@@ -210,6 +211,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
           idToken,
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
+          source: signupSource || undefined,
         });
         onSuccess(data);
       } catch (err) {
@@ -269,6 +271,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
           name,
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
+          source: signupSource || undefined,
         });
         onSuccess(data);
       } catch (err) {
@@ -305,6 +308,7 @@ export default function SocialButtons({ inviteToken, promoCode, onSuccess, onErr
         name: result.user ? `${result.user.name.firstName} ${result.user.name.lastName}`.trim() : undefined,
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
+        source: signupSource || undefined,
       });
       onSuccess(data);
     } catch (err) {

@@ -168,6 +168,11 @@ app.use('/api/contact', require('./routes/contact'));
 // Mounted before the subscription gate: no household/auth context required.
 app.use('/api/la-term-dates', require('./routes/laTermDates'));
 
+// Public event-invite RSVP endpoints - no auth (the unguessable link token
+// IS the credential). Mounted before the subscription gate because invitee
+// families are usually not Housemait users at all - that's the point.
+app.use('/api/rsvp', require('./routes/rsvp'));
+
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,
 // /admin, /inbound-email, /webhooks via an internal allowlist - see

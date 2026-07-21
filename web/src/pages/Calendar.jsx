@@ -16,6 +16,7 @@ import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 import ActivityModal from '../components/ActivityModal';
+import { looksLikeGathering } from '../lib/partyDetect';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -425,6 +426,13 @@ export default function Calendar() {
   const [eventAttachments, setEventAttachments] = useState([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef(null);
+  // Party invites: the host-side roster for the event being edited, plus the
+  // shareable link once one exists. Null roster = not loaded / no tables yet.
+  const [inviteRoster, setInviteRoster] = useState(null);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteRosterOpen, setInviteRosterOpen] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formDate, setFormDate] = useState(toDateStr(today));
   const [formAllDay, setFormAllDay] = useState(false);
@@ -979,6 +987,11 @@ export default function Calendar() {
     setFormReminders([]);
     setShowMoreOptions(false);
     setEventAttachments([]);
+    setInviteRoster(null);
+    setInviteUrl('');
+    setInviteBusy(false);
+    setInviteCopied(false);
+    setInviteRosterOpen(false);
     // Activity-mode fields (the Event / Kids' activity toggle).
     setCreateKind('event');
     const base = selectedDate || today;
@@ -1025,6 +1038,55 @@ export default function Calendar() {
       setEventAttachments(prev => prev.filter(a => a.id !== id));
     } catch {
       alert('Could not remove that attachment.');
+    }
+  }
+
+  // ── Party invites (host side) ──────────────────────────
+  // The public link lives at housemait.com/p/<token>, so it can be rebuilt
+  // client-side from the roster's token - one source of truth for the path.
+  const inviteUrlFromToken = (token) => `${window.location.origin}/p/${token}`;
+
+  async function loadInviteRoster(eventId) {
+    try {
+      const { data } = await api.get(`/calendar/events/${eventId}/rsvps`);
+      setInviteRoster(data);
+      setInviteUrl(data?.hasLink && data.token ? inviteUrlFromToken(data.token) : '');
+    } catch {
+      setInviteRoster(null); // quiet: the section just shows the create button
+    }
+  }
+
+  async function copyInviteUrl(url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch {
+      // Clipboard can be blocked (older WebViews) - the visible URL is
+      // selectable, so failing silently beats an alert here.
+    }
+  }
+
+  async function createInviteLink() {
+    if (!editingEvent?.id || inviteBusy) return;
+    setInviteBusy(true);
+    try {
+      const { data } = await api.post(`/calendar/events/${editingEvent.id}/invite-link`);
+      setInviteUrl(data.url);
+      setInviteRoster(prev => ({ ...(prev || { going: 0, declined: 0, kids: 0, adults: 0, dietary: [], rsvps: [] }), hasLink: true }));
+      // On phones go straight to the share sheet - the whole flow is "make
+      // link, paste into the class group chat".
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: formTitle || 'You’re invited', url: data.url });
+        } catch { /* user closed the sheet - the link row stays visible */ }
+      } else {
+        copyInviteUrl(data.url);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not create the invite link.');
+    } finally {
+      setInviteBusy(false);
     }
   }
 
@@ -1093,6 +1155,11 @@ export default function Calendar() {
     setEditingEvent(ev);
     setEventAttachments([]);
     if (ev.id) loadAttachments(ev.id);
+    setInviteRoster(null);
+    setInviteUrl('');
+    setInviteCopied(false);
+    setInviteRosterOpen(false);
+    if (ev.id) loadInviteRoster(ev.id);
     setFormTitle(ev.title || '');
     setFormDate(ev.start_time?.split('T')[0] || toDateStr(selectedDate));
     setFormEndDate(ev.end_time?.split('T')[0] || ev.start_time?.split('T')[0] || toDateStr(selectedDate));
@@ -2959,6 +3026,100 @@ export default function Calendar() {
                     </button>
                   </div>
                 </MField>
+
+                {/* ── 5b. Invite other families (saved events only) ──
+                    Available on EVERY event via the quiet link; promoted to a
+                    card when the title looks like a gathering (partyDetect -
+                    prominence only, never availability). */}
+                {editingEvent?.id && (
+                  inviteRoster?.hasLink ? (
+                    <MField label="Invites">
+                      <div style={{ borderRadius: 12, border: `1px solid ${M_LINE_STRONG}`, background: '#FBF8F3', padding: '12px 14px' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>
+                          {inviteRoster.going > 0
+                            ? `${inviteRoster.going} famil${inviteRoster.going === 1 ? 'y' : 'ies'} going · ${inviteRoster.kids} kid${inviteRoster.kids === 1 ? '' : 's'}, ${inviteRoster.adults} adult${inviteRoster.adults === 1 ? '' : 's'}`
+                            : 'No RSVPs yet — share the link below'}
+                          {inviteRoster.declined > 0 && (
+                            <span style={{ fontWeight: 400, color: M_INK3 }}> · {inviteRoster.declined} can’t make it</span>
+                          )}
+                        </div>
+                        {inviteRoster.dietary?.length > 0 && (
+                          <div style={{ marginTop: 8, borderRadius: 10, background: '#EDF5EE', border: '1px solid rgba(125,174,130,0.3)', padding: '8px 10px' }}>
+                            {inviteRoster.dietary.map((d, i) => (
+                              <div key={i} style={{ fontSize: 12.5, color: M_INK2, lineHeight: 1.5 }}>
+                                <strong>{d.family}:</strong> {d.note}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {inviteRoster.rsvps?.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setInviteRosterOpen(o => !o)}
+                            style={{ marginTop: 8, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: M_BRAND }}
+                          >
+                            {inviteRosterOpen ? 'Hide replies' : `See all replies (${inviteRoster.rsvps.length})`}
+                          </button>
+                        )}
+                        {inviteRosterOpen && (
+                          <ul style={{ margin: '6px 0 0', padding: 0, listStyle: 'none' }}>
+                            {inviteRoster.rsvps.map((r, i) => (
+                              <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, color: M_INK2, padding: '3px 0' }}>
+                                <span>{r.family_name}</span>
+                                <span style={{ color: r.status === 'yes' ? '#5B8A60' : M_INK3, fontWeight: 600 }}>
+                                  {r.status === 'yes' ? `Yes · ${(r.kids_count || 0) + (r.adults_count || 0)} coming` : 'No'}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                          <input
+                            readOnly
+                            value={inviteUrl}
+                            onFocus={(e) => e.target.select()}
+                            style={{ ...mInput, flex: 1, width: 'auto', fontSize: 12.5, color: M_INK3, background: '#fff' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => (navigator.share ? navigator.share({ title: formTitle || 'You’re invited', url: inviteUrl }).catch(() => {}) : copyInviteUrl(inviteUrl))}
+                            style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff' }}
+                          >
+                            {inviteCopied ? 'Copied!' : 'Share'}
+                          </button>
+                        </div>
+                      </div>
+                    </MField>
+                  ) : looksLikeGathering(formTitle) ? (
+                    <MField label="Invites">
+                      <div style={{ borderRadius: 12, border: '1px solid rgba(107,63,160,0.25)', background: M_BRAND_SOFT, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>🎈 Hosting other families?</div>
+                        <div style={{ fontSize: 12.5, color: M_INK2, marginTop: 3, lineHeight: 1.5 }}>
+                          Share one link in the group chat — you’ll get RSVPs, headcounts and allergy notes back here.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={createInviteLink}
+                          disabled={inviteBusy}
+                          style={{ marginTop: 10, padding: '9px 16px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff', opacity: inviteBusy ? 0.6 : 1 }}
+                        >
+                          {inviteBusy ? 'Creating…' : 'Create invite link'}
+                        </button>
+                      </div>
+                    </MField>
+                  ) : (
+                    <div style={{ marginBottom: 14 }}>
+                      <button
+                        type="button"
+                        onClick={createInviteLink}
+                        disabled={inviteBusy}
+                        style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: M_BRAND, fontFamily: 'inherit' }}
+                      >
+                        {inviteBusy ? 'Creating link…' : '+ Invite other families'}
+                      </button>
+                    </div>
+                  )
+                )}
 
                 {/* ── 6. More options / Less options ── */}
                 {showMoreOptions && (

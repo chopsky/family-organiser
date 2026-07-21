@@ -34,6 +34,15 @@ function sanitizePromoCode(raw) {
     : null;
 }
 
+// Acquisition-surface tag from a tagged signup link (e.g. /signup?src=rsvp
+// from an invite page's pitch card). Free-form-ish but tightly bounded -
+// it's an analytics dimension, not an identifier.
+function sanitizeSignupSource(raw) {
+  return typeof raw === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(raw.trim())
+    ? raw.trim().toLowerCase()
+    : null;
+}
+
 function sessionMetaFromReq(req) {
   if (!req) return {};
   return {
@@ -113,7 +122,7 @@ async function authResponse(user, req = null) {
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
 router.post('/register', requireTurnstile, async (req, res) => {
-  const { email: userEmail, password, name, inviteToken, promoCode } = req.body;
+  const { email: userEmail, password, name, inviteToken, promoCode, source } = req.body;
 
   if (!userEmail?.trim() || !password || !name?.trim()) {
     return res.status(400).json({ error: 'email, password, and name are required' });
@@ -126,6 +135,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
   // checkout later. Only meaningful for a new household owner (the invite
   // branch below creates a member who joins someone else's billing).
   const signupPromoCode = sanitizePromoCode(promoCode);
+  const signupSource = sanitizeSignupSource(source);
 
   // Strength gate: minimum length, no personal-info, not in HaveIBeenPwned's
   // breach corpus. See src/utils/password-strength.js for policy + rationale.
@@ -198,6 +208,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       name: name.trim(),
       authProvider: 'email',
       signupPromoCode,
+      signupSource,
     });
 
     const token = generateToken();
@@ -1123,8 +1134,9 @@ router.delete('/sessions', requireAuth, async (req, res) => {
 // ─── POST /api/auth/google ──────────────────────────────────────────────────
 
 router.post('/google', async (req, res) => {
-  const { idToken, code, inviteToken, promoCode } = req.body;
+  const { idToken, code, inviteToken, promoCode, source } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
+  const signupSource = sanitizeSignupSource(source);
 
   if (!idToken && !code) {
     return res.status(400).json({ error: 'idToken or code is required' });
@@ -1223,6 +1235,7 @@ router.post('/google', async (req, res) => {
         authProvider: 'google',
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
+        signupSource: acceptedInvite ? null : signupSource,
       });
 
       if (acceptedInvite) {
@@ -1253,8 +1266,9 @@ router.post('/google', async (req, res) => {
 // ─── POST /api/auth/apple ───────────────────────────────────────────────────
 
 router.post('/apple', async (req, res) => {
-  const { idToken, name: appleName, inviteToken, promoCode } = req.body;
+  const { idToken, name: appleName, inviteToken, promoCode, source } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
+  const signupSource = sanitizeSignupSource(source);
 
   if (!idToken) {
     return res.status(400).json({ error: 'idToken is required' });
@@ -1338,6 +1352,7 @@ router.post('/apple', async (req, res) => {
         authProvider: 'apple',
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
+        signupSource: acceptedInvite ? null : signupSource,
       });
 
       if (acceptedInvite) {

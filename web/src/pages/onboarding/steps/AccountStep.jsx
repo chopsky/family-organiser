@@ -4,6 +4,7 @@ import SocialButtons from '../../../components/SocialButtons';
 import TurnstileWidget from '../../../components/TurnstileWidget';
 import ErrorBanner from '../../../components/ErrorBanner';
 import { clearSignupPromo } from '../../../lib/signupPromo';
+import { clearSignupSource } from '../../../lib/signupSource';
 import { Title, Em, Kicker, PrimaryButton, Ghost } from './_ui';
 import { inputStyle, labelStyle } from './_styles';
 
@@ -26,7 +27,7 @@ function promoDiscountLabel(info) {
 // Discount/promo parity with Signup.jsx: the captured promoCode is confirmed
 // for the banner, passed to BOTH register and the SSO buttons, and cleared once
 // the account exists.
-export default function AccountStep({ update, setError, goAfterAuth, inviteToken, promoCode, navigate }) {
+export default function AccountStep({ update, setError, goAfterAuth, inviteToken, promoCode, signupSource, navigate }) {
   const [showEmail, setShowEmail] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -65,9 +66,11 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
         email: email.trim(), password, name: name.trim(),
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
+        source: signupSource || undefined,
         turnstile_token: turnstile,
       });
       clearSignupPromo();              // account created - consume the code
+      clearSignupSource();             // ...and the acquisition tag
       update({ accName: name.trim() });
       if (data.token) {
         goAfterAuth(data);             // invite auto-join: straight on, logged in
@@ -126,7 +129,7 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
           scoped style re-skins SocialButtons' first button (Google) to the
           plum-primary treatment used on the old /signup screen. */}
       <div className="ob-account-google" style={{ marginTop: 24 }}>
-        <SocialButtons inviteToken={inviteToken} promoCode={promoCode} onSuccess={goAfterAuth} onError={setError} />
+        <SocialButtons inviteToken={inviteToken} promoCode={promoCode} signupSource={signupSource} onSuccess={goAfterAuth} onError={setError} />
       </div>
       <style>{`
         .ob-account-google > div.space-y-3 > button:first-child {

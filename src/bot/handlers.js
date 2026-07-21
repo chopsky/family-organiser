@@ -24,6 +24,7 @@ const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../service
 const { routeReadIntent } = require('../services/intent-router');
 const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
 const { buildDayView } = require('../services/chores');
+const { looksLikeGathering } = require('../utils/party-detect');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -330,6 +331,70 @@ function popBirthdayRecurrence(userId) {
   pendingBirthdayRecurrence.delete(userId);
   if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
   return entry;
+}
+
+// ─── Pending "want an invite link?" follow-up (in-memory, 5-min TTL) ──
+// When the bot creates an event that looks like a gathering (party-detect,
+// prominence only) it offers a shareable RSVP link. The user's next "yes"
+// mints the link deterministically - no LLM round-trip, no new intent.
+const pendingInviteOffer = new Map(); // userId → { eventId, householdId, title, timestamp }
+
+function rememberInviteOffer(userId, entry) {
+  if (!userId || !entry?.eventId) return;
+  pendingInviteOffer.set(userId, { ...entry, timestamp: Date.now() });
+}
+function popInviteOffer(userId) {
+  const entry = pendingInviteOffer.get(userId);
+  if (!entry) return null;
+  pendingInviteOffer.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+
+// Mint (or fetch) the invite link for an event and word the bot's reply.
+// Shared by the pending-offer "yes" path; kept small and export-tested.
+async function buildInviteLinkReply(eventId, householdId, userId, title) {
+  const link = await db.createOrGetEventInviteLink({ eventId, householdId, createdBy: userId });
+  const base = process.env.WEB_URL || 'https://housemait.com';
+  const url = `${base}/p/${link.token}`;
+  return (
+    `Here's your invite link for *${title}*:\n${url}\n\n` +
+    `Share it in the group chat - families can RSVP with headcounts and allergy notes, no app needed. ` +
+    `Ask me _"who's coming?"_ any time. 🎈`
+  );
+}
+
+// "Who's coming?" - deterministic roster answer for events with a live
+// invite link. Only fires on a clear RSVP-shaped question; returns null when
+// the household has no invite links so the message falls through to normal
+// classification ("who's coming to dinner?" might mean anything).
+const RSVP_QUERY_RE = /\bwho(?:'s| is| has)?\s+(?:coming|going|rsvp'?d|replied)\b|\brsvps?\b|\bany\s+allerg/i;
+
+async function buildInviteRosterReply(householdId, tz = 'Europe/London') {
+  const events = await db.getUpcomingInviteEvents(householdId);
+  if (!events.length) return null;
+  const lines = [];
+  for (const ev of events) {
+    const roster = await db.getEventRsvps(ev.id, householdId);
+    if (!roster.hasLink) continue;
+    const when = ev.start_time
+      ? new Date(ev.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz })
+      : '';
+    let line = `*${ev.title}*${when ? ` (${when})` : ''} - `;
+    if (roster.going === 0 && roster.declined === 0) {
+      line += 'no RSVPs yet.';
+    } else {
+      line += `${roster.going} famil${roster.going === 1 ? 'y' : 'ies'} going: ${roster.kids} kid${roster.kids === 1 ? '' : 's'}, ${roster.adults} adult${roster.adults === 1 ? '' : 's'}`;
+      if (roster.declined > 0) line += ` (${roster.declined} can't make it)`;
+      line += '.';
+      const goingNames = roster.rsvps.filter((r) => r.status === 'yes').map((r) => r.family_name);
+      if (goingNames.length) line += `\n  ${goingNames.join(', ')}`;
+      for (const d of roster.dietary) line += `\n  ⚠️ ${d.family}: ${d.note}`;
+    }
+    lines.push(line);
+  }
+  if (!lines.length) return null;
+  return lines.join('\n\n');
 }
 
 // Parse a bare yes/no answer. Returns 'yes', 'no', or null when it's neither
@@ -1936,6 +2001,30 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     // Neither yes nor no - drop the pending question and classify normally.
   }
 
+  // Pending "want an invite link?" reply - a yes mints the shareable RSVP
+  // link deterministically; a no just acknowledges. Anything else drops the
+  // offer and classifies normally.
+  const pendingInvite = popInviteOffer(user.id);
+  if (pendingInvite && pendingInvite.householdId === household.id) {
+    const ans = parseAffirmative(text);
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    if (ans === 'yes') {
+      ctx.intent = 'invite_link_reply';
+      try {
+        const reply = await buildInviteLinkReply(pendingInvite.eventId, household.id, user.id, pendingInvite.title);
+        return { response: reply, actions: noActions };
+      } catch (e) {
+        console.error('[handlers] invite link create failed:', e.message);
+        return { response: "I couldn't make the invite link just now - try again in a minute, or open the event in the app. 🙏", actions: noActions };
+      }
+    }
+    if (ans === 'no') {
+      ctx.intent = 'invite_link_reply';
+      return { response: 'No problem - it stays a family-only event. 👍', actions: noActions };
+    }
+    // Neither yes nor no - drop the offer and classify normally.
+  }
+
   // Pending "did you mean X?" reply for a weak-target update/delete - the
   // stashed action executes deterministically on "yes" (no LLM round-trip),
   // drops on "no", and anything else classifies normally.
@@ -2244,6 +2333,19 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // user is their household timezone - too coarse to be useful, and
   // misleading for anyone away from home or in a non-UK household whose
   // timezone has been left at the default.
+  // Pre-classify: RSVP roster questions ("who's coming?", "any allergies?")
+  // answer deterministically from the invite tables - but ONLY when the
+  // household actually has a live invite link on an upcoming event.
+  // Otherwise fall through: "who's coming to dinner?" is ordinary chat.
+  if (RSVP_QUERY_RE.test(text)) {
+    const rosterReply = await buildInviteRosterReply(household.id, user.timezone || household.timezone).catch(() => null);
+    if (rosterReply) {
+      console.log('[handlers] Pre-classified as invite roster query:', text.slice(0, 50));
+      ctx.intent = 'invite_roster';
+      return { response: rosterReply, actions: { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] } };
+    }
+  }
+
   const weatherPattern = /\b(weather|temperature|rain|umbrella|jacket|coat|forecast|sunny|cloudy|cold|hot|warm|chilly)\b/i;
   if (weatherPattern.test(text)) {
     console.log('[handlers] Pre-classified as weather for:', text.slice(0, 50));
@@ -3278,16 +3380,28 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   const birthdayEvent = (actions.eventsAdded || []).find(
     (e) => e && e.category === 'birthday' && !e.recurrence && e.id
   );
+  // A just-added event that looks like a gathering (party-detect: prominence
+  // only) - offer a shareable RSVP link. The growth loop's bot entry point.
+  const gatheringEvent = (actions.eventsAdded || []).find(
+    (e) => e && e.id && looksLikeGathering(e.title)
+  );
   if (!alreadyAsks && (eventAdded || taskAdded)) {
     let followUp = null;
-    // Priority order: birthday-repeat → reminder offer → none. We never add a
-    // generic "anything else?".
+    // Priority order: birthday-repeat → invite offer → reminder offer → none.
+    // We never add a generic "anything else?".
     if (birthdayEvent) {
       followUp = 'Want this birthday to repeat every year? Reply yes or no.';
       rememberBirthdayRecurrence(user.id, {
         eventIds: [birthdayEvent.id],
         householdId: household.id,
         label: birthdayEvent.title,
+      });
+    } else if (gatheringEvent) {
+      followUp = 'Hosting other families? Reply *yes* and I\'ll make a shareable invite link - they can RSVP with headcounts and allergy notes, no app needed.';
+      rememberInviteOffer(user.id, {
+        eventId: gatheringEvent.id,
+        householdId: household.id,
+        title: gatheringEvent.title,
       });
     } else if ((eventAdded || taskAdded) && !reminderSaved) {
       followUp = eventAdded
@@ -4032,4 +4146,8 @@ module.exports = {
   rememberSchoolSource,
   peekSchoolSource,
   armOpenerSchoolAnswer,
+  // Party-invite loop (exported for tests)
+  rememberInviteOffer,
+  buildInviteLinkReply,
+  buildInviteRosterReply,
 };

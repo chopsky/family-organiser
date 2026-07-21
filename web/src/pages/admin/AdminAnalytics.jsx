@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null,
-    acquisition = null,
+    acquisition = null, inviteLoop = null,
   } = data || {};
 
   // Calculate DAU average
@@ -173,6 +173,31 @@ export default function AdminAnalytics() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Party invite loop: links → opens → RSVPs → attributed signups */}
+      {inviteLoop && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Party invite loop (last {inviteLoop.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            Hosts share one RSVP link per event; invitee families RSVP without an account and see a
+            Housemait pitch after. <strong>Signups</strong> = accounts created with <code>src=rsvp</code>.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              ['Links created', inviteLoop.links],
+              ['Link opens', inviteLoop.views],
+              ['RSVPs', inviteLoop.rsvps],
+              ['Families going', inviteLoop.rsvpYes],
+              ['Signups', inviteLoop.signups],
+            ].map(([label, val]) => (
+              <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
+                <div className="text-2xl font-bold text-plum">{val}</div>
+                <div className="text-xs text-warm-grey mt-1">{label}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
