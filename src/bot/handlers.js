@@ -2821,24 +2821,44 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (createdEv?.id) {
       // The reply names the new event - it's a valid "it" for follow-ups.
       rememberReferents(user.id, [{ kind: 'event', id: createdEv.id, label: createdEv.title }]);
-      const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
-      if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
-        // Deterministic offer backstop when the model didn't ask anything
-        // (same trailing-question test as the reconciliation tail's
-        // alreadyAsks - "...time?)" counts as already-asking).
-        if (!/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
-          eventReply += `\n\nWant me to add a reminder for it?`;
+
+      if (looksLikeParty(createdEv.title)) {
+        // A party owns this turn: offer the shareable invite link. This branch
+        // returns early (never reaching the reconciliation tail where the other
+        // party offer lives), so the offer has to be made HERE too. Replace any
+        // model-authored trailing question so there's exactly one ask and "yes"
+        // resolves to the invite. Only an explicit party word triggers this
+        // (looksLikeParty excludes a bare "birthday").
+        if (/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
+          const stripped = eventReply.replace(/\s*[^.?!\n]*\?["')\]]*\s*$/, '').trimEnd();
+          if (stripped.length > 10) eventReply = stripped;
         }
-        // Arm the pending store whenever the outgoing reply asks a reminder
-        // question - ours or the model's - so "Yes" resolves deterministically.
-        if (/remind[^.!\n]*\?/i.test(eventReply)) {
-          rememberReminderTarget(user.id, {
-            itemId: createdEv.id,
-            itemType: 'event',
-            label: createdEv.title,
-            startTime: createdEv.start_time,
-            householdId: household.id,
-          });
+        eventReply += '\n\nWant to invite guests? Reply *yes* and I\'ll make a shareable RSVP link - they can reply with headcounts and any allergies, no app needed. 🎈';
+        rememberInviteOffer(user.id, {
+          eventId: createdEv.id,
+          householdId: household.id,
+          title: createdEv.title,
+        });
+      } else {
+        const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
+        if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
+          // Deterministic offer backstop when the model didn't ask anything
+          // (same trailing-question test as the reconciliation tail's
+          // alreadyAsks - "...time?)" counts as already-asking).
+          if (!/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
+            eventReply += `\n\nWant me to add a reminder for it?`;
+          }
+          // Arm the pending store whenever the outgoing reply asks a reminder
+          // question - ours or the model's - so "Yes" resolves deterministically.
+          if (/remind[^.!\n]*\?/i.test(eventReply)) {
+            rememberReminderTarget(user.id, {
+              itemId: createdEv.id,
+              itemType: 'event',
+              label: createdEv.title,
+              startTime: createdEv.start_time,
+              householdId: household.id,
+            });
+          }
         }
       }
     }

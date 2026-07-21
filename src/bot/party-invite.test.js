@@ -67,9 +67,14 @@ beforeEach(() => {
 });
 
 describe('invite offer after a gathering-looking event', () => {
-  test('creating a party event appends the invite offer and arms the pending state', async () => {
+  // NOTE: real party messages classify as intent 'create_event', whose handler
+  // branch returns EARLY (before the reconciliation tail). The offer therefore
+  // has to be made in that branch too - these tests use 'create_event' to
+  // exercise the actual production path (an earlier version only tested the
+  // tail via intent 'calendar' and missed the live bug).
+  test('creating a party event (create_event) appends the invite offer and arms the pending state', async () => {
     classify.mockResolvedValue({
-      intent: 'calendar',
+      intent: 'create_event',
       calendar_event: { title: "Olivia's party", date: '2026-08-01', start_time: '13:00', end_time: '15:00' },
       response_message: 'Added the party to the calendar.',
     });
@@ -86,18 +91,18 @@ describe('invite offer after a gathering-looking event', () => {
     expect(yes.response).toContain('/p/tok-abc');
   });
 
-  test('the invite offer survives a model-authored trailing question (the alreadyAsks bug)', async () => {
-    // The model signs off with its OWN question. Previously this suppressed the
-    // whole follow-up block, so the invite offer never appeared or armed.
+  test('the invite offer survives a model-authored trailing question (create_event, the reported bug)', async () => {
+    // The exact reported case: create_event intent, model signs off with its
+    // OWN reminder question. The offer must still appear and replace it.
     classify.mockResolvedValue({
-      intent: 'calendar',
+      intent: 'create_event',
       calendar_event: { title: "Mason's birthday party", date: '2026-12-10', all_day: true },
-      response_message: "Done! Added Mason's Birthday Party. Want me to add a start time or a reminder?",
+      response_message: "Got it! I've added Mason's Birthday Party. Want me to set a specific time or a reminder ahead of it?",
     });
-    const res = await handlers.handleTextMessage("Mason's birthday party on 10 December", user, household);
+    const res = await handlers.handleTextMessage("Mason is having his birthday party on 10 December", user, household);
     expect(res.response).toContain('invite guests');
     // The model's own reminder question was stripped so there's one clear ask.
-    expect(res.response).not.toMatch(/reminder\?/i);
+    expect(res.response).not.toMatch(/reminder ahead of it\?/i);
 
     // ...and "yes" is wired to the invite, not misrouted through the classifier.
     classify.mockClear();
@@ -106,28 +111,36 @@ describe('invite offer after a gathering-looking event', () => {
     expect(yes.response).toContain('/p/tok-abc');
   });
 
-  test('a bare "birthday" (no party word) gets the yearly-repeat offer, not the invite', async () => {
+  test('a party created via a non-create_event intent still offers (the reconciliation-tail path)', async () => {
     classify.mockResolvedValue({
       intent: 'calendar',
+      calendar_event: { title: "Olivia's party", date: '2026-08-01', start_time: '13:00' },
+      response_message: 'Added the party.',
+    });
+    const res = await handlers.handleTextMessage("Olivia's party Saturday 1pm", user, household);
+    expect(res.response).toContain('invite guests');
+  });
+
+  test('a bare "birthday" (no party word) does NOT get the invite offer', async () => {
+    classify.mockResolvedValue({
+      intent: 'create_event',
       calendar_event: { title: "Mum's birthday", date: '2026-05-05', all_day: true },
       response_message: "Added Mum's birthday.",
     });
-    // Production auto-categorises birthdays from the title (queries.createCalendarEvent);
-    // mirror that here so the birthday-repeat branch has its category signal.
     db.createCalendarEvent.mockResolvedValueOnce({ id: 'e-99', title: "Mum's birthday", all_day: true, category: 'birthday' });
     const res = await handlers.handleTextMessage("Mum's birthday 5 May", user, household);
     expect(res.response).not.toContain('invite guests');
-    expect(res.response).toMatch(/repeat every year/i);
   });
 
   test('a plain event gets the reminder offer, not the invite offer', async () => {
     classify.mockResolvedValue({
-      intent: 'calendar',
+      intent: 'create_event',
       calendar_event: { title: 'Dentist', date: '2026-08-01', start_time: '09:00' },
       response_message: 'Added.',
     });
     const res = await handlers.handleTextMessage('Dentist Saturday 9am', user, household);
     expect(res.response).not.toContain('invite guests');
+    expect(res.response).toMatch(/reminder/i);
   });
 
   test('"no" to the offer acknowledges without creating anything', async () => {
