@@ -218,7 +218,7 @@ export default function PartyInvite() {
                 {phase === 'expired' ? (
                   <>This invite has <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>expired.</em></>
                 ) : (
-                  <>This invite isn't <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>available.</em></>
+                  <>This invite isn't available.</>
                 )}
               </h1>
               <p className="text-center" style={{ marginTop: 14, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453', lineHeight: 1.6 }}>
