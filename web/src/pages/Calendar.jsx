@@ -1067,6 +1067,25 @@ export default function Calendar() {
     }
   }
 
+  async function revokeInviteLink() {
+    if (!editingEvent?.id || inviteBusy) return;
+    const ok = await confirmDestructive({
+      title: 'Turn off this invite link?',
+      message: 'Anyone with the link won’t be able to open it or RSVP any more. RSVPs you’ve already received are kept.',
+      confirmLabel: 'Turn off',
+    });
+    if (!ok) return;
+    setInviteBusy(true);
+    try {
+      await api.delete(`/calendar/events/${editingEvent.id}/invite-link`);
+      await loadInviteRoster(editingEvent.id);
+    } catch {
+      alert('Could not turn off the link — try again in a moment.');
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
   async function createInviteLink() {
     if (!editingEvent?.id || inviteBusy) return;
     setInviteBusy(true);
@@ -3032,13 +3051,15 @@ export default function Calendar() {
                     card when the title looks like a gathering (partyDetect -
                     prominence only, never availability). */}
                 {editingEvent?.id && (
-                  inviteRoster?.hasLink ? (
+                  (inviteRoster?.hasLink || inviteRoster?.rsvps?.length > 0) ? (
                     <MField label="Invites">
                       <div style={{ borderRadius: 12, border: `1px solid ${M_LINE_STRONG}`, background: '#FBF8F3', padding: '12px 14px' }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>
                           {inviteRoster.going > 0
                             ? `${inviteRoster.going} famil${inviteRoster.going === 1 ? 'y' : 'ies'} going · ${inviteRoster.kids} kid${inviteRoster.kids === 1 ? '' : 's'}, ${inviteRoster.adults} adult${inviteRoster.adults === 1 ? '' : 's'}`
-                            : 'No RSVPs yet — share the link below'}
+                            : inviteRoster.hasLink
+                              ? 'No RSVPs yet — share the link below'
+                              : 'RSVPs received'}
                           {inviteRoster.declined > 0 && (
                             <span style={{ fontWeight: 400, color: M_INK3 }}> · {inviteRoster.declined} can’t make it</span>
                           )}
@@ -3073,21 +3094,45 @@ export default function Calendar() {
                             ))}
                           </ul>
                         )}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
-                          <input
-                            readOnly
-                            value={inviteUrl}
-                            onFocus={(e) => e.target.select()}
-                            style={{ ...mInput, flex: 1, width: 'auto', fontSize: 12.5, color: M_INK3, background: '#fff' }}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => (navigator.share ? navigator.share({ title: formTitle || 'You’re invited', url: inviteUrl }).catch(() => {}) : copyInviteUrl(inviteUrl))}
-                            style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff' }}
-                          >
-                            {inviteCopied ? 'Copied!' : 'Share'}
-                          </button>
-                        </div>
+                        {inviteRoster.hasLink ? (
+                          <>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                              <input
+                                readOnly
+                                value={inviteUrl}
+                                onFocus={(e) => e.target.select()}
+                                style={{ ...mInput, flex: 1, width: 'auto', fontSize: 12.5, color: M_INK3, background: '#fff' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => (navigator.share ? navigator.share({ title: formTitle || 'You’re invited', url: inviteUrl }).catch(() => {}) : copyInviteUrl(inviteUrl))}
+                                style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff' }}
+                              >
+                                {inviteCopied ? 'Copied!' : 'Share'}
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={revokeInviteLink}
+                              disabled={inviteBusy}
+                              style={{ marginTop: 8, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#C0562F', fontFamily: 'inherit' }}
+                            >
+                              Turn off link
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12.5, color: M_INK3 }}>The invite link is turned off.</span>
+                            <button
+                              type="button"
+                              onClick={createInviteLink}
+                              disabled={inviteBusy}
+                              style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: M_BRAND, fontFamily: 'inherit' }}
+                            >
+                              {inviteBusy ? 'Creating…' : 'Create a new link'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </MField>
                   ) : looksLikeGathering(formTitle) ? (

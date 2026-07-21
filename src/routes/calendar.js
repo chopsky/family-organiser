@@ -1019,6 +1019,23 @@ router.post('/events/:id/invite-link', async (req, res) => {
 });
 
 /**
+ * DELETE /api/calendar/events/:id/invite-link
+ * Turn off the event's live invite link. The link 404s for invitees from
+ * this moment; RSVPs already received are kept (the roster aggregates
+ * across revoked links). Creating again mints a fresh token - the
+ * "shared it to the wrong group chat" rotation path.
+ */
+router.delete('/events/:id/invite-link', async (req, res) => {
+  try {
+    const revoked = await db.revokeEventInviteLink(req.params.id, req.householdId);
+    return res.json({ ok: true, revoked });
+  } catch (err) {
+    console.error('DELETE /api/calendar/events/:id/invite-link error:', err?.message || err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/calendar/events/:id/rsvps
  * The host's roster + rollups (going/declined, headcounts, allergy list).
  * Returns the calm empty shape when the event has no live link.

@@ -11,6 +11,7 @@ const {
   createOrGetEventInviteLink,
   getEventInviteByToken,
   upsertEventRsvp,
+  revokeEventInviteLink,
   getEventRsvps,
 } = require('./queries');
 
@@ -34,6 +35,7 @@ function fakeDb(queues) {
           select: () => chain,
           eq: () => chain,
           is: () => chain,
+          in: () => chain,
           ilike: () => chain,
           order: () => resolve(),
           limit: () => resolve(),
@@ -206,8 +208,57 @@ describe('getEventRsvps', () => {
     expect(r.rsvps).toHaveLength(3);
   });
 
-  test('no live link (or table not migrated yet) → calm empty shape', async () => {
+  test('no links (or table not migrated yet) → calm empty shape', async () => {
     const r = await getEventRsvps('e1', 'h1', fakeDb({}));
     expect(r).toEqual({ hasLink: false, going: 0, declined: 0, kids: 0, adults: 0, dietary: [], rsvps: [] });
+  });
+
+  test('link rotation keeps the roster: RSVPs merge across revoked links, latest reply per family wins', async () => {
+    const db = fakeDb({
+      'event_invite_links.select': [{
+        data: [
+          { id: 'l-old', token: 'old', revoked_at: '2026-07-10T00:00:00Z', view_count: 8 },
+          { id: 'l-new', token: 'fresh', revoked_at: null, view_count: 3 },
+        ],
+      }],
+      'event_rsvps.select': [{
+        data: [
+          // The Smiths said yes on the old link, then no on the new one - one row, the no wins.
+          { family_name: 'The Smiths', status: 'yes', kids_count: 2, adults_count: 1, dietary_notes: null, created_at: '2026-07-09T10:00:00Z', updated_at: null },
+          { family_name: 'the smiths', status: 'no', kids_count: 0, adults_count: 0, dietary_notes: null, created_at: '2026-07-11T10:00:00Z', updated_at: null },
+          { family_name: 'The Patels', status: 'yes', kids_count: 1, adults_count: 2, dietary_notes: null, created_at: '2026-07-09T11:00:00Z', updated_at: null },
+        ],
+      }],
+    });
+    const r = await getEventRsvps('e1', 'h1', db);
+    expect(r.hasLink).toBe(true);
+    expect(r.token).toBe('fresh');       // only the LIVE link is shareable
+    expect(r.viewCount).toBe(11);        // opens sum across links
+    expect(r.rsvps).toHaveLength(2);     // Smiths deduped
+    expect(r).toMatchObject({ going: 1, declined: 1, kids: 1, adults: 2 });
+  });
+
+  test('all links revoked → roster survives with hasLink false', async () => {
+    const db = fakeDb({
+      'event_invite_links.select': [{ data: [{ id: 'l1', token: 't', revoked_at: '2026-07-10T00:00:00Z', view_count: 5 }] }],
+      'event_rsvps.select': [{ data: [{ family_name: 'The Patels', status: 'yes', kids_count: 1, adults_count: 2, dietary_notes: null, created_at: '2026-07-09T11:00:00Z', updated_at: null }] }],
+    });
+    const r = await getEventRsvps('e1', 'h1', db);
+    expect(r.hasLink).toBe(false);
+    expect(r.token).toBeUndefined();
+    expect(r.going).toBe(1);
+    expect(r.rsvps).toHaveLength(1);
+  });
+});
+
+describe('revokeEventInviteLink', () => {
+  test('stamps revoked_at on the live link', async () => {
+    const db = fakeDb({ 'event_invite_links.update': [{ data: [{ id: 'l1' }] }] });
+    expect(await revokeEventInviteLink('e1', 'h1', db)).toBe(true);
+    expect(db.calls.update[0].row.revoked_at).toBeTruthy();
+  });
+
+  test('no live link (or missing table) → false, never a throw', async () => {
+    expect(await revokeEventInviteLink('e1', 'h1', fakeDb({}))).toBe(false);
   });
 });

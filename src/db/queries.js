@@ -6237,9 +6237,33 @@ async function upsertEventRsvp({ inviteLinkId, familyName, status, kidsCount, ad
 }
 
 /**
+ * Turn off an event's live invite link. Anyone opening the link afterwards
+ * gets the not-available page (getEventInviteByToken checks revoked_at);
+ * a later createOrGetEventInviteLink mints a FRESH token, which is the
+ * "shared it to the wrong group chat" rotation path. Returns true when a
+ * live link was actually revoked. Missing tables → false, never a throw.
+ */
+async function revokeEventInviteLink(eventId, householdId, db = supabase) {
+  try {
+    const { data } = await db
+      .from('event_invite_links')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('event_id', eventId)
+      .eq('household_id', householdId)
+      .is('revoked_at', null)
+      .select();
+    return !!(data && data.length);
+  } catch { return false; }
+}
+
+/**
  * Host roster for an event: every RSVP plus the rollups the mock leads with
- * (going/declined, kids/adults totals, the allergy list). Empty shape when
- * the event has no live link or the tables aren't migrated yet.
+ * (going/declined, kids/adults totals, the allergy list). Aggregates across
+ * ALL of the event's links - live AND revoked - so turning a link off (or
+ * rotating it after a mis-share) never loses the RSVPs already received.
+ * A family that replied on both the old and new link counts once, latest
+ * reply wins. token/hasLink describe only the LIVE link; view counts sum.
+ * Empty shape when there are no links or the tables aren't migrated yet.
  */
 async function getEventRsvps(eventId, householdId, db = supabase) {
   const empty = { hasLink: false, going: 0, declined: 0, kids: 0, adults: 0, dietary: [], rsvps: [] };
@@ -6248,22 +6272,28 @@ async function getEventRsvps(eventId, householdId, db = supabase) {
       .from('event_invite_links')
       .select('id, token, expires_at, revoked_at, view_count')
       .eq('event_id', eventId)
-      .eq('household_id', householdId)
-      .is('revoked_at', null)
-      .limit(1);
+      .eq('household_id', householdId);
     if (error || !links || !links.length) return empty;
-    const link = links[0];
+    const liveLink = links.find((l) => !l.revoked_at) || null;
     const { data: rsvps } = await db
       .from('event_rsvps')
-      .select('family_name, status, kids_count, adults_count, dietary_notes, user_id, created_at')
-      .eq('invite_link_id', link.id)
+      .select('family_name, status, kids_count, adults_count, dietary_notes, user_id, created_at, updated_at')
+      .in('invite_link_id', links.map((l) => l.id))
       .order('created_at', { ascending: true });
-    const rows = rsvps || [];
+    // Dedupe by family name across links, keeping the most recent reply.
+    const latest = new Map();
+    for (const r of (rsvps || [])) {
+      const key = String(r.family_name || '').trim().toLowerCase();
+      const prev = latest.get(key);
+      const stamp = (row) => row.updated_at || row.created_at || '';
+      if (!prev || stamp(r) >= stamp(prev)) latest.set(key, r);
+    }
+    const rows = [...latest.values()].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     const going = rows.filter((r) => r.status === 'yes');
     return {
-      hasLink: true,
-      token: link.token,
-      viewCount: link.view_count || 0,
+      hasLink: !!liveLink,
+      token: liveLink?.token,
+      viewCount: links.reduce((s, l) => s + (l.view_count || 0), 0),
       going: going.length,
       declined: rows.length - going.length,
       kids: going.reduce((s, r) => s + (r.kids_count || 0), 0),
@@ -9751,6 +9781,7 @@ module.exports = {
   createOrGetEventInviteLink,
   getEventInviteByToken,
   upsertEventRsvp,
+  revokeEventInviteLink,
   getEventRsvps,
   getUpcomingInviteEvents,
   getInviteLoopFunnel,
