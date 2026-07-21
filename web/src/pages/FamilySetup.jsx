@@ -376,6 +376,15 @@ export default function FamilySetup() {
   const [depBirthday, setDepBirthday] = useState('');
   const [depColor, setDepColor] = useState('teal');
   const [addingDependent, setAddingDependent] = useState(false);
+  // Avatar/photo for the NEW member (parity with the edit modal). The
+  // illustrated avatar is sent in the create payload; a photo can't upload
+  // until the member has an id, so we hold the File + a local preview and
+  // upload it right after creation.
+  const [depAvatarId, setDepAvatarId] = useState('');
+  const [depPhotoFile, setDepPhotoFile] = useState(null);
+  const [depPhotoPreview, setDepPhotoPreview] = useState(null);
+  const [depPicker, setDepPicker] = useState('avatar'); // 'avatar' | 'photo'
+  const [depAvatarMenuOpen, setDepAvatarMenuOpen] = useState(false);
 
   // School state
   const [depAttendsSchool, setDepAttendsSchool] = useState(false);
@@ -516,6 +525,11 @@ export default function FamilySetup() {
     setDepName('');
     setDepKind('child');
     setDepBirthday('');
+    setDepAvatarId('');
+    setDepPhotoFile(null);
+    setDepPhotoPreview(null);
+    setDepPicker('avatar');
+    setDepAvatarMenuOpen(false);
     // Pre-pick the next colour not yet used in this household so a
     // newly-added child gets a distinct avatar by default. Admin can
     // still override before saving.
@@ -531,6 +545,19 @@ export default function FamilySetup() {
     setShowAddDependent(true);
   }
 
+  // Add-modal photo pick: the member doesn't exist yet, so we hold the File
+  // and show a local preview; the upload happens after creation (which is
+  // when we finally have an id to attach it to).
+  function handleDepPhotoPick(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDepPhotoFile(file);
+    setDepAvatarId(''); // a photo overrides any chosen illustration
+    const reader = new FileReader();
+    reader.onload = () => setDepPhotoPreview(reader.result);
+    reader.readAsDataURL(file);
+  }
+
   async function handleAddDependent() {
     if (!depName.trim()) { setError('Name is required.'); return; }
     setAddingDependent(true);
@@ -544,13 +571,32 @@ export default function FamilySetup() {
       // single school on the backend).
       const schoolId = (showSchools && householdSchools.length >= 2) ? (depSchoolId || null) : null;
 
-      await api.post('/household/dependents', {
+      const { data: created } = await api.post('/household/dependents', {
         name: depName.trim(),
         birthday: depBirthday || null,
         color_theme: depColor,
         school_id: schoolId,
         dependent_kind: depKind,
+        avatar_id: depAvatarId || null,
       });
+
+      // If a photo was picked, upload it to the freshly-created member (the
+      // avatar endpoint needs the id, which only exists now). Best-effort: a
+      // failed upload doesn't undo the add - the member is created and the
+      // photo can be added later via edit.
+      const newId = created?.member?.id;
+      if (depPhotoFile && newId) {
+        try {
+          const resized = await resizeImage(depPhotoFile);
+          const fd = new FormData();
+          fd.append('avatar', resized, resized.name);
+          fd.append('userId', newId);
+          await api.post('/household/profile/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        } catch (photoErr) {
+          console.warn('[FamilySetup] member created but photo upload failed:', photoErr?.response?.data?.error || photoErr.message);
+        }
+      }
+
       setShowAddDependent(false);
       await loadMembers();
       // Kid-gated surfaces (Kids' Notes nav, Child Mode card) listen for
@@ -1537,12 +1583,65 @@ export default function FamilySetup() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex justify-center">
-                <div className={`w-16 h-16 rounded-full ${
-                  AVATAR_COLOURS[depColor] || AVATAR_COLOURS.teal
-                } flex items-center justify-center font-semibold text-xl`}>
-                  {depName?.[0]?.toUpperCase() || '?'}
+              {/* Avatar: an illustrated avatar from the set, or a photo (parity
+                  with the edit modal). The photo is uploaded after the member
+                  is created - handleAddDependent does that. */}
+              <div className="flex flex-col items-center gap-3.5">
+                <Avatar member={{ name: depName, color_theme: depColor, avatar_url: depPhotoPreview, avatar_id: depAvatarId }} size={84} />
+                <div className="inline-flex gap-1 p-1 rounded-[11px]" style={{ background: '#F3EEE5' }}>
+                  {[['avatar', 'Avatar'], ['photo', 'Photo']].map(([k, l]) => (
+                    <button key={k} type="button" onClick={() => setDepPicker(k)}
+                      className="px-4 py-1.5 rounded-lg text-[13px] font-semibold transition-colors"
+                      style={depPicker === k ? { background: '#fff', color: '#2D2A33', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' } : { background: 'transparent', color: '#6B6774' }}>
+                      {l}
+                    </button>
+                  ))}
                 </div>
+                {depPicker === 'photo' ? (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium cursor-pointer text-primary hover:text-primary-pressed transition-colors">
+                      {depPhotoPreview ? 'Change photo' : 'Upload photo'}
+                      <input type="file" accept="image/*" onChange={handleDepPhotoPick} className="hidden" />
+                    </label>
+                    {depPhotoPreview && (
+                      <button type="button" onClick={() => { setDepPhotoFile(null); setDepPhotoPreview(null); }} className="text-sm text-error hover:text-error/80 transition-colors">Remove</button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full relative">
+                    <button
+                      type="button"
+                      onClick={() => setDepAvatarMenuOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={depAvatarMenuOpen}
+                      className="w-full flex items-center justify-between border border-cream-border rounded-lg pl-3 pr-3.5 py-2 bg-white text-sm"
+                    >
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        {depAvatarId ? (
+                          <img src={`/avatars/${depAvatarId}.png`} alt="" className="w-7 h-7 rounded-full object-contain shrink-0" />
+                        ) : (
+                          <span className="w-7 h-7 rounded-full shrink-0" style={{ background: hexFor({ color_theme: depColor }) + '33' }} />
+                        )}
+                        <span className="text-bark truncate">{depAvatarId ? 'Avatar selected' : 'Choose an avatar'}</span>
+                      </span>
+                      <svg className={`shrink-0 text-cocoa transition-transform ${depAvatarMenuOpen ? 'rotate-180' : ''}`} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                    </button>
+                    {depAvatarMenuOpen && (
+                      <div className="mt-2 rounded-lg border border-cream-border bg-white p-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 52px)', justifyContent: 'space-between', gap: '12px 8px', maxHeight: 200, overflowY: 'auto' }}>
+                        {FAMILY_AVATARS.map((id) => {
+                          const on = depAvatarId === id && !depPhotoPreview;
+                          const hex = hexFor({ color_theme: depColor });
+                          return (
+                            <button key={id} type="button" onClick={() => { setDepAvatarId(id); setDepPhotoFile(null); setDepPhotoPreview(null); setDepAvatarMenuOpen(false); }} aria-label="Choose avatar"
+                              style={{ width: 52, height: 52, borderRadius: '50%', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', boxSizing: 'border-box', border: 'none', background: on ? hex + '33' : 'transparent', boxShadow: on ? `0 0 0 2px ${hex}` : 'none' }}>
+                              <img src={`/avatars/${id}.png`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

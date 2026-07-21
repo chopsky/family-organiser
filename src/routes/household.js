@@ -574,7 +574,7 @@ router.delete('/members/:userId', requireAuth, requireHousehold, requireAdmin, a
  * Add a dependent (infant, pet, etc.) to the household. Admin only.
  */
 router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
-  const { name, family_role, birthday, color_theme, school_id, dependent_kind } = req.body;
+  const { name, family_role, birthday, color_theme, school_id, dependent_kind, avatar_id } = req.body;
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Name is required.' });
@@ -595,6 +595,9 @@ router.post('/dependents', requireAuth, requireHousehold, requireAdmin, async (r
       birthday: birthday || null,
       color_theme: finalColor,
       school_id: school_id || null,
+      // Illustrated avatar chosen at add time (optional); a photo is uploaded
+      // separately via /profile/avatar once the member has an id.
+      avatar_id: typeof avatar_id === 'string' && avatar_id.trim() ? avatar_id.trim() : null,
       // Older app builds don't send dependent_kind; default those to
       // 'child' (the pre-split behaviour) rather than leaving it null.
       dependent_kind: dependent_kind || 'child',

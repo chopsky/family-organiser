@@ -709,7 +709,7 @@ async function deleteHouseholdPreference(id, householdId, db = supabase) {
 
 // ─── Dependent helpers ───────────────────────────────────────────────────────
 
-async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, dependent_kind }, db = supabase) {
+async function createDependent(householdId, { name, family_role, birthday, color_theme, school_id, dependent_kind, avatar_id }, db = supabase) {
   const row = {
     household_id: householdId,
     name,
@@ -717,6 +717,10 @@ async function createDependent(householdId, { name, family_role, birthday, color
     birthday: birthday || null,
     color_theme: color_theme || 'sage',
     school_id: school_id || null,
+    // Illustrated-avatar id chosen at add time (e.g. 'set2/n07'). A photo is
+    // uploaded separately after creation (needs the new member's id), so only
+    // the illustrated avatar is set inline here.
+    avatar_id: avatar_id || null,
     member_type: 'dependent',
     role: 'member',
     email_verified: false,
