@@ -84,7 +84,7 @@
 }
 /* The img bleeds 8px past the section so the blur's transparent edge
    never exposes the dark fallback as a band at the viewport top. */
-.lv-hero-img { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); object-fit: cover; opacity: 0.8; filter: blur(3px); }
+.lv-hero-img { position: absolute; top: -8px; left: 0; width: 100%; height: calc(100% + 16px); object-fit: cover; opacity: 0.8; filter: blur(3px); }
 .lv-hero-scrim { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.6; background: linear-gradient(rgb(0 0 0 / 76%) 0%, rgb(0 0 0 / 30%) 45%, rgba(0, 0, 0, 0.88) 100%); }
 .lv-hero-noise { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.04; background-image: url('/landing/noise.png'); background-size: 160px 160px; }
 .lv-hero-inner {
