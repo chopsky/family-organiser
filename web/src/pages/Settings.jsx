@@ -25,6 +25,7 @@ import { useSubscription } from '../context/SubscriptionContext';
 import PageHeader from '../components/ui/PageHeader';
 import Avatar from '../components/ui/Avatar';
 import { MEMBER_HEX } from '../lib/memberColors';
+import { isKidMember } from '../lib/kidsTheme';
 import { useChildMode } from '../context/ChildModeContext';
 import useHasChildren from '../hooks/useHasChildren';
 import {
@@ -1423,7 +1424,7 @@ export default function Settings() {
   // Exit PIN control (the existing set/change/remove PIN form drops down
   // inside the footer). Rendered standalone on web, inside the section
   // popup on iOS - one JSX tree so the two stay identical.
-  const kidMembers = members.filter((m) => m.member_type === 'dependent');
+  const kidMembers = members.filter(isKidMember); // pets can't be a Child Mode profile
   const childModeCard = (
     <div className={SET_CARD_CLASS} style={{ boxShadow: SET_CARD_SHADOW, overflow: 'hidden', background: 'linear-gradient(140deg,#F3EDFC,#E3F4FE)' }}>
       <div className="flex items-center gap-[18px] p-[22px] flex-wrap sm:flex-nowrap">

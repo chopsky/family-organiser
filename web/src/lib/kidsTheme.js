@@ -75,6 +75,13 @@ export const KIDS_INK = { ink: '#312B4B', ink2: '#6C6690', ink3: '#A6A1C4', pape
 // row, treated as child (pre-split behaviour).
 export const isKidMember = (m) => m?.member_type === 'dependent' && m?.dependent_kind !== 'pet';
 
+// A pet is a dependent flagged dependent_kind='pet'. Pets belong in the family
+// roster and can hold calendar events (vet trips), but must be excluded from
+// the people-facing surfaces: tasks/chores, rewards/stars, to-do assignees,
+// extracurricular activities and Child Mode. Use `!isPetMember(m)` for the
+// "everyone except pets" sets (adults + kids), and isKidMember for kids-only.
+export const isPetMember = (m) => m?.member_type === 'dependent' && m?.dependent_kind === 'pet';
+
 const presetByKey = Object.fromEntries(KID_COLOR_PRESETS.map((p) => [p.key, p]));
 
 /**

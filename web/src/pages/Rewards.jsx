@@ -10,6 +10,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { isKidMember, isPetMember } from '../lib/kidsTheme';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useChildMode } from '../context/ChildModeContext';
 import EmojiPicker from '../components/ui/EmojiPicker';
@@ -20,7 +21,8 @@ const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
 const BRAND = '#6C3DD9', BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
 const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
-const isKid = (m) => m?.member_type === 'dependent';
+// A child dependent, never a pet - pets don't earn or spend stars.
+const isKid = isKidMember;
 
 const Svg = (p) => <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24" fill="none" stroke={p.c || 'currentColor'} strokeWidth={p.w || 2} strokeLinecap="round" strokeLinejoin="round">{p.children}</svg>;
 const IcPlus = (p) => <Svg {...p}><path d="M12 5v14M5 12h14" /></Svg>;
@@ -106,7 +108,7 @@ export default function Rewards() {
   // Everyone earns + redeems stars now. In Child Mode the device is locked to
   // kids, so we still show only dependents there (a kid shouldn't spend a
   // parent's stars); in full mode every member appears.
-  const earners = childMode ? members.filter(isKid) : members;
+  const earners = childMode ? members.filter(isKid) : members.filter((m) => !isPetMember(m));
   const pending = redemptions.filter((r) => !r.fulfilled).length;
 
   const load = useCallback(async () => {

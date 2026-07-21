@@ -10,6 +10,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
+import { isKidMember, isPetMember } from '../lib/kidsTheme';
 import { hexFor } from '../lib/memberColors';
 import { useIsMobile, useMediaQuery } from '../hooks/useMediaQuery';
 import { buildWeek } from '../lib/choreRecurrence';
@@ -36,7 +37,9 @@ const SLOT_META = {
 };
 const SLOT_ORDER = ['morning', 'afternoon', 'evening', 'chores'];
 const WEEK = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-const isKid = (m) => m?.member_type === 'dependent';
+// "Kid" here means a child dependent - never a pet. Pets don't do chores or
+// earn stars, so they're excluded from every member set on this page.
+const isKid = isKidMember;
 
 function currentSlot() {
   const h = new Date().getHours();
@@ -624,7 +627,7 @@ export default function Chores() {
   // Default the selected week-member to the first shown member.
   useEffect(() => {
     if (weekMode && !weekWho && members.length) {
-      const pool = childMode ? members.filter(isKid) : members;
+      const pool = childMode ? members.filter(isKid) : members.filter((m) => !isPetMember(m));
       setWeekWho((pool[0] || members[0]).id);
     }
   }, [weekMode, weekWho, members, childMode]);
@@ -661,7 +664,7 @@ export default function Chores() {
 
   // Child Mode shows only dependents across the board (columns, mobile pills,
   // swipe). loadDay/tasksFor still operate on real ids.
-  const baseMembers = childMode ? members.filter(isKid) : members;
+  const baseMembers = childMode ? members.filter(isKid) : members.filter((m) => !isPetMember(m));
   const shown = visibleIds ? baseMembers.filter((m) => visibleIds.includes(m.id)) : baseMembers;
   // The up-for-grabs "Anyone" chores get their own column. Parents always see
   // it (so they can add to it); in Child Mode it only appears once it has

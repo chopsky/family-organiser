@@ -17,6 +17,7 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 import ActivityModal from '../components/ActivityModal';
 import { looksLikeGathering } from '../lib/partyDetect';
+import { isKidMember } from '../lib/kidsTheme';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -909,7 +910,7 @@ export default function Calendar() {
     const ds = toDateStr(date);
     const memberIdSet = new Set(members.map((m) => m.id));
     const nameToId = new Map(members.map((m) => [m.name, m.id]));
-    const kidIds = childMode ? new Set(members.filter((m) => m.member_type === 'dependent').map((m) => m.id)) : null;
+    const kidIds = childMode ? new Set(members.filter(isKidMember).map((m) => m.id)) : null;
     return events.filter(e => {
       const start = e.start_time?.split('T')[0];
       const end = e.end_time?.split('T')[0];
@@ -944,7 +945,7 @@ export default function Calendar() {
     const ds = toDateStr(date);
     const memberIdSet = new Set(members.map((m) => m.id));
     const nameToId = new Map(members.map((m) => [m.name, m.id]));
-    const kidIds = childMode ? new Set(members.filter((m) => m.member_type === 'dependent').map((m) => m.id)) : null;
+    const kidIds = childMode ? new Set(members.filter(isKidMember).map((m) => m.id)) : null;
     return tasks.filter(t => {
       if (t.due_date !== ds) return false;
       // Child Mode: only a dependent's tasks appear on the calendar.
@@ -1124,7 +1125,7 @@ export default function Calendar() {
     }
     // Default the activity's child: the single filtered member when the
     // filter is one kid, otherwise the household's first dependent.
-    const kids = members.filter((m) => m.member_type === 'dependent');
+    const kids = members.filter(isKidMember); // activities belong to a child, never a pet
     let defaultKid = kids[0]?.id || '';
     if (activeMemberFilters && activeMemberFilters.size === 1) {
       const only = [...activeMemberFilters][0];
@@ -2786,7 +2787,7 @@ export default function Calendar() {
                   days, so it gets its own field set rather than a banner
                   to a second dialog. Households without kids never see
                   the toggle. The typed title survives switching type. */}
-              {!editingEvent && members.some((m) => m.member_type === 'dependent') && (
+              {!editingEvent && members.some(isKidMember) && (
                 <div className="mb-3">
                   <Segmented
                     fluid
@@ -2811,7 +2812,7 @@ export default function Calendar() {
               {!editingEvent && createKind === 'activity' && (
                 <MField label="Who's it for">
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {members.filter((m) => m.member_type === 'dependent').map((m) => (
+                    {members.filter(isKidMember).map((m) => (
                       <MAvatarPick
                         key={m.id}
                         member={m}

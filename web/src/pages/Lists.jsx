@@ -12,6 +12,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
+import { isPetMember } from '../lib/kidsTheme';
 import { getItemEmoji, AISLE_CATEGORIES } from '../lib/shopping-constants';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { usePullToRefresh, PullIndicator } from '../hooks/usePullToRefresh';
@@ -381,7 +382,7 @@ export default function Lists() {
             <>
               <div onClick={() => setWhoPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
               <div style={{ position: 'absolute', top: 38, left: 0, zIndex: 30, background: '#fff', borderRadius: 14, padding: 6, minWidth: 172, border: `1px solid ${LINE}`, boxShadow: '0 12px 34px rgba(26,22,32,0.18)' }}>
-                {members.map((m) => (
+                {members.filter((m) => !isPetMember(m)).map((m) => (
                   <button key={m.id} onClick={() => { setDraftWho(m.id); setWhoPickerOpen(false); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 10, border: 0, cursor: 'pointer', background: draftWho === m.id ? BG_SOFT : 'transparent', fontFamily: INTER, textAlign: 'left' }}>
                     <Avatar member={m} size={26} /><span style={{ fontSize: 13.5, fontWeight: 600, color: INK }}>{m.name}</span>
@@ -407,7 +408,7 @@ export default function Lists() {
   const assigneeFilter = () => (isTodos && members.length > 0 ? (
     <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, WebkitOverflowScrolling: 'touch', flexShrink: 0 }}>
       <button onClick={() => setToFilter(null)} style={{ flexShrink: 0, padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, border: 0, background: !toFilter ? (active?.color || BRAND) : '#fff', color: !toFilter ? '#fff' : INK2 }}>All</button>
-      {members.map((m) => {
+      {members.filter((m) => !isPetMember(m)).map((m) => {
         const on = toFilter === m.id; const mc = hexFor(m);
         const n = items.filter((i) => !i.done && (i.whoIds || []).includes(m.id)).length;
         return (
