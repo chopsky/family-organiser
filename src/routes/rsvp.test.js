@@ -107,7 +107,7 @@ describe('POST /api/rsvp/:token', () => {
       .post('/api/rsvp/tok123')
       .send({ familyName: '', status: 'yes' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/family name/i);
+    expect(res.body.error).toMatch(/your name/i);
   });
 
   test('expired link refuses the RSVP with 410', async () => {

@@ -157,7 +157,7 @@ export default function PartyInvite() {
 
   async function submit(e) {
     e.preventDefault();
-    if (!familyName.trim()) { setSubmitError('Please tell the host your family name.'); return; }
+    if (!familyName.trim()) { setSubmitError('Please tell the host your name.'); return; }
     setSubmitting(true);
     setSubmitError('');
     try {
@@ -181,7 +181,7 @@ export default function PartyInvite() {
     }
   }
 
-  const hostLine = invite?.hostFirstName ? `${invite.hostFirstName}'s family is hosting` : null;
+  const hostLine = invite?.hostFirstName ? `${invite.hostFirstName} is hosting` : null;
 
   return (
     <div
@@ -264,12 +264,12 @@ export default function PartyInvite() {
 
               <form onSubmit={submit} style={{ marginTop: 22 }}>
                 <label>
-                  <span style={ui.label}>Your family name</span>
+                  <span style={ui.label}>Your name</span>
                   <input
                     style={ui.input}
                     value={familyName}
                     onChange={(e) => setFamilyName(e.target.value)}
-                    placeholder="e.g. The Smiths"
+                    placeholder="e.g. Sarah Smith"
                     maxLength={80}
                     autoComplete="off"
                   />

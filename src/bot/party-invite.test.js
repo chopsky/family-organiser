@@ -74,7 +74,7 @@ describe('invite offer after a gathering-looking event', () => {
       response_message: 'Added the party to the calendar.',
     });
     const res = await handlers.handleTextMessage("Olivia's party Saturday 1-3pm", user, household);
-    expect(res.response).toContain('shareable invite link');
+    expect(res.response).toContain('invite guests');
 
     // The armed offer: "yes" on the next turn mints the link with NO AI call.
     classify.mockClear();
@@ -86,6 +86,40 @@ describe('invite offer after a gathering-looking event', () => {
     expect(yes.response).toContain('/p/tok-abc');
   });
 
+  test('the invite offer survives a model-authored trailing question (the alreadyAsks bug)', async () => {
+    // The model signs off with its OWN question. Previously this suppressed the
+    // whole follow-up block, so the invite offer never appeared or armed.
+    classify.mockResolvedValue({
+      intent: 'calendar',
+      calendar_event: { title: "Mason's birthday party", date: '2026-12-10', all_day: true },
+      response_message: "Done! Added Mason's Birthday Party. Want me to add a start time or a reminder?",
+    });
+    const res = await handlers.handleTextMessage("Mason's birthday party on 10 December", user, household);
+    expect(res.response).toContain('invite guests');
+    // The model's own reminder question was stripped so there's one clear ask.
+    expect(res.response).not.toMatch(/reminder\?/i);
+
+    // ...and "yes" is wired to the invite, not misrouted through the classifier.
+    classify.mockClear();
+    const yes = await handlers.handleTextMessage('yes', user, household);
+    expect(classify).not.toHaveBeenCalled();
+    expect(yes.response).toContain('/p/tok-abc');
+  });
+
+  test('a bare "birthday" (no party word) gets the yearly-repeat offer, not the invite', async () => {
+    classify.mockResolvedValue({
+      intent: 'calendar',
+      calendar_event: { title: "Mum's birthday", date: '2026-05-05', all_day: true },
+      response_message: "Added Mum's birthday.",
+    });
+    // Production auto-categorises birthdays from the title (queries.createCalendarEvent);
+    // mirror that here so the birthday-repeat branch has its category signal.
+    db.createCalendarEvent.mockResolvedValueOnce({ id: 'e-99', title: "Mum's birthday", all_day: true, category: 'birthday' });
+    const res = await handlers.handleTextMessage("Mum's birthday 5 May", user, household);
+    expect(res.response).not.toContain('invite guests');
+    expect(res.response).toMatch(/repeat every year/i);
+  });
+
   test('a plain event gets the reminder offer, not the invite offer', async () => {
     classify.mockResolvedValue({
       intent: 'calendar',
@@ -93,14 +127,14 @@ describe('invite offer after a gathering-looking event', () => {
       response_message: 'Added.',
     });
     const res = await handlers.handleTextMessage('Dentist Saturday 9am', user, household);
-    expect(res.response).not.toContain('invite link');
+    expect(res.response).not.toContain('invite guests');
   });
 
   test('"no" to the offer acknowledges without creating anything', async () => {
     handlers.rememberInviteOffer('u1', { eventId: 'e-1', householdId: 'h1', title: 'BBQ' });
     const res = await handlers.handleTextMessage('no thanks', user, household);
     expect(db.createOrGetEventInviteLink).not.toHaveBeenCalled();
-    expect(res.response).toMatch(/family-only/i);
+    expect(res.response).toMatch(/no invite link/i);
   });
 });
 
@@ -120,7 +154,7 @@ describe('buildInviteRosterReply ("who\'s coming?")', () => {
     });
     const reply = await handlers.buildInviteRosterReply('h1');
     expect(reply).toContain("Olivia's 7th Birthday");
-    expect(reply).toContain('2 families going: 3 kids, 3 adults');
+    expect(reply).toContain('2 going (3 adults, 3 kids)');
     expect(reply).toContain("1 can't make it");
     expect(reply).toContain('The Smiths, The Patels');
     expect(reply).toContain('⚠️ The Smiths: Nut allergy');
@@ -142,7 +176,7 @@ describe('buildInviteRosterReply ("who\'s coming?")', () => {
     const res = await handlers.handleTextMessage("who's coming?", user, household);
     expect(classify).not.toHaveBeenCalled();
     expect(res.response).toContain('BBQ');
-    expect(res.response).toContain('1 family going: 2 kids, 2 adults');
+    expect(res.response).toContain('1 going (2 adults, 2 kids)');
   });
 
   test('an RSVP-shaped question with no invite links classifies normally', async () => {

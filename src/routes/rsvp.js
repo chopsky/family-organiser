@@ -89,7 +89,7 @@ router.post('/:token', writeLimiter, async (req, res) => {
     });
   } catch (err) {
     if (err.code === 'NAME_REQUIRED') {
-      return res.status(400).json({ error: 'Please tell the host your family name' });
+      return res.status(400).json({ error: 'Please tell the host your name' });
     }
     console.error('POST /api/rsvp/:token error:', err?.message || err);
     return res.status(500).json({ error: 'Internal server error' });

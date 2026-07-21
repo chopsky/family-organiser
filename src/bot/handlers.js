@@ -24,7 +24,7 @@ const { formatRecipeConstraints, mergeHouseholdAllergies } = require('../service
 const { routeReadIntent } = require('../services/intent-router');
 const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
 const { buildDayView } = require('../services/chores');
-const { looksLikeGathering } = require('../utils/party-detect');
+const { looksLikeParty } = require('../utils/party-detect');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -359,7 +359,7 @@ async function buildInviteLinkReply(eventId, householdId, userId, title) {
   const url = `${base}/p/${link.token}`;
   return (
     `Here's your invite link for *${title}*:\n${url}\n\n` +
-    `Share it in the group chat - families can RSVP with headcounts and allergy notes, no app needed. ` +
+    `Share it in the group chat - guests can RSVP with headcounts and allergy notes, no app needed. ` +
     `Ask me _"who's coming?"_ any time. 🎈`
   );
 }
@@ -384,8 +384,10 @@ async function buildInviteRosterReply(householdId, tz = 'Europe/London') {
     if (roster.going === 0 && roster.declined === 0) {
       line += 'no RSVPs yet.';
     } else {
-      line += `${roster.going} famil${roster.going === 1 ? 'y' : 'ies'} going: ${roster.kids} kid${roster.kids === 1 ? '' : 's'}, ${roster.adults} adult${roster.adults === 1 ? '' : 's'}`;
-      if (roster.declined > 0) line += ` (${roster.declined} can't make it)`;
+      const heads = roster.kids + roster.adults;
+      line += `${roster.going} going`;
+      if (heads > 0) line += ` (${roster.adults} adult${roster.adults === 1 ? '' : 's'}, ${roster.kids} kid${roster.kids === 1 ? '' : 's'})`;
+      if (roster.declined > 0) line += `, ${roster.declined} can't make it`;
       line += '.';
       const goingNames = roster.rsvps.filter((r) => r.status === 'yes').map((r) => r.family_name);
       if (goingNames.length) line += `\n  ${goingNames.join(', ')}`;
@@ -2020,7 +2022,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
     if (ans === 'no') {
       ctx.intent = 'invite_link_reply';
-      return { response: 'No problem - it stays a family-only event. 👍', actions: noActions };
+      return { response: 'No problem - no invite link. 👍', actions: noActions };
     }
     // Neither yes nor no - drop the offer and classify normally.
   }
@@ -3307,6 +3309,15 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     response = "I caught what you said but didn't quite manage to save it - sorry about that. Could you say that again? If it's a task or event, try to include the date.";
   }
 
+  // A just-added event that looks like a PARTY (explicit party word - not a
+  // bare "birthday", which stays a yearly-repeat offer). Computed up here so
+  // the reminder reconciliation + value receipt below can skip it: a party
+  // turn is owned entirely by the invite offer (built further down), and any
+  // reminder-clarification addendum would just be noise before it.
+  const partyEvent = (actions.eventsAdded || []).find(
+    (e) => e && e.id && looksLikeParty(e.title)
+  );
+
   // ── Reminder claim reconciliation ──────────────────────────────────────
   // Partial-dishonesty case: an event WAS added (so the broad reconcile
   // above passes) but the response claims a reminder/notification that
@@ -3314,11 +3325,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // catches most of these at save-time; this is the last-line backstop
   // for phrasings the parser missed. We append a corrective addendum
   // rather than rewriting the message so the user still sees the event
-  // confirmation - just with an honest caveat.
+  // confirmation - just with an honest caveat. Skipped for a party: the
+  // invite offer replaces the model's whole trailing question anyway.
   const REMINDER_CLAIM_REGEX = /\b(?:remind(?:er)?|nudge|alert|notify|notification|ping)\b/i;
   const reminderWasSaved = (actions.remindersSaved || 0) > 0;
   const claimedAReminder = REMINDER_CLAIM_REGEX.test(response);
-  if (claimedAReminder && !reminderWasSaved && actions.eventsAdded?.length) {
+  if (claimedAReminder && !reminderWasSaved && actions.eventsAdded?.length && !partyEvent) {
     console.warn('[handlers] Reminder reconciliation hit: response mentioned a reminder but none was saved. Response:', response.slice(0, 200));
     response += "\n\n(I couldn't quite catch the reminder timing — could you tell me again how many minutes/hours before you want the nudge?)";
     actions.reminderReconciled = true;
@@ -3367,7 +3379,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // reconciliation already crowded the turn. buildValueReceipt only returns a
   // line when it's genuinely true + high-signal, so routine personal captures
   // get nothing.
-  if (!actions.reminderReconciled) {
+  // Skipped for a party: the invite offer is a stronger value message than the
+  // shared-calendar receipt, and we keep that turn focused on one ask.
+  if (!actions.reminderReconciled && !partyEvent) {
     const valueReceipt = buildValueReceipt(actions, user, household);
     if (valueReceipt) {
       response += `\n\n${valueReceipt}`;
@@ -3380,28 +3394,32 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   const birthdayEvent = (actions.eventsAdded || []).find(
     (e) => e && e.category === 'birthday' && !e.recurrence && e.id
   );
-  // A just-added event that looks like a gathering (party-detect: prominence
-  // only) - offer a shareable RSVP link. The growth loop's bot entry point.
-  const gatheringEvent = (actions.eventsAdded || []).find(
-    (e) => e && e.id && looksLikeGathering(e.title)
-  );
-  if (!alreadyAsks && (eventAdded || taskAdded)) {
+
+  if (partyEvent) {
+    // Replace any model-authored trailing question with the invite ask, so
+    // there's exactly one question and "yes" resolves to the invite. Guard the
+    // strip so a reply that is nothing BUT a question isn't nuked to empty.
+    if (alreadyAsks) {
+      const stripped = response.replace(/\s*[^.?!\n]*\?["')\]]*\s*$/, '').trimEnd();
+      if (stripped.length > 10) response = stripped;
+    }
+    response += '\n\nWant to invite guests? Reply *yes* and I\'ll make a shareable RSVP link - they can reply with headcounts and any allergies, no app needed. 🎈';
+    actions.followUpAppended = true;
+    rememberInviteOffer(user.id, {
+      eventId: partyEvent.id,
+      householdId: household.id,
+      title: partyEvent.title,
+    });
+  } else if (!alreadyAsks && (eventAdded || taskAdded)) {
     let followUp = null;
-    // Priority order: birthday-repeat → invite offer → reminder offer → none.
-    // We never add a generic "anything else?".
+    // Priority order: birthday-repeat → reminder offer → none. (Parties are
+    // handled above and never reach here.) We never add "anything else?".
     if (birthdayEvent) {
       followUp = 'Want this birthday to repeat every year? Reply yes or no.';
       rememberBirthdayRecurrence(user.id, {
         eventIds: [birthdayEvent.id],
         householdId: household.id,
         label: birthdayEvent.title,
-      });
-    } else if (gatheringEvent) {
-      followUp = 'Hosting other families? Reply *yes* and I\'ll make a shareable invite link - they can RSVP with headcounts and allergy notes, no app needed.';
-      rememberInviteOffer(user.id, {
-        eventId: gatheringEvent.id,
-        householdId: household.id,
-        title: gatheringEvent.title,
       });
     } else if ((eventAdded || taskAdded) && !reminderSaved) {
       followUp = eventAdded
@@ -3421,8 +3439,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // offer skipped it and the user's "Yes" fell through to classification,
   // where it misrouted into a phantom update (real 2026-07-16 transcript).
   // The reply flow at the top of handleTextMessage handles the answer
-  // deterministically either way.
-  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent
+  // deterministically either way. Never arm for a party turn - the invite
+  // offer already owns the "yes".
+  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent && !partyEvent
       && /remind[^.!\n]*\?/i.test(response)) {
     const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
     const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;

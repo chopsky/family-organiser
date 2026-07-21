@@ -3046,7 +3046,7 @@ export default function Calendar() {
                   </div>
                 </MField>
 
-                {/* ── 5b. Invite other families (saved events only) ──
+                {/* ── 5b. Invite guests (saved events only) ──
                     Available on EVERY event via the quiet link; promoted to a
                     card when the title looks like a gathering (partyDetect -
                     prominence only, never availability). */}
@@ -3056,7 +3056,7 @@ export default function Calendar() {
                       <div style={{ borderRadius: 12, border: `1px solid ${M_LINE_STRONG}`, background: '#FBF8F3', padding: '12px 14px' }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>
                           {inviteRoster.going > 0
-                            ? `${inviteRoster.going} famil${inviteRoster.going === 1 ? 'y' : 'ies'} going · ${inviteRoster.kids} kid${inviteRoster.kids === 1 ? '' : 's'}, ${inviteRoster.adults} adult${inviteRoster.adults === 1 ? '' : 's'}`
+                            ? `${inviteRoster.going} going${(inviteRoster.kids + inviteRoster.adults) > 0 ? ` · ${inviteRoster.adults} adult${inviteRoster.adults === 1 ? '' : 's'}, ${inviteRoster.kids} kid${inviteRoster.kids === 1 ? '' : 's'}` : ''}`
                             : inviteRoster.hasLink
                               ? 'No RSVPs yet — share the link below'
                               : 'RSVPs received'}
@@ -3138,9 +3138,9 @@ export default function Calendar() {
                   ) : looksLikeGathering(formTitle) ? (
                     <MField label="Invites">
                       <div style={{ borderRadius: 12, border: '1px solid rgba(107,63,160,0.25)', background: M_BRAND_SOFT, padding: '12px 14px' }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>🎈 Hosting other families?</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>🎈 Hosting a party?</div>
                         <div style={{ fontSize: 12.5, color: M_INK2, marginTop: 3, lineHeight: 1.5 }}>
-                          Share one link in the group chat — you’ll get RSVPs, headcounts and allergy notes back here.
+                          Share one link with your guests — you’ll get RSVPs, headcounts and allergy notes back here.
                         </div>
                         <button
                           type="button"
@@ -3160,7 +3160,7 @@ export default function Calendar() {
                         disabled={inviteBusy}
                         style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: M_BRAND, fontFamily: 'inherit' }}
                       >
-                        {inviteBusy ? 'Creating link…' : '+ Invite other families'}
+                        {inviteBusy ? 'Creating link…' : '+ Invite guests'}
                       </button>
                     </div>
                   )

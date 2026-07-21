@@ -27,4 +27,24 @@ function looksLikeGathering(title) {
   return PARTY_RE.test(String(title || ''));
 }
 
-module.exports = { looksLikeGathering, PARTY_RE };
+// Stricter sibling: an EXPLICIT party/gathering word, deliberately WITHOUT the
+// bare "birthday"/"bday"/"anniversary" tokens. Those usually mean "record this
+// date" (→ offer to repeat it yearly), not "throw a party". The bot uses this
+// to decide when the invite offer should OUTRANK the yearly-repeat offer, so
+// "Mason's birthday" → repeat-yearly, "Mason's birthday party" → invite guests.
+const PARTY_RE_STRICT = new RegExp(
+  [
+    '\\bparty\\b', 'bbq', 'barbecue', 'barbeque', 'playdate', 'play date',
+    'sleepover', 'sleep over', 'picnic', 'gathering', 'get[- ]?together',
+    'christening', 'baptism', 'bar mitzvah', 'bat mitzvah', 'bonfire',
+    'fireworks', 'halloween', 'easter egg', 'baby shower', 'housewarming',
+    'house warming', 'leaving do', 'reunion', 'meet[- ]?up',
+  ].join('|'),
+  'i',
+);
+
+function looksLikeParty(title) {
+  return PARTY_RE_STRICT.test(String(title || ''));
+}
+
+module.exports = { looksLikeGathering, looksLikeParty, PARTY_RE, PARTY_RE_STRICT };
