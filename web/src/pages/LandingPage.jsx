@@ -117,7 +117,7 @@ const STORY_CHAPTERS = [
   { h: ['Chores kids', 'actually do'], p: 'Routines and quests with stars to earn and treats to spend. Beds get made, teeth get brushed, and nobody nags.' },
   { h: ['A week of dinners', 'in minutes'], p: 'Plan the week from your family recipe box, and every ingredient lands on the shopping list by itself.' },
   { h: ['Lists that keep', 'everyone in sync'], p: 'To-dos and shopping, shared in real time. Add it the moment you think of it, sorted before you forget.' },
-  { h: ['And manage it all', 'in WhatsApp'], p: 'Message Housemait like a friend. It adds the event, updates the list and answers back in seconds.' },
+  { h: ['Manage it all', 'in WhatsApp'], p: 'Message Housemait like a friend. It adds the event, updates the list and answers back in seconds.' },
 ]
 
 const SCREENS = ['/landing/app-calendar.jpg', '/landing/app-tasks.jpg', '/landing/app-mealplan.jpg', '/landing/app-lists.jpg']
