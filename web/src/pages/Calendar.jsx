@@ -2060,6 +2060,16 @@ export default function Calendar() {
             ]}
           />
 
+          {/* Current month / week / day - the desktop toolbar's only place
+              for it (the PageHeader kicker is not rendered, and the mobile
+              month-nav bar is md:hidden). Sits by the arrows that change it. */}
+          <span
+            className="ml-1 mr-1 text-[15px] font-semibold text-charcoal whitespace-nowrap"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            {navigationLabel}
+          </span>
+
           {/* Prev / next */}
           <div className="flex items-center gap-1.5">
             <button
