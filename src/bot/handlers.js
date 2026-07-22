@@ -2888,8 +2888,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   if (result.intent === 'school_activity' && result.school_activity) {
     try {
       const sa = result.school_activity;
+      // Extracurricular activities belong to a CHILD, never a pet - so match
+      // dependents excluding pets (same rule the app now enforces). A pet name
+      // here correctly falls through to the "no child called X" reply.
       const child = household.members.find(m =>
-        m.name.toLowerCase() === sa.child_name?.toLowerCase() && m.member_type === 'dependent'
+        m.name.toLowerCase() === sa.child_name?.toLowerCase()
+        && m.member_type === 'dependent' && m.dependent_kind !== 'pet'
       );
       if (!child) {
         return { response: `I couldn't find a child called "${sa.child_name}" in your family. Check the name and try again!`, actions };
