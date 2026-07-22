@@ -536,18 +536,25 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     console.warn('[reminders] subscription fetch failed:', e.message);
   }
 
+  // Load the household roster once - reused for the weather location (any
+  // member's shared device location), the send targets, and the school-
+  // activity dependents below.
+  const householdMembers = await db.getHouseholdMembers(householdId).catch(() => []);
+
   // Today's weather one-liner - one fetch per household run, shared
   // across every member's digest. Cached 12h inside the helper so a
-  // re-trigger / second cron tick doesn't re-fetch.
+  // re-trigger / second cron tick doesn't re-fetch. Location precedence:
+  // a fresh shared device location → typed home address → stale shared
+  // location → omit.
   let weatherLine = null;
   try {
-    const forecast = await fetchTodayForecastForHousehold(household);
+    const forecast = await fetchTodayForecastForHousehold(household, householdMembers);
     weatherLine = buildDigestWeatherLine(forecast);
   } catch (e) {
     console.warn('[reminders] weather fetch failed:', e.message);
   }
 
-  const targets = singleMember ? [singleMember] : await db.getHouseholdMembers(householdId);
+  const targets = singleMember ? [singleMember] : householdMembers;
 
   for (const member of targets) {
     // Per-user opt-out (Settings → Notifications). whatsapp_daily_reminder is
@@ -571,7 +578,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       const dayOfWeek = (new Date().getDay() + 6) % 7; // Convert JS day (0=Sun) to our format (0=Mon)
       if (dayOfWeek <= 4) { // Only Mon-Fri
         const todayStr = new Date().toISOString().split('T')[0];
-        const allMembers = await db.getHouseholdMembers(householdId);
+        const allMembers = householdMembers;
         const dependents = allMembers.filter(m => m.member_type === 'dependent');
         const householdSchools = await db.getHouseholdSchools(householdId).catch(() => []);
 

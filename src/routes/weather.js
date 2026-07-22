@@ -30,6 +30,15 @@ router.get('/widget', requireAuth, requireHousehold, async (req, res) => {
     const lon = parseFloat(req.query.lon);
     const coords = (Number.isFinite(lat) && Number.isFinite(lon)) ? { lat, lon } : null;
 
+    // Persist the shared location so the WhatsApp morning brief (a server cron
+    // with no device) can fall back to it - the brief prefers a fresh shared
+    // location, then the typed home address. Fire-and-forget: never blocks or
+    // fails the widget response.
+    if (coords) {
+      db.updateUserLocation(req.user.id, lat, lon).catch((e) =>
+        console.warn('[weather/widget] persist location failed:', e.message));
+    }
+
     // Today's calendar events feed the AI note. Scope to the household's
     // local day. Soft-fail to an empty list - the note generator just
     // omits the row when there are no timed events, so a calendar hiccup

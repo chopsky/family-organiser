@@ -55,12 +55,73 @@ async function geocodeViaPhoton(query) {
   }
 }
 
-async function resolveLocation(household) {
-  if (!household?.address?.trim()) {
-    console.log(`[digest-weather] household ${household?.id} has no address - skipping weather`);
+// Reverse of geocodeViaPhoton: coords → a city label for the digest line.
+async function reverseGeocodeViaPhoton(lat, lon) {
+  try {
+    const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const props = data.features?.[0]?.properties || {};
+    return { cityName: props.city || props.town || props.village || props.county || props.name || null };
+  } catch {
     return null;
   }
-  return geocodeViaPhoton(household.address.trim());
+}
+
+// A shared device location has to be FRESH to outrank the typed home address:
+// otherwise last week's holiday would keep showing after you're back. 48h.
+const FRESH_LOCATION_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Pick the best household member's shared device location. Returns the most
+ * recently-updated coord with a `fresh` flag (updated within FRESH_LOCATION_MS),
+ * or null when no member has coords. Pure + exported so the precedence is unit-
+ * testable without hitting the network. A missing/blank timestamp is treated as
+ * stale (fresh:false) - it still qualifies as a last-resort location.
+ */
+function pickMemberLocation(members, nowMs = Date.now()) {
+  const coords = (members || [])
+    .filter((m) => Number.isFinite(m?.latitude) && Number.isFinite(m?.longitude))
+    .map((m) => {
+      const t = m.location_updated_at ? Date.parse(m.location_updated_at) : 0;
+      return { lat: m.latitude, lon: m.longitude, ts: Number.isNaN(t) ? 0 : t };
+    });
+  if (!coords.length) return null;
+  coords.sort((a, b) => b.ts - a.ts);
+  const best = coords[0];
+  return { lat: best.lat, lon: best.lon, fresh: !!best.ts && (nowMs - best.ts) <= FRESH_LOCATION_MS };
+}
+
+/**
+ * Location precedence for the morning brief:
+ *   1. A FRESH shared device location (a member opened the app <=48h ago) -
+ *      the "match the app" path.
+ *   2. The typed home address (Family → Household), geocoded.
+ *   3. A STALE shared location - better than nothing when there's no address.
+ *   4. null - omit weather. Deliberately NO timezone guess (that gives
+ *      confidently-wrong, wrong-city weather).
+ */
+async function resolveLocation(household, members = []) {
+  const pick = pickMemberLocation(members);
+
+  if (pick && pick.fresh) {
+    const rev = await reverseGeocodeViaPhoton(pick.lat, pick.lon);
+    return { lat: pick.lat, lon: pick.lon, cityName: rev?.cityName || null };
+  }
+
+  if (household?.address?.trim()) {
+    const geo = await geocodeViaPhoton(household.address.trim());
+    if (geo) return geo;
+  }
+
+  if (pick) {
+    const rev = await reverseGeocodeViaPhoton(pick.lat, pick.lon);
+    return { lat: pick.lat, lon: pick.lon, cityName: rev?.cityName || null };
+  }
+
+  console.log(`[digest-weather] household ${household?.id} has no shared location or address - skipping weather`);
+  return null;
 }
 
 /**
@@ -181,7 +242,7 @@ async function fetchFromWttr(loc) {
  * @returns {Promise<object|null>} shape suitable for buildDigestWeatherLine:
  *   { cityName, code, hi, lo, precipProbability }
  */
-async function fetchTodayForecastForHousehold(household) {
+async function fetchTodayForecastForHousehold(household, members = []) {
   if (!household?.id) return null;
 
   const cached = cache.get(household.id);
@@ -190,7 +251,7 @@ async function fetchTodayForecastForHousehold(household) {
     if (Date.now() - cached.ts < ttl) return cached.data;
   }
 
-  const loc = await resolveLocation(household);
+  const loc = await resolveLocation(household, members);
   if (!loc) {
     cache.set(household.id, { data: null, ts: Date.now() });
     return null;
@@ -226,4 +287,4 @@ function invalidateHouseholdWeatherCache(householdId) {
   if (householdId) cache.delete(householdId);
 }
 
-module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache };
+module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation };

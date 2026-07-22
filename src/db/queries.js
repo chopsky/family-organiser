@@ -279,6 +279,23 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
   return data;
 }
 
+/**
+ * Persist a member's shared device location (from the app's weather-widget
+ * fetch) so the morning brief can fall back to it. Stamps location_updated_at
+ * for freshness; tolerant of that column being unmigrated. Fire-and-forget:
+ * callers don't await the result on the request path.
+ */
+async function updateUserLocation(userId, latitude, longitude, db = supabase) {
+  if (!userId || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+  const row = { latitude, longitude, location_updated_at: new Date().toISOString() };
+  const { error } = await db.from('users').update(row).eq('id', userId);
+  if (error && error.code === 'PGRST204') {
+    // location_updated_at not migrated yet - store the coords without it.
+    delete row.location_updated_at;
+    await db.from('users').update(row).eq('id', userId);
+  }
+}
+
 async function updateUser(userId, fields, db = supabase) {
   const { data, error } = await db
     .from('users')
@@ -9431,6 +9448,7 @@ module.exports = {
   getUserByEmail,
   createUserWithEmail,
   updateUser,
+  updateUserLocation,
   deleteUser,
   createEmailVerificationToken,
   getEmailVerificationToken,
