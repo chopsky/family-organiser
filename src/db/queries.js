@@ -296,6 +296,21 @@ async function updateUserLocation(userId, latitude, longitude, db = supabase) {
   }
 }
 
+/**
+ * Cache a household's geocoded address coords so the morning brief can skip the
+ * Photon geocoder on repeat days (its outages were dropping weather for the
+ * day). `address` is stored so a later address edit self-invalidates the cache.
+ * Tolerant of the geo_* columns being unmigrated.
+ */
+async function updateHouseholdGeocode(householdId, { lat, lon, city, address }, db = supabase) {
+  if (!householdId || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  const row = { geo_latitude: lat, geo_longitude: lon, geo_city: city || null, geo_address: address || null };
+  const { error } = await db.from('households').update(row).eq('id', householdId);
+  if (error && error.code === 'PGRST204') {
+    // geo_* columns not migrated yet - no-op (the digest just geocodes fresh).
+  }
+}
+
 async function updateUser(userId, fields, db = supabase) {
   const { data, error } = await db
     .from('users')
@@ -9449,6 +9464,7 @@ module.exports = {
   createUserWithEmail,
   updateUser,
   updateUserLocation,
+  updateHouseholdGeocode,
   deleteUser,
   createEmailVerificationToken,
   getEmailVerificationToken,

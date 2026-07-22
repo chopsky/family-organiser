@@ -94,10 +94,26 @@ function pickMemberLocation(members, nowMs = Date.now()) {
 }
 
 /**
+ * The household's previously-geocoded address coords, IF the cached address
+ * still matches the current one. Pure + exported: lets the brief reuse a good
+ * geocode instead of hitting Photon every morning (a Photon blip at 07:00 was
+ * silently dropping weather for the whole day). Returns null when nothing is
+ * cached, or when the address has since changed (→ re-geocode).
+ */
+function cachedHouseholdGeocode(household) {
+  const address = household?.address?.trim();
+  if (!address) return null;
+  if ((household.geo_address || '').trim() !== address) return null;
+  if (!Number.isFinite(household.geo_latitude) || !Number.isFinite(household.geo_longitude)) return null;
+  return { lat: household.geo_latitude, lon: household.geo_longitude, cityName: household.geo_city || null };
+}
+
+/**
  * Location precedence for the morning brief:
  *   1. A FRESH shared device location (a member opened the app <=48h ago) -
  *      the "match the app" path.
- *   2. The typed home address (Family → Household), geocoded.
+ *   2. The typed home address (Family → Household): a cached geocode if the
+ *      address is unchanged (no Photon call), else geocode fresh + cache it.
  *   3. A STALE shared location - better than nothing when there's no address.
  *   4. null - omit weather. Deliberately NO timezone guess (that gives
  *      confidently-wrong, wrong-city weather).
@@ -110,9 +126,19 @@ async function resolveLocation(household, members = []) {
     return { lat: pick.lat, lon: pick.lon, cityName: rev?.cityName || null };
   }
 
-  if (household?.address?.trim()) {
-    const geo = await geocodeViaPhoton(household.address.trim());
-    if (geo) return geo;
+  const address = household?.address?.trim();
+  if (address) {
+    const cached = cachedHouseholdGeocode(household);
+    if (cached) return cached;
+    const geo = await geocodeViaPhoton(address);
+    if (geo) {
+      // Cache so tomorrow's brief skips Photon. Fire-and-forget - never
+      // blocks the digest, and a write failure just means we geocode again.
+      require('../db/queries')
+        .updateHouseholdGeocode(household.id, { lat: geo.lat, lon: geo.lon, city: geo.cityName, address })
+        .catch((e) => console.warn('[digest-weather] geocode cache write failed:', e.message));
+      return geo;
+    }
   }
 
   if (pick) {
@@ -287,4 +313,4 @@ function invalidateHouseholdWeatherCache(householdId) {
   if (householdId) cache.delete(householdId);
 }
 
-module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation };
+module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation, cachedHouseholdGeocode };

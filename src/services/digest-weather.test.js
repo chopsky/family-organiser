@@ -3,7 +3,7 @@
  * shared device location is only "fresh" (and thus allowed to outrank the typed
  * home address) if updated within 48h. Pure logic - no network.
  */
-const { pickMemberLocation } = require('./digest-weather');
+const { pickMemberLocation, cachedHouseholdGeocode } = require('./digest-weather');
 
 const NOW = Date.parse('2026-07-22T09:00:00Z');
 const hoursAgo = (h) => new Date(NOW - h * 3600 * 1000).toISOString();
@@ -41,4 +41,29 @@ test('picks the most recently-updated member when several have coords', () => {
 test('exactly 48h old still counts as fresh (boundary)', () => {
   const r = pickMemberLocation([{ latitude: 5, longitude: 5, location_updated_at: hoursAgo(48) }], NOW);
   expect(r.fresh).toBe(true);
+});
+
+describe('cachedHouseholdGeocode', () => {
+  const cached = {
+    address: 'Heton Gardens, London, NW4 4XS',
+    geo_address: 'Heton Gardens, London, NW4 4XS',
+    geo_latitude: 51.589, geo_longitude: -0.233, geo_city: 'London',
+  };
+
+  test('reuses the cached coords when the address is unchanged', () => {
+    expect(cachedHouseholdGeocode(cached)).toEqual({ lat: 51.589, lon: -0.233, cityName: 'London' });
+  });
+
+  test('ignores the cache when the address has changed (→ re-geocode)', () => {
+    expect(cachedHouseholdGeocode({ ...cached, address: '10 New Road, Leeds' })).toBeNull();
+  });
+
+  test('null when nothing is cached yet', () => {
+    expect(cachedHouseholdGeocode({ address: '10 New Road, Leeds' })).toBeNull();
+  });
+
+  test('null when there is no address', () => {
+    expect(cachedHouseholdGeocode({ geo_latitude: 1, geo_longitude: 2 })).toBeNull();
+    expect(cachedHouseholdGeocode({})).toBeNull();
+  });
 });
