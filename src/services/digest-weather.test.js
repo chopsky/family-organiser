@@ -3,7 +3,7 @@
  * shared device location is only "fresh" (and thus allowed to outrank the typed
  * home address) if updated within 48h. Pure logic - no network.
  */
-const { pickMemberLocation, cachedHouseholdGeocode, metnoToWmo, summariseMetnoToday } = require('./digest-weather');
+const { pickMemberLocation, cachedHouseholdGeocode, metnoToWmo, summariseMetnoToday, coordCacheKey } = require('./digest-weather');
 
 const NOW = Date.parse('2026-07-22T09:00:00Z');
 const hoursAgo = (h) => new Date(NOW - h * 3600 * 1000).toISOString();
@@ -144,5 +144,25 @@ describe('summariseMetnoToday', () => {
       entry('2026-07-23T14:00:00Z', 26, 'clearsky_day', 0),
     ];
     expect(summariseMetnoToday(series, 'Europe/London', NOW)).toMatchObject({ precipProbability: 0, code: 1 });
+  });
+});
+
+describe('coordCacheKey', () => {
+  test('nearby households (~1km apart) collapse to the same key → one fetch', () => {
+    // The Schneiders (51.5894, -0.2334) and a neighbour ~1km away share a key.
+    const schneiders = coordCacheKey(51.5893739, -0.2333729, 'Europe/London');
+    const neighbour = coordCacheKey(51.5951, -0.2402, 'Europe/London');
+    expect(schneiders).toBe(neighbour);
+    expect(schneiders).toBe('51.6,-0.2@Europe/London');
+  });
+
+  test('different towns get different keys', () => {
+    expect(coordCacheKey(51.59, -0.23, 'Europe/London'))
+      .not.toBe(coordCacheKey(53.80, -1.55, 'Europe/London')); // London vs Leeds
+  });
+
+  test('same coords in different timezones do not collide', () => {
+    expect(coordCacheKey(51.6, -0.2, 'Europe/London'))
+      .not.toBe(coordCacheKey(51.6, -0.2, 'Europe/Paris'));
   });
 });

@@ -30,7 +30,25 @@ const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours for successful fetches
 // /reminders) gets a fresh shot. 12h on a null was poisoning the
 // next digest in cases where the API recovered minutes after the miss.
 const NEG_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for null/failure
-const cache = new Map(); // key: householdId → { data, ts }
+
+// Two-tier cache, both { data, ts }:
+//  - householdCache short-circuits a household's OTHER members in the same
+//    digest run so we don't re-resolve their location (avoids repeat Photon
+//    calls on the device-coords path).
+//  - coordCache dedupes ACROSS households by rounded location, so a whole
+//    town shares ONE weather fetch instead of hammering the free tier once
+//    per household in the 07:00 burst.
+const householdCache = new Map(); // key: householdId
+const coordCache = new Map();     // key: coordCacheKey(lat, lon, tz)
+
+// Round to ~11km so neighbours share a fetch. A daily "high 22°, light rain"
+// brief doesn't need finer than this, and coarser buckets = fewer API calls
+// at 07:00. Each household keeps its own city label on the way out.
+const COORD_DP = 1; // decimal places: 1 ≈ 11km, 2 ≈ 1.1km
+function coordCacheKey(lat, lon, tz = '') {
+  return `${Number(lat).toFixed(COORD_DP)},${Number(lon).toFixed(COORD_DP)}@${tz}`;
+}
+const freshEnough = (entry) => entry && (Date.now() - entry.ts) < (entry.data ? CACHE_TTL_MS : NEG_CACHE_TTL_MS);
 
 // Every upstream weather/geocode call gets a hard timeout. A hung provider
 // (wttr.in stalled ~90s at 07:00 with no AbortController, killing the brief
@@ -376,19 +394,28 @@ async function fetchFromWttr(loc) {
 async function fetchTodayForecastForHousehold(household, members = []) {
   if (!household?.id) return null;
 
-  const cached = cache.get(household.id);
-  if (cached) {
-    const ttl = cached.data ? CACHE_TTL_MS : NEG_CACHE_TTL_MS;
-    if (Date.now() - cached.ts < ttl) return cached.data;
-  }
+  // Tier 1: this household was already resolved this run (another member).
+  const hhCached = householdCache.get(household.id);
+  if (freshEnough(hhCached)) return hhCached.data;
 
   const loc = await resolveLocation(household, members);
   if (!loc) {
-    cache.set(household.id, { data: null, ts: Date.now() });
+    householdCache.set(household.id, { data: null, ts: Date.now() });
     return null;
   }
 
   const tz = household.timezone || 'auto';
+  const key = coordCacheKey(loc.lat, loc.lon, tz);
+
+  // Tier 2: another household at (roughly) this location already fetched.
+  // Reuse the forecast but keep THIS household's own city label.
+  const coordCached = coordCache.get(key);
+  if (freshEnough(coordCached)) {
+    const out = coordCached.data ? { ...coordCached.data, cityName: loc.cityName || coordCached.data.cityName } : null;
+    householdCache.set(household.id, { data: out, ts: Date.now() });
+    return out;
+  }
+
   // Three independent providers, tried in order. Open-Meteo 503'd AND wttr.in
   // connection-failed together at 07:00 two mornings running, so met.no (a
   // national met service on separate infra) sits between them. Each attempt is
@@ -411,20 +438,25 @@ async function fetchTodayForecastForHousehold(household, members = []) {
     }
   }
 
-  if (forecast) {
-    cache.set(household.id, { data: forecast, ts: Date.now() });
-    return forecast;
+  // Populate both tiers. The coord cache lets the very next household at this
+  // location skip the API entirely; the negative entry (30 min) means a
+  // location whose providers are ALL down doesn't get re-hammered by every
+  // household in the same town during the 07:00 run, but recovers soon after.
+  const now = Date.now();
+  coordCache.set(key, { data: forecast || null, ts: now });
+  householdCache.set(household.id, { data: forecast || null, ts: now });
+  if (!forecast) {
+    console.warn(`[digest-weather] ALL weather providers failed for household ${household.id} - no weather line today`);
   }
-  // All providers down. Negative-cache (30 min) so subsequent member
-  // iterations in the same digest run don't beat up the upstreams, but a
-  // recovered provider is picked up soon after.
-  console.warn(`[digest-weather] ALL weather providers failed for household ${household.id} - no weather line today`);
-  cache.set(household.id, { data: null, ts: Date.now() });
-  return null;
+  return forecast || null;
 }
 
-function invalidateHouseholdWeatherCache(householdId) {
-  if (householdId) cache.delete(householdId);
+// Clear the whole (tiny) cache. Used by the admin self-preview to force a
+// genuinely fresh fetch; keying is by coordinate now, so there's no single
+// household entry to target, and a full clear is cheap and unambiguous.
+function invalidateHouseholdWeatherCache(_householdId) {
+  householdCache.clear();
+  coordCache.clear();
 }
 
-module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation, cachedHouseholdGeocode, metnoToWmo, summariseMetnoToday };
+module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation, cachedHouseholdGeocode, metnoToWmo, summariseMetnoToday, coordCacheKey };
