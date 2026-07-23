@@ -10,12 +10,14 @@
  * entirely and let the user notice they should set an address.
  *
  * Provider chain: Open-Meteo (primary, more accurate, daily-shape API)
- * → wttr.in (fallback, different infrastructure - WWO-backed). Both
- * are free and key-less; the fallback exists because Open-Meteo has
- * recurring 502 windows that took out the morning digest twice in a
- * row, and three quick retries don't help when the upstream is
- * genuinely down. wttr.in lives on completely separate infra so it
- * shouldn't share an outage with Open-Meteo.
+ * → MET Norway / api.met.no (a national meteorological service, very
+ * reliable, key-less, genuinely independent infra) → wttr.in (last
+ * resort, WWO-backed hobby service). All three are free and key-less.
+ * The chain grew to three because Open-Meteo 503'd AND wttr.in
+ * connection-failed together at 07:00 two mornings running, taking out
+ * the Schneiders' brief entirely - two flaky free providers can share a
+ * bad moment, so a solid third (met.no) is the real insurance. met.no
+ * requires an identifying User-Agent (it 403s generic ones).
  *
  * Cache: 12h in-memory per household. Negative cache 30 min so a
  * recovered upstream is picked up by the next admin re-trigger.
@@ -30,10 +32,25 @@ const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours for successful fetches
 const NEG_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for null/failure
 const cache = new Map(); // key: householdId → { data, ts }
 
+// Every upstream weather/geocode call gets a hard timeout. A hung provider
+// (wttr.in stalled ~90s at 07:00 with no AbortController, killing the brief
+// AND holding up the sequential per-household loop behind it) must fail fast
+// so the next provider in the chain gets its turn well inside the digest
+// window. On timeout, fetch() rejects with an AbortError the caller catches.
+async function fetchWithTimeout(url, { timeoutMs = 8000, ...opts } = {}) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new Error(`timeout after ${timeoutMs}ms`)), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function geocodeViaPhoton(query) {
   try {
     const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) {
       console.warn(`[digest-weather] Photon HTTP ${res.status} for "${query}"`);
       return null;
@@ -59,7 +76,7 @@ async function geocodeViaPhoton(query) {
 async function reverseGeocodeViaPhoton(lat, lon) {
   try {
     const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&limit=1`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     if (!res.ok) return null;
     const data = await res.json();
     const props = data.features?.[0]?.properties || {};
@@ -188,18 +205,18 @@ async function fetchFromOpenMeteo(loc, tz) {
     `&forecast_days=1`;
 
   // Retry on 5xx (occasional 502/503 blips). 4xx is treated as a hard
-  // fail - usually a bad lat/lon. Three attempts with 250ms / 750ms
-  // backoff catches the common transient case without making the
-  // digest job sluggish. After 3 strikes, throw and let the caller
-  // try wttr.in.
+  // fail - usually a bad lat/lon. Three attempts with 400ms / 1200ms
+  // backoff catches the common transient case; each attempt is itself
+  // time-boxed so a slow-failing edge can't burn the whole window. After
+  // 3 strikes, throw and let the caller try met.no.
   let res = null;
   let lastErr = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) {
-      await new Promise(r => setTimeout(r, attempt === 1 ? 250 : 750));
+      await new Promise(r => setTimeout(r, attempt === 1 ? 400 : 1200));
     }
     try {
-      res = await fetch(url);
+      res = await fetchWithTimeout(url, { timeoutMs: 7000 });
       if (res.ok) break;
       lastErr = new Error(`Open-Meteo ${res.status}`);
       if (res.status < 500) break; // 4xx - don't retry
@@ -223,13 +240,101 @@ async function fetchFromOpenMeteo(loc, tz) {
   };
 }
 
+/**
+ * Map a MET Norway symbol_code ("cloudy", "lightrainshowers_day",
+ * "heavysnowandthunder") to the WMO daily code buildDigestWeatherLine()
+ * dispatches on. The _day/_night/_polartwilight suffix is irrelevant to the
+ * digest so it's stripped first. Coarse buckets, same philosophy as wwoToWmo.
+ * Reference: https://api.met.no/weatherapi/weathericon/2.0/documentation
+ */
+function metnoToWmo(symbolCode) {
+  if (!symbolCode) return undefined;
+  const s = String(symbolCode).replace(/_(day|night|polartwilight)$/, '');
+  if (s === 'clearsky') return 0;
+  if (s === 'fair') return 1;
+  if (s === 'partlycloudy') return 2;
+  if (s === 'cloudy') return 3;
+  if (s === 'fog') return 45;
+  if (s.includes('thunder')) return 95;                       // any *andthunder variant
+  if (s.includes('sleet')) return 66;                         // sleet / freezing rain
+  if (s.includes('snow')) return s.startsWith('heavy') ? 75 : 71;
+  if (s.includes('rain')) {
+    if (s.startsWith('heavy')) return 65;
+    if (s.startsWith('light')) return 61;
+    return 63;                                                // moderate rain / showers
+  }
+  return undefined;                                           // unknown → generic line
+}
+
+/**
+ * Reduce a met.no /compact timeseries + the household tz to today's headline:
+ * hi/lo across today's hourly instant temps, a midday-representative weather
+ * code, and a rough precip probability from the forecast precipitation
+ * amounts (compact carries amount, not probability). Pure + exported so the
+ * mapping is unit-testable without the network. "Today" is the local calendar
+ * date of `nowMs` in `tz`; a morning brief only sees the rest of today's
+ * hours, which is fine - the daytime high is what matters for the digest.
+ */
+function summariseMetnoToday(timeseries, tz, nowMs = Date.now()) {
+  const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false });
+  const todayStr = dateFmt.format(new Date(nowMs));
+
+  const rows = (Array.isArray(timeseries) ? timeseries : [])
+    .map((t) => {
+      const d = new Date(t.time);
+      return { t, date: dateFmt.format(d), hour: parseInt(hourFmt.format(d), 10) };
+    })
+    .filter((r) => r.date === todayStr);
+  if (!rows.length) return null;
+
+  let hi = -Infinity, lo = Infinity, maxPrecip = 0;
+  for (const { t } of rows) {
+    const temp = Number(t?.data?.instant?.details?.air_temperature);
+    if (Number.isFinite(temp)) { if (temp > hi) hi = temp; if (temp < lo) lo = temp; }
+    const amt = Number(
+      t?.data?.next_1_hours?.details?.precipitation_amount
+      ?? t?.data?.next_6_hours?.details?.precipitation_amount,
+    );
+    if (Number.isFinite(amt) && amt > maxPrecip) maxPrecip = amt;
+  }
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+
+  // Representative symbol: the entry closest to local noon that carries one.
+  const withSym = rows
+    .map((r) => ({ hour: r.hour, sym: r.t?.data?.next_1_hours?.summary?.symbol_code || r.t?.data?.next_6_hours?.summary?.symbol_code }))
+    .filter((r) => r.sym)
+    .sort((a, b) => Math.abs(a.hour - 12) - Math.abs(b.hour - 12));
+
+  // Compact gives amount, not probability. Coarse-map to a % the wet-day
+  // branch in weather-line.js can read; the code bucket already conveys rain.
+  const precipProbability = maxPrecip >= 2 ? 80 : maxPrecip >= 0.5 ? 60 : maxPrecip > 0 ? 40 : 0;
+
+  return { hi: Math.round(hi), lo: Math.round(lo), code: metnoToWmo(withSym[0]?.sym), precipProbability };
+}
+
+async function fetchFromMetNo(loc, tz) {
+  // MET Norway REQUIRES an identifying User-Agent with contact info, else 403.
+  const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${loc.lat}&lon=${loc.lon}`;
+  const res = await fetchWithTimeout(url, {
+    timeoutMs: 8000,
+    headers: { 'User-Agent': 'Housemait/1.0 https://housemait.com support@housemait.com' },
+  });
+  if (!res.ok) throw new Error(`met.no ${res.status}`);
+  const data = await res.json();
+  const today = summariseMetnoToday(data?.properties?.timeseries, tz);
+  if (!today) throw new Error('met.no returned no usable today data');
+  return { cityName: loc.cityName || 'home', ...today };
+}
+
 async function fetchFromWttr(loc) {
   // wttr.in accepts "lat,lon" and returns a JSON forecast block.
   // No API key, no rate limit we've ever hit, completely separate
   // infrastructure from Open-Meteo. Good as a "different upstream"
   // fallback when Open-Meteo is having a 502 day.
   const url = `https://wttr.in/${loc.lat},${loc.lon}?format=j1`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    timeoutMs: 8000,
     headers: { 'User-Agent': 'Housemait-Digest/1.0 (+https://housemait.com)' },
   });
   if (!res.ok) throw new Error(`wttr.in ${res.status}`);
@@ -284,18 +389,25 @@ async function fetchTodayForecastForHousehold(household, members = []) {
   }
 
   const tz = household.timezone || 'auto';
+  // Three independent providers, tried in order. Open-Meteo 503'd AND wttr.in
+  // connection-failed together at 07:00 two mornings running, so met.no (a
+  // national met service on separate infra) sits between them. Each attempt is
+  // logged with status + latency so the next incident is diagnosable at a
+  // glance (429 rate-limit vs 503 outage vs an AbortError timeout).
+  const providers = [
+    { name: 'Open-Meteo', run: () => fetchFromOpenMeteo(loc, tz) },
+    { name: 'met.no',     run: () => fetchFromMetNo(loc, tz) },
+    { name: 'wttr.in',    run: () => fetchFromWttr(loc) },
+  ];
   let forecast = null;
-  let openMeteoErr = null;
-  try {
-    forecast = await fetchFromOpenMeteo(loc, tz);
-  } catch (err) {
-    openMeteoErr = err;
-    console.warn(`[digest-weather] Open-Meteo failed for household ${household.id}: ${err.message} - trying wttr.in fallback`);
+  for (const p of providers) {
+    const t0 = Date.now();
     try {
-      forecast = await fetchFromWttr(loc);
-      console.log(`[digest-weather] wttr.in fallback succeeded for household ${household.id}`);
-    } catch (wttrErr) {
-      console.warn(`[digest-weather] wttr.in fallback ALSO failed for household ${household.id}: ${wttrErr.message} - giving up`);
+      forecast = await p.run();
+      console.log(`[digest-weather] ${p.name} ok for household ${household.id} (${Date.now() - t0}ms)`);
+      break;
+    } catch (err) {
+      console.warn(`[digest-weather] ${p.name} failed for household ${household.id} (${Date.now() - t0}ms): ${err.message}`);
     }
   }
 
@@ -303,8 +415,10 @@ async function fetchTodayForecastForHousehold(household, members = []) {
     cache.set(household.id, { data: forecast, ts: Date.now() });
     return forecast;
   }
-  // Both providers down. Negative-cache so subsequent member
-  // iterations in the same digest run don't beat up the upstream.
+  // All providers down. Negative-cache (30 min) so subsequent member
+  // iterations in the same digest run don't beat up the upstreams, but a
+  // recovered provider is picked up soon after.
+  console.warn(`[digest-weather] ALL weather providers failed for household ${household.id} - no weather line today`);
   cache.set(household.id, { data: null, ts: Date.now() });
   return null;
 }
@@ -313,4 +427,4 @@ function invalidateHouseholdWeatherCache(householdId) {
   if (householdId) cache.delete(householdId);
 }
 
-module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation, cachedHouseholdGeocode };
+module.exports = { fetchTodayForecastForHousehold, invalidateHouseholdWeatherCache, pickMemberLocation, cachedHouseholdGeocode, metnoToWmo, summariseMetnoToday };
