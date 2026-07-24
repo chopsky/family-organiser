@@ -6,6 +6,7 @@ const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
 const { callWithFailover } = require('../services/ai-client');
 const { parseJSON } = require('../services/ai');
+const { normaliseImageData } = require('../utils/image-data');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
@@ -606,6 +607,10 @@ router.post('/recipes/import-photo', requireAuth, requireHousehold, async (req, 
     return res.status(400).json({ error: 'Base64 image data is required' });
   }
 
+  // The iOS app sends a full data URI ("data:image/jpeg;base64,...") which the
+  // vision APIs reject as invalid base64. Strip the prefix so either shape works.
+  const { data: imageData, mediaType } = normaliseImageData(image, media_type || 'image/jpeg');
+
   try {
     const { text } = await callWithFailover({
       system: 'You extract recipes from photos. Return only valid JSON.',
@@ -619,8 +624,8 @@ router.post('/recipes/import-photo', requireAuth, requireHousehold, async (req, 
             type: 'image',
             source: {
               type: 'base64',
-              media_type: media_type || 'image/jpeg',
-              data: image,
+              media_type: mediaType,
+              data: imageData,
             },
           },
           {

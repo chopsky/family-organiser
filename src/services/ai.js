@@ -4,6 +4,7 @@ const { getCityFromTimezone } = require('./weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { formatPreferenceLines } = require('./preferences-format');
 const { CLASSIFY_SCHEMA } = require('./classify-schema');
+const { normaliseImageData } = require('../utils/image-data');
 const {
   CLASSIFICATION_SYSTEM,
   CLASSIFICATION_CONTEXT,
@@ -272,9 +273,12 @@ function salvageProseAsChat(text) {
  * Extract items from a receipt image.
  */
 async function scanReceipt(imageData, mediaType = 'image/jpeg', { householdId, userId } = {}) {
-  const base64 = Buffer.isBuffer(imageData)
-    ? imageData.toString('base64')
-    : imageData;
+  // A Buffer is already raw bytes; a string may be a full data URI from a
+  // client (the iOS app), which the vision APIs reject - strip its prefix.
+  const norm = Buffer.isBuffer(imageData)
+    ? { data: imageData.toString('base64'), mediaType }
+    : normaliseImageData(imageData, mediaType);
+  const base64 = norm.data;
 
   return withRetry(async () => {
     const { text } = await callWithFailover({
@@ -285,7 +289,7 @@ async function scanReceipt(imageData, mediaType = 'image/jpeg', { householdId, u
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 },
+              source: { type: 'base64', media_type: norm.mediaType, data: base64 },
             },
             { type: 'text', text: 'Please extract all items from this receipt.' },
           ],
@@ -348,9 +352,11 @@ async function matchReceiptToList(receiptItems, shoppingList, { householdId, use
  * Scan an image to determine if it's a receipt or contains calendar events.
  */
 async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId, caption = '' } = {}) {
-  const base64 = Buffer.isBuffer(imageData)
-    ? imageData.toString('base64')
-    : imageData;
+  // Buffer = raw bytes; string may be a data URI from a client - strip its prefix.
+  const norm = Buffer.isBuffer(imageData)
+    ? { data: imageData.toString('base64'), mediaType }
+    : normaliseImageData(imageData, mediaType);
+  const base64 = norm.data;
 
   const today = new Date().toISOString().split('T')[0];
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
@@ -368,7 +374,7 @@ async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], 
           content: [
             {
               type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 },
+              source: { type: 'base64', media_type: norm.mediaType, data: base64 },
             },
             { type: 'text', text: 'Analyse this image. Is it a receipt or does it contain event/date information? Extract all relevant details.' },
           ],
