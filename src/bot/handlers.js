@@ -11,7 +11,8 @@ const { classify, scanReceipt, matchReceiptToList, scanImage, runWebSearch } = r
 const { transcribeVoice } = require('../services/transcribe');
 const { getWeatherReport, composeWeatherAnswer, extractLocationFromMessage, geocodeLocation } = require('../services/weather');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
-const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
+const { parseRemindersFromMessage, parseBareDuration, messageMentionsReminder, snapToTaskNotification, describeOffsets } = require('../utils/reminder-parser');
+const { extractReminderOffsets } = require('../services/reminder-extract');
 const { callWithFailover } = require('../services/ai-client');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -1920,19 +1921,52 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   const pendingRem = popReminderTarget(user.id);
   if (pendingRem && pendingRem.householdId === household.id) {
     const remActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
-    const offsets = parseRemindersFromMessage(text);
+    let offsets = parseRemindersFromMessage(text);
+    // We just asked "how long before?" - a reply that is NOTHING but a
+    // duration ("2 hours", "30 mins") answers it, even without "before".
+    if (offsets.length === 0) offsets = parseBareDuration(text);
     const timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
-    const isReminderReply = offsets.length > 0 || timeOfDay || parseAffirmative(text) === 'yes' || messageMentionsReminder(text);
+    const bareYes = parseAffirmative(text) === 'yes';
+    // A bare "yes" accepts whatever lead time the offer itself suggested
+    // ("Want me to add a reminder the day before?" → yes → day before).
+    // Asking "how long before?" after proposing a lead ourselves was a
+    // real-user complaint.
+    if (offsets.length === 0 && bareYes && pendingRem.suggestedOffsets?.length) {
+      offsets = pendingRem.suggestedOffsets;
+    }
+    const isReminderReply = offsets.length > 0 || timeOfDay || bareYes || messageMentionsReminder(text);
+    // Reminder-ish but unparseable ("make it a couple of hours ahead") →
+    // one cheap Haiku extraction instead of re-asking. A miss returns []
+    // and falls into the ask-once-then-let-go flow below - the bot must
+    // NEVER repeat the same question verbatim (a real user got the
+    // identical "how long before?" four times).
+    if (isReminderReply && offsets.length === 0 && !timeOfDay && !bareYes) {
+      const llm = await extractReminderOffsets(text, { label: pendingRem.label, householdId: household.id, userId: user.id });
+      if (llm?.offsets?.length) offsets = llm.offsets;
+    }
     if (isReminderReply) {
       ctx.intent = 'reminder_followup';
       try {
         if (pendingRem.itemType === 'event') {
           if (offsets.length > 0) {
             await db.saveEventReminders(pendingRem.itemId, household.id, offsets, pendingRem.startTime);
-            return { response: `Done - I'll remind you before **${pendingRem.label}**.`, actions: remActions };
+            return { response: `Done - I'll remind you ${describeOffsets(offsets)} about **${pendingRem.label}**.`, actions: remActions };
           }
-          rememberReminderTarget(user.id, pendingRem);
-          return { response: 'Sure - how long before should I remind you? (e.g. "1 hour before", "the day before")', actions: remActions };
+          // A bare "yes" is a normal handoff to the question, not a failed
+          // answer - only unparseable ANSWERS burn attempts. Two failures →
+          // stop looping: the event is safe; let go gracefully.
+          const asks = (pendingRem.askCount || 0) + (bareYes ? 0 : 1);
+          if (!bareYes && asks >= 2) {
+            return { response: `**${pendingRem.label}** is saved either way. I didn't catch the reminder timing - message me any time, e.g. "remind me about ${pendingRem.label} 2 hours before". 👍`, actions: remActions };
+          }
+          rememberReminderTarget(user.id, { ...pendingRem, askCount: asks });
+          // A bare "yes" to a lead-less offer is a normal question, not a
+          // failed parse - only apologise when we actually failed to read
+          // an answer.
+          const askCopy = bareYes
+            ? 'Sure - how long before should I remind you? (e.g. "2 hours before", "the day before")'
+            : 'Sorry - how far ahead? Something like "2 hours before" or "the day before" works.';
+          return { response: askCopy, actions: remActions };
         }
         // to-do (task)
         const offset = offsets[0] || pendingRem.pendingOffset || null;
@@ -2857,6 +2891,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
               label: createdEv.title,
               startTime: createdEv.start_time,
               householdId: household.id,
+              // If the outgoing question itself names a lead ("...reminder
+              // the day before?"), a bare "yes" applies it directly.
+              suggestedOffsets: parseRemindersFromMessage(eventReply),
             });
           }
         }
@@ -3474,7 +3511,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       : tk
         ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
         : null;
-    if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id });
+    // Capture any lead the model's own question proposed ("...the day
+    // before?") so a bare "yes" applies it instead of re-asking.
+    if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id, suggestedOffsets: parseRemindersFromMessage(response) });
   }
 
   // The reply is about to NAME the created rows - remember them so an

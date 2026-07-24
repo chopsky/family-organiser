@@ -210,3 +210,62 @@ describe('messageMentionsReminder', () => {
     expect(messageMentionsReminder(null)).toBe(false);
   });
 });
+
+describe('number-less phrasings (the "Day before" loop, 2026-07-24)', () => {
+  // The bot's own follow-up question suggests "the day before" as an
+  // example; a user typing exactly that (or the bare "day before") got
+  // NOTHING parsed and the same question re-asked four times.
+  it.each([
+    ['the day before', 1, 'days'],
+    ['day before', 1, 'days'],
+    ['Day before', 1, 'days'],
+    ['The day before !!', 1, 'days'],
+    ['You said day before', 1, 'days'],
+    ['the night before', 1, 'days'],
+    ['evening before', 1, 'days'],
+    ['the hour before', 1, 'hours'],
+    ['half an hour before', 30, 'minutes'],
+  ])('%s -> {time: %d, unit: %s}', (text, time, unit) => {
+    expect(parseRemindersFromMessage(text)).toEqual([{ time, unit }]);
+  });
+
+  it('"half an hour before" does NOT also match "an hour before" (single offset)', () => {
+    expect(parseRemindersFromMessage('remind me half an hour before')).toEqual([{ time: 30, unit: 'minutes' }]);
+  });
+
+  it('"1 day before" still parses once, not twice, alongside the special phrase', () => {
+    expect(parseRemindersFromMessage('1 day before')).toEqual([{ time: 1, unit: 'days' }]);
+  });
+});
+
+describe('parseBareDuration (pending-reply-only whole-message durations)', () => {
+  const { parseBareDuration } = require('./reminder-parser');
+  it.each([
+    ['2 hours', 2, 'hours'],
+    ['30 mins', 30, 'minutes'],
+    ['1 hr', 1, 'hours'],
+    ['a day', 1, 'days'],
+    ['half an hour', 30, 'minutes'],
+    ['in 20 minutes', 20, 'minutes'],
+    ['2 hours before.', 2, 'hours'],
+  ])('%s -> {time: %d, unit: %s}', (text, time, unit) => {
+    expect(parseBareDuration(text)).toEqual([{ time, unit }]);
+  });
+
+  it('refuses durations embedded in longer messages (no false positives)', () => {
+    expect(parseBareDuration('book the court for 2 hours')).toEqual([]);
+    expect(parseBareDuration('the meeting runs 30 mins late')).toEqual([]);
+    expect(parseBareDuration('yes')).toEqual([]);
+  });
+});
+
+describe('describeOffsets (confirmation copy)', () => {
+  const { describeOffsets } = require('./reminder-parser');
+  it('phrases common offsets naturally', () => {
+    expect(describeOffsets([{ time: 1, unit: 'days' }])).toBe('the day before');
+    expect(describeOffsets([{ time: 1, unit: 'hours' }])).toBe('an hour before');
+    expect(describeOffsets([{ time: 2, unit: 'hours' }])).toBe('2 hours before');
+    expect(describeOffsets([{ time: 30, unit: 'minutes' }])).toBe('30 minutes before');
+    expect(describeOffsets([{ time: 1, unit: 'days' }, { time: 30, unit: 'minutes' }])).toBe('the day before and 30 minutes before');
+  });
+});

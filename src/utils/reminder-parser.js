@@ -64,7 +64,7 @@ function unitFromWord(word) {
 // ("10"), an article ("a"/"an"), or a word ("ten").
 const PATTERNS = [
   // "remind me 10 minutes before" / "nudge me 30 mins prior"
-  /\b(?:remind|nudge|ping|notify|alert)\s+(?:me|us)\s+(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior)\b/gi,
+  /\b(?:remind|nudge|ping|notify|alert)\s+(?:me|us)\s+(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/gi,
   // "with a 30 minute reminder" / "with an hour alert"
   /\bwith\s+(?:a|an|one)\s+(\d+|\w+)?\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
   // "with a 30 min" form when only the number + unit are given
@@ -72,27 +72,84 @@ const PATTERNS = [
   // "10 minute reminder" / "1 hour alert" (no "with a")
   /\b(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
   // "10 minutes before" / "a day before" - generic fallback
-  /\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior)\b/gi,
+  /\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/gi,
+];
+
+// Number-less phrasings people actually type, mapped straight to offsets.
+// The bot's own follow-up question suggests "the day before" as an example -
+// a user replying with exactly that phrase (or the bare "day before") used
+// to parse to NOTHING and loop the question forever. Matched text is
+// consumed before the numeric PATTERNS run so "half an hour before" can't
+// ALSO match "an hour before" and save a second, wrong reminder.
+const SPECIAL_PHRASES = [
+  { re: /\bhalf\s+an?\s+hour\s+(?:before|earlier|prior|ahead)\b/gi, offsets: [{ time: 30, unit: 'minutes' }] },
+  { re: /\b(?:the\s+)?(?:day|night|evening|morning)\s+before\b/gi, offsets: [{ time: 1, unit: 'days' }] },
+  { re: /\b(?:the\s+)?hour\s+before\b/gi, offsets: [{ time: 1, unit: 'hours' }] },
 ];
 
 function parseRemindersFromMessage(text) {
   if (typeof text !== 'string' || !text.trim()) return [];
   const out = [];
   const seen = new Set();
+  const push = ({ time, unit }) => {
+    const key = `${time}:${unit}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ time, unit });
+  };
+  // Number-less phrases first, consuming what they match.
+  let remaining = text;
+  for (const { re, offsets } of SPECIAL_PHRASES) {
+    if (re.test(remaining)) {
+      re.lastIndex = 0;
+      offsets.forEach(push);
+      remaining = remaining.replace(re, ' ');
+    }
+  }
   for (const pattern of PATTERNS) {
-    for (const m of text.matchAll(pattern)) {
-      const numRaw = m[1];
-      const unitRaw = m[2];
-      const time = parseNumber(numRaw);
-      const unit = unitFromWord(unitRaw);
+    for (const m of remaining.matchAll(pattern)) {
+      const time = parseNumber(m[1]);
+      const unit = unitFromWord(m[2]);
       if (!time || !unit) continue;
-      const key = `${time}:${unit}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ time, unit });
+      push({ time, unit });
     }
   }
   return out;
+}
+
+// Whole-message bare duration - ONLY safe when we just asked "how long
+// before?" and the reply is nothing but a lead time: "2 hours", "30 mins",
+// "1 hr", "a day", "half an hour", "in 20 minutes". Deliberately anchored to
+// the full string so it can never misread durations inside longer messages
+// ("book the court for 2 hours"); callers use it exclusively on pending
+// reminder replies.
+const BARE_DURATION_RE = /^\s*(?:in\s+)?(?:(half)\s+an?\s+|(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s*)(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s*(?:before|earlier|prior|ahead)?\s*[.!?\s]*$/i;
+
+function parseBareDuration(text) {
+  if (typeof text !== 'string') return [];
+  const m = text.match(BARE_DURATION_RE);
+  if (!m) return [];
+  if (m[1]) {
+    // "half an hour" (the only half-form worth supporting)
+    return /^h/i.test(m[3]) ? [{ time: 30, unit: 'minutes' }] : [];
+  }
+  const time = parseNumber(m[2]);
+  const unit = unitFromWord(m[3]);
+  return time && unit ? [{ time, unit }] : [];
+}
+
+// Human phrasing for a saved offset list, for confirmation copy:
+//   [{1,days}] → "the day before" ; [{2,hours}] → "2 hours before" ;
+//   [{1,days},{30,minutes}] → "the day before and 30 minutes before".
+function describeOffsets(offsets) {
+  if (!Array.isArray(offsets) || offsets.length === 0) return 'before';
+  const one = ({ time, unit }) => {
+    if (unit === 'days' && time === 1) return 'the day before';
+    if (unit === 'hours' && time === 1) return 'an hour before';
+    const label = time === 1 ? unit.replace(/s$/, '') : unit;
+    return `${time} ${label} before`;
+  };
+  return offsets.map(one).join(' and ');
 }
 
 // Cheap sniff: does the user's message even mention reminder-like
@@ -108,7 +165,7 @@ function messageMentionsReminder(text) {
     t.includes('alert') ||
     t.includes('notify') ||
     t.includes('notification') ||
-    /\b(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior)\b/i.test(t)
+    /\b(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/i.test(t)
   );
 }
 
@@ -189,6 +246,8 @@ function snapToTaskNotification(reminder) {
 
 module.exports = {
   parseRemindersFromMessage,
+  parseBareDuration,
   messageMentionsReminder,
   snapToTaskNotification,
+  describeOffsets,
 };

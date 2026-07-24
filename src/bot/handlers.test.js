@@ -58,6 +58,10 @@ jest.mock('../services/term-date-extract', () => ({
   extractTermDatesPreview: jest.fn(),
   academicYearsForCountry: jest.fn(() => ({ currentAY: '2025-2026', nextAY: '2026-2027' })),
 }));
+// LLM fallback for unparseable reminder replies. Default null = "call
+// failed / unavailable" so existing tests exercise the deterministic flow;
+// the loop-breaker tests override per-case.
+jest.mock('../services/reminder-extract', () => ({ extractReminderOffsets: jest.fn(() => Promise.resolve(null)) }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), get: jest.fn(), set: jest.fn() }));
 jest.mock('../services/agent-loop', () => ({ agentEnabled: jest.fn(() => false), agentCalendarAnswer: jest.fn() }));
 jest.mock('../services/school-add', () => ({
@@ -1043,5 +1047,84 @@ describe('pin nudge', () => {
     await handlers.handleSchoolAdd('Ashfield Primary Leeds', parent, hh, {}, {});
     const done = await handlers.handleTextMessage('yes', parent, hh, {});
     expect(done.response).not.toMatch(/pin this chat/i);
+  });
+});
+
+describe('pending reminder flow — the "Day before" loop transcript (2026-07-24)', () => {
+  // Real WhatsApp failure: the bot offered "a reminder the day before?",
+  // the user said Yes, then answered "day before" THREE ways, and got the
+  // identical "how long before?" question four times. Two bugs: a bare
+  // "yes" ignored the lead the offer itself proposed, and the parser
+  // couldn't read the number-less phrase its own example suggested.
+  const ai = require('../services/ai');
+  const { extractReminderOffsets } = require('../services/reminder-extract');
+  const hh = { id: 'h1', timezone: 'Europe/London', members: [] };
+
+  async function createLoganEvent(u, offerText) {
+    ai.classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_event: { title: 'Logan eye appointment', date: '2026-10-29', start_time: '09:30' },
+      response_message: offerText,
+    });
+    return handlers.handleTextMessage('Logan eye appointment on 29 October 9:30', u, hh, {});
+  }
+
+  test('offer names "the day before" → bare "Yes" saves it directly, no re-ask', async () => {
+    const u = { id: 'u-loop-1', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Want me to add a reminder the day before?');
+    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 1, unit: 'days' }], expect.anything());
+    expect(yes.response).toMatch(/day before/i);
+    expect(yes.response).not.toMatch(/how long before/i);
+  });
+
+  test.each(['You said day before', 'Day before', 'The day before !!'])(
+    'generic offer → "Yes" asks once → %s parses and saves (the exact loop replies)',
+    async (reply) => {
+      const u = { id: `u-loop-${reply.length}`, name: 'Grant' };
+      await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Want me to add a reminder for it?');
+      const yes = await handlers.handleTextMessage('Yes', u, hh, {});
+      expect(yes.response).toMatch(/how long before/i); // no lead proposed - asking is right
+      const ans = await handlers.handleTextMessage(reply, u, hh, {});
+      expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 1, unit: 'days' }], expect.anything());
+      expect(ans.response).toMatch(/day before/i);
+      expect(ans.response).not.toMatch(/how long before/i);
+    },
+  );
+
+  test('a bare duration reply ("2 hours") answers the question without "before"', async () => {
+    const u = { id: 'u-loop-bare', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    await handlers.handleTextMessage('Yes', u, hh, {});
+    const ans = await handlers.handleTextMessage('2 hours', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 2, unit: 'hours' }], expect.anything());
+    expect(ans.response).toMatch(/2 hours before/i);
+  });
+
+  test('unparseable reminder-ish reply → Haiku fallback saves what it extracts', async () => {
+    const u = { id: 'u-loop-llm', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    await handlers.handleTextMessage('Yes', u, hh, {});
+    extractReminderOffsets.mockResolvedValueOnce({ offsets: [{ time: 2, unit: 'hours' }] });
+    const ans = await handlers.handleTextMessage('remind me a wee bit ahead of time pls', u, hh, {});
+    expect(extractReminderOffsets).toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 2, unit: 'hours' }], expect.anything());
+    expect(ans.response).toMatch(/2 hours before/i);
+  });
+
+  test('never asks the same question twice: second failure lets go gracefully', async () => {
+    const u = { id: 'u-loop-giveup', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    const q1 = await handlers.handleTextMessage('Yes', u, hh, {});           // ask #1
+    const q2 = await handlers.handleTextMessage('remind me at whatever works', u, hh, {}); // LLM null → ask #2 (different copy)
+    const q3 = await handlers.handleTextMessage('remind me at whatever works', u, hh, {}); // give up, keep the event
+    expect(q2.response).not.toBe(q1.response);
+    expect(q3.response).toMatch(/saved either way/i);
+    expect(db.saveEventReminders).not.toHaveBeenCalled();
+    // State dropped: the next message goes to normal classification.
+    ai.classify.mockClear();
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'ok' });
+    await handlers.handleTextMessage('remind me at whatever works', u, hh, {});
+    expect(ai.classify).toHaveBeenCalled();
   });
 });
