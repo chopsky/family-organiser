@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const ical = require('node-ical');
+const { hhmmWithinWindow } = require('../utils/brief-window');
 const db = require('../db/queries');
 const externalFeed = require('../services/externalFeed');
 const googleCal = require('../services/googleCalendar');
@@ -50,6 +51,20 @@ function currentHHMMInTZ(timezone) {
 // not by picking a time - so there's no per-member/household reminder_time here.
 const DAILY_BRIEF_TIME = '07:00';
 
+// The send GATE is a window, not a single minute. This job runs every minute
+// and walks all households SEQUENTIALLY; the per-member day-lock guarantees
+// exactly one send. With a hard `=== '07:00'` gate, any slow household pushed
+// everyone behind it in the loop past 07:00, and they were skipped for the
+// WHOLE day (a ~90s stall on 22-23 Jul silently dropped the tail of the list -
+// households after index ~10 got no brief at all). A window means a slow
+// morning just delays the tail by a minute or two instead of dropping it; the
+// lock still prevents any duplicate. 30 min is generous headroom for growth.
+const DAILY_BRIEF_WINDOW_MIN = 30;
+
+function withinDailyBriefWindow(timezone) {
+  return hhmmWithinWindow(currentHHMMInTZ(timezone), DAILY_BRIEF_TIME, DAILY_BRIEF_WINDOW_MIN);
+}
+
 /**
  * Run daily reminders - the morning brief is sent to every member at
  * DAILY_BRIEF_TIME in the household's timezone. Members who turned the brief
@@ -62,7 +77,7 @@ async function runDailyReminderCheck() {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       const tz = household.timezone || 'Europe/London';
-      if (currentHHMMInTZ(tz) !== DAILY_BRIEF_TIME) continue;
+      if (!withinDailyBriefWindow(tz)) continue;
       const members = await db.getHouseholdMembers(household.id);
       const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
 
