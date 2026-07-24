@@ -12,7 +12,7 @@ jest.mock('../services/email', () => ({ sendAdminAlert: jest.fn(() => Promise.re
 const { supabaseAdmin: supabase } = require('../db/client');
 const db = require('../db/queries');
 const email = require('../services/email');
-const { checkAiHealth } = require('./ai-health');
+const { checkAiHealth, featuresOverImpact } = require('./ai-health');
 
 // Chainable, awaitable supabase-query stub: every builder method returns the
 // chain; awaiting it resolves to the canned result.
@@ -34,7 +34,12 @@ function mockTables({ aiRows = [], userFailureCount = 0 } = {}) {
 const claudePrimary = { provider: 'claude', is_failover: false, error: null };
 const geminiRescue = { provider: 'gemini', is_failover: true, error: null };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  // clearAllMocks resets calls but NOT implementations - restore the lock to
+  // "acquired" so a test that set it false (debounce) doesn't leak forward.
+  db.acquireSchedulerLock.mockResolvedValue(true);
+});
 
 test('healthy hour: Claude-primary traffic does NOT alert (old inverted signal)', async () => {
   mockTables({ aiRows: Array(10).fill(claudePrimary), userFailureCount: 0 });
@@ -70,4 +75,52 @@ test('debounce: no email when the daily lock was already taken', async () => {
   mockTables({ aiRows: [claudePrimary], userFailureCount: 5 });
   await checkAiHealth();
   expect(email.sendAdminAlert).not.toHaveBeenCalled();
+});
+
+// ── Signal 4: a specific feature erroring for multiple users ──
+const featErr = (user_id, feature = 'recipe_import_photo') =>
+  ({ provider: 'claude', is_failover: false, error: '400 invalid base64 data', feature, user_id });
+
+test('signal 4: a feature failing for 2 distinct users alerts (rate signals would miss it)', async () => {
+  mockTables({ aiRows: [featErr('u1'), featErr('u2')] });
+  await checkAiHealth();
+  expect(email.sendAdminAlert).toHaveBeenCalledTimes(1);
+  expect(email.sendAdminAlert.mock.calls[0][0]).toMatch(/recipe_import_photo.*failing/i);
+});
+
+test('signal 4: one user erroring repeatedly on a feature does NOT alert (dashboard-only)', async () => {
+  mockTables({ aiRows: [featErr('u1'), featErr('u1'), featErr('u1')] });
+  await checkAiHealth();
+  expect(email.sendAdminAlert).not.toHaveBeenCalled();
+});
+
+describe('featuresOverImpact (pure)', () => {
+  const row = (feature, user_id, error = '400 boom') => ({ feature, user_id, error });
+
+  test('2 distinct users on one feature is surfaced with counts', () => {
+    expect(featuresOverImpact([row('recipe_import_photo', 'a'), row('recipe_import_photo', 'b')]))
+      .toEqual([{ feature: 'recipe_import_photo', count: 2, users: 2, sample: '400 boom' }]);
+  });
+
+  test('failover doubling for one user counts as ONE user', () => {
+    const out = featuresOverImpact([
+      row('recipe_import_photo', 'a', 'claude 400'), row('recipe_import_photo', 'a', 'gemini 400'),
+      row('recipe_import_photo', 'b', 'claude 400'), row('recipe_import_photo', 'b', 'gemini 400'),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ users: 2, count: 4 });
+  });
+
+  test('single-user, non-error, and empty inputs return nothing', () => {
+    expect(featuresOverImpact([row('chat', 'a'), row('chat', 'a')])).toEqual([]);
+    expect(featuresOverImpact([{ feature: 'chat', user_id: 'a', error: null }])).toEqual([]);
+    expect(featuresOverImpact([])).toEqual([]);
+    expect(featuresOverImpact(undefined)).toEqual([]);
+  });
+
+  test('threshold is configurable', () => {
+    const rows = [row('chat', 'a'), row('chat', 'b'), row('chat', 'c')];
+    expect(featuresOverImpact(rows, 3)).toHaveLength(1);
+    expect(featuresOverImpact(rows, 4)).toHaveLength(0);
+  });
 });

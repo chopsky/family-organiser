@@ -35,6 +35,7 @@
 const { supabaseAdmin: supabase } = require('../db/client');
 const db = require('../db/queries');
 const email = require('../services/email');
+const { shortenError } = require('../utils/error-snippet');
 
 // Thresholds - picked to be loud enough to catch real problems without
 // firing on quiet hours. If hourly volume is below MIN_VOLUME we don't
@@ -45,6 +46,32 @@ const FAILURE_RATE_THRESHOLD = 0.5;
 // User-visible bot failures are individually bad, so the bar is a count,
 // not a rate: three families apologised-to in an hour is an incident.
 const USER_FAILURE_THRESHOLD = 3;
+// A specific FEATURE erroring for multiple distinct users in an hour is a
+// broken feature (like the iOS recipe-photo import), which the rate signals
+// miss when it's a small share of overall volume. Distinct users (not raw
+// rows) so one failed action logged across two providers counts once. A
+// single user's error stays on the admin errors panel rather than emailing.
+const FEATURE_USER_IMPACT_THRESHOLD = 2;
+
+/**
+ * Pure: from errored ai_usage_log rows, the features whose DISTINCT-USER
+ * impact meets the threshold. Exported for testing.
+ * @param {Array<{feature:string, user_id?:string, error:any}>} errorRows
+ * @returns {Array<{feature:string, count:number, users:number, sample:any}>}
+ */
+function featuresOverImpact(errorRows, threshold = FEATURE_USER_IMPACT_THRESHOLD) {
+  const byFeature = new Map();
+  for (const r of errorRows || []) {
+    if (!r || !r.error) continue;
+    const f = byFeature.get(r.feature) || { feature: r.feature, count: 0, users: new Set(), sample: r.error };
+    f.count += 1;
+    if (r.user_id) f.users.add(r.user_id);
+    byFeature.set(r.feature, f);
+  }
+  return [...byFeature.values()]
+    .filter((f) => f.users.size >= threshold)
+    .map((f) => ({ feature: f.feature, count: f.count, users: f.users.size, sample: f.sample }));
+}
 
 async function checkAiHealth() {
   try {
@@ -53,7 +80,7 @@ async function checkAiHealth() {
     const [{ data: rows, error }, { count: userFailures, error: waError }] = await Promise.all([
       supabase
         .from('ai_usage_log')
-        .select('provider, is_failover, error')
+        .select('provider, feature, error, user_id, is_failover')
         .gte('created_at', since),
       supabase
         .from('whatsapp_message_log')
@@ -79,6 +106,24 @@ async function checkAiHealth() {
           `${userFailures} WhatsApp turns in the last hour ended with the user receiving an error apology (whatsapp_message_log.error set).`,
           ``,
           `Triage: Admin → AI usage → Bot health strip shows the recent failures with intents and error messages. Railway logs have the full [whatsapp-text-handler-error] blocks.`,
+        ].join('<br>')
+      );
+    }
+
+    // ── Signal 4: a specific feature erroring for multiple users. Runs before
+    //    the MIN_VOLUME gate (like signal 3) - a feature broken for two people
+    //    at 2am is still an incident, and the rate signals below miss it when
+    //    the broken feature is a small share of total volume. ──
+    for (const f of featuresOverImpact(rows.filter((r) => r.error))) {
+      await sendOncePerDay(
+        `ai-feature-errors:${f.feature}`,
+        `Housemait: "${f.feature}" is failing for ${f.users} users`,
+        [
+          `The <b>${escapeHtml(f.feature)}</b> feature errored ${f.count} time${f.count === 1 ? '' : 's'} for ${f.users} different users in the last hour.`,
+          ``,
+          `Sample error: <code>${escapeHtml(shortenError(f.sample) || 'unknown')}</code>`,
+          ``,
+          `Triage: Admin → Platform Overview - the errors panel at the top lists who hit it, the feature, and the trimmed error. Railway logs have the full stack.`,
         ].join('<br>')
       );
     }
@@ -156,4 +201,4 @@ function escapeHtml(s) {
   ));
 }
 
-module.exports = { checkAiHealth };
+module.exports = { checkAiHealth, featuresOverImpact };
