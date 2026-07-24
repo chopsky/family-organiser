@@ -27,13 +27,11 @@ const SOFT = '#F3EEE5';
 const CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
 const CARD_SHADOW_HOVER = '0 4px 18px rgba(26, 22, 32, 0.10)';
 
-// Render the household name as "The {X} family", tolerating names that already
-// carry "The " and/or "family" so we never double them up.
+// Show the household name exactly as the family named it - no forced "The …
+// family" wrapper (a household called "The Shapiro" should read "The Shapiro",
+// not "The Shapiro family").
 function familyTitle(name) {
-  const raw = (name || '').trim();
-  if (!raw) return 'Your household';
-  const core = raw.replace(/^the\s+/i, '').replace(/\s+family$/i, '').trim();
-  return core ? `The ${core} family` : raw;
+  return (name || '').trim() || 'Your household';
 }
 
 // Role pill: colour by tier (admin / parent / dependent), but the LABEL comes
