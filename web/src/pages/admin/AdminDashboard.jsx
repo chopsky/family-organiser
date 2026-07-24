@@ -63,6 +63,10 @@ export default function AdminDashboard() {
         <ErrorBanner message={error} onRetry={() => setReloadKey((k) => k + 1)} />
       </div>
 
+      {/* Errors first: app/AI failures across all users, so they're never
+          buried inside an individual user's page. */}
+      <SystemHealth errors={stats?.recentErrors} />
+
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
         {statCards.map(({ label, value, icon: Icon, color }) => (
@@ -196,6 +200,76 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${Math.floor(s)}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
+// App/AI failures across every user, surfaced at the top of the dashboard so
+// they're not buried inside individual user pages. Loud when there are errors,
+// calm and reassuring when there aren't.
+function SystemHealth({ errors }) {
+  const e = errors || { count: 0, recent: [], byFeature: [], windowHours: 24 };
+  const hrs = e.windowHours || 24;
+
+  if (!e.count) {
+    return (
+      <div className="mt-6 flex items-center gap-2 rounded-2xl bg-sage-light/60 border border-sage/30 px-4 py-3">
+        <span className="text-sage font-bold">✓</span>
+        <p className="text-sm text-charcoal font-medium">No app or AI errors in the last {hrs}h</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl bg-coral-light border border-coral/40 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-coral/20 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-coral text-lg leading-none">⚠</span>
+          <p className="text-sm font-bold text-charcoal">
+            {e.count} error{e.count === 1 ? '' : 's'} in the last {hrs}h
+          </p>
+          <div className="hidden sm:flex flex-wrap gap-1.5 sm:ml-2">
+            {(e.byFeature || []).slice(0, 5).map((f) => (
+              <span key={f.feature} className="text-[11px] font-semibold text-coral bg-white/70 rounded-md px-1.5 py-0.5">
+                {f.feature} ×{f.count}
+              </span>
+            ))}
+          </div>
+        </div>
+        <Link to="/admin/ai-usage" className="text-xs font-semibold text-plum hover:underline shrink-0">
+          AI usage &rarr;
+        </Link>
+      </div>
+      <ul className="divide-y divide-coral/10">
+        {(e.recent || []).map((r, i) => (
+          <li key={i} className="px-4 py-2.5 flex items-start gap-3">
+            <span className="text-[11px] text-warm-grey w-10 shrink-0 mt-0.5" title={new Date(r.at).toLocaleString()}>
+              {timeAgo(r.at)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-charcoal">{r.feature}</span>
+                <span className="text-[11px] text-warm-grey">{r.provider}</span>
+                {r.userId && (
+                  <Link to={`/admin/users/${r.userId}`} className="text-[11px] text-plum hover:underline">
+                    {r.userName || r.userEmail || 'user'}
+                  </Link>
+                )}
+              </div>
+              {r.error && <p className="text-xs text-warm-grey break-words mt-0.5">{r.error}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 const { supabaseAdmin: supabase } = require('./client');
 const crypto = require('crypto');
 const { computeStreak, DEFAULT_LOOKBACK_DAYS, addDaysStr } = require('../services/kids-streak');
+const { shortenError } = require('../utils/error-snippet');
 
 // Sanitise a free-text value before embedding it in a PostgREST `.or()` filter
 // STRING. PostgREST parses that whole string, so commas / parentheses (its
@@ -5994,6 +5995,60 @@ async function getBotUserVisibleFailures({ days = 7 } = {}, db = supabase) {
   };
 }
 
+/**
+ * Recent AI/app errors across ALL users and features, for the admin dashboard.
+ * The per-user profile page already lists a user's failed calls, but errors
+ * were only findable by digging into individual users. This surfaces them in
+ * one place: any ai_usage_log row with an error in the window (recipe-photo
+ * import, chat, brief, etc.), newest first, with the user resolved and the
+ * (often huge) raw provider error trimmed to a readable snippet.
+ */
+async function getRecentAiErrors({ hours = 24, limit = 12 } = {}, db = supabase) {
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const [countRes, rowsRes] = await Promise.all([
+    db.from('ai_usage_log').select('id', { count: 'exact', head: true })
+      .not('error', 'is', null).gte('created_at', since),
+    db.from('ai_usage_log').select('created_at, feature, provider, model, error, user_id, household_id')
+      .not('error', 'is', null).gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(limit),
+  ]);
+  if (rowsRes.error) throw rowsRes.error;
+  const rows = rowsRes.data || [];
+
+  // Resolve who hit each error so the admin can jump straight to them.
+  const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))];
+  const userMap = new Map();
+  if (userIds.length > 0) {
+    const { data: users } = await db.from('users').select('id, name, email').in('id', userIds);
+    for (const u of users || []) userMap.set(u.id, u);
+  }
+
+  // "recipe_import_photo ×4" at-a-glance grouping (from the sampled rows).
+  const byFeature = {};
+  for (const r of rows) byFeature[r.feature] = (byFeature[r.feature] || 0) + 1;
+
+  return {
+    windowHours: hours,
+    count: countRes.count || 0,
+    byFeature: Object.entries(byFeature)
+      .map(([feature, n]) => ({ feature, count: n }))
+      .sort((a, b) => b.count - a.count),
+    recent: rows.map((r) => {
+      const u = userMap.get(r.user_id);
+      return {
+        at: r.created_at,
+        feature: r.feature,
+        provider: r.provider,
+        userId: r.user_id || null,
+        userName: u?.name || null,
+        userEmail: u?.email || null,
+        householdId: r.household_id || null,
+        error: shortenError(r.error),
+      };
+    }),
+  };
+}
+
 async function getAiUsageTimeline({ days = 30 } = {}, db = supabase) {
   // Aggregate via SQL RPC (see supabase/migration-ai-usage-timeline-rpc.sql).
   // The previous .select() approach silently truncated past 1000 rows due to
@@ -9701,6 +9756,7 @@ module.exports = {
   // Platform admin Phase 2
   getAiUsageStats,
   getBotUserVisibleFailures,
+  getRecentAiErrors,
   getAiUsageTimeline,
   logWhatsAppMessage,
   getRecentWhatsAppTurns,

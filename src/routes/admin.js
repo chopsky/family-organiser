@@ -35,11 +35,16 @@ router.get('/audit-log', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    const [stats, revenue] = await Promise.all([
+    const [stats, revenue, recentErrors] = await Promise.all([
       db.getPlatformStats(),
       db.getRevenueStats(),
+      // Never let an errors-panel query failure blank the whole dashboard.
+      db.getRecentAiErrors().catch((e) => {
+        console.error('[admin/stats] getRecentAiErrors failed:', e.message);
+        return { windowHours: 24, count: 0, byFeature: [], recent: [] };
+      }),
     ]);
-    return res.json({ ...stats, revenue });
+    return res.json({ ...stats, revenue, recentErrors });
   } catch (err) {
     console.error('GET /api/admin/stats error:', err);
     return res.status(500).json({ error: 'Internal server error' });
