@@ -14,6 +14,14 @@ const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotificati
 const { transcribeVoice } = require('../services/transcribe');
 const cache = require('../services/cache');
 
+// ── In-app assistant budget ───────────────────────────────────────────────
+// Deliberately set here, not inherited from ai-client's defaults (12s/2048),
+// which are sized for short classify calls rather than a full assistant reply.
+// See the call site in POST / for the live-traffic evidence behind each value.
+const CHAT_TIMEOUT_MS = 30000;   // Claude's observed p95 is ~10.4s
+const CHAT_MAX_TOKENS = 4096;    // 2048 truncated a real reply mid-answer
+const CHAT_HISTORY_TURNS = 12;   // caps prompt growth (and thus latency drift)
+
 // Multer config for chat attachments. Accepts both images (receipts,
 // event invitations, screenshots) and PDFs (school newsletters, party
 // invites that came as attachments). 10 MB is enough for either: a
@@ -481,8 +489,14 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     const household = await db.getHouseholdById(req.householdId);
     const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message, deviceCoords);
 
-    // Get recent conversation history for context
-    const history = await db.getChatHistory(conversationId, 30, req.householdId);
+    // Get recent conversation history for context. Capped at 12 turns (was
+    // 30): the prompt grows with the conversation, and latency grows with it
+    // - live traffic showed input tokens climbing 7.2k → 8.6k across a single
+    // chat while Claude's response time climbed 3.4s → 10.4s, until turns
+    // tipped over the abort ceiling. 12 turns keeps plenty of context for a
+    // family assistant while stopping long chats from getting progressively
+    // slower. (getChatHistory returns the most recent N, oldest-first.)
+    const history = await db.getChatHistory(conversationId, CHAT_HISTORY_TURNS, req.householdId);
 
     // Build messages array
     const messages = [
@@ -501,6 +515,19 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       feature: 'chat',
       householdId: req.householdId,
       userId: req.user.id,
+      // Explicit budget - do NOT inherit ai-client's 12s/2048 defaults, which
+      // are sized for short classify calls. Live traffic showed Claude aborted
+      // at exactly 12.00s on three real chats, each then failing over to
+      // Gemini: the user still got an answer, but after ~20s of waiting, and
+      // via the provider this route deliberately demoted (see the note above -
+      // Gemini is the one that claims "I've added X" without an action block).
+      // 30s comfortably covers Claude's observed p95 (~10.4s) with headroom,
+      // so failover becomes a genuine emergency path rather than routine.
+      timeoutMs: CHAT_TIMEOUT_MS,
+      // 2048 truncated a real reply mid-answer (a failover response landed on
+      // exactly 2048 output tokens); 4096 leaves room for a full reply plus
+      // its trailing action JSON.
+      maxTokens: CHAT_MAX_TOKENS,
     });
     if (provider !== 'claude') {
       console.log(`[chat] Response served by ${provider}`);
