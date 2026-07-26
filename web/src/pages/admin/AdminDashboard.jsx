@@ -100,6 +100,13 @@ export default function AdminDashboard() {
             <p className="text-xs text-warm-grey font-medium mt-0.5">Active Households</p>
             <p className="text-[10px] text-warm-grey mt-1">Any activity within 14 days</p>
           </Link>
+          <div className="bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">
+            <p className="text-2xl font-bold text-plum">{stats?.schools?.householdsWithSchool ?? 0}</p>
+            <p className="text-xs text-warm-grey font-medium mt-0.5">Using School</p>
+            <p className="text-[10px] text-warm-grey mt-1">
+              {stats?.schools?.householdsWithDates ?? 0} with term dates · {stats?.schools?.childrenLinked ?? 0} children linked
+            </p>
+          </div>
         </div>
       </div>
 

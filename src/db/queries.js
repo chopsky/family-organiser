@@ -5584,6 +5584,21 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
       h.documents_count = docStats[h.id]?.count || 0;
       h.documents_bytes = docStats[h.id]?.bytes || 0;
     }
+
+    // School adoption - one bulk fetch, same pattern as documents. Just the
+    // count here; the detail page carries the per-school breakdown.
+    const { data: schoolRows } = await db
+      .from('household_schools')
+      .select('household_id')
+      .in('household_id', householdIds);
+
+    const schoolCounts = {};
+    for (const s of schoolRows || []) {
+      schoolCounts[s.household_id] = (schoolCounts[s.household_id] || 0) + 1;
+    }
+    for (const h of data) {
+      h.schools_count = schoolCounts[h.id] || 0;
+    }
   }
 
   // For sort=last_active_at we deferred ordering + pagination until after
@@ -5614,13 +5629,14 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     .single();
   if (error) throw error;
 
-  const [{ data: members }, storage] = await Promise.all([
+  const [{ data: members }, storage, schools] = await Promise.all([
     db
       .from('users')
-      .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at')
+      .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at, school_id')
       .eq('household_id', householdId)
       .order('created_at'),
     getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
+    getHouseholdSchoolsAdmin(householdId, db).catch(() => []),
   ]);
 
   // Enrich each member with last_active_at + platforms, and roll up the
@@ -5640,20 +5656,72 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     }
   }
 
+  // Which members are assigned to each school - lets the admin see whether
+  // a school was added but never linked to a child (a half-finished setup).
+  const childrenBySchool = {};
+  for (const m of members || []) {
+    if (!m.school_id) continue;
+    if (!childrenBySchool[m.school_id]) childrenBySchool[m.school_id] = [];
+    childrenBySchool[m.school_id].push({ id: m.id, name: m.name });
+  }
+  for (const s of schools) {
+    s.children = childrenBySchool[s.id] || [];
+  }
+
   return {
     ...household,
     members: members || [],
     documents_count: storage.fileCount,
     documents_bytes: storage.totalBytes,
     last_active_at: householdLastActive,
+    schools,
   };
+}
+
+/**
+ * Admin view of a household's schools. Each row carries the term-date
+ * coverage that actually makes the School feature useful - a school with
+ * zero term dates is added-but-not-working, which is the failure mode the
+ * admin most needs to spot.
+ *
+ * Per-school term-date lookups run one query each (schools per household
+ * are single digits), each riding idx_school_term_dates_school.
+ */
+async function getHouseholdSchoolsAdmin(householdId, db = supabase) {
+  const { data: schools, error } = await db
+    .from('household_schools')
+    .select('id, school_name, school_urn, school_type, local_authority, postcode, uses_la_dates, ical_url, created_at')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  if (!schools || schools.length === 0) return [];
+
+  return Promise.all(schools.map(async (s) => {
+    const { data: dates } = await db
+      .from('school_term_dates')
+      .select('academic_year, date')
+      .eq('school_id', s.id);
+    const rows = dates || [];
+    const years = [...new Set(rows.map((d) => d.academic_year).filter(Boolean))].sort();
+    // Latest date on file tells us how far ahead their calendar is populated.
+    let latestDate = null;
+    for (const d of rows) {
+      if (d.date && (!latestDate || d.date > latestDate)) latestDate = d.date;
+    }
+    return {
+      ...s,
+      term_date_count: rows.length,
+      academic_years: years,
+      latest_term_date: latestDate,
+    };
+  }));
 }
 
 async function getPlatformStats(db = supabase) {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats, idleFilter, activeFilter] = await Promise.all([
+  const [usersResult, householdsResult, newUsersResult, newHouseholdsResult, subStats, idleFilter, activeFilter, schoolStats] = await Promise.all([
     db.from('users').select('id', { count: 'exact', head: true }),
     db.from('households').select('id', { count: 'exact', head: true }),
     db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
@@ -5661,6 +5729,7 @@ async function getPlatformStats(db = supabase) {
     getSubscriptionStats(db),
     resolveActivityFilter('idle', db),
     resolveActivityFilter('active', db),
+    getSchoolAdoptionStats(db),
   ]);
 
   return {
@@ -5671,6 +5740,44 @@ async function getPlatformStats(db = supabase) {
     subscriptions: subStats,
     atRiskHouseholds: idleFilter?.householdIds?.length || 0,
     activeHouseholds: activeFilter?.householdIds?.length || 0,
+    schools: schoolStats,
+  };
+}
+
+/**
+ * Platform-wide School feature adoption. Distinguishes "added a school" from
+ * "school actually works" - a school with no term dates gives the household
+ * nothing, so counting only the first number would overstate adoption.
+ *
+ *   householdsWithSchool  - households with >= 1 household_schools row
+ *   householdsWithDates   - of those, how many have >= 1 term date on file
+ *   totalSchools          - raw school rows (a household can add several)
+ *   childrenLinked        - users with school_id set (the setup is complete
+ *                           only once a child is attached to the school)
+ */
+async function getSchoolAdoptionStats(db = supabase) {
+  const [schoolsRes, datesRes, childrenRes] = await Promise.all([
+    db.from('household_schools').select('id, household_id'),
+    db.from('school_term_dates').select('school_id'),
+    db.from('users').select('id', { count: 'exact', head: true }).not('school_id', 'is', null),
+  ]);
+
+  const schools = schoolsRes.data || [];
+  const schoolIdsWithDates = new Set((datesRes.data || []).map((d) => d.school_id));
+
+  const householdsWithSchool = new Set();
+  const householdsWithDates = new Set();
+  for (const s of schools) {
+    if (!s.household_id) continue;
+    householdsWithSchool.add(s.household_id);
+    if (schoolIdsWithDates.has(s.id)) householdsWithDates.add(s.household_id);
+  }
+
+  return {
+    totalSchools: schools.length,
+    householdsWithSchool: householdsWithSchool.size,
+    householdsWithDates: householdsWithDates.size,
+    childrenLinked: childrenRes.count || 0,
   };
 }
 
@@ -9744,6 +9851,7 @@ module.exports = {
   getUserByIdAdmin,
   getAllHouseholdsAdmin,
   getHouseholdDetailAdmin,
+  getHouseholdSchoolsAdmin,
   getPlatformStats,
   getSubscriptionStats,
   updateHouseholdSubscriptionAdmin,

@@ -161,6 +161,7 @@ export default function AdminHouseholds() {
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
                   <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
+                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">School</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Join Code</th>
                   <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Timezone</th>
@@ -189,6 +190,18 @@ export default function AdminHouseholds() {
                     >
                       {formatRelativeTime(h.last_active_at)}
                     </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {(h.schools_count ?? 0) > 0 ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-sage-light text-sage text-xs font-semibold"
+                          title={`${h.schools_count} school${h.schools_count === 1 ? '' : 's'} added`}
+                        >
+                          {h.schools_count === 1 ? 'Yes' : `${h.schools_count} schools`}
+                        </span>
+                      ) : (
+                        <span className="text-warm-grey text-xs">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-warm-grey text-xs hidden lg:table-cell whitespace-nowrap">
                       {(h.documents_count ?? 0)} files · {formatBytes(h.documents_bytes ?? 0)}
                     </td>
@@ -200,7 +213,7 @@ export default function AdminHouseholds() {
                   </tr>
                 ))}
                 {households.length === 0 && (
-                  <tr><td colSpan="8" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
+                  <tr><td colSpan="9" className="px-4 py-8 text-center text-warm-grey">No households found</td></tr>
                 )}
               </tbody>
             </table>

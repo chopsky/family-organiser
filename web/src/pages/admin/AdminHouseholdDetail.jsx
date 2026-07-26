@@ -297,6 +297,12 @@ export default function AdminHouseholdDetail() {
         <ActivityCard activity={activity} loading={activityLoading} />
       </div>
 
+      {/* Schools */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">School</h3>
+        <SchoolsCard schools={household.schools} />
+      </div>
+
       {/* Members */}
       <div className="mt-6">
         <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Members</h3>
@@ -527,6 +533,84 @@ const ACTIVITY_FEATURES = [
   { key: 'documents', label: 'Documents', verb: 'uploaded' },
   { key: 'meals', label: 'Meals', verb: 'planned' },
 ];
+
+/**
+ * School feature state. Three distinct situations the admin needs to tell
+ * apart, because "added a school" alone doesn't mean the feature is working:
+ *   - no schools           → never used the feature
+ *   - school, no dates     → added but the term calendar is empty (broken)
+ *   - school, no children  → added but not linked to a child (half-finished)
+ */
+function SchoolsCard({ schools }) {
+  if (!schools || schools.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No school added - this household isn&apos;t using the School feature.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] divide-y divide-light-grey">
+      {schools.map((s) => {
+        const hasDates = (s.term_date_count ?? 0) > 0;
+        const childCount = s.children?.length ?? 0;
+        return (
+          <div key={s.id} className="p-5">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="font-medium text-charcoal">{s.school_name}</p>
+                <p className="text-xs text-warm-grey mt-0.5">
+                  {[s.school_type, s.local_authority, s.postcode].filter(Boolean).join(' · ') || 'No details on file'}
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap shrink-0">
+                {hasDates ? (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-md bg-sage-light text-sage text-xs font-semibold"
+                    title={`${s.term_date_count} term dates${s.academic_years?.length ? ` across ${s.academic_years.join(', ')}` : ''}`}
+                  >
+                    {s.term_date_count} term dates
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-coral-light text-coral text-xs font-semibold">
+                    No term dates
+                  </span>
+                )}
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                  s.uses_la_dates ? 'bg-plum-light text-plum' : 'bg-cream text-warm-grey'
+                }`}>
+                  {s.uses_la_dates ? 'LA dates' : 'Own dates'}
+                </span>
+                {s.ical_url && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-plum-light text-plum text-xs font-semibold" title={s.ical_url}>
+                    iCal feed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-light-grey">
+              <Detail label="Children" value={childCount > 0 ? s.children.map((c) => c.name).join(', ') : 'None linked'} />
+              <Detail label="Academic Years" value={s.academic_years?.length ? s.academic_years.join(', ') : '-'} />
+              <Detail
+                label="Dates Through"
+                value={s.latest_term_date ? new Date(`${s.latest_term_date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+              />
+              <Detail label="Added" value={formatDate(s.created_at)} />
+            </div>
+
+            {childCount === 0 && (
+              <p className="text-xs text-coral mt-3">
+                School added but no child is assigned to it - term dates won&apos;t appear on anyone&apos;s calendar.
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function ActivityCard({ activity, loading }) {
   if (loading) {
