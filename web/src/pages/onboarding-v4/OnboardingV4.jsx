@@ -14,17 +14,15 @@ import { useNavigate } from 'react-router-dom';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { loadDraft, saveDraft } from '../../lib/onboardingDraft';
 import { T } from './tokens';
+import { STEPS } from './flow';
 
-// Spec: STEPS drives the progress bar; advancing past the last sets phase
-// 'signup'. The per-provider calendar connect view lives INSIDE the 'cals'
-// step, deliberately not in this array, so progress doesn't jump to 100%.
-export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'house', 'cals', 'ask', 'reminders'];
+
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
   const reduced = usePrefersReducedMotion();
 
-  const [phase, setPhase] = useState('splash'); // splash | flow | login | signup | done
+  const [phase] = useState('splash'); // splash | flow | login | signup | done
   const [i, setI] = useState(0);
   const [d, setD] = useState(loadDraft);
 

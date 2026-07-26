@@ -30,6 +30,7 @@ const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 // it's built so the live /signup flow is untouched; the cutover swaps the
 // element on /signup once v4 is complete and measured against it.
 const OnboardingV4    = lazy(() => import('./pages/onboarding-v4/OnboardingV4'));
+import { V4_ALLOWED } from './pages/onboarding-v4/flow';
 const KidsShell       = lazy(() => import('./pages/kids/KidsShell'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
@@ -241,8 +242,11 @@ function AppRoutes() {
             through (the flow captures them). The old single-screen Signup.jsx is
             retired (kept on disk as the styling reference). */}
         <Route path="/signup" element={<OnboardingFlow />} />
-        {/* v4 preview route - unlisted, no guard (it renders pre-auth like /signup). */}
-        <Route path="/signup-v4" element={<OnboardingV4 />} />
+        {/* Onboarding v4: iOS/Android only for now (app first, web later). One
+            codebase ships both, so the platform gate is enforced here rather
+            than remembered at cutover. Production web falls through to the
+            existing flow; V4_ALLOWED keeps it reachable in local dev. */}
+        <Route path="/signup-v4" element={V4_ALLOWED ? <OnboardingV4 /> : <Navigate to="/signup" replace />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}
