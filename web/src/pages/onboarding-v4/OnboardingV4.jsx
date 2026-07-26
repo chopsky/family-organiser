@@ -1,13 +1,14 @@
 /**
- * Onboarding v4 — flow shell (Phase 0).
+ * Onboarding v4 — flow shell.
  *
  * Value-first 12-screen flow from design_handoff_onboarding. Sign-up stays at
  * step 11 by design: everything before it is held client-side (see
  * lib/onboardingDraft) and replayed once the account exists, because a calendar
  * feed needs user_id + household_id and a WhatsApp link is a column on users.
  *
- * Phase 0 wires the frame only: tokens, draft persistence, routing, Reduce
- * Motion. The Step frame and primitives land in Phase 1, screens in Phase 3.
+ * Phase 1 (here): the shared Step frame + primitives, exercised by a harness so
+ * they can be verified before any screen depends on them. Phase 2 replaces the
+ * harness with the real state machine; Phase 3 brings the screens.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,110 +16,110 @@ import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { loadDraft, saveDraft } from '../../lib/onboardingDraft';
 import { T } from './tokens';
 import { STEPS } from './flow';
+import { Step, Cta, Ghost, OptionRow, ChipGrid, Field, Bubble, Typing } from './ui';
+import useScript from './useScript';
 
+// Real screen-02 content, used here to exercise OptionRow at production size.
+const PAINS = [
+  { id: 'calendar', emoji: '📅', label: 'Calendar chaos', note: "Clashes, pickups, who's where" },
+  { id: 'chores', emoji: '🧹', label: 'Chore wars', note: 'Whose turn is it, again' },
+  { id: 'shopping', emoji: '🛒', label: 'Shopping-list roulette', note: 'Two lots of milk, no bread' },
+];
+const ROLES = ['Mum', 'Dad', 'Parent', 'Guardian'];
 
+const SCRIPT = [
+  { from: 'bot', text: 'Oof, 3 of the classics.', wait: 700 },
+  { from: 'bot', text: "Right then. Here's what I'll take off your hands:", wait: 900 },
+];
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
   const reduced = usePrefersReducedMotion();
 
-  const [phase] = useState('splash'); // splash | flow | login | signup | done
   const [i, setI] = useState(0);
   const [d, setD] = useState(loadDraft);
+  const [name, setName] = useState('');
 
   // Mirror answers to localStorage so a backgrounded webview doesn't lose ten
   // screens of input. Calendar URLs are deliberately excluded - see the module
   // note in onboardingDraft.js.
   useEffect(() => { saveDraft(d); }, [d]);
 
-  const pct = Math.round((i / (STEPS.length)) * 100);
+  const { shown, typing } = useScript(SCRIPT, undefined, reduced);
+
+  const togglePain = (id) => setD((p) => ({
+    ...p,
+    pains: p.pains.includes(id) ? p.pains.filter((x) => x !== id) : [...p.pains, id],
+  }));
+
+  const pct = Math.round((i / STEPS.length) * 100);
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{
-        background: T.bg,
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        color: T.ink,
-      }}
+    <Step
+      pct={pct}
+      reduced={reduced}
+      hideBack={i === 0}
+      onBack={() => setI((n) => Math.max(0, n - 1))}
+      footer={(
+        <>
+          <Cta disabled={d.pains.length === 0} onClick={() => setI((n) => Math.min(STEPS.length - 1, n + 1))}>
+            {d.pains.length === 0 ? 'Pick at least one' : `That's my list (${d.pains.length})`}
+          </Cta>
+          <Ghost onClick={() => navigate('/signup')}>None of these, just looking</Ghost>
+        </>
+      )}
     >
-      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <p
-          style={{
-            fontFamily: T.title, fontSize: 34, lineHeight: 1.08,
-            letterSpacing: '-.015em', color: T.ink,
-          }}
-        >
-          Onboarding <em style={{ color: T.purple, fontStyle: 'italic' }}>v4</em>
-        </p>
-        <p style={{ color: T.ink2, fontSize: 15, marginTop: 10, maxWidth: 320 }}>
-          Phase 0 shell. Tokens, draft persistence and routing are wired; screens
-          land in Phase 3.
-        </p>
+      <p style={{ font: '700 11.5px Inter, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple }}>
+        Phase 1 · primitives
+      </p>
+      <h1
+        style={{
+          fontFamily: T.title, fontWeight: 400, fontSize: 32, lineHeight: 1.08,
+          letterSpacing: '-.015em', marginTop: 8, textWrap: 'balance',
+        }}
+      >
+        Which of these <em style={{ color: T.purple, fontStyle: 'italic' }}>sound like you?</em>
+      </h1>
+      <p style={{ fontSize: 15, color: T.ink2, marginTop: 8, lineHeight: 1.45 }}>Pick as many as you like.</p>
 
-        {/* Progress bar - the real one moves to the shared Step header in Phase 1. */}
-        <div
-          style={{
-            height: 5, borderRadius: 99, background: 'rgba(26,22,32,.09)',
-            width: '100%', maxWidth: 320, marginTop: 22, overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              height: '100%', borderRadius: 99, width: `${pct}%`,
-              background: 'linear-gradient(90deg,#A97FFF,#6D38AD)',
-              transition: reduced ? 'none' : 'width .55s cubic-bezier(.32,.72,0,1)',
-            }}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 18 }}>
+        {PAINS.map((p, n) => (
+          <OptionRow
+            key={p.id}
+            i={n}
+            compact
+            emoji={p.emoji}
+            label={p.label}
+            note={p.note}
+            selected={d.pains.includes(p.id)}
+            onClick={() => togglePain(p.id)}
           />
-        </div>
+        ))}
+      </div>
 
-        <p style={{ color: T.ink3, fontSize: 12.5, marginTop: 14 }}>
-          step {i + 1} of {STEPS.length} · {STEPS[i]} · phase: {phase}
-          {reduced ? ' · reduce-motion' : ''}
-        </p>
+      <p style={{ fontSize: 12.5, color: T.ink3, marginTop: 22, marginBottom: 8 }}>ChipGrid</p>
+      <ChipGrid options={ROLES} value={d.role} onPick={(r) => setD((p) => ({ ...p, role: r }))} />
 
-        <div className="flex gap-2 mt-6">
-          <button
-            type="button"
-            onClick={() => setI((n) => Math.max(0, n - 1))}
-            style={{
-              minHeight: 44, padding: '0 18px', borderRadius: 17, border: 0,
-              background: 'rgba(26,22,32,.05)', color: T.ink2, fontWeight: 600,
-            }}
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={() => setI((n) => Math.min(STEPS.length - 1, n + 1))}
-            style={{
-              minHeight: 44, padding: '0 22px', borderRadius: 17, border: 0,
-              background: T.purple, color: '#fff', fontWeight: 700,
-            }}
-          >
-            Next
-          </button>
-        </div>
+      <p style={{ fontSize: 12.5, color: T.ink3, marginTop: 22, marginBottom: 8 }}>Field + suggestions</p>
+      <Field
+        value={name}
+        onChange={setName}
+        placeholder="e.g. The Carters"
+        autoFocus={false}
+        suggestions={['The Nest', 'Base Camp', 'Casa Sam']}
+        onSuggest={setName}
+      />
 
-        <button
-          type="button"
-          onClick={() => { setD({ ...d, you: 'Sam', house: 'The Carters' }); }}
-          style={{ marginTop: 18, background: 'none', border: 0, color: T.purple, fontWeight: 600, fontSize: 14 }}
-        >
-          Write a test draft
-        </button>
-        <p style={{ color: T.ink3, fontSize: 12, marginTop: 6 }}>
-          draft: {d.you || '—'} / {d.house || '—'}
-        </p>
+      <p style={{ fontSize: 12.5, color: T.ink3, marginTop: 22, marginBottom: 8 }}>Chat beat</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <Bubble from="me">Dentist for Arlo Tue 3pm</Bubble>
+        {shown.map((s, n) => <Bubble key={n} from="bot">{s.text}</Bubble>)}
+        {typing && <Typing />}
+      </div>
 
-        <button
-          type="button"
-          onClick={() => navigate('/signup')}
-          style={{ marginTop: 26, background: 'none', border: 0, color: T.ink3, fontSize: 13 }}
-        >
-          ← current /signup flow
-        </button>
-      </main>
-    </div>
+      <p style={{ fontSize: 12, color: T.ink3, marginTop: 20 }}>
+        step {i + 1}/{STEPS.length} · {STEPS[i]}{reduced ? ' · reduce-motion' : ''} · draft role: {d.role || '—'}
+      </p>
+    </Step>
   );
 }
