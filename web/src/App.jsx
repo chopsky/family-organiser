@@ -26,6 +26,10 @@ import Login from './pages/Login';
 // file is kept on disk only as the design reference the account step was lifted
 // from.
 const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
+// Onboarding v4 (value-first, sign-up at step 11). Behind its own route while
+// it's built so the live /signup flow is untouched; the cutover swaps the
+// element on /signup once v4 is complete and measured against it.
+const OnboardingV4    = lazy(() => import('./pages/onboarding-v4/OnboardingV4'));
 const KidsShell       = lazy(() => import('./pages/kids/KidsShell'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
@@ -237,6 +241,8 @@ function AppRoutes() {
             through (the flow captures them). The old single-screen Signup.jsx is
             retired (kept on disk as the styling reference). */}
         <Route path="/signup" element={<OnboardingFlow />} />
+        {/* v4 preview route - unlisted, no guard (it renders pre-auth like /signup). */}
+        <Route path="/signup-v4" element={<OnboardingV4 />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
             the promo on every device. */}
