@@ -441,14 +441,54 @@ async function markWhatsAppFollowupSent(userId, db = supabase) {
 
 // ─── Token helpers (verification, reset) ─────────────────────────────────────
 
-async function createToken(table, { userId, token, expiresAt }, db = supabase) {
-  const { data, error } = await db
-    .from(table)
-    .insert({ user_id: userId, token, expires_at: expiresAt })
-    .select()
-    .single();
+async function createToken(table, { userId, token, expiresAt, code }, db = supabase) {
+  const row = { user_id: userId, token, expires_at: expiresAt };
+  if (code) row.code = code;
+  let { data, error } = await db.from(table).insert(row).select().single();
+  // Pre-migration tolerance: if the code column isn't there yet, still create
+  // the token so sign-up keeps working on the link alone.
+  if (error && code && /column .*code/i.test(error.message || '')) {
+    console.warn('[auth] email_verification_tokens.code missing — run migration-email-verification-code.sql');
+    delete row.code;
+    ({ data, error } = await db.from(table).insert(row).select().single());
+  }
   if (error) throw error;
   return data;
+}
+
+/**
+ * Find a live verification row by (user, code). The code is short and typed by
+ * hand, so this is the brute-forceable surface: the caller MUST burn the row
+ * once attempts run out. Case-insensitive because people type lower case.
+ */
+async function getEmailVerificationByCode(userId, code, db = supabase) {
+  const { data, error } = await db
+    .from('email_verification_tokens')
+    .select()
+    .eq('user_id', userId)
+    .eq('used', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const row = (data || [])[0];
+  if (!row || !row.code) return null;
+  // Compare here rather than in the query so a wrong code still returns the
+  // row, and the caller can count the attempt against it.
+  return { row, matches: String(row.code).toUpperCase() === String(code).trim().toUpperCase() };
+}
+
+/** Count a failed code entry. Returns the new total. */
+async function bumpEmailVerificationAttempts(id, db = supabase) {
+  const { data, error } = await db
+    .from('email_verification_tokens')
+    .select('attempts')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  const next = (data?.attempts || 0) + 1;
+  await db.from('email_verification_tokens').update({ attempts: next }).eq('id', id);
+  return next;
 }
 
 async function getValidToken(table, token, db = supabase) {
@@ -472,7 +512,7 @@ async function markTokenUsed(table, tokenId, db = supabase) {
 }
 
 // Convenience wrappers
-const createEmailVerificationToken = (userId, token, expiresAt) => createToken('email_verification_tokens', { userId, token, expiresAt });
+const createEmailVerificationToken = (userId, token, expiresAt, code = null) => createToken('email_verification_tokens', { userId, token, expiresAt, code });
 const getEmailVerificationToken = (token) => getValidToken('email_verification_tokens', token);
 const markEmailVerificationTokenUsed = (id) => markTokenUsed('email_verification_tokens', id);
 
@@ -9676,6 +9716,8 @@ module.exports = {
   deleteUser,
   createEmailVerificationToken,
   getEmailVerificationToken,
+  getEmailVerificationByCode,
+  bumpEmailVerificationAttempts,
   markEmailVerificationTokenUsed,
   createPasswordResetToken,
   getPasswordResetToken,

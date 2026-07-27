@@ -74,7 +74,7 @@ async function sendEmail(to, subject, html, options = {}) {
   await client.sendEmail(payload);
 }
 
-async function sendVerificationEmail(to, name, token) {
+async function sendVerificationEmail(to, name, token, code = null) {
   // Universal Link target: hitting this URL from the iOS app opens
   // Housemait directly (see web/public/.well-known/apple-app-site-association),
   // while web visitors just see the React /verify page. Either way the
@@ -88,7 +88,14 @@ async function sendVerificationEmail(to, name, token) {
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Hi ${name},</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click the button below to verify your email address and get started with Housemait.</p>
     <div style="text-align:center;">${button('Verify email', url)}</div>
-    <p style="color:${BRAND.inkLight};font-size:13px;">This link expires in 24 hours.</p>
+    ${code ? `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin-top:26px;">Signing up on another device, or already have Housemait open? Enter this code instead:</p>
+    <div style="text-align:center;margin:14px 0;">
+      <span style="display:inline-block;padding:14px 26px;border-radius:12px;background:#F3EDFC;color:${BRAND.ink};font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:.22em;">${code}</span>
+    </div>
+    <p style="color:${BRAND.inkLight};font-size:13px;text-align:center;">Entering the code keeps you on the screen you started on, so anything you set up during sign-up isn’t lost.</p>
+    ` : ''}
+    <p style="color:${BRAND.inkLight};font-size:13px;">This link and code both expire in 24 hours.</p>
   `);
   // trackLinks:'None' keeps the raw housemait.com/verify link so iOS Universal
   // Links / Android App Links open the app instead of the browser.

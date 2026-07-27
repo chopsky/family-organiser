@@ -106,6 +106,32 @@ export default function useV4Auth(d) {
     }
   }, [d, completeSignup]);
 
+  /**
+   * Redeem the emailed code. This is the whole reason the code exists: it
+   * returns a session WITHOUT a page navigation, so the in-memory calendar
+   * address survives and completeSignup can attach it. Following the link
+   * instead reloads the page and silently loses it.
+   */
+  const verifyCode = useCallback(async ({ email: addr, code }) => {
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await api.post('/auth/verify-email-code', { email: addr, code });
+      return await completeSignup(data);
+    } catch (err) {
+      setError(err?.response?.data?.error || 'That code didn’t work. Try again.');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [completeSignup]);
+
+  /** Another code, for when the first didn't arrive. Never reports failure —
+   *  the endpoint is deliberately vague to avoid confirming who has an account. */
+  const resend = useCallback(async (addr) => {
+    try { await api.post('/auth/resend-verification', { email: addr }); } catch { /* silent by design */ }
+  }, []);
+
   /** Existing account, from the login screen. */
   const logIn = useCallback(async ({ email, password }) => {
     setBusy(true);
@@ -124,5 +150,5 @@ export default function useV4Auth(d) {
     }
   }, [auth]);
 
-  return { busy, error, setError, outcome, completeSignup, registerWithEmail, logIn };
+  return { busy, error, setError, outcome, completeSignup, registerWithEmail, verifyCode, resend, logIn };
 }

@@ -119,6 +119,20 @@ async function authResponse(user, req = null) {
   };
 }
 
+// Verification codes reuse the WhatsApp pairing alphabet: 0/O/1/I/L/U are
+// absent so a code survives being read off one screen and typed into another.
+// 30^6 is ~729M, which is only safe alongside the 24h expiry AND the attempt
+// cap below - a short code with unlimited guesses is far weaker than the link.
+const VERIFY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+const MAX_CODE_ATTEMPTS = 5;
+function generateVerifyCode(len = 6) {
+  const bytes = require('crypto').randomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i++) out += VERIFY_ALPHABET[bytes[i] % VERIFY_ALPHABET.length];
+  return out;
+}
+
+
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
 router.post('/register', requireTurnstile, async (req, res) => {
@@ -212,11 +226,16 @@ router.post('/register', requireTurnstile, async (req, res) => {
     });
 
     const token = generateToken();
+    // Both go in the same row and redeem the same account. The link is a
+    // Universal Link (opens the iOS app); the code lets someone finish WITHOUT
+    // leaving the page they signed up on, which is what onboarding v4 needs -
+    // navigating away destroys the in-memory calendar address they pasted.
+    const code = generateVerifyCode();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-    await db.createEmailVerificationToken(user.id, token, expiresAt);
+    await db.createEmailVerificationToken(user.id, token, expiresAt, code);
 
     try {
-      await email.sendVerificationEmail(emailLower, name.trim(), token);
+      await email.sendVerificationEmail(emailLower, name.trim(), token, code);
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr);
     }
@@ -333,6 +352,66 @@ router.post('/verify-email-and-login', async (req, res) => {
     return res.json(response);
   } catch (err) {
     console.error('POST /api/auth/verify-email-and-login error:', err);
+    return res.status(500).json({ error: 'Verification failed. Please try logging in.' });
+  }
+});
+
+// ─── POST /api/auth/verify-email-code ───────────────────────────────────────
+//
+// The same verification as the link, without navigating away.
+//
+// That difference is the whole point. Onboarding v4 holds the calendar address
+// someone pasted in memory only - it's a bearer credential and is deliberately
+// never persisted - so following a link to a new page (often a different
+// browser entirely) destroyed it. Someone who connected a calendar, watched it
+// report "244 events found", then verified by link, silently ended up with no
+// calendar. Typing a code keeps the page alive, so everything they set up
+// during onboarding actually lands.
+//
+// Redeems the SAME row as the link, and issues the same session, so a user can
+// use whichever reached them first.
+//
+// Guessing guard, both halves needed: the per-row attempt cap stops one code
+// being brute-forced, and the limiter stops someone spreading cheap guesses
+// across many accounts.
+// Rate limiting is mounted in app.js with the other auth surfaces.
+router.post('/verify-email-code', async (req, res) => {
+  const { email: userEmail, code } = req.body || {};
+  if (!userEmail?.trim() || !code?.trim()) {
+    return res.status(400).json({ error: 'Email and code are required.' });
+  }
+  // One message for every failure below: a distinct "no such account" would
+  // turn this into an email-enumeration oracle.
+  const rejected = { error: 'That code didn’t match. Check the email and try again.' };
+
+  try {
+    const user = await db.getUserByEmail(userEmail.trim().toLowerCase());
+    if (!user) return res.status(400).json(rejected);
+    if (user.email_verified) {
+      return res.status(400).json({ error: 'That email is already verified — please log in.' });
+    }
+
+    const found = await db.getEmailVerificationByCode(user.id, code);
+    if (!found) return res.status(400).json(rejected);
+
+    if (!found.matches) {
+      const attempts = await db.bumpEmailVerificationAttempts(found.row.id);
+      if (attempts >= MAX_CODE_ATTEMPTS) {
+        // Burn it rather than leave a weakened code alive.
+        await db.markEmailVerificationTokenUsed(found.row.id);
+        return res.status(400).json({ error: 'Too many wrong codes. Request a new one.' });
+      }
+      return res.status(400).json(rejected);
+    }
+
+    await db.markEmailVerificationTokenUsed(found.row.id);
+    await db.updateUser(user.id, { email_verified: true });
+
+    const fresh = await db.getUserById(user.id);
+    const response = await authResponse(fresh || user, req);
+    return res.json(response);
+  } catch (err) {
+    console.error('POST /api/auth/verify-email-code error:', err);
     return res.status(500).json({ error: 'Verification failed. Please try logging in.' });
   }
 });

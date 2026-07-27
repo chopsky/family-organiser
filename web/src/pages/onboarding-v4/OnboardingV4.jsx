@@ -118,7 +118,14 @@ export default function OnboardingV4() {
         d={d}
         onBack={back}
         auth={socialAuth}
-        v4={{ ...v4, error: v4.error || authError, setError: (e) => { v4.setError(e); setAuthError(e); } }}
+        v4={{
+          ...v4,
+          error: v4.error || authError,
+          setError: (e) => { v4.setError(e); setAuthError(e); },
+          // A verified code has done everything a provider does, so it lands
+          // on the same welcome screen rather than a second dead end.
+          onVerified: () => f.finish(),
+        }}
       />
     );
   }

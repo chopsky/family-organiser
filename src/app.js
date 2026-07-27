@@ -90,6 +90,10 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api/auth/forgot-password', sensitiveAuthLimiter);
   app.use('/api/auth/reset-password', sensitiveAuthLimiter);
   app.use('/api/auth/resend-verification', sensitiveAuthLimiter);
+  // Verification CODES are short and typed by hand, so the endpoint is the
+  // brute-force surface. The per-row attempt cap in the route stops one code
+  // being ground down; this stops cheap guesses being sprayed across accounts.
+  app.use('/api/auth/verify-email-code', sensitiveAuthLimiter);
   // SSO sign-in endpoints are auth surfaces too - rate-limit them against
   // token-spraying / account-probing the same as password login.
   app.use('/api/auth/google', sensitiveAuthLimiter);

@@ -118,22 +118,72 @@ function EmailForm({ mode, busy, error, onSubmit, onBack }) {
 }
 
 /**
- * Sent-a-link state. Registering without an invite issues NO token — the
- * account has to be verified by email first — so email sign-up genuinely
- * cannot land on the welcome screen the way a provider can. Saying so is
- * better than a spinner that never resolves.
+ * Code entry. This is what makes email sign-up equal to a provider.
+ *
+ * The alternative — following the link in the email — is a NAVIGATION, and the
+ * calendar address pasted at step 08 lives in memory only (it's a bearer
+ * credential and is deliberately never persisted). Leaving the page destroyed
+ * it, so someone who connected a calendar, watched it find 244 events, then
+ * verified by link silently got no calendar. Typing the code keeps the page
+ * alive, so the replay runs and everything they set up actually lands.
+ *
+ * The link still works and still opens the iOS app; this is the path that
+ * doesn't cost them their setup.
  */
-function CheckInbox({ email, house }) {
+function CodeEntry({ email, busy, error, onSubmit, onResend, resent }) {
+  const [code, setCode] = useState('');
+  const ready = code.trim().length >= 6;
+
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 40 }} aria-hidden="true">📬</div>
-      <h1 style={{ fontFamily: T.title, fontWeight: 400, fontSize: 30, lineHeight: 1.1, color: T.ink, marginTop: 10 }}>
-        Check your inbox.
+      <div style={{ fontSize: 38 }} aria-hidden="true">📬</div>
+      <h1 style={{ fontFamily: T.title, fontWeight: 400, fontSize: 28, lineHeight: 1.1, color: T.ink, marginTop: 8 }}>
+        Check your email.
       </h1>
-      <p style={{ fontSize: 15, lineHeight: 1.5, color: T.ink2, marginTop: 10 }}>
-        We’ve sent a link to <strong style={{ color: T.ink }}>{email}</strong>. Tap it to
-        confirm your account and {house ? <>{house}</> : 'your household'} will be waiting.
+      <p style={{ fontSize: 14.5, lineHeight: 1.5, color: T.ink2, marginTop: 8 }}>
+        We’ve sent a 6-character code to <strong style={{ color: T.ink }}>{email}</strong>.
       </p>
+
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (ready && !busy) onSubmit(code.trim()); }}
+        style={{ marginTop: 18 }}
+      >
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+          placeholder="K7M2QF"
+          aria-label="Verification code"
+          // iOS reads one-time codes out of Mail and offers them above the
+          // keyboard; without this it doesn't know to.
+          autoComplete="one-time-code"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck="false"
+          maxLength={6}
+          autoFocus
+          style={{
+            width: '100%', minHeight: 56, padding: '14px 16px', borderRadius: R.field,
+            border: `1.5px solid ${error ? '#C2543F' : T.line2}`, background: T.surface,
+            font: '700 27px ui-monospace, SFMono-Regular, Menlo, monospace',
+            letterSpacing: '.2em', textAlign: 'center', color: T.ink, outline: 'none',
+          }}
+        />
+        {error && (
+          <p role="alert" style={{ fontSize: 13, lineHeight: 1.4, color: T.danger, marginTop: 8 }}>{error}</p>
+        )}
+        <div style={{ marginTop: 12 }}>
+          <Cta type="submit" disabled={!ready || busy}>
+            {busy ? 'Checking…' : 'Verify and finish'}
+          </Cta>
+        </div>
+      </form>
+
+      <p style={{ fontSize: 12.5, lineHeight: 1.5, color: T.ink3, marginTop: 14 }}>
+        The email also has a link you can tap — but entering the code here keeps
+        anything you’ve already set up.
+      </p>
+      <Ghost onClick={onResend}>{resent ? 'Sent again' : 'Send it again'}</Ghost>
     </div>
   );
 }
@@ -145,6 +195,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
   // 'pick' -> the provider stack | 'email' -> the form | 'sent' -> check inbox
   const [face, setFace] = useState('pick');
   const [sentTo, setSentTo] = useState('');
+  const [resent, setResent] = useState(false);
 
   const submitEmail = async ({ email, password }) => {
     const result = await v4.registerWithEmail({ email, password });
@@ -221,7 +272,14 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
           </div>
 
           {face === 'sent' ? (
-            <CheckInbox email={sentTo} house={(d.house || '').trim()} />
+            <CodeEntry
+              email={sentTo}
+              busy={v4.busy}
+              error={v4.error}
+              resent={resent}
+              onResend={async () => { await v4.resend(sentTo); setResent(true); }}
+              onSubmit={async (code) => { if (await v4.verifyCode({ email: sentTo, code })) v4.onVerified?.(); }}
+            />
           ) : face === 'email' ? (
             <EmailForm
               mode="signup" busy={v4.busy} error={v4.error}
