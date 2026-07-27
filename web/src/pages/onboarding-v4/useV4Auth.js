@@ -18,13 +18,14 @@
  * out instead.
  */
 import { useCallback, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../../lib/country';
 import { readLocaleCookie } from '../../hooks/useLocale';
 import { getStorefrontCountry } from '../../lib/revenuecat';
-import { clearSignupPromo } from '../../lib/signupPromo';
-import { clearSignupSource } from '../../lib/signupSource';
+import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
+import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
 import { isNative } from '../../lib/platform';
 import { replayQueued } from './replay';
 
@@ -36,6 +37,11 @@ const CLIENT = isNative() ? 'app' : undefined;
 
 export default function useV4Auth(d) {
   const auth = useAuth();
+  // Campaign promo + acquisition tag, exactly as the existing flow reads them.
+  // Both resolvers take the code from ?promo=/?src= or fall back to one stored
+  // earlier in the same install, so they're read at register time rather than
+  // captured on mount - there's no window in which they can go stale.
+  const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // What actually happened, for the welcome screen to speak to honestly.
@@ -131,7 +137,12 @@ export default function useV4Auth(d) {
         password,
         // Collected at step 05 — v4 never asks for a name twice.
         name: (d.you || '').trim() || email.trim().split('@')[0],
+        inviteToken: searchParams.get('invite') || undefined,
+        promoCode: resolveSignupPromo(searchParams) || undefined,
+        source: resolveSignupSource(searchParams) || undefined,
         client: CLIENT,
+        // No turnstile_token: the middleware bypasses native clients entirely
+        // (Apple rejected 1.1.0(8) over a Turnstile race), and v4 is native.
       });
       // Without an invite the backend issues no token: the account has to be
       // verified by email first. That's why email can't land on the welcome
@@ -144,7 +155,7 @@ export default function useV4Auth(d) {
     } finally {
       setBusy(false);
     }
-  }, [d, completeSignup]);
+  }, [d, completeSignup, searchParams]);
 
   /**
    * Redeem the emailed code. This is the whole reason the code exists: it

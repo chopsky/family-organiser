@@ -241,11 +241,15 @@ function AppRoutes() {
             to /dashboard once fully onboarded. Carries ?invite= and ?promo=
             through (the flow captures them). The old single-screen Signup.jsx is
             retired (kept on disk as the styling reference). */}
-        <Route path="/signup" element={<OnboardingFlow />} />
-        {/* Onboarding v4: iOS/Android only for now (app first, web later). One
-            codebase ships both, so the platform gate is enforced here rather
-            than remembered at cutover. Production web falls through to the
-            existing flow; V4_ALLOWED keeps it reachable in local dev. */}
+        {/* CUTOVER: on iOS/Android this is onboarding v4; on the web it stays
+            the existing flow, which is deliberate and not a staging step - the
+            web/desktop sign-up is not changing. One codebase ships both, so the
+            platform gate lives here rather than being remembered at build time.
+            V4_ALLOWED also covers local dev, so `npm run dev` shows v4. */}
+        <Route path="/signup" element={V4_ALLOWED ? <OnboardingV4 /> : <OnboardingFlow />} />
+        {/* Kept so v4 has a stable address of its own - handy for jumping
+            straight to it, and for opening it on the web while it's being
+            worked on. Production web still falls through to the existing flow. */}
         <Route path="/signup-v4" element={V4_ALLOWED ? <OnboardingV4 /> : <Navigate to="/signup" replace />} />
         {/* Legacy campaign link - admin now generates /signup?promo= directly.
             Kept so older printed flyers still work; redirects to web signup with
