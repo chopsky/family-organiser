@@ -31,6 +31,7 @@
     "@capawesome/capacitor-app-shortcuts": "^8.0.1",
     "@capawesome/capacitor-badge": "^8.0.2",
     "@capgo/capacitor-social-login": "^8.3.20",
+    "@paulmillr/qr": "^0.3.0",
     "@revenuecat/purchases-capacitor": "^13.0.1",
     "@tanstack/query-sync-storage-persister": "^5.101.2",
     "@tanstack/react-query": "^5.101.2",

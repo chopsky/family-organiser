@@ -14,11 +14,19 @@
  *      deployments where the OTP Authentication template hasn't been
  *      approved yet, or markets where Meta hasn't enabled it.
  *
+ *      Pull-push offers three routes to that one message, ordered by
+ *      device: on a laptop a QR leads (the WhatsApp account is on the
+ *      phone, so scanning beats retyping a code across devices), then
+ *      the wa.me deep link, then the number and code as selectable
+ *      text. On a phone the QR is dropped - it would point at the
+ *      device already displaying it.
+ *
  * The component fetches /auth/whatsapp-bot-info on mount to learn
  * which mode the server supports.
  *
  * Used by:
  *   • Onboarding wizard (pages/onboarding/ConnectWhatsApp.jsx)
+ *   • Onboarding step (pages/onboarding/steps/WhatsAppStep.jsx)
  *   • Settings → Notifications → Connect WhatsApp accordion
  *
  * Props:
@@ -31,6 +39,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../lib/api';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import { isNative } from '../lib/platform';
+import QrCode from './QrCode';
 
 export default function WhatsAppPairing({ onSuccess, onError, autoStart = true, compact = false }) {
   // mode resolution: null while we don't know, then 'otp' or 'pull-push'
@@ -217,6 +228,14 @@ const MAX_POLL_DURATION_MS = 11 * 60 * 1000;
 function PullPushPairing({ onSuccess, onError, autoStart, compact }) {
   const [stage, setStage] = useState(autoStart ? 'init' : 'idle'); // idle | init | waiting | done | error
   const [pairing, setPairing] = useState(null);
+  // The QR is a second-device route: scan it with the phone that holds the
+  // WhatsApp account. On the phone itself it would point at the device already
+  // showing it, so there it's noise - the deep-link button is the answer.
+  const smallScreen = useIsMobile();
+  const showQr = !isNative() && !smallScreen;
+  // Copy is otherwise a button that appears to do nothing - and this one is
+  // the fallback route, so it's the one that most needs to feel like it worked.
+  const [copied, setCopied] = useState(false);
   const pollRef = useRef(null);
   const pollStartedAtRef = useRef(null);
   const onSuccessRef = useRef(onSuccess);
@@ -284,6 +303,16 @@ function PullPushPairing({ onSuccess, onError, autoStart, compact }) {
     if (stage === 'waiting') pollOnce();
   }, { throttleMs: 0 });
 
+  const copyMessage = useCallback(() => {
+    if (!pairing?.message) return;
+    Promise.resolve(navigator.clipboard?.writeText(pairing.message))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1800);
+      })
+      .catch(() => { /* clipboard blocked - the code is selectable text anyway */ });
+  }, [pairing?.message]);
+
   if (stage === 'idle') {
     return (
       <button
@@ -317,28 +346,41 @@ function PullPushPairing({ onSuccess, onError, autoStart, compact }) {
           onClick={start}
           className="inline-flex items-center gap-2 border border-cream-border text-bark text-sm font-medium px-4 py-2 rounded-2xl hover:bg-oat transition-colors"
         >
-          Try again
+          Generate a new code
         </button>
       </div>
     );
   }
 
+  // Three routes to the same message, in the order that suits the device.
+  // On a laptop the QR comes first: the WhatsApp account lives on the phone,
+  // so scanning is the only route that doesn't involve retyping a code across
+  // devices. The deep link is next (it works if WhatsApp Desktop or Web is
+  // signed in), and the number + code in plain selectable text is the floor
+  // that always works, on any device, with no scanner and no app switch.
   return (
     <div className="space-y-3">
-      <p className="text-sm text-cocoa">
-        Open WhatsApp and send the bot this message:
-      </p>
-      <div className="flex items-center gap-3 bg-white border border-cream-border rounded-xl px-3 py-2.5">
-        <span className="flex-1 text-base font-mono font-semibold text-bark tracking-wider">{pairing.message}</span>
-        <button
-          type="button"
-          onClick={() => navigator.clipboard?.writeText(pairing.message).catch(() => {})}
-          className="text-xs text-cocoa hover:text-bark px-2 py-1"
-          aria-label="Copy code"
-        >
-          Copy
-        </button>
-      </div>
+      {showQr && pairing.deep_link ? (
+        <>
+          <p className="text-sm text-cocoa">
+            Scan this with your phone's camera. WhatsApp opens with the message ready - just hit send.
+          </p>
+          <div className="flex justify-center">
+            <div className="bg-white border border-cream-border rounded-2xl p-3">
+              <QrCode
+                value={pairing.deep_link}
+                size={compact ? 148 : 176}
+                label={`Scan to message the Housemait bot with the code ${pairing.code}`}
+              />
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-cocoa">
+          Open WhatsApp and send the bot this message:
+        </p>
+      )}
+
       {pairing.deep_link && (
         <a
           href={pairing.deep_link}
@@ -349,9 +391,29 @@ function PullPushPairing({ onSuccess, onError, autoStart, compact }) {
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
           </svg>
-          Open WhatsApp to send
+          {showQr ? 'Or open WhatsApp on this computer' : 'Open WhatsApp to send'}
         </a>
       )}
+
+      <div className="bg-white border border-cream-border rounded-xl px-3 py-2.5 space-y-1.5">
+        {pairing.bot_number && (
+          <p className="text-xs text-cocoa">
+            Or message <span className="font-medium text-bark select-all">+{pairing.bot_number}</span> yourself with:
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <span className="flex-1 text-base font-mono font-semibold text-bark tracking-wider select-all">{pairing.message}</span>
+          <button
+            type="button"
+            onClick={copyMessage}
+            className="text-xs text-cocoa hover:text-bark px-2 py-1"
+            aria-label="Copy code"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+
       <p className="text-xs text-cocoa">
         Waiting for your message… we'll link automatically when it arrives. Code valid for 10 minutes.
       </p>
