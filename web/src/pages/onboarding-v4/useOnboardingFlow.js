@@ -20,8 +20,8 @@ import {
  * Transition rules live in machine.js so they stay readable and testable; this
  * hook owns only React state, the auto-advance timer, and draft persistence.
  */
-export default function useOnboardingFlow() {
-  const [nav, setNav] = useState({ phase: 'splash', i: 0 });
+export default function useOnboardingFlow(initialPhase = 'splash') {
+  const [nav, setNav] = useState({ phase: initialPhase, i: 0 });
   const [d, setD] = useState(loadDraft);
 
   // Mirror answers to localStorage so a backgrounded webview doesn't lose ten

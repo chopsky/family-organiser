@@ -230,7 +230,16 @@ function AppRoutes() {
         <Route path="/au" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/ca" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/za" element={token ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-        <Route path="/login" element={token && !needsHousehold ? <Navigate to="/dashboard" replace /> : <Login />} />
+        {/* On iOS/Android this is v4's own sign-in screen. Every auth guard
+            redirects here when the token goes, so signing out used to land on
+            the web login page - a different design from everything around it.
+            Web keeps the existing page. */}
+        <Route
+          path="/login"
+          element={token && !needsHousehold
+            ? <Navigate to="/dashboard" replace />
+            : (V4_ALLOWED ? <OnboardingV4 initialPhase="login" /> : <Login />)}
+        />
         {/* /signup must be unreachable while a session is live - otherwise a
             logged-in user creating a "new" account carries their token into
             the flow, every API call inside onboarding acts as the original

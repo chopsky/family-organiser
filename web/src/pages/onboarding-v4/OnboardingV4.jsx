@@ -31,10 +31,13 @@ import { setCalUrl } from '../../lib/onboardingDraft';
 import useSocialAuth from '../../hooks/useSocialAuth';
 import useV4Auth from './useV4Auth';
 
-export default function OnboardingV4() {
+// initialPhase lets a route open the flow somewhere other than the splash.
+// /login uses it so signing out lands on v4's own sign-in screen instead of
+// the web login page, which looks nothing like the rest of the app.
+export default function OnboardingV4({ initialPhase }) {
   const navigate = useNavigate();
   const reduced = usePrefersReducedMotion();
-  const f = useOnboardingFlow();
+  const f = useOnboardingFlow(initialPhase);
   const { phase, step, pct, d, update, next, back, skip, goPhase, pickAndAdvance, canAdvance } = f;
 
   // The house-sign reward sits between submitting the name and advancing, so

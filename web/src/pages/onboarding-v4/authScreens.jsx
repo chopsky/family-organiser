@@ -405,8 +405,15 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
       <p style={{ font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple, marginTop: 18 }}>
         All set
       </p>
-      <h1 style={{ ...H1, fontSize: 37, marginTop: 8 }}>
-        Welcome home, <span style={{ color: T.purple }}>{d.you || 'friend'}.</span>
+      {/* Two explicit lines, and textWrap back to normal for this one heading.
+          H1's `balance` evens the line lengths, which on a phone split the
+          greeting as "Welcome" / "home, Grant." — the phrase belongs together
+          and the name belongs on its own line. The clamp keeps the designed
+          37px on a normal handset and steps down on narrow ones rather than
+          letting "Welcome home," break again. */}
+      <h1 style={{ ...H1, fontSize: 'clamp(30px, 8.6vw, 37px)', marginTop: 8, textWrap: 'initial' }}>
+        <span style={{ display: 'block' }}>Welcome home,</span>
+        <span style={{ color: T.purple }}>{d.you || 'friend'}.</span>
       </h1>
       <p style={{ ...SUB, fontSize: 15, marginTop: 12, maxWidth: 320 }}>
         <b style={{ color: T.ink }}>{d.house || 'Your household'}</b> is live. Add your first task or
