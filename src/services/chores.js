@@ -22,38 +22,52 @@ function weekdayAbbrev(dateStr) {
  * Does a chore definition apply on `dateStr` ('YYYY-MM-DD')?
  *  - hidden before its start_date;
  *  - weekly  -> the date's weekday is in `days`;
- *  - once    -> its due date, and every day after until someone does it;
- *  - daily   -> always.
+ *  - daily   -> always;
+ *  - once    -> exactly ONE day, see below.
  * Archived definitions never apply.
  *
- * One-offs CARRY FORWARD deliberately. A task you meant to do on Saturday and
- * didn't is still a task on Sunday - dropping it off the board the moment its
- * day passed meant a missed one-off vanished silently. This matches how an
- * overdue to-do stays in the Today bucket rather than disappearing.
+ * ── One-offs land on exactly one day ──────────────────────────────────────
+ * A one-off is a single thing, so it occupies a single square:
  *
- * Carry-forward is bounded at TODAY. An outstanding task belongs on the days it
- * was actually outstanding - its due date through to today - and NOT on future
- * days, which haven't happened yet. Without the bound, browsing to any later
- * date showed the task there too, so a one-off appeared to repeat forever.
+ *   done      -> the day it was ticked, so the record and the star survive
+ *   undone    -> its due date, or TODAY once that date has passed
  *
- * @param opts.doneIds Set of definition ids that already have a completion (on
- *   ANY date).
- * @param opts.today   the household's today ('YYYY-MM-DD'), the upper bound.
- * Omit either and a one-off shows only on its own due date: the caller hasn't
- * given us what carrying needs, so we don't invent it.
+ * The first version of this carried a one-off across every day from its due
+ * date onward, which broke three ways: it ran into future days (a task isn't
+ * overdue on a day that hasn't happened); ticking it made it vanish from the
+ * day it was ticked; and because star credit is keyed by (definition, member,
+ * DATE), the same task could be ticked on its due date AND on a carried day
+ * for double stars. One day, one instance, one tick closes all three.
+ *
+ * Routines are exempt from the carry: a routine is a habit, not a debt, so a
+ * missed one resets rather than following you around. (Routines shouldn't be
+ * one-off at all - the form no longer offers it - but existing rows exist.)
+ *
+ * @param opts.today  the household's today ('YYYY-MM-DD')
+ * @param opts.doneOn Map of definition id -> the date it was completed
+ * Omit `today` and a one-off shows only on its own due date: without knowing
+ * the present we can't say where an overdue one belongs, so we don't guess.
  */
 function appliesOn(def, dateStr, opts = {}) {
-  const { doneIds, today } = opts;
+  const { today, doneOn } = opts;
   if (!def || def.archived_at) return false;
   if (def.start_date && dateStr < def.start_date) return false;
   if (def.repeat === 'weekly') return (def.days || []).includes(weekdayAbbrev(dateStr));
-  if (def.repeat === 'once') {
-    if (!def.due_date) return false; // dateless: nothing to anchor it to
-    if (dateStr === def.due_date) return true;
-    if (!doneIds || !today) return false;
-    return dateStr > def.due_date && dateStr <= today && !doneIds.has(def.id);
-  }
+  if (def.repeat === 'once') return dateStr === oneOffDay(def, today, doneOn);
   return true; // daily (or unset)
+}
+
+/**
+ * The single day a one-off occupies, or null if it has none (no due date, so
+ * nothing to anchor it to - such rows were a bug and are backfilled).
+ */
+function oneOffDay(def, today, doneOn) {
+  if (!def.due_date) return null;
+  const completedOn = doneOn && doneOn.get(def.id);
+  if (completedOn) return completedOn;
+  if (!today) return def.due_date;             // caller can't place an overdue one
+  if (def.type === 'routine') return def.due_date; // habits don't accrue
+  return def.due_date > today ? def.due_date : today;
 }
 
 /**
@@ -106,4 +120,4 @@ function buildDayView(defs, completions, dateStr, opts = {}) {
   return out.sort((a, b) => (a.position - b.position) || String(a.created_at).localeCompare(String(b.created_at)));
 }
 
-module.exports = { weekdayAbbrev, appliesOn, buildDayView };
+module.exports = { weekdayAbbrev, appliesOn, oneOffDay, buildDayView };

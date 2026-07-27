@@ -1,4 +1,4 @@
-const { weekdayAbbrev, appliesOn, buildDayView } = require('./chores');
+const { weekdayAbbrev, appliesOn, oneOffDay, buildDayView } = require('./chores');
 
 describe('weekdayAbbrev', () => {
   test('maps dates to UK weekday abbreviations (no tz drift)', () => {
@@ -113,78 +113,6 @@ describe('buildDayView', () => {
   });
 });
 
-// Regression: a one-off with no due_date was invisible on EVERY day.
-// `appliesOn`'s `due_date === dateStr` is false when due_date is null, so the
-// definition existed, showed in the week view (which lists all definitions
-// unfiltered) and never appeared on a single day. Reported by a user on
-// 2026-07-27; 11 of 11 one-offs across every household were affected, because
-// the create form never sent a date at all. The route now defaults the date,
-// so this documents the trap rather than changing appliesOn's contract.
-describe('one-off definitions must carry a date', () => {
-  it('a dated one-off applies on its date and no other', () => {
-    expect(appliesOn({ repeat: 'once', due_date: '2026-07-27' }, '2026-07-27')).toBe(true);
-    expect(appliesOn({ repeat: 'once', due_date: '2026-07-27' }, '2026-07-28')).toBe(false);
-  });
-
-  it('a dateless one-off applies on NO date — which is why it must never be stored', () => {
-    for (const d of ['2026-07-26', '2026-07-27', '2026-07-28', '2027-01-01']) {
-      expect(appliesOn({ repeat: 'once', due_date: null }, d)).toBe(false);
-    }
-  });
-
-  it('buildDayView therefore drops a dateless one-off entirely', () => {
-    const defs = [
-      { id: 'a', title: 'Dateless', repeat: 'once', due_date: null, assignee_ids: ['m1'] },
-      { id: 'b', title: 'Dated', repeat: 'once', due_date: '2026-07-27', assignee_ids: ['m1'] },
-    ];
-    const out = buildDayView(defs, [], '2026-07-27');
-    expect(out.map((t) => t.id)).toEqual(['b']);
-  });
-});
-
-// One-offs carry forward: a task you meant to do on Saturday and didn't is
-// still a task on Sunday. Before this, a missed one-off dropped off the board
-// silently the moment its day passed.
-describe('one-off carry-forward', () => {
-  const def = { id: 'd1', repeat: 'once', due_date: '2026-07-24', assignee_ids: ['m1'] };
-  const TODAY = '2026-07-27';
-
-  it('shows on its due date whether or not it is done', () => {
-    expect(appliesOn(def, '2026-07-24', { doneIds: new Set(), today: TODAY })).toBe(true);
-    expect(appliesOn(def, '2026-07-24', { doneIds: new Set(['d1']), today: TODAY })).toBe(true);
-  });
-
-  it('keeps showing on later days while undone', () => {
-    expect(appliesOn(def, '2026-07-25', { doneIds: new Set(), today: TODAY })).toBe(true);
-    expect(appliesOn(def, '2026-09-01', { doneIds: new Set(), today: '2026-09-01' })).toBe(true);
-  });
-
-  it('stops as soon as someone has done it', () => {
-    expect(appliesOn(def, '2026-07-25', { doneIds: new Set(['d1']), today: TODAY })).toBe(false);
-  });
-
-  it('never shows BEFORE its due date', () => {
-    expect(appliesOn(def, '2026-07-23', { doneIds: new Set(), today: TODAY })).toBe(false);
-  });
-
-  it('does not carry when the caller omits the done set (streaks keep old behaviour)', () => {
-    expect(appliesOn(def, '2026-07-25')).toBe(false);
-    expect(appliesOn(def, '2026-07-24')).toBe(true);
-  });
-
-  it('marks a carried instance so the UI can show where it came from', () => {
-    const [onDay] = buildDayView([def], [], '2026-07-24', { doneIds: new Set(), today: TODAY });
-    const [carried] = buildDayView([def], [], '2026-07-26', { doneIds: new Set(), today: TODAY });
-    expect(onDay.carried_from).toBeNull();
-    expect(carried.carried_from).toBe('2026-07-24');
-  });
-
-  it('leaves repeating tasks untouched', () => {
-    const daily = { id: 'd2', repeat: 'daily', assignee_ids: ['m1'] };
-    expect(appliesOn(daily, '2026-07-26', { doneIds: new Set(['d2']), today: TODAY })).toBe(true);
-  });
-});
-
 // Carry-forward is for one-offs ONLY. A recurring chore's next occurrence is a
 // fresh one - a missed Tuesday must never pile up on Wednesday, or reappear
 // alongside next Tuesday's. Pinned because the natural way to extend
@@ -214,34 +142,100 @@ describe('recurring chores never carry forward', () => {
   });
 });
 
-// Regression: carry-forward must stop at TODAY. It originally compared only
-// against the due date, so browsing to ANY later day showed the task there —
-// a one-off looked like it repeated forever. Reported the same day it shipped:
-// "the chore is showing on every day. If I go to tomorrow, it's showing there."
-describe('carry-forward never reaches into the future', () => {
-  const def = { id: 'd1', repeat: 'once', due_date: '2026-07-27', assignee_ids: ['m1'] };
-  const carry = (today) => ({ doneIds: new Set(), today });
+// ── One-offs occupy exactly one day ────────────────────────────────────────
+// A one-off is a single thing, so it gets a single square. The first attempt
+// carried it across every day from its due date onward and produced three
+// distinct bugs, each pinned below:
+//   1. it ran into future days — "go to tomorrow, it's showing there"
+//   2. ticking it made it vanish from the day it was ticked
+//   3. star credit is keyed by (definition, member, DATE), so appearing on two
+//      days meant it could be ticked twice for double stars
+describe('one-off placement', () => {
+  const TODAY = '2026-07-29';
+  const chore = (over) => ({ id: 'c1', repeat: 'once', assignee_ids: ['m1'], ...over });
+  const on = (def, date, doneOn) => appliesOn(def, date, { today: TODAY, doneOn });
 
-  it('shows on its due date and up to today, and nowhere beyond', () => {
-    const t = '2026-07-29';
-    expect(appliesOn(def, '2026-07-27', carry(t))).toBe(true);  // due date
-    expect(appliesOn(def, '2026-07-28', carry(t))).toBe(true);  // outstanding
-    expect(appliesOn(def, '2026-07-29', carry(t))).toBe(true);  // today
-    expect(appliesOn(def, '2026-07-30', carry(t))).toBe(false); // tomorrow
-    expect(appliesOn(def, '2026-12-25', carry(t))).toBe(false); // far future
+  it('an overdue one sits on today, not on the days it was missed', () => {
+    const d = chore({ due_date: '2026-07-27' });
+    expect(on(d, '2026-07-29')).toBe(true);
+    expect(on(d, '2026-07-27')).toBe(false);
+    expect(on(d, '2026-07-28')).toBe(false);
   });
 
-  it('due today means today only — not tomorrow, not next year', () => {
-    const t = '2026-07-27';
-    expect(appliesOn(def, '2026-07-27', carry(t))).toBe(true);
-    expect(appliesOn(def, '2026-07-28', carry(t))).toBe(false);
-    expect(appliesOn(def, '2027-01-01', carry(t))).toBe(false);
+  it('never reaches a day that has not happened', () => {
+    const d = chore({ due_date: '2026-07-27' });
+    expect(on(d, '2026-07-30')).toBe(false);
+    expect(on(d, '2026-12-25')).toBe(false);
   });
 
-  it('a future-dated one-off shows on its day and not before', () => {
-    const future = { id: 'f1', repeat: 'once', due_date: '2026-08-20' };
-    const t = '2026-07-27';
-    expect(appliesOn(future, '2026-07-27', carry(t))).toBe(false);
-    expect(appliesOn(future, '2026-08-20', carry(t))).toBe(true);
+  it('a future-dated one waits on its own day', () => {
+    const d = chore({ due_date: '2026-08-20' });
+    expect(on(d, '2026-08-20')).toBe(true);
+    expect(on(d, TODAY)).toBe(false);
+  });
+
+  it('once ticked it stays on the day it was ticked — the record survives', () => {
+    const d = chore({ due_date: '2026-07-27' });
+    const doneOn = new Map([['c1', '2026-07-28']]);
+    expect(on(d, '2026-07-28', doneOn)).toBe(true);
+    expect(on(d, '2026-07-29', doneOn)).toBe(false); // no longer chasing today
+  });
+
+  it('appears on exactly ONE day, so it can never be ticked twice for stars', () => {
+    const d = chore({ due_date: '2026-07-25' });
+    const week = ['2026-07-25', '2026-07-26', '2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30'];
+    expect(week.filter((x) => on(d, x))).toHaveLength(1);
+  });
+
+  it('a routine never chases today — habits reset, they do not accrue', () => {
+    const r = chore({ due_date: '2026-07-27', type: 'routine' });
+    expect(on(r, '2026-07-27')).toBe(true);
+    expect(on(r, TODAY)).toBe(false);
+  });
+
+  it('without today it falls back to the due date rather than guessing', () => {
+    const d = chore({ due_date: '2026-07-27' });
+    expect(appliesOn(d, '2026-07-27', {})).toBe(true);
+    expect(appliesOn(d, TODAY, {})).toBe(false);
+  });
+
+  it('a dateless one-off has no day at all', () => {
+    expect(oneOffDay(chore({ due_date: null }), TODAY)).toBeNull();
+    expect(on(chore({ due_date: null }), TODAY)).toBe(false);
+  });
+
+  it('start_date still hides it — and buildDayView agrees with appliesOn', () => {
+    const d = chore({ due_date: '2026-07-27', start_date: '2026-08-01' });
+    expect(on(d, TODAY)).toBe(false);
+    expect(buildDayView([d], [], TODAY, { today: TODAY })).toHaveLength(0);
+  });
+
+  it('flags an overdue instance so the UI can say where it came from', () => {
+    const d = chore({ due_date: '2026-07-27' });
+    const [inst] = buildDayView([d], [], TODAY, { today: TODAY, doneOn: new Map() });
+    expect(inst.carried_from).toBe('2026-07-27');
+    const dueToday = chore({ id: 'c2', due_date: TODAY });
+    const [fresh] = buildDayView([dueToday], [], TODAY, { today: TODAY, doneOn: new Map() });
+    expect(fresh.carried_from).toBeNull();
+  });
+});
+
+// Carry-forward is for one-offs ONLY. A recurring chore's next occurrence is a
+// fresh one — a missed Tuesday must never pile up on Wednesday.
+describe('recurring chores are untouched by one-off placement', () => {
+  const opts = { today: '2026-08-31', doneOn: new Map() };
+
+  it('a weekly chore shows only on its weekdays, missed or not', () => {
+    const weekly = { id: 'w1', repeat: 'weekly', days: ['TUE', 'THU'] };
+    expect(appliesOn(weekly, '2026-07-28', opts)).toBe(true);  // Tue
+    expect(appliesOn(weekly, '2026-07-29', opts)).toBe(false); // Wed
+    expect(appliesOn(weekly, '2026-07-30', opts)).toBe(true);  // Thu
+    expect(appliesOn(weekly, '2026-08-04', opts)).toBe(true);  // next Tue
+  });
+
+  it('a daily chore is just daily — no accumulation', () => {
+    const daily = { id: 'd1', repeat: 'daily' };
+    expect(appliesOn(daily, '2026-07-29', opts)).toBe(true);
+    expect(appliesOn(daily, '2026-07-30', opts)).toBe(true);
   });
 });

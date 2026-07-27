@@ -825,7 +825,7 @@ export default function Chores() {
           )}
         </div>
       ) : weekMode ? (
-        <DesktopChoresWeek completedDefIds={weekData?.completed_def_ids || []} today={weekData?.today}
+        <DesktopChoresWeek doneOn={weekData?.done_on || []} today={weekData?.today}
           members={shown}
           who={weekWho}
           setWho={setWeekWho}
@@ -916,6 +916,17 @@ function TaskModal({ modal, members, onClose, onSave }) {
   // One-time tasks are pinned to a date. Defaults to the day being viewed,
   // so "add a one-off" on Tuesday lands on Tuesday rather than nowhere.
   const [dueDate, setDueDate] = useState(t.due_date || modal.date || '');
+  // A routine is a habit, so "One-time" is a contradiction — and a one-off
+  // routine deliberately doesn't carry when missed, which just reads as a bug.
+  // Offer it for chores only, and never strand a routine holding repeat:'once'.
+  const routineNow = !isAnyone && type === 'routine';
+  const repeatOptions = [
+    { v: 'daily', l: 'Daily' }, { v: 'weekly', l: 'Weekly' },
+    ...(routineNow ? [] : [{ v: 'once', l: 'One-time' }]),
+  ];
+  useEffect(() => {
+    if (routineNow && repeat === 'once') setRepeat('daily');
+  }, [routineNow, repeat]);
   const [dueTime, setDueTime] = useState(t.due_time ? String(t.due_time).slice(0, 5) : '');
   const [reward, setReward] = useState(!!t.reward);
   const [stars, setStars] = useState(t.stars || 5);
@@ -936,7 +947,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
       whens: (!isAnyone && type === 'routine') ? whens : [],
       repeat, days: repeat === 'weekly' ? days : [],
       due_date: repeat === 'once' ? (dueDate || null) : null,
-      start_date: startDate || null, due_time: dueTime || null,
+      start_date: repeat === 'once' ? null : (startDate || null), due_time: dueTime || null,
       reward: rewardable ? reward : false, stars: rewardable && reward ? stars : 0,
     });
   };
@@ -993,7 +1004,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
         )}
 
         <Field label="Repeat">
-          <Seg options={[{ v: 'daily', l: 'Daily' }, { v: 'weekly', l: 'Weekly' }, { v: 'once', l: 'One-time' }]} value={repeat} onChange={setRepeat} />
+          <Seg options={repeatOptions} value={repeat} onChange={setRepeat} />
           {repeat === 'weekly' && (
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {WEEK.map((d) => <Chip key={d} on={days.includes(d)} onClick={() => toggleIn(days, setDays, d)} small>{d[0] + d[1].toLowerCase()}</Chip>)}
@@ -1007,7 +1018,11 @@ function TaskModal({ modal, members, onClose, onSave }) {
         </Field>
 
         <div style={{ display: 'flex', gap: 12 }}>
-          <Field label="Starts" style={{ flex: 1 }}><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={input} /></Field>
+          {/* A one-off already carries its own date; a second "Starts" box next
+              to it only invites setting the wrong one. */}
+          {repeat !== 'once' && (
+            <Field label="Starts" style={{ flex: 1 }}><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={input} /></Field>
+          )}
           <Field label="Due time (optional)" style={{ flex: 1 }}><input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} style={input} /></Field>
         </div>
 

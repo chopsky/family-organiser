@@ -19,27 +19,29 @@ export function weekdayAbbrev(dateStr) {
 }
 
 // Does a definition apply on dateStr? Hidden before start_date; weekly → the
-// weekday is in `days`; once → its due date and every day after until done;
-// daily → always. Archived never.
+// weekday is in `days`; daily → always; once → exactly one day (see below).
+// Archived never. MIRRORS appliesOn in src/services/chores.js — keep in lockstep.
 //
-// `doneIds` is the set of definition ids that have ever been completed, from
-// the week endpoint's `completed_def_ids`. Without it a one-off shows only on
-// its own date — same contract as the server helper, so the grid and the day
-// view can never disagree.
+// A one-off occupies a single square: the day it was ticked, or its due date /
+// today (whichever is later) while undone. `opts.doneOn` is a Map of
+// definition id → completion date, from the week endpoint's `done_on`.
 export function appliesOnDate(def, dateStr, opts = {}) {
-  const { doneIds, today } = opts;
+  const { today, doneOn } = opts;
   if (!def || def.archived_at) return false;
   if (def.start_date && dateStr < def.start_date) return false;
   if (def.repeat === 'weekly') return (def.days || []).includes(weekdayAbbrev(dateStr));
-  if (def.repeat === 'once') {
-    if (!def.due_date) return false; // dateless: nothing to anchor it to
-    if (dateStr === def.due_date) return true;
-    if (!doneIds || !today) return false;
-    // Bounded at today: an outstanding task is not "overdue" on a day that
-    // hasn't happened, and the week grid runs into the future.
-    return dateStr > def.due_date && dateStr <= today && !doneIds.has(def.id);
-  }
+  if (def.repeat === 'once') return dateStr === oneOffDay(def, today, doneOn);
   return true; // daily (or unset)
+}
+
+// The single day a one-off occupies, or null if it has no date to sit on.
+export function oneOffDay(def, today, doneOn) {
+  if (!def.due_date) return null;
+  const completedOn = doneOn && doneOn.get(def.id);
+  if (completedOn) return completedOn;
+  if (!today) return def.due_date;
+  if (def.type === 'routine') return def.due_date; // habits don't accrue
+  return def.due_date > today ? def.due_date : today;
 }
 
 // The 7 day objects for the Monday-anchored week starting at fromStr.

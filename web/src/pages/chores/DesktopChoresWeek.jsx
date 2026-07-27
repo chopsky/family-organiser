@@ -110,10 +110,10 @@ function SummaryStat({ dot, label, value }) {
   );
 }
 
-export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, completedDefIds = [], today, onToggle, onEdit, allowPast = false }) {
-  // Ever-completed ids: an undone one-off carries forward past its due date,
-  // so the grid needs the same input the server's day view uses.
-  const carry = useMemo(() => ({ doneIds: new Set(completedDefIds), today }), [completedDefIds, today]);
+export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, doneOn = [], today, onToggle, onEdit, allowPast = false }) {
+  // Where each completed one-off was ticked. The grid places one-offs with
+  // the same rule as the server's day view, or the two disagree.
+  const carry = useMemo(() => ({ doneOn: new Map(doneOn), today }), [doneOn, today]);
   const selected = members.find((m) => m.id === who) || members[0];
   if (!selected) {
     return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Add family members to start assigning tasks.</div>;

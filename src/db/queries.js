@@ -9199,21 +9199,24 @@ async function reorderChoreDefinitions(householdId, orderedIds, db = supabase) {
 }
 
 /**
- * Definition ids that have EVER been completed, for one-off carry-forward.
+ * Map of definition id -> the date it was first completed, for placing
+ * one-offs. A one-off sits on the day it was ticked (so the tick and its star
+ * survive) or, while undone, on today. Knowing merely THAT it was done isn't
+ * enough - we need WHERE to draw it.
  *
- * A one-off shows on its due date and every day after until someone does it,
- * so the day view needs "has this ever been ticked?" - which the per-date
- * completion rows can't answer. Only one-offs are ever consulted, but the
- * query isn't restricted to them: joining would cost more than the small set
- * it returns, and a superset is harmless (appliesOn only asks about one-offs).
+ * Earliest wins: a multi-assignee one-off pins to the first tick, so the task
+ * stays put while the others catch up rather than hopping days.
  */
-async function getCompletedChoreDefinitionIds(householdId, db = supabase) {
+async function getChoreCompletionDates(householdId, db = supabase) {
   const { data, error } = await db
     .from('chore_completions')
-    .select('definition_id')
-    .eq('household_id', householdId);
+    .select('definition_id, date')
+    .eq('household_id', householdId)
+    .order('date', { ascending: true });
   if (error) throw error;
-  return new Set((data || []).map((r) => r.definition_id));
+  const out = new Map();
+  for (const r of data || []) if (!out.has(r.definition_id)) out.set(r.definition_id, r.date);
+  return out;
 }
 
 async function getChoreCompletionsForDate(householdId, dateStr, db = supabase) {
@@ -9603,7 +9606,7 @@ module.exports = {
   archiveChoreDefinition,
   reorderChoreDefinitions,
   getChoreCompletionsForDate,
-  getCompletedChoreDefinitionIds,
+  getChoreCompletionDates,
   getChoreCompletionsForRange,
   addChoreCompletion,
   removeChoreCompletion,
