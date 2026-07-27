@@ -112,3 +112,32 @@ describe('buildDayView', () => {
     expect(claimed).toMatchObject({ completed: true, completed_by: 'm', done: {} });
   });
 });
+
+// Regression: a one-off with no due_date was invisible on EVERY day.
+// `appliesOn`'s `due_date === dateStr` is false when due_date is null, so the
+// definition existed, showed in the week view (which lists all definitions
+// unfiltered) and never appeared on a single day. Reported by a user on
+// 2026-07-27; 11 of 11 one-offs across every household were affected, because
+// the create form never sent a date at all. The route now defaults the date,
+// so this documents the trap rather than changing appliesOn's contract.
+describe('one-off definitions must carry a date', () => {
+  it('a dated one-off applies on its date and no other', () => {
+    expect(appliesOn({ repeat: 'once', due_date: '2026-07-27' }, '2026-07-27')).toBe(true);
+    expect(appliesOn({ repeat: 'once', due_date: '2026-07-27' }, '2026-07-28')).toBe(false);
+  });
+
+  it('a dateless one-off applies on NO date — which is why it must never be stored', () => {
+    for (const d of ['2026-07-26', '2026-07-27', '2026-07-28', '2027-01-01']) {
+      expect(appliesOn({ repeat: 'once', due_date: null }, d)).toBe(false);
+    }
+  });
+
+  it('buildDayView therefore drops a dateless one-off entirely', () => {
+    const defs = [
+      { id: 'a', title: 'Dateless', repeat: 'once', due_date: null, assignee_ids: ['m1'] },
+      { id: 'b', title: 'Dated', repeat: 'once', due_date: '2026-07-27', assignee_ids: ['m1'] },
+    ];
+    const out = buildDayView(defs, [], '2026-07-27');
+    expect(out.map((t) => t.id)).toEqual(['b']);
+  });
+});

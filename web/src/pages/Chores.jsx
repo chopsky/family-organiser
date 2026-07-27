@@ -508,6 +508,10 @@ export default function Chores() {
   }, []);
 
   // iOS home-screen "Add Task" shortcut lands here with ?quickAdd=1.
+  // Deliberately no `date` here: the quick-add shortcut means "add something
+  // now", and an empty one-off date is defaulted to today server-side. Passing
+  // selDateStr would only add it as an effect dependency and re-open the sheet
+  // whenever the viewed day changed.
   useEffect(() => { if (!childMode && searchParams.get('quickAdd')) setModal({ mode: 'add' }); }, [searchParams, childMode]);
 
   // Close the people filter on an outside click (not on mouse-leave, which
@@ -747,8 +751,8 @@ export default function Chores() {
               )}
             </div>
             {!childMode && (isMobile
-              ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
-              : <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add' })} />
+              ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add', date: selDateStr })} />
+              : <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add', date: selDateStr })} />
             )}
           </div>
         )}
@@ -800,14 +804,14 @@ export default function Chores() {
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <AnyoneColumn tasks={anyoneTasks} members={members} mobile onClaim={claimAnyone}
                 onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
-                onAdd={() => setModal({ mode: 'add', anyone: true })} />
+                onAdd={() => setModal({ mode: 'add', anyone: true, date: selDateStr })} />
             </div>
           ) : activeMember && (
             <div key={activeMember.id}
               style={{ animation: slideDir > 0 ? 'choreSlideR .2s ease' : slideDir < 0 ? 'choreSlideL .2s ease' : 'none' }}>
               <MemberDayCard member={activeMember} done={tasksFor(activeMember.id).filter((t) => t.done?.[activeMember.id]).length} total={tasksFor(activeMember.id).length} balance={balances[activeMember.id]} showRewards={isKid(activeMember) || (balances[activeMember.id] || 0) > 0} onRewards={() => navigate(`/rewards?member=${activeMember.id}`)} />
               <MemberColumn m={activeMember} balance={balances[activeMember.id]} tasks={tasksFor(activeMember.id)} mobile bare
-                onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+                onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid, date: selDateStr })} />
             </div>
           )}
         </div>
@@ -830,12 +834,12 @@ export default function Chores() {
         <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, alignItems: 'stretch', flex: 1, minHeight: 0 }}>
           {shown.map((m) => (
             <MemberColumn key={m.id} m={m} balance={balances[m.id]} tasks={tasksFor(m.id)}
-              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid })} />
+              onToggle={toggle} onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip} onReorder={handleReorder} onAdd={(mid) => setModal({ mode: 'add', defaultWho: mid, date: selDateStr })} />
           ))}
           {showAnyone && (
             <AnyoneColumn tasks={anyoneTasks} members={members} onClaim={claimAnyone}
               onEdit={(t) => setModal({ mode: 'edit', task: t })} onDelete={handleDelete} onSkip={handleSkip}
-              onAdd={() => setModal({ mode: 'add', anyone: true })} />
+              onAdd={() => setModal({ mode: 'add', anyone: true, date: selDateStr })} />
           )}
         </div>
       )}
@@ -896,6 +900,9 @@ function TaskModal({ modal, members, onClose, onSave }) {
   const [repeat, setRepeat] = useState(t.repeat || 'daily');
   const [days, setDays] = useState(t.days || []);
   const [startDate, setStartDate] = useState(t.start_date || '');
+  // One-time tasks are pinned to a date. Defaults to the day being viewed,
+  // so "add a one-off" on Tuesday lands on Tuesday rather than nowhere.
+  const [dueDate, setDueDate] = useState(t.due_date || modal.date || '');
   const [dueTime, setDueTime] = useState(t.due_time ? String(t.due_time).slice(0, 5) : '');
   const [reward, setReward] = useState(!!t.reward);
   const [stars, setStars] = useState(t.stars || 5);
@@ -915,6 +922,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
       assignee_ids: isAnyone ? [] : assignees,
       whens: (!isAnyone && type === 'routine') ? whens : [],
       repeat, days: repeat === 'weekly' ? days : [],
+      due_date: repeat === 'once' ? (dueDate || null) : null,
       start_date: startDate || null, due_time: dueTime || null,
       reward: rewardable ? reward : false, stars: rewardable && reward ? stars : 0,
     });
@@ -976,6 +984,11 @@ function TaskModal({ modal, members, onClose, onSave }) {
           {repeat === 'weekly' && (
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {WEEK.map((d) => <Chip key={d} on={days.includes(d)} onClick={() => toggleIn(days, setDays, d)} small>{d[0] + d[1].toLowerCase()}</Chip>)}
+            </div>
+          )}
+          {repeat === 'once' && (
+            <div style={{ marginTop: 10 }}>
+              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label="Date" style={input} />
             </div>
           )}
         </Field>

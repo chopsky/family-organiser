@@ -40,7 +40,17 @@ function mondayOf(dateStr) {
 }
 
 // Validate + normalise an incoming definition body. Returns { def } or { error }.
-function normaliseDef(body, memberIds) {
+/**
+ * @param todayStr the household's today ('YYYY-MM-DD'), used as the fallback
+ *   due date for a one-off that arrives without one. Without this a
+ *   `repeat: 'once'` definition stored `due_date: null`, and appliesOn's
+ *   `due_date === dateStr` is false for EVERY date - so the task existed, was
+ *   listed in the week view (which returns all definitions unfiltered), and
+ *   never appeared on a single day. Every one-off ever created hit this.
+ *   The web form now always sends a date; this keeps the shipped iOS/Android
+ *   bundles (which cannot) and the bot's create path working.
+ */
+function normaliseDef(body, memberIds, todayStr) {
   if (!body || typeof body.title !== 'string' || !body.title.trim()) return { error: 'title is required' };
   // "Anyone" chores are up-for-grabs: no assignee, always a chore (not a
   // routine). The completer is chosen at check-off time, not here.
@@ -61,7 +71,8 @@ function normaliseDef(body, memberIds) {
   return {
     def: {
       title: body.title.trim(), emoji: body.emoji || null, type, anyone, assignee_ids, whens, repeat, days,
-      due_date: repeat === 'once' ? (body.due_date || null) : null,
+      // A one-off ALWAYS carries a date - a dateless one never shows up.
+      due_date: repeat === 'once' ? (body.due_date || todayStr || null) : null,
       start_date: body.start_date || null,
       due_time: body.due_time || null,
       reward, stars, position: body.position,
@@ -145,8 +156,11 @@ router.get('/streak', requireAuth, requireHousehold, async (req, res) => {
 /** POST /api/chores — create a recurring definition. */
 router.post('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const members = await db.getHouseholdMembers(req.householdId);
-    const { def, error } = normaliseDef(req.body, members.map((m) => m.id));
+    const [members, today] = await Promise.all([
+      db.getHouseholdMembers(req.householdId),
+      householdToday(req.householdId),
+    ]);
+    const { def, error } = normaliseDef(req.body, members.map((m) => m.id), today);
     if (error) return res.status(400).json({ error });
     const created = await db.addChoreDefinition(req.householdId, def, req.user.id);
     cache.invalidate(`digest:${req.householdId}`);
@@ -160,8 +174,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
 /** PATCH /api/chores/:id — edit a definition. */
 router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const members = await db.getHouseholdMembers(req.householdId);
-    const { def, error } = normaliseDef({ ...req.body }, members.map((m) => m.id));
+    const [members, today] = await Promise.all([
+      db.getHouseholdMembers(req.householdId),
+      householdToday(req.householdId),
+    ]);
+    const { def, error } = normaliseDef({ ...req.body }, members.map((m) => m.id), today);
     if (error) return res.status(400).json({ error });
     const updated = await db.updateChoreDefinition(req.params.id, req.householdId, def);
     if (!updated) return res.status(404).json({ error: 'Task not found' });
