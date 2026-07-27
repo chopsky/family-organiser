@@ -144,7 +144,13 @@ export default function OnboardingV4({ initialPhase }) {
     return (
       <LoginScreen
         onBack={back}
-        onCreate={() => goPhase('flow', 0)}
+        // Where "Create an account" goes depends on how they got here. Arriving
+        // from the splash, they have already seen the pitch, so jumping them
+        // back to it would be a loop - go straight into the questions. Arriving
+        // at /login directly (signing out lands here) they have seen nothing,
+        // and dropping them on "Step 1 of 6" skips the screen that explains
+        // what they are signing up for.
+        onCreate={() => goPhase(initialPhase === 'login' ? 'splash' : 'flow', 0)}
         auth={socialAuth}
         v4={v4}
         // An existing account has a household already: straight to the app,
