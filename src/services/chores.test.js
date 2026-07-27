@@ -141,3 +141,45 @@ describe('one-off definitions must carry a date', () => {
     expect(out.map((t) => t.id)).toEqual(['b']);
   });
 });
+
+// One-offs carry forward: a task you meant to do on Saturday and didn't is
+// still a task on Sunday. Before this, a missed one-off dropped off the board
+// silently the moment its day passed.
+describe('one-off carry-forward', () => {
+  const def = { id: 'd1', repeat: 'once', due_date: '2026-07-24', assignee_ids: ['m1'] };
+
+  it('shows on its due date whether or not it is done', () => {
+    expect(appliesOn(def, '2026-07-24', new Set())).toBe(true);
+    expect(appliesOn(def, '2026-07-24', new Set(['d1']))).toBe(true);
+  });
+
+  it('keeps showing on later days while undone', () => {
+    expect(appliesOn(def, '2026-07-25', new Set())).toBe(true);
+    expect(appliesOn(def, '2026-09-01', new Set())).toBe(true);
+  });
+
+  it('stops as soon as someone has done it', () => {
+    expect(appliesOn(def, '2026-07-25', new Set(['d1']))).toBe(false);
+  });
+
+  it('never shows BEFORE its due date', () => {
+    expect(appliesOn(def, '2026-07-23', new Set())).toBe(false);
+  });
+
+  it('does not carry when the caller omits the done set (streaks keep old behaviour)', () => {
+    expect(appliesOn(def, '2026-07-25')).toBe(false);
+    expect(appliesOn(def, '2026-07-24')).toBe(true);
+  });
+
+  it('marks a carried instance so the UI can show where it came from', () => {
+    const [onDay] = buildDayView([def], [], '2026-07-24', new Set());
+    const [carried] = buildDayView([def], [], '2026-07-26', new Set());
+    expect(onDay.carried_from).toBeNull();
+    expect(carried.carried_from).toBe('2026-07-24');
+  });
+
+  it('leaves repeating tasks untouched', () => {
+    const daily = { id: 'd2', repeat: 'daily', assignee_ids: ['m1'] };
+    expect(appliesOn(daily, '2026-07-26', new Set(['d2']))).toBe(true);
+  });
+});

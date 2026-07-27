@@ -88,17 +88,20 @@ function normaliseDef(body, memberIds, todayStr) {
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
     const date = DATE_RE.test(req.query.date) ? req.query.date : await householdToday(req.householdId);
-    const [defs, completions, balances] = await Promise.all([
+    const [defs, completions, balances, doneIds] = await Promise.all([
       db.getChoreDefinitions(req.householdId),
       db.getChoreCompletionsForDate(req.householdId, date),
       db.getStarBalances(req.householdId),
+      // Which definitions have ever been ticked - an undone one-off carries
+      // forward past its due date, a done one stops.
+      db.getCompletedChoreDefinitionIds(req.householdId).catch(() => new Set()),
     ]);
     // Skips are best-effort: if the chore_skips migration hasn't run yet, a
     // missing table must NOT blank the whole board - just show no skips.
     let skipped = new Set();
     try { skipped = new Set(await db.getChoreSkipsForDate(req.householdId, date)); }
     catch (e) { console.warn('chore skips unavailable (run migration-chore-skips.sql):', e.message); }
-    const tasks = buildDayView(defs, completions, date).filter((t) => !skipped.has(t.id));
+    const tasks = buildDayView(defs, completions, date, doneIds).filter((t) => !skipped.has(t.id));
     return res.json({ date, tasks, balances });
   } catch (err) {
     console.error('GET /api/chores error:', err);
@@ -119,13 +122,16 @@ router.get('/week', requireAuth, requireHousehold, async (req, res) => {
     const ref = DATE_RE.test(req.query.date) ? req.query.date : today;
     const from = mondayOf(ref);
     const to = addDays(from, 6);
-    const [defs, completions, skips, balances] = await Promise.all([
+    const [defs, completions, skips, balances, doneIds] = await Promise.all([
       db.getChoreDefinitions(req.householdId),
       db.getChoreCompletionsForRange(req.householdId, from, to),
       db.getChoreSkipsForRange(req.householdId, from, to).catch(() => []), // pre-migration tolerant
       db.getStarBalances(req.householdId),
+      db.getCompletedChoreDefinitionIds(req.householdId).catch(() => new Set()),
     ]);
-    return res.json({ from, to, today, defs, completions, skips, balances });
+    // The grid mirrors appliesOn client-side, so it needs the same carry-forward
+    // input the day view uses or the two views disagree about one-offs.
+    return res.json({ from, to, today, defs, completions, skips, balances, completed_def_ids: [...doneIds] });
   } catch (err) {
     console.error('GET /api/chores/week error:', err);
     return res.status(500).json({ error: 'Internal server error' });

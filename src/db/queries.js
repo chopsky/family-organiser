@@ -9198,6 +9198,24 @@ async function reorderChoreDefinitions(householdId, orderedIds, db = supabase) {
   }
 }
 
+/**
+ * Definition ids that have EVER been completed, for one-off carry-forward.
+ *
+ * A one-off shows on its due date and every day after until someone does it,
+ * so the day view needs "has this ever been ticked?" - which the per-date
+ * completion rows can't answer. Only one-offs are ever consulted, but the
+ * query isn't restricted to them: joining would cost more than the small set
+ * it returns, and a superset is harmless (appliesOn only asks about one-offs).
+ */
+async function getCompletedChoreDefinitionIds(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('chore_completions')
+    .select('definition_id')
+    .eq('household_id', householdId);
+  if (error) throw error;
+  return new Set((data || []).map((r) => r.definition_id));
+}
+
 async function getChoreCompletionsForDate(householdId, dateStr, db = supabase) {
   let { data, error } = await db
     .from('chore_completions')
@@ -9585,6 +9603,7 @@ module.exports = {
   archiveChoreDefinition,
   reorderChoreDefinitions,
   getChoreCompletionsForDate,
+  getCompletedChoreDefinitionIds,
   getChoreCompletionsForRange,
   addChoreCompletion,
   removeChoreCompletion,

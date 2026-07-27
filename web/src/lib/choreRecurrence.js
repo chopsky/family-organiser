@@ -19,12 +19,22 @@ export function weekdayAbbrev(dateStr) {
 }
 
 // Does a definition apply on dateStr? Hidden before start_date; weekly → the
-// weekday is in `days`; once → due_date matches; daily → always. Archived never.
-export function appliesOnDate(def, dateStr) {
+// weekday is in `days`; once → its due date and every day after until done;
+// daily → always. Archived never.
+//
+// `doneIds` is the set of definition ids that have ever been completed, from
+// the week endpoint's `completed_def_ids`. Without it a one-off shows only on
+// its own date — same contract as the server helper, so the grid and the day
+// view can never disagree.
+export function appliesOnDate(def, dateStr, doneIds) {
   if (!def || def.archived_at) return false;
   if (def.start_date && dateStr < def.start_date) return false;
   if (def.repeat === 'weekly') return (def.days || []).includes(weekdayAbbrev(dateStr));
-  if (def.repeat === 'once') return def.due_date === dateStr;
+  if (def.repeat === 'once') {
+    if (!def.due_date) return false; // dateless: nothing to anchor it to
+    if (dateStr === def.due_date) return true;
+    return dateStr > def.due_date && Boolean(doneIds) && !doneIds.has(def.id);
+  }
   return true; // daily (or unset)
 }
 

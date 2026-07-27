@@ -45,6 +45,12 @@ function currentSlot() {
   const h = new Date().getHours();
   return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
 }
+// '2026-07-24' -> '24 Jul', for the carried-forward chip.
+function fmtDayMon(d) {
+  const [y, m, day] = String(d).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, day || 1).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
 function repeatLabel(t) {
   if (t.repeat === 'once') return 'One-time';
   if (t.repeat === 'weekly') {
@@ -80,12 +86,15 @@ function MetaChips({ task }) {
   const chips = [];
   if (task.due_time) chips.push({ k: 'time', label: String(task.due_time).slice(0, 5) });
   if (task.type === 'chore') chips.push({ k: 'rep', label: repeatLabel(task) || 'Daily' });
+  // A one-off that wasn't done on its day carries forward. Say where it came
+  // from, so it reads as overdue rather than appearing out of nowhere.
+  if (task.carried_from) chips.push({ k: 'late', label: `since ${fmtDayMon(task.carried_from)}`, late: true });
   if (!chips.length) return null;
   return (
     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 4 }}>
       {chips.map((c) => (
-        <span key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 7px', borderRadius: 99, background: BG_SOFT, fontSize: 10.5, fontWeight: 600, color: INK3 }}>
-          {c.k === 'time' ? <IcClock s={10} c={INK3} /> : <IcRepeat s={10} c={INK3} />}{c.label}
+        <span key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 7px', borderRadius: 99, background: c.late ? '#FBEDE9' : BG_SOFT, fontSize: 10.5, fontWeight: 600, color: c.late ? '#B04A36' : INK3 }}>
+          {c.k === 'late' ? null : c.k === 'time' ? <IcClock s={10} c={INK3} /> : <IcRepeat s={10} c={INK3} />}{c.label}
         </span>
       ))}
     </div>
@@ -816,7 +825,7 @@ export default function Chores() {
           )}
         </div>
       ) : weekMode ? (
-        <DesktopChoresWeek
+        <DesktopChoresWeek completedDefIds={weekData?.completed_def_ids || []}
           members={shown}
           who={weekWho}
           setWho={setWeekWho}
