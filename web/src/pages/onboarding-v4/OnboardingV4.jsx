@@ -21,6 +21,7 @@ import {
   Splash, PainPicker, ShapePicker, NameStep, RoleStep, HouseStep, HouseSignOverlay,
 } from './screens';
 import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
+import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
@@ -46,16 +47,31 @@ export default function OnboardingV4() {
     return <Splash reduced={reduced} onStart={() => goPhase('flow', 0)} onLogin={() => goPhase('login')} />;
   }
 
-  if (phase === 'login' || phase === 'signup' || phase === 'done') {
+  if (phase === 'login') {
     return (
-      <StandIn
-        title={phase === 'login' ? 'Welcome back.' : phase === 'done' ? 'Welcome home.' : `${d.house || 'Your household'} is ready.`}
-        note={`${phase} screen — Phase 3 batch ${phase === 'login' ? '3' : '3'}`}
-        d={d}
-        primary={phase === 'signup' ? { label: 'Create account (stand-in)', onClick: f.finish } : null}
-        ghost={{ label: phase === 'signup' ? '← Back to the last step' : '← Back', onClick: phase === 'done' ? () => navigate('/signup') : back }}
+      <LoginScreen
+        onBack={back}
+        onCreate={() => goPhase('flow', 0)}
+        // Real providers + session handling arrive in Phase 5.
+        onPick={() => navigate('/signup')}
       />
     );
+  }
+
+  if (phase === 'signup') {
+    return (
+      <SignUpScreen
+        d={d}
+        onBack={back}
+        // Phase 5 replaces this with real auth, then replays the queued
+        // calendar + WhatsApp connections against the new household.
+        onPick={() => f.finish()}
+      />
+    );
+  }
+
+  if (phase === 'done') {
+    return <DoneScreen d={d} reduced={reduced} onEnter={() => navigate('/dashboard')} />;
   }
 
   const skipLabel = skipLabelAt(f.i);
@@ -125,31 +141,3 @@ export default function OnboardingV4() {
   );
 }
 
-/** Placeholder frame for the phases still to be built. */
-function StandIn({ title, note, d, primary, ghost }) {
-  return (
-    <div
-      className="ob-v4"
-      style={{
-        height: '100dvh', display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        background: T.bg, color: T.ink, padding: '0 26px 30px',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-      }}
-    >
-      <h1 style={{ fontFamily: T.title, fontWeight: 400, fontSize: 34, lineHeight: 1.08, letterSpacing: '-.015em' }}>{title}</h1>
-      <p style={{ fontSize: 15, color: T.ink2, marginTop: 8 }}>{note}</p>
-      <div style={{ marginTop: 18, background: T.surface, borderRadius: 16, padding: 14 }}>
-        {['pains', 'shape', 'you', 'role', 'house'].map((k) => (
-          <p key={k} style={{ fontSize: 13, display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-            <span style={{ color: T.ink3 }}>{k}</span>
-            <b style={{ color: T.ink }}>{Array.isArray(d[k]) ? (d[k].length || '—') : (d[k] || '—')}</b>
-          </p>
-        ))}
-      </div>
-      <div style={{ marginTop: 20 }}>
-        {primary && <Cta onClick={primary.onClick}>{primary.label}</Cta>}
-        {ghost && <Ghost onClick={ghost.onClick}>{ghost.label}</Ghost>}
-      </div>
-    </div>
-  );
-}
