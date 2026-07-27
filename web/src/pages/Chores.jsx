@@ -916,17 +916,6 @@ function TaskModal({ modal, members, onClose, onSave }) {
   // One-time tasks are pinned to a date. Defaults to the day being viewed,
   // so "add a one-off" on Tuesday lands on Tuesday rather than nowhere.
   const [dueDate, setDueDate] = useState(t.due_date || modal.date || '');
-  // A routine is a habit, so "One-time" is a contradiction — and a one-off
-  // routine deliberately doesn't carry when missed, which just reads as a bug.
-  // Offer it for chores only, and never strand a routine holding repeat:'once'.
-  const routineNow = !isAnyone && type === 'routine';
-  const repeatOptions = [
-    { v: 'daily', l: 'Daily' }, { v: 'weekly', l: 'Weekly' },
-    ...(routineNow ? [] : [{ v: 'once', l: 'One-time' }]),
-  ];
-  useEffect(() => {
-    if (routineNow && repeat === 'once') setRepeat('daily');
-  }, [routineNow, repeat]);
   const [dueTime, setDueTime] = useState(t.due_time ? String(t.due_time).slice(0, 5) : '');
   const [reward, setReward] = useState(!!t.reward);
   const [stars, setStars] = useState(t.stars || 5);
@@ -936,6 +925,24 @@ function TaskModal({ modal, members, onClose, onSave }) {
   // assignee (or an anyone chore) can carry a reward.
   const isAnyone = !!(modal.anyone || t.anyone);
   const rewardable = isAnyone || assignees.length > 0;
+  // A routine is a habit, so "One-time" is a contradiction — and a one-off
+  // routine deliberately doesn't carry when missed, which just reads as a bug.
+  // Offer it for chores only, and never strand a routine holding repeat:'once'.
+  // MUST stay below isAnyone: reading it above the declaration puts it in the
+  // temporal dead zone, which throws on every render of this sheet.
+  const routineNow = !isAnyone && type === 'routine';
+  const repeatOptions = [
+    { v: 'daily', l: 'Daily' }, { v: 'weekly', l: 'Weekly' },
+    ...(routineNow ? [] : [{ v: 'once', l: 'One-time' }]),
+  ];
+  // Switching to Routine while One-time is selected would leave repeat holding
+  // a value the segment no longer offers. Corrected at the moment of the
+  // change rather than in an effect, so there's no render with an impossible
+  // state and no set-state-in-effect loop.
+  const pickType = (v) => {
+    setType(v);
+    if (v === 'routine' && repeat === 'once') setRepeat('daily');
+  };
   const toggleIn = (arr, set, v) => set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
   const submit = () => {
@@ -988,7 +995,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
             </Field>
 
             <Field label="Type">
-              <Seg options={[{ v: 'chore', l: 'Chore' }, { v: 'routine', l: 'Routine' }]} value={type} onChange={setType} />
+              <Seg options={[{ v: 'chore', l: 'Chore' }, { v: 'routine', l: 'Routine' }]} value={type} onChange={pickType} />
             </Field>
           </>
         )}
