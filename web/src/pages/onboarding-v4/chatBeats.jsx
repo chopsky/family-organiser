@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import { PAINS, PAINS_FALLBACK, planOpener } from './content';
-import { Bubble, Typing } from './ui';
+import { Bubble, Typing, Ghost } from './ui';
 import useScript from './useScript';
 
 const H1 = {
@@ -160,22 +160,29 @@ export function AskBeat({ d, reduced, onDone }) {
  * state would therefore be a lie here. Instead we take the yes, say plainly
  * when it happens, and fire the real pairing immediately after sign-up.
  */
-export function WhatsAppFooter({ on, onConnect, onSkip }) {
+export function WhatsAppFooter({ on, onConnect, onSkip, onContinue }) {
   const [busy, setBusy] = useState(false);
 
   if (on) {
     return (
-      <div
-        style={{
-          background: T.okBg, color: T.okInk, borderRadius: R.cta, padding: '14px 16px',
-          textAlign: 'center', font: '700 15px Inter, system-ui, sans-serif',
-        }}
-      >
-        WhatsApp it is
-        <span style={{ display: 'block', font: '500 12.5px Inter, system-ui, sans-serif', marginTop: 2 }}>
-          We’ll link it the moment your account’s saved.
-        </span>
-      </div>
+      <>
+        <div
+          style={{
+            background: T.okBg, color: T.okInk, borderRadius: R.cta, padding: '14px 16px',
+            textAlign: 'center', font: '700 15px Inter, system-ui, sans-serif',
+          }}
+        >
+          WhatsApp it is
+          <span style={{ display: 'block', font: '500 12.5px Inter, system-ui, sans-serif', marginTop: 2 }}>
+            We’ll link it the moment your account’s saved.
+          </span>
+        </div>
+        {/* Taking the "yes" auto-advances, so this is usually unseen. It exists
+            because the step can also be ENTERED with the answer already in -
+            a resumed draft, or pressing back from the reminders screen - and
+            without it that is a screen with no way forward. */}
+        <Ghost onClick={onContinue}>Continue</Ghost>
+      </>
     );
   }
 

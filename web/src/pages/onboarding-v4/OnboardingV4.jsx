@@ -6,9 +6,9 @@
  * lib/onboardingDraft) and replayed once the account exists, because a calendar
  * feed needs user_id + household_id and a WhatsApp link is a column on users.
  *
- * Phase 3 batch 1 (here): splash and the pickers are the designed screens.
- * The chat beats (03, 09), calendars (08), reminders (10), sign-up (11) and
- * welcome (12) are still stand-ins and land in the next batches.
+ * All twelve screens are the designed ones. The remaining gap is the auth
+ * itself: the sign-up and login buttons do not yet call a real provider, so
+ * the queued connections in ./replay are wired but not fired.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +22,8 @@ import {
 } from './screens';
 import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
 import { CalendarList, CalendarConnect } from './calendarScreens';
+import { RemindersBody, RemindersFooter } from './remindersScreen';
+import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import { setCalUrl } from '../../lib/onboardingDraft';
 
@@ -40,6 +42,25 @@ export default function OnboardingV4() {
   // Which provider's connect flow is open, if any. A sub-view of step 08
   // rather than a step of its own, so the progress bar doesn't jump.
   const [connecting, setConnecting] = useState(null);
+
+  // Notification permission is a one-shot OS prompt, so the screen owns a busy
+  // flag and an explanation line rather than silently doing nothing.
+  const [remBusy, setRemBusy] = useState(false);
+  const [remNote, setRemNote] = useState('');
+
+  const askNudges = async () => {
+    setRemBusy(true);
+    const { granted, note } = await askForNudges();
+    setRemBusy(false);
+    update({ rem: granted });
+    if (!granted && note) {
+      // Show why, briefly, then move on - this step is never a gate.
+      setRemNote(note);
+      setTimeout(next, 1400);
+      return;
+    }
+    next();
+  };
 
   // A verified calendar. The URL goes to the in-memory store only (it's a
   // bearer credential); the draft records the fact of the connection, which is
@@ -115,7 +136,11 @@ export default function OnboardingV4() {
         footer={connecting ? null : step === 'ask' ? (
           // Screen 09 owns its footer entirely - a green WhatsApp button, not
           // the standard CTA, and no skip once the answer is in.
-          <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} />
+          <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} onContinue={next} />
+        ) : step === 'reminders' ? (
+          // Screen 10's CTA triggers a one-shot OS prompt, so it is its own
+          // control rather than the standard advance button.
+          <RemindersFooter busy={remBusy} onAsk={askNudges} onSkip={skip} />
         ) : (
           <>
             {!autoAdvances(f.i) && (
@@ -160,17 +185,7 @@ export default function OnboardingV4() {
           <CalendarList d={d} onConnect={setConnecting} />
         ))}
 
-        {step === 'reminders' && (
-          <>
-            <p style={{ font: '700 11.5px Inter, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple }}>
-              {step}
-            </p>
-            <h1 style={{ fontFamily: T.title, fontWeight: 400, fontSize: 34, lineHeight: 1.08, letterSpacing: '-.015em', marginTop: 8 }}>
-              {step} screen
-            </h1>
-            <p style={{ fontSize: 15, color: T.ink2, marginTop: 8 }}>Stand-in — arrives in the next batch.</p>
-          </>
-        )}
+        {step === 'reminders' && <RemindersBody d={d} reduced={reduced} note={remNote} />}
       </Step>
     </>
   );
