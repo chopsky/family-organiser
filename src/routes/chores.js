@@ -39,6 +39,13 @@ function mondayOf(dateStr) {
   return ymd(dt);
 }
 
+// Household members who can be given a chore. Pets are real members - they
+// show on the family page and own vet appointments - but they cannot hold a
+// task, so they never reach an assignee list.
+const assignableIds = (members) => (members || [])
+  .filter((m) => !(m.member_type === 'dependent' && m.dependent_kind === 'pet'))
+  .map((m) => m.id);
+
 // Validate + normalise an incoming definition body. Returns { def } or { error }.
 /**
  * @param todayStr the household's today ('YYYY-MM-DD'), used as the fallback
@@ -57,6 +64,8 @@ function normaliseDef(body, memberIds, todayStr) {
   const anyone = !!body.anyone;
   const type = anyone ? 'chore' : (VALID_TYPES.includes(body.type) ? body.type : 'chore');
   const repeat = VALID_REPEATS.includes(body.repeat) ? body.repeat : 'daily';
+  // memberIds excludes pets (see the caller): they live on the family page but
+  // can't be given a chore, and the shipped mobile bundle still offers them.
   const assignee_ids = (!anyone && Array.isArray(body.assignee_ids))
     ? body.assignee_ids.filter((id) => memberIds.includes(id)) : [];
   const whens = (!anyone && type === 'routine' && Array.isArray(body.whens))
@@ -166,7 +175,7 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdMembers(req.householdId),
       householdToday(req.householdId),
     ]);
-    const { def, error } = normaliseDef(req.body, members.map((m) => m.id), today);
+    const { def, error } = normaliseDef(req.body, assignableIds(members), today);
     if (error) return res.status(400).json({ error });
     const created = await db.addChoreDefinition(req.householdId, def, req.user.id);
     cache.invalidate(`digest:${req.householdId}`);
@@ -184,7 +193,7 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
       db.getHouseholdMembers(req.householdId),
       householdToday(req.householdId),
     ]);
-    const { def, error } = normaliseDef({ ...req.body }, members.map((m) => m.id), today);
+    const { def, error } = normaliseDef({ ...req.body }, assignableIds(members), today);
     if (error) return res.status(400).json({ error });
     const updated = await db.updateChoreDefinition(req.params.id, req.householdId, def);
     if (!updated) return res.status(404).json({ error: 'Task not found' });

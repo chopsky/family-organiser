@@ -853,7 +853,11 @@ export default function Chores() {
         </div>
       )}
 
-      {modal && <TaskModal modal={modal} members={members} onClose={() => setModal(null)} onSave={handleSave} />}
+      {/* baseMembers, not members: pets appear on the family page but are not
+          assignable — nobody hands the dog the dishwasher. Same list the
+          board columns use, so the picker can't offer someone the board
+          would never show. */}
+      {modal && <TaskModal modal={modal} members={baseMembers} onClose={() => setModal(null)} onSave={handleSave} />}
       {/* When the celebration closes, ask iOS for the native App Store review
           sheet. This page only renders OUTSIDE Child Mode (ChildGate swaps
           /tasks to KidsShell), so unlike the kids' quest celebration an adult

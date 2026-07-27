@@ -87,3 +87,41 @@ describe('one-off chores always get a date', () => {
     expect(db.addChoreDefinition).not.toHaveBeenCalled();
   });
 });
+
+// Pets are household members — they show on the family page and own vet
+// appointments — but nobody hands the dog the dishwasher. The picker hides
+// them, and the server drops them too, because the shipped mobile bundle is a
+// frozen dist that will keep offering them until it updates.
+describe('pets are never assignable', () => {
+  beforeEach(() => {
+    db.getHouseholdMembers.mockResolvedValue([
+      { id: 'm1', member_type: 'account' },
+      { id: 'kid', member_type: 'dependent', dependent_kind: 'child' },
+      { id: 'dog', member_type: 'dependent', dependent_kind: 'pet' },
+    ]);
+  });
+
+  it('drops a pet from assignee_ids while keeping everyone else', async () => {
+    await request(app())
+      .post('/api/chores')
+      .send({ title: 'Empty dishwasher', repeat: 'daily', assignee_ids: ['m1', 'dog', 'kid'] });
+
+    expect(db.addChoreDefinition.mock.calls[0][1].assignee_ids).toEqual(['m1', 'kid']);
+  });
+
+  it('drops a pet on edit too', async () => {
+    await request(app())
+      .patch('/api/chores/x')
+      .send({ title: 'Walkies', repeat: 'daily', assignee_ids: ['dog'] });
+
+    expect(db.updateChoreDefinition.mock.calls[0][2].assignee_ids).toEqual([]);
+  });
+
+  it('still accepts a child (dependents are assignable, pets are not)', async () => {
+    await request(app())
+      .post('/api/chores')
+      .send({ title: 'Tidy room', repeat: 'daily', assignee_ids: ['kid'] });
+
+    expect(db.addChoreDefinition.mock.calls[0][1].assignee_ids).toEqual(['kid']);
+  });
+});
