@@ -21,7 +21,9 @@ import {
   Splash, PainPicker, ShapePicker, NameStep, RoleStep, HouseStep, HouseSignOverlay,
 } from './screens';
 import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
+import { CalendarList, CalendarConnect } from './calendarScreens';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
+import { setCalUrl } from '../../lib/onboardingDraft';
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
@@ -35,6 +37,20 @@ export default function OnboardingV4() {
   // The plan screen's CTA stays disabled until its scripted reply finishes -
   // letting someone skip past the payback would waste the screen's whole job.
   const [planDone, setPlanDone] = useState(false);
+  // Which provider's connect flow is open, if any. A sub-view of step 08
+  // rather than a step of its own, so the progress bar doesn't jump.
+  const [connecting, setConnecting] = useState(null);
+
+  // A verified calendar. The URL goes to the in-memory store only (it's a
+  // bearer credential); the draft records the fact of the connection, which is
+  // what the recap and the post-signup replay need.
+  const calendarConnected = (providerId, url, result) => {
+    setCalUrl(providerId, url);
+    update((prev) => ({
+      cals: { ...prev.cals, [providerId]: { eventCount: result.eventCount, name: result.name } },
+    }));
+    setConnecting(null);
+  };
 
   // Taking the WhatsApp "yes" records intent only; the real pairing runs after
   // sign-up (a WhatsApp link is a column on users, and there is no user yet).
@@ -74,7 +90,10 @@ export default function OnboardingV4() {
     return <DoneScreen d={d} reduced={reduced} onEnter={() => navigate('/dashboard')} />;
   }
 
-  const skipLabel = skipLabelAt(f.i);
+  const calCount = Object.keys(d.cals || {}).length;
+  // Once a calendar is in, "I'll do this later" is the wrong offer - the CTA
+  // is the only sensible way on.
+  const skipLabel = step === 'cals' && calCount > 0 ? null : skipLabelAt(f.i);
   // Submitting the household name shows the sign, which then advances.
   const advance = () => { if (step === 'house') setSign(true); else next(); };
 
@@ -90,8 +109,10 @@ export default function OnboardingV4() {
       <Step
         pct={pct}
         reduced={reduced}
-        onBack={back}
-        footer={step === 'ask' ? (
+        // Inside a provider's connect flow, back means "leave this provider",
+        // not "leave the calendar step".
+        onBack={connecting ? () => setConnecting(null) : back}
+        footer={connecting ? null : step === 'ask' ? (
           // Screen 09 owns its footer entirely - a green WhatsApp button, not
           // the standard CTA, and no skip once the answer is in.
           <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} />
@@ -102,7 +123,11 @@ export default function OnboardingV4() {
                 {step === 'pains'
                   ? ((d.pains || []).length === 0 ? 'Pick at least one' : `That’s my list (${d.pains.length})`)
                   : step === 'plan' ? (planDone ? 'Sounds good' : 'One sec…')
-                    : step === 'house' ? 'Put the sign up' : 'Continue'}
+                    : step === 'house' ? 'Put the sign up'
+                      // The calendar step is never a gate, so its CTA reads as
+                      // "done here" rather than implying something is missing.
+                      : step === 'cals' ? (calCount > 0 ? `Done · ${calCount} connected` : 'Continue')
+                        : 'Continue'}
               </Cta>
             )}
             {skipLabel && <Ghost onClick={skip}>{skipLabel}</Ghost>}
@@ -125,7 +150,17 @@ export default function OnboardingV4() {
         {step === 'plan' && <PlanBeat d={d} reduced={reduced} onDone={() => setPlanDone(true)} />}
         {step === 'ask' && <AskBeat d={d} reduced={reduced} />}
 
-        {(step === 'cals' || step === 'reminders') && (
+        {step === 'cals' && (connecting ? (
+          <CalendarConnect
+            providerId={connecting}
+            onDone={calendarConnected}
+            onCancel={() => setConnecting(null)}
+          />
+        ) : (
+          <CalendarList d={d} onConnect={setConnecting} />
+        ))}
+
+        {step === 'reminders' && (
           <>
             <p style={{ font: '700 11.5px Inter, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple }}>
               {step}

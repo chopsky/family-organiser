@@ -703,16 +703,22 @@ function startScheduler() {
   cron.schedule('0 6 * * *', () => syncAllIcalFeeds());
   console.log('✓ Daily iCal sync scheduled (06:00 UTC)');
 
-  // ── External feed refresh: every 6 hours at :15 ─────────────────────────────
+  // ── External feed refresh: hourly at :15 ──────────────────────────────────
   // Refreshes user-subscribed iCal feeds (Apple/Google/Outlook/sports
-  // calendars from the Calendar settings page). 6h gives users a max
-  // ~6h delay between adding an event in their source calendar and seeing
-  // it in Housemait - generous enough to be polite to upstream hosts
-  // (Apple iCloud feeds are notoriously slow + heavy), tight enough that
-  // "I added it yesterday and it's still not here" stops being a thing.
+  // calendars from the Calendar settings page).
+  //
+  // This was every 6h. It is hourly because the onboarding calendar screen
+  // makes a promise about how often we check, and the promise has to be one
+  // the backend actually keeps - see SYNC_CADENCE_COPY in
+  // web/src/lib/calendarConnect.js, which is the single source of truth for
+  // the wording. Change one, change the other.
+  //
+  // Hourly is still polite to upstream hosts (Apple's iCloud feeds are slow
+  // and heavy, and refreshAllExternalFeeds paces itself across feeds), and it
+  // retires "I added it yesterday and it's still not here".
   // Runs at :15 to dodge the top-of-hour reminder ticks.
-  cron.schedule('15 */6 * * *', () => refreshAllExternalFeeds());
-  console.log('✓ External feed refresh scheduled (every 6h at :15)');
+  cron.schedule('15 * * * *', () => refreshAllExternalFeeds());
+  console.log('✓ External feed refresh scheduled (hourly at :15)');
 
   // ── Google Calendar inbound pull: every 30 min ─────────────────────────────
   // OAuth-connected Google calendars sync via incremental syncTokens, so each

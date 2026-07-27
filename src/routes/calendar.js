@@ -367,6 +367,82 @@ const feedLimiter = rateLimit({
 });
 
 /**
+ * POST /api/calendar/validate-feed
+ *
+ * Check a pasted calendar address WITHOUT storing it. Onboarding needs this:
+ * the calendar step happens before sign-up, and external_calendar_feeds
+ * requires both user_id and household_id, so there is nothing to attach a feed
+ * to yet. The flow holds the URL in memory and replays it after the account
+ * exists - but it must be able to tell the user, on that screen, whether the
+ * address actually works.
+ *
+ * "Works" means fetched AND parsed. A URL that 404s, or that returns an HTML
+ * login page with a 200, fails here rather than looking fine and quietly
+ * pulling nothing for the next six months.
+ *
+ * Unauthenticated by necessity, so: rate-limited per IP, and the URL is never
+ * written to a row and never printed to a log line. Errors are echoed back as
+ * guidance, not as raw fetch output.
+ */
+const validateFeedLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  // A real person tries a handful of addresses at most; this leaves room for
+  // fumbling the copy-paste several times without becoming a probe oracle.
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many attempts. Please try again in a little while.' },
+});
+
+router.post('/validate-feed', validateFeedLimiter, async (req, res) => {
+  const { feed_url: feedUrl } = req.body || {};
+  if (!feedUrl || typeof feedUrl !== 'string') {
+    return res.status(400).json({ ok: false, error: 'Paste the calendar address first.' });
+  }
+  // Cheap shape rejections before we spend a network round-trip on it.
+  if (feedUrl.length > 2048) {
+    return res.status(400).json({ ok: false, error: "That doesn't look like a calendar address." });
+  }
+
+  const url = externalFeed.normaliseFeedUrl(feedUrl);
+  if (!/^https?:\/\//i.test(url)) {
+    return res.status(400).json({ ok: false, error: 'A calendar address starts with https:// or webcal://.' });
+  }
+  // Known wrong-paste shapes get "copy this instead" guidance rather than a
+  // generic failure - the web-page URL sits right next to the real one in all
+  // three providers' UIs, so this is the most common mistake by far.
+  const mistake = externalFeed.classifyFeedUrlMistake(url);
+  if (mistake) {
+    return res.status(400).json({ ok: false, error: mistake });
+  }
+
+  try {
+    const text = await externalFeed.fetchFeed(url);
+    // Fetching is not enough. Providers happily return 200 + HTML for an
+    // expired or private link, so require the payload to actually be a
+    // calendar before we call this connected.
+    if (!/BEGIN:VCALENDAR/i.test(text || '')) {
+      return res.status(400).json({
+        ok: false,
+        error: 'That address loaded, but it isn’t a calendar — it looks like a web page. Copy the iCal/ICS address instead.',
+      });
+    }
+    const events = externalFeed.extractVEvents(text);
+    return res.json({
+      ok: true,
+      name: externalFeed.extractCalendarName(text) || null,
+      eventCount: events.length,
+    });
+  } catch (err) {
+    // Deliberately no URL in this log line - a pasted feed address is a bearer
+    // credential for Google and Outlook.
+    console.warn('[validate-feed] check failed:', err.message);
+    const friendly = externalFeed.friendlyPullError(url, err.message);
+    return res.status(400).json({ ok: false, error: friendly.message });
+  }
+});
+
+/**
  * GET /api/calendar/feed/:token.ics
  * Public iCal feed - no authentication required.
  */
