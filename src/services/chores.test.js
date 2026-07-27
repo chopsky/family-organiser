@@ -183,3 +183,32 @@ describe('one-off carry-forward', () => {
     expect(appliesOn(daily, '2026-07-26', new Set(['d2']))).toBe(true);
   });
 });
+
+// Carry-forward is for one-offs ONLY. A recurring chore's next occurrence is a
+// fresh one - a missed Tuesday must never pile up on Wednesday, or reappear
+// alongside next Tuesday's. Pinned because the natural way to extend
+// carry-forward later is to loosen the repeat check, which would do exactly
+// that. `done` is empty throughout: the worst case for an accidental carry.
+describe('recurring chores never carry forward', () => {
+  const none = new Set();
+
+  it('a weekly chore shows only on its weekdays, missed or not', () => {
+    const weekly = { id: 'w1', repeat: 'weekly', days: ['TUE', 'THU'] };
+    expect(appliesOn(weekly, '2026-07-28', none)).toBe(true);  // Tue
+    expect(appliesOn(weekly, '2026-07-29', none)).toBe(false); // Wed — not carried
+    expect(appliesOn(weekly, '2026-07-30', none)).toBe(true);  // Thu — fresh
+    expect(appliesOn(weekly, '2026-08-04', none)).toBe(true);  // next Tue — fresh
+  });
+
+  it('a daily chore is just daily — no accumulation', () => {
+    const daily = { id: 'd1', repeat: 'daily' };
+    expect(appliesOn(daily, '2026-07-29', none)).toBe(true);
+    expect(appliesOn(daily, '2026-07-30', none)).toBe(true);
+  });
+
+  it('buildDayView shows one instance of a weekly chore, not a backlog', () => {
+    const weekly = { id: 'w1', repeat: 'weekly', days: ['TUE'], assignee_ids: ['m1'] };
+    expect(buildDayView([weekly], [], '2026-08-04', none)).toHaveLength(1);
+    expect(buildDayView([weekly], [], '2026-08-05', none)).toHaveLength(0);
+  });
+});
