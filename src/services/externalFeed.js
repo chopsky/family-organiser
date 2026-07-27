@@ -3,6 +3,7 @@ const db = require('../db/queries');
 const cache = require('./cache');
 const { parseVEvent, expandRecurrence } = require('./providers/apple');
 const { ssrfSafeAgents, assertFetchableUrl } = require('../utils/ssrf-guard');
+const { resolveFeedUrl } = require('../utils/feed-url-crypto');
 
 const FETCH_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 25 * 1024 * 1024; // 25 MB - sane upper bound for iCal feeds
@@ -217,7 +218,13 @@ async function refreshFeed(feed) {
 
   let icalText;
   try {
-    icalText = await fetchFeed(feed.feed_url);
+    // The stored address is encrypted at rest; this is the one place that needs
+    // it back in the clear. resolveFeedUrl returns null if the ciphertext can't
+    // be decrypted (key absent or rotated), which is a feed the user has to
+    // re-add rather than something a retry will fix.
+    const url = resolveFeedUrl(feed);
+    if (!url) throw new Error('Calendar address could not be read — please re-add this calendar');
+    icalText = await fetchFeed(url);
     // Providers serve HTML login/challenge/maintenance pages with HTTP 200
     // (Cloudflare, lapsed O365 auth). Parsed as iCal that reads as "the feed
     // now has zero events" and would wipe every synced copy - so a body

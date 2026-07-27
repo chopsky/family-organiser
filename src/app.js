@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { feedCryptoReady } = require('./utils/feed-url-crypto');
 
 const app = express();
 
@@ -115,6 +116,11 @@ app.get('/health', (req, res) => {
     flags: {
       calendarInbound: process.env.GOOGLE_CALENDAR_ENABLED === 'true',
       calendarWrites: process.env.GOOGLE_CALENDAR_WRITES_ENABLED === 'true',
+      // Whether CALENDAR_TOKEN_KEY is present and usable. Subscribed calendar
+      // addresses are bearer credentials and are encrypted at rest, so adding
+      // a calendar FAILS CLOSED without this - check it landed before running
+      // the backfill (scripts/encrypt-feed-urls.js).
+      feedUrlCrypto: feedCryptoReady(),
       // Bot pipeline flags - exposed so "did the Railway flip actually
       // land?" is a curl, not a guess (the 2026-07-22 robotic-reply
       // report turned out to be exactly that question).

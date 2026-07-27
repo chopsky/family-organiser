@@ -2,6 +2,7 @@ const { supabaseAdmin: supabase } = require('./client');
 const crypto = require('crypto');
 const { computeStreak, DEFAULT_LOOKBACK_DAYS, addDaysStr } = require('../services/kids-streak');
 const { shortenError } = require('../utils/error-snippet');
+const { encryptFeedRow, maskFeedUrl, resolveFeedUrl } = require('../utils/feed-url-crypto');
 
 // Sanitise a free-text value before embedding it in a PostgREST `.or()` filter
 // STRING. PostgREST parses that whole string, so commas / parentheses (its
@@ -4171,13 +4172,33 @@ async function getExternalFeedById(feedId, db = supabase) {
   return data || null;
 }
 
+/**
+ * The single funnel for creating a subscribed feed, which is why the
+ * encryption lives here rather than in each caller: the route, the bot's
+ * paste handler and the device-sync adopter all land on this one insert.
+ *
+ * encryptFeedRow is a no-op for synthetic device:// / google:// identifiers,
+ * so this is safe for every source. See utils/feed-url-crypto.js for why the
+ * address splits across two columns instead of the obvious one.
+ */
 async function createExternalFeed(feed, db = supabase) {
   const { data, error } = await db
     .from('external_calendar_feeds')
-    .insert(feed)
+    .insert(encryptFeedRow(feed))
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    // Deploy-ordering guard. If this build reaches production before
+    // migration-feed-url-encryption.sql runs, PostgREST rejects the unknown
+    // column with PGRST204 and the user would see a bare schema error. We
+    // deliberately do NOT retry without the column: falling back would store
+    // the credential in plaintext, which is the exact thing being fixed.
+    if (error.code === 'PGRST204' && /feed_url_enc/.test(error.message || '')) {
+      console.error('[external-feeds] migration-feed-url-encryption.sql has not been run');
+      throw new Error('Calendar syncing is being upgraded — please try again in a few minutes.');
+    }
+    throw error;
+  }
   return data;
 }
 
@@ -4518,7 +4539,10 @@ async function getCalendarSyncHealthAdmin(db = supabase) {
     user_id: f.user_id,
     user_name: userMap[f.user_id]?.name || 'Unknown',
     user_email: userMap[f.user_id]?.email || '',
-    feed_url: f.feed_url,
+    // Host only. The credential sits in the middle of these URLs, so the admin
+    // list identifies a feed without handing the address to anyone reading the
+    // screen (or the API response).
+    feed_url: maskFeedUrl(resolveFeedUrl(f)),
     display_name: f.display_name,
     color: f.color,
     sync_enabled: f.sync_enabled,
