@@ -53,9 +53,25 @@ export function Lockup({ width = 92 }) {
   );
 }
 
+/**
+ * The gap between the status bar and the first row of UI, for every screen in
+ * the flow.
+ *
+ * It is measured FROM the safe-area inset rather than stacked on top of a
+ * second allowance for the same thing. The handoff was drawn at 375x812 with
+ * the status bar painted into the mockup, so its 56px top padding already
+ * INCLUDED the status bar. Applying the real inset as well double-counted it:
+ * ~100px of dead space above the progress bar on a device, against ~56px in
+ * the design.
+ */
+export const TOP_GAP = 'calc(env(safe-area-inset-top, 0px) + 24px)';
+
 export function Header({ onBack, hideBack, pct = 0, reduced }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '56px 0 18px', flexShrink: 0 }}>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 13, flexShrink: 0,
+      paddingTop: TOP_GAP, paddingBottom: 18,
+    }}>
       <button
         type="button"
         onClick={onBack}
@@ -110,7 +126,8 @@ export function Step({ onBack, hideBack, pct, reduced, children, footer }) {
         // overflow never engages, and the footer scrolls away with the content.
         height: '100dvh', display: 'flex', flexDirection: 'column',
         background: T.bg, color: T.ink, padding: '0 26px 30px',
-        paddingTop: 'env(safe-area-inset-top, 0px)',
+        // No paddingTop here: the header owns the whole gap (TOP_GAP), so the
+        // safe-area inset is applied exactly once.
         // The scrolling body sits inside; keep momentum scrolling on iOS.
         WebkitOverflowScrolling: 'touch',
       }}

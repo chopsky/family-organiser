@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import { completedRecap } from '../../lib/onboardingDraft';
-import { Lockup, Cta, Ghost } from './ui';
+import { Lockup, Cta, Ghost, TOP_GAP } from './ui';
 
 const H1 = {
   fontFamily: T.title, fontWeight: 400, lineHeight: 1.08,
@@ -213,10 +213,10 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
       style={{
         minHeight: '100dvh', display: 'flex', flexDirection: 'column',
         background: T.bg, padding: '0 26px 30px',
-        paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
+        paddingTop: TOP_GAP,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 36 }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         {backChevron(onBack)}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44, pointerEvents: 'none' }}>
           <Lockup width={112} />
@@ -310,10 +310,10 @@ export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn }) {
       style={{
         minHeight: '100dvh', display: 'flex', flexDirection: 'column',
         background: T.bg, padding: '0 26px 30px',
-        paddingTop: 'calc(20px + env(safe-area-inset-top, 0px))',
+        paddingTop: TOP_GAP,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', paddingTop: 36 }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
         {backChevron(onBack)}
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44, pointerEvents: 'none' }}>
           <Lockup width={118} />
