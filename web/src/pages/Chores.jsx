@@ -825,7 +825,7 @@ export default function Chores() {
           )}
         </div>
       ) : weekMode ? (
-        <DesktopChoresWeek completedDefIds={weekData?.completed_def_ids || []}
+        <DesktopChoresWeek completedDefIds={weekData?.completed_def_ids || []} today={weekData?.today}
           members={shown}
           who={weekWho}
           setWho={setWeekWho}

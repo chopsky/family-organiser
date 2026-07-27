@@ -31,18 +31,27 @@ function weekdayAbbrev(dateStr) {
  * day passed meant a missed one-off vanished silently. This matches how an
  * overdue to-do stays in the Today bucket rather than disappearing.
  *
- * @param doneIds Set of definition ids that already have a completion (on ANY
- *   date). Omit it and a one-off shows only on its own due date - the caller
- *   simply hasn't told us whether it's been done, so we don't invent a carry.
+ * Carry-forward is bounded at TODAY. An outstanding task belongs on the days it
+ * was actually outstanding - its due date through to today - and NOT on future
+ * days, which haven't happened yet. Without the bound, browsing to any later
+ * date showed the task there too, so a one-off appeared to repeat forever.
+ *
+ * @param opts.doneIds Set of definition ids that already have a completion (on
+ *   ANY date).
+ * @param opts.today   the household's today ('YYYY-MM-DD'), the upper bound.
+ * Omit either and a one-off shows only on its own due date: the caller hasn't
+ * given us what carrying needs, so we don't invent it.
  */
-function appliesOn(def, dateStr, doneIds) {
+function appliesOn(def, dateStr, opts = {}) {
+  const { doneIds, today } = opts;
   if (!def || def.archived_at) return false;
   if (def.start_date && dateStr < def.start_date) return false;
   if (def.repeat === 'weekly') return (def.days || []).includes(weekdayAbbrev(dateStr));
   if (def.repeat === 'once') {
     if (!def.due_date) return false; // dateless: nothing to anchor it to
     if (dateStr === def.due_date) return true;
-    return dateStr > def.due_date && Boolean(doneIds) && !doneIds.has(def.id);
+    if (!doneIds || !today) return false;
+    return dateStr > def.due_date && dateStr <= today && !doneIds.has(def.id);
   }
   return true; // daily (or unset)
 }
@@ -65,7 +74,7 @@ function appliesOn(def, dateStr, doneIds) {
  * @returns instances (sorted by position, then created_at) with `done`, `slot`
  *          and `occurrence_key` added.
  */
-function buildDayView(defs, completions, dateStr, doneIds) {
+function buildDayView(defs, completions, dateStr, opts = {}) {
   const doneByDefSlot = new Map(); // `${definition_id}|${slot}` -> Set(member_id)
   for (const c of completions || []) {
     const k = `${c.definition_id}|${c.slot || ''}`;
@@ -74,7 +83,7 @@ function buildDayView(defs, completions, dateStr, doneIds) {
   }
   const out = [];
   for (const d of (defs || [])) {
-    if (!appliesOn(d, dateStr, doneIds)) continue;
+    if (!appliesOn(d, dateStr, opts)) continue;
     // "Anyone" chores have no per-assignee state: a single shared completion
     // (the attributed completer) marks the whole chore done for the day.
     if (d.anyone) {

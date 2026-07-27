@@ -147,23 +147,24 @@ describe('one-off definitions must carry a date', () => {
 // silently the moment its day passed.
 describe('one-off carry-forward', () => {
   const def = { id: 'd1', repeat: 'once', due_date: '2026-07-24', assignee_ids: ['m1'] };
+  const TODAY = '2026-07-27';
 
   it('shows on its due date whether or not it is done', () => {
-    expect(appliesOn(def, '2026-07-24', new Set())).toBe(true);
-    expect(appliesOn(def, '2026-07-24', new Set(['d1']))).toBe(true);
+    expect(appliesOn(def, '2026-07-24', { doneIds: new Set(), today: TODAY })).toBe(true);
+    expect(appliesOn(def, '2026-07-24', { doneIds: new Set(['d1']), today: TODAY })).toBe(true);
   });
 
   it('keeps showing on later days while undone', () => {
-    expect(appliesOn(def, '2026-07-25', new Set())).toBe(true);
-    expect(appliesOn(def, '2026-09-01', new Set())).toBe(true);
+    expect(appliesOn(def, '2026-07-25', { doneIds: new Set(), today: TODAY })).toBe(true);
+    expect(appliesOn(def, '2026-09-01', { doneIds: new Set(), today: '2026-09-01' })).toBe(true);
   });
 
   it('stops as soon as someone has done it', () => {
-    expect(appliesOn(def, '2026-07-25', new Set(['d1']))).toBe(false);
+    expect(appliesOn(def, '2026-07-25', { doneIds: new Set(['d1']), today: TODAY })).toBe(false);
   });
 
   it('never shows BEFORE its due date', () => {
-    expect(appliesOn(def, '2026-07-23', new Set())).toBe(false);
+    expect(appliesOn(def, '2026-07-23', { doneIds: new Set(), today: TODAY })).toBe(false);
   });
 
   it('does not carry when the caller omits the done set (streaks keep old behaviour)', () => {
@@ -172,15 +173,15 @@ describe('one-off carry-forward', () => {
   });
 
   it('marks a carried instance so the UI can show where it came from', () => {
-    const [onDay] = buildDayView([def], [], '2026-07-24', new Set());
-    const [carried] = buildDayView([def], [], '2026-07-26', new Set());
+    const [onDay] = buildDayView([def], [], '2026-07-24', { doneIds: new Set(), today: TODAY });
+    const [carried] = buildDayView([def], [], '2026-07-26', { doneIds: new Set(), today: TODAY });
     expect(onDay.carried_from).toBeNull();
     expect(carried.carried_from).toBe('2026-07-24');
   });
 
   it('leaves repeating tasks untouched', () => {
     const daily = { id: 'd2', repeat: 'daily', assignee_ids: ['m1'] };
-    expect(appliesOn(daily, '2026-07-26', new Set(['d2']))).toBe(true);
+    expect(appliesOn(daily, '2026-07-26', { doneIds: new Set(['d2']), today: TODAY })).toBe(true);
   });
 });
 
@@ -194,21 +195,53 @@ describe('recurring chores never carry forward', () => {
 
   it('a weekly chore shows only on its weekdays, missed or not', () => {
     const weekly = { id: 'w1', repeat: 'weekly', days: ['TUE', 'THU'] };
-    expect(appliesOn(weekly, '2026-07-28', none)).toBe(true);  // Tue
-    expect(appliesOn(weekly, '2026-07-29', none)).toBe(false); // Wed — not carried
-    expect(appliesOn(weekly, '2026-07-30', none)).toBe(true);  // Thu — fresh
-    expect(appliesOn(weekly, '2026-08-04', none)).toBe(true);  // next Tue — fresh
+    expect(appliesOn(weekly, '2026-07-28', { doneIds: none, today: '2026-08-31' })).toBe(true);  // Tue
+    expect(appliesOn(weekly, '2026-07-29', { doneIds: none, today: '2026-08-31' })).toBe(false); // Wed — not carried
+    expect(appliesOn(weekly, '2026-07-30', { doneIds: none, today: '2026-08-31' })).toBe(true);  // Thu — fresh
+    expect(appliesOn(weekly, '2026-08-04', { doneIds: none, today: '2026-08-31' })).toBe(true);  // next Tue — fresh
   });
 
   it('a daily chore is just daily — no accumulation', () => {
     const daily = { id: 'd1', repeat: 'daily' };
-    expect(appliesOn(daily, '2026-07-29', none)).toBe(true);
-    expect(appliesOn(daily, '2026-07-30', none)).toBe(true);
+    expect(appliesOn(daily, '2026-07-29', { doneIds: none, today: '2026-08-31' })).toBe(true);
+    expect(appliesOn(daily, '2026-07-30', { doneIds: none, today: '2026-08-31' })).toBe(true);
   });
 
   it('buildDayView shows one instance of a weekly chore, not a backlog', () => {
     const weekly = { id: 'w1', repeat: 'weekly', days: ['TUE'], assignee_ids: ['m1'] };
-    expect(buildDayView([weekly], [], '2026-08-04', none)).toHaveLength(1);
-    expect(buildDayView([weekly], [], '2026-08-05', none)).toHaveLength(0);
+    expect(buildDayView([weekly], [], '2026-08-04', { doneIds: none, today: '2026-08-31' })).toHaveLength(1);
+    expect(buildDayView([weekly], [], '2026-08-05', { doneIds: none, today: '2026-08-31' })).toHaveLength(0);
+  });
+});
+
+// Regression: carry-forward must stop at TODAY. It originally compared only
+// against the due date, so browsing to ANY later day showed the task there —
+// a one-off looked like it repeated forever. Reported the same day it shipped:
+// "the chore is showing on every day. If I go to tomorrow, it's showing there."
+describe('carry-forward never reaches into the future', () => {
+  const def = { id: 'd1', repeat: 'once', due_date: '2026-07-27', assignee_ids: ['m1'] };
+  const carry = (today) => ({ doneIds: new Set(), today });
+
+  it('shows on its due date and up to today, and nowhere beyond', () => {
+    const t = '2026-07-29';
+    expect(appliesOn(def, '2026-07-27', carry(t))).toBe(true);  // due date
+    expect(appliesOn(def, '2026-07-28', carry(t))).toBe(true);  // outstanding
+    expect(appliesOn(def, '2026-07-29', carry(t))).toBe(true);  // today
+    expect(appliesOn(def, '2026-07-30', carry(t))).toBe(false); // tomorrow
+    expect(appliesOn(def, '2026-12-25', carry(t))).toBe(false); // far future
+  });
+
+  it('due today means today only — not tomorrow, not next year', () => {
+    const t = '2026-07-27';
+    expect(appliesOn(def, '2026-07-27', carry(t))).toBe(true);
+    expect(appliesOn(def, '2026-07-28', carry(t))).toBe(false);
+    expect(appliesOn(def, '2027-01-01', carry(t))).toBe(false);
+  });
+
+  it('a future-dated one-off shows on its day and not before', () => {
+    const future = { id: 'f1', repeat: 'once', due_date: '2026-08-20' };
+    const t = '2026-07-27';
+    expect(appliesOn(future, '2026-07-27', carry(t))).toBe(false);
+    expect(appliesOn(future, '2026-08-20', carry(t))).toBe(true);
   });
 });

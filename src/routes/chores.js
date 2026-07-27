@@ -96,7 +96,8 @@ function normaliseDef(body, memberIds, todayStr) {
  */
 router.get('/', requireAuth, requireHousehold, async (req, res) => {
   try {
-    const date = DATE_RE.test(req.query.date) ? req.query.date : await householdToday(req.householdId);
+    const today = await householdToday(req.householdId);
+    const date = DATE_RE.test(req.query.date) ? req.query.date : today;
     const [defs, completions, balances, doneIds] = await Promise.all([
       db.getChoreDefinitions(req.householdId),
       db.getChoreCompletionsForDate(req.householdId, date),
@@ -110,7 +111,7 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     let skipped = new Set();
     try { skipped = new Set(await db.getChoreSkipsForDate(req.householdId, date)); }
     catch (e) { console.warn('chore skips unavailable (run migration-chore-skips.sql):', e.message); }
-    const tasks = buildDayView(defs, completions, date, doneIds).filter((t) => !skipped.has(t.id));
+    const tasks = buildDayView(defs, completions, date, { doneIds, today }).filter((t) => !skipped.has(t.id));
     return res.json({ date, tasks, balances });
   } catch (err) {
     console.error('GET /api/chores error:', err);

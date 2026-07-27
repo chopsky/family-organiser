@@ -36,8 +36,8 @@ function tint(hex, a) {
 // past cells tickable so a parent can back-fill a forgotten tick - streaks
 // are derived from completion history, so the kid's streak heals itself the
 // moment the missed day is filled in.
-function Cell({ row, day, memberId, mc, doneSet, skipped, onToggle, allowPast, doneIds }) {
-  const applies = !skipped && appliesOnDate(row.def, day.str, doneIds);
+function Cell({ row, day, memberId, mc, doneSet, skipped, onToggle, allowPast, carry }) {
+  const applies = !skipped && appliesOnDate(row.def, day.str, carry);
   if (!applies) {
     return <span style={{ width: 14, height: 2, borderRadius: 2, background: INK3, opacity: 0.3 }} aria-hidden="true" />;
   }
@@ -110,10 +110,10 @@ function SummaryStat({ dot, label, value }) {
   );
 }
 
-export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, completedDefIds = [], onToggle, onEdit, allowPast = false }) {
+export default function DesktopChoresWeek({ members, who, setWho, defs, completions, skips, weekDays, balances = {}, completedDefIds = [], today, onToggle, onEdit, allowPast = false }) {
   // Ever-completed ids: an undone one-off carries forward past its due date,
   // so the grid needs the same input the server's day view uses.
-  const doneIds = useMemo(() => new Set(completedDefIds), [completedDefIds]);
+  const carry = useMemo(() => ({ doneIds: new Set(completedDefIds), today }), [completedDefIds, today]);
   const selected = members.find((m) => m.id === who) || members[0];
   if (!selected) {
     return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK3, fontFamily: SERIF, fontSize: 24 }}>Add family members to start assigning tasks.</div>;
@@ -130,7 +130,7 @@ export default function DesktopChoresWeek({ members, who, setWho, defs, completi
   for (const s of presentSections) {
     for (const row of rows[s]) {
       for (const day of weekDays) {
-        if (skips_.has(`${row.def.id}|${day.str}`) || !appliesOnDate(row.def, day.str, doneIds)) continue;
+        if (skips_.has(`${row.def.id}|${day.str}`) || !appliesOnDate(row.def, day.str, carry)) continue;
         if (day.isFuture) { upcoming += 1; continue; }
         const isDone = doneSet.has(`${row.def.id}|${row.slot}|${selected.id}|${day.str}`);
         if (isDone) done += 1;
@@ -209,7 +209,7 @@ export default function DesktopChoresWeek({ members, who, setWho, defs, completi
                     {/* 7 day-cells */}
                     {weekDays.map((day) => (
                       <div key={day.str} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 2px', minHeight: 44, background: day.isToday ? tint(mc, 0.06) : 'transparent' }}>
-                        <Cell row={row} day={day} memberId={selected.id} mc={mc} doneSet={doneSet} skipped={skips_.has(`${row.def.id}|${day.str}`)} onToggle={onToggle} allowPast={allowPast} doneIds={doneIds} />
+                        <Cell row={row} day={day} memberId={selected.id} mc={mc} doneSet={doneSet} skipped={skips_.has(`${row.def.id}|${day.str}`)} onToggle={onToggle} allowPast={allowPast} carry={carry} />
                       </div>
                     ))}
                   </div>

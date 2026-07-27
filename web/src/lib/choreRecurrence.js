@@ -26,14 +26,18 @@ export function weekdayAbbrev(dateStr) {
 // the week endpoint's `completed_def_ids`. Without it a one-off shows only on
 // its own date — same contract as the server helper, so the grid and the day
 // view can never disagree.
-export function appliesOnDate(def, dateStr, doneIds) {
+export function appliesOnDate(def, dateStr, opts = {}) {
+  const { doneIds, today } = opts;
   if (!def || def.archived_at) return false;
   if (def.start_date && dateStr < def.start_date) return false;
   if (def.repeat === 'weekly') return (def.days || []).includes(weekdayAbbrev(dateStr));
   if (def.repeat === 'once') {
     if (!def.due_date) return false; // dateless: nothing to anchor it to
     if (dateStr === def.due_date) return true;
-    return dateStr > def.due_date && Boolean(doneIds) && !doneIds.has(def.id);
+    if (!doneIds || !today) return false;
+    // Bounded at today: an outstanding task is not "overdue" on a day that
+    // hasn't happened, and the week grid runs into the future.
+    return dateStr > def.due_date && dateStr <= today && !doneIds.has(def.id);
   }
   return true; // daily (or unset)
 }
