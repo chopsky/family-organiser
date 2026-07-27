@@ -11,8 +11,9 @@
  * page), and useV4Auth turns the resulting session into a finished household —
  * naming it, replaying the queued calendars, offering WhatsApp pairing.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { T } from './tokens';
 import { skipLabelAt, autoAdvances } from './machine';
@@ -62,6 +63,31 @@ export default function OnboardingV4() {
   const [remBusy, setRemBusy] = useState(false);
   const [remNote, setRemNote] = useState('');
 
+  // Arriving from the verification LINK. Verify.jsx redeems the token, logs
+  // the user in and sends them to /signup - so v4 remounts with a live session
+  // and the restored draft, but nothing replayed and no household. Left alone
+  // it would show the splash screen to someone who has just finished signing
+  // up. Pick the thread back up instead and land them on the welcome screen.
+  //
+  // Gated on a household NAME in the draft: that is the marker of a real v4
+  // run reaching step 07. Without it there is nothing to create and nothing to
+  // replay, so the flow should simply carry on rather than declare itself done.
+  const auth = useAuth();
+  const needsResume = Boolean(auth.token) && !auth.user?.onboarded_at && Boolean((d.house || '').trim());
+  const resumedRef = useRef(false);
+  const [resuming, setResuming] = useState(needsResume);
+  useEffect(() => {
+    if (!needsResume || resumedRef.current) return;
+    resumedRef.current = true;
+    (async () => {
+      const ok = await v4.resumeVerifiedSession();
+      setResuming(false);
+      if (ok) f.finish();
+    })();
+    // f and v4 are recreated every render; the ref is what makes this run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsResume]);
+
   const askNudges = async () => {
     setRemBusy(true);
     const { granted, note } = await askForNudges();
@@ -93,6 +119,19 @@ export default function OnboardingV4() {
     update({ wa: true });
     setTimeout(next, 900);
   };
+
+  // Held while the link-arrival resume runs, so the splash never flashes at
+  // someone who has already finished signing up.
+  if (resuming) {
+    return (
+      <div style={{
+        minHeight: '100dvh', display: 'grid', placeItems: 'center',
+        background: T.cream, color: T.ink3, fontSize: 15, padding: 24, textAlign: 'center',
+      }}>
+        Email verified — setting up your home…
+      </div>
+    );
+  }
 
   if (phase === 'splash') {
     return <Splash reduced={reduced} onStart={() => goPhase('flow', 0)} onLogin={() => goPhase('login')} />;

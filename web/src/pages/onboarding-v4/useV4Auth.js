@@ -25,7 +25,14 @@ import { readLocaleCookie } from '../../hooks/useLocale';
 import { getStorefrontCountry } from '../../lib/revenuecat';
 import { clearSignupPromo } from '../../lib/signupPromo';
 import { clearSignupSource } from '../../lib/signupSource';
+import { isNative } from '../../lib/platform';
 import { replayQueued } from './replay';
+
+// Tells the server this sign-up is happening inside the app, so the
+// verification email leads with the CODE rather than the link. In the app the
+// two are not equivalent: the link navigates away from the screen holding the
+// pasted calendar address, which lives in memory only.
+const CLIENT = isNative() ? 'app' : undefined;
 
 export default function useV4Auth(d) {
   const auth = useAuth();
@@ -35,14 +42,15 @@ export default function useV4Auth(d) {
   const [outcome, setOutcome] = useState(null);
 
   /**
-   * Runs once a provider hands back a session. Returns true when the flow
-   * should advance to the welcome screen.
+   * Everything after the session exists: name the household, replay what was
+   * queued, mark onboarded. Split out from completeSignup because the
+   * verification LINK arrives here already logged in - Verify.jsx exchanged
+   * the token and called auth.login itself - so there is no payload to log in
+   * with, only an existing session.
    */
-  const completeSignup = useCallback(async (data) => {
-    if (!data?.token) return false;
+  const finishHousehold = useCallback(async (existingHousehold) => {
     clearSignupPromo();
     clearSignupSource();
-    auth.login(data);
 
     // The household name was collected at step 07 and has been sitting in the
     // draft ever since. A brand-new account has no household yet; one created
@@ -53,7 +61,7 @@ export default function useV4Auth(d) {
     // and holidays, and a v4 signup must not land somewhere different from a
     // v3 one.
     const wanted = (d.house || '').trim();
-    if (!data.household && wanted) {
+    if (!existingHousehold && wanted) {
       try {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
         const country = (await getStorefrontCountry())
@@ -82,6 +90,37 @@ export default function useV4Auth(d) {
     return true;
   }, [auth, d]);
 
+  /**
+   * Runs once a provider hands back a session. Returns true when the flow
+   * should advance to the welcome screen.
+   */
+  const completeSignup = useCallback(async (data) => {
+    if (!data?.token) return false;
+    auth.login(data);
+    return finishHousehold(data.household);
+  }, [auth, finishHousehold]);
+
+  /**
+   * The verification LINK path. Verify.jsx has already redeemed the token and
+   * logged the user in, then bounced them to /signup — so v4 remounts with a
+   * live session and a restored draft, but nothing has been replayed. Without
+   * this the flow would restart at the splash screen and everything the user
+   * set up before signing up would be quietly dropped.
+   *
+   * Note what this CANNOT rescue: a pasted calendar address lives in memory
+   * only, so it survives an in-app navigation but not a cold launch or a link
+   * opened on another device. That gap is exactly why the code exists.
+   */
+  const resumeVerifiedSession = useCallback(async () => {
+    if (!auth.token) return false;
+    setBusy(true);
+    try {
+      return await finishHousehold(auth.household);
+    } finally {
+      setBusy(false);
+    }
+  }, [auth.token, auth.household, finishHousehold]);
+
   /** Email + password. Returns 'done' | 'verify' | null (error shown inline). */
   const registerWithEmail = useCallback(async ({ email, password }) => {
     setBusy(true);
@@ -92,6 +131,7 @@ export default function useV4Auth(d) {
         password,
         // Collected at step 05 — v4 never asks for a name twice.
         name: (d.you || '').trim() || email.trim().split('@')[0],
+        client: CLIENT,
       });
       // Without an invite the backend issues no token: the account has to be
       // verified by email first. That's why email can't land on the welcome
@@ -129,7 +169,7 @@ export default function useV4Auth(d) {
   /** Another code, for when the first didn't arrive. Never reports failure —
    *  the endpoint is deliberately vague to avoid confirming who has an account. */
   const resend = useCallback(async (addr) => {
-    try { await api.post('/auth/resend-verification', { email: addr }); } catch { /* silent by design */ }
+    try { await api.post('/auth/resend-verification', { email: addr, client: CLIENT }); } catch { /* silent by design */ }
   }, []);
 
   /** Existing account, from the login screen. */
@@ -150,5 +190,8 @@ export default function useV4Auth(d) {
     }
   }, [auth]);
 
-  return { busy, error, setError, outcome, completeSignup, registerWithEmail, verifyCode, resend, logIn };
+  return {
+    busy, error, setError, outcome,
+    completeSignup, resumeVerifiedSession, registerWithEmail, verifyCode, resend, logIn,
+  };
 }

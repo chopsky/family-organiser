@@ -31,14 +31,27 @@ const labelFor = (id) => CAL_PROVIDERS.find((p) => p.id === id)?.label || 'Calen
 /**
  * Attach every calendar the user connected during onboarding.
  * Resolves { connected: string[], failed: [{ label, error }] }.
+ *
+ * `promised` is the draft's cals map — what the user was TOLD was connected.
+ * The addresses themselves live in memory only (bearer credentials, never
+ * persisted), so they don't survive a webview teardown or the verification
+ * link opening a fresh page. When one is promised but its address is gone,
+ * that has to be reported: the alternative is a welcome screen that quietly
+ * omits a calendar the user watched us find 244 events in.
  */
-export async function replayCalendars() {
+export async function replayCalendars(promised = {}) {
   const urls = getAllCalUrls();
   const entries = Object.entries(urls).filter(([, url]) => Boolean(url));
-  if (entries.length === 0) return { connected: [], failed: [] };
 
   const connected = [];
-  const failed = [];
+  const failed = Object.keys(promised)
+    .filter((id) => !urls[id])
+    .map((id) => ({
+      label: labelFor(id),
+      error: 'We lost the link when you left this screen — please add it again.',
+    }));
+
+  if (entries.length === 0) return { connected, failed };
 
   // Sequential rather than parallel: each POST triggers an initial pull on the
   // server, and three concurrent feed fetches on a cold container is a slow
@@ -90,7 +103,7 @@ export async function startWhatsAppPairing() {
  * can speak to honestly.
  */
 export async function replayQueued(d) {
-  const calendars = await replayCalendars();
+  const calendars = await replayCalendars(d?.cals || {});
   const whatsapp = d?.wa ? await startWhatsAppPairing() : null;
   return { calendars, whatsapp };
 }

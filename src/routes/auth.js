@@ -136,7 +136,7 @@ function generateVerifyCode(len = 6) {
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
 router.post('/register', requireTurnstile, async (req, res) => {
-  const { email: userEmail, password, name, inviteToken, promoCode, source } = req.body;
+  const { email: userEmail, password, name, inviteToken, promoCode, source, client } = req.body;
 
   if (!userEmail?.trim() || !password || !name?.trim()) {
     return res.status(400).json({ error: 'email, password, and name are required' });
@@ -239,7 +239,12 @@ router.post('/register', requireTurnstile, async (req, res) => {
     const storedCode = row?.code || null;
 
     try {
-      await email.sendVerificationEmail(emailLower, name.trim(), token, storedCode);
+      // From the app the two routes are not equivalent - the link navigates
+      // away from the screen holding the pasted calendar address - so the code
+      // leads there. On the website the button stays first.
+      await email.sendVerificationEmail(emailLower, name.trim(), token, storedCode, {
+        codeFirst: client === 'app',
+      });
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr);
     }
@@ -423,7 +428,7 @@ router.post('/verify-email-code', async (req, res) => {
 // ─── POST /api/auth/resend-verification ─────────────────────────────────────
 
 router.post('/resend-verification', async (req, res) => {
-  const { email: userEmail } = req.body;
+  const { email: userEmail, client } = req.body;
 
   // Always return 200 to prevent email enumeration
   const genericResponse = { message: 'If that email is registered and unverified, a new verification link has been sent.' };
@@ -437,11 +442,18 @@ router.post('/resend-verification', async (req, res) => {
     // Only send if user exists AND is not already verified
     if (user && !user.email_verified) {
       const token = generateToken();
+      // A resend must carry a code too. Someone waiting on the code screen who
+      // taps "Send another" and gets a link-only email has no way to finish
+      // where they are - which is the whole point of the code.
+      const code = generateVerifyCode();
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-      await db.createEmailVerificationToken(user.id, token, expiresAt);
+      const row = await db.createEmailVerificationToken(user.id, token, expiresAt, code);
+      const storedCode = row?.code || null;
 
       try {
-        await email.sendVerificationEmail(user.email, user.name, token);
+        await email.sendVerificationEmail(user.email, user.name, token, storedCode, {
+          codeFirst: client === 'app',
+        });
       } catch (emailErr) {
         console.error('Failed to resend verification email:', emailErr);
       }

@@ -423,10 +423,16 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
           </p>
         )}
         {outcome?.calendars?.failed?.length > 0 && (
-          <p role="status" style={{ fontSize: 13, lineHeight: 1.45, color: T.ink2, marginBottom: 10 }}>
-            {outcome.calendars.failed.map((f) => f.label).join(' and ')} didn’t connect —
-            you can add it again from Settings.
-          </p>
+          // Per-calendar, with its own reason: "didn't connect" and "we lost
+          // the link when you left this screen" call for different next moves,
+          // and lumping them together would hide which happened.
+          <div role="status" style={{ marginBottom: 10 }}>
+            {outcome.calendars.failed.map((f) => (
+              <p key={f.label} style={{ fontSize: 13, lineHeight: 1.45, color: T.ink2, marginBottom: 6 }}>
+                <b style={{ color: T.ink }}>{f.label}</b> isn’t connected — {f.error} You can add it in Settings.
+              </p>
+            ))}
+          </div>
         )}
         {outcome?.whatsapp?.deepLink && (
           <a
