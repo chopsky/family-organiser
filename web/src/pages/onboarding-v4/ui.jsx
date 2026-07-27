@@ -84,7 +84,7 @@ export function Header({ onBack, hideBack, pct = 0, reduced }) {
         <div
           style={{
             height: '100%', borderRadius: 99, width: `${pct}%`,
-            background: 'linear-gradient(90deg,#A97FFF,#6D38AD)',
+            background: T.gradProgress,
             transition: reduced ? 'none' : 'width .55s cubic-bezier(.32,.72,0,1)',
           }}
         />
@@ -297,7 +297,7 @@ export function Bubble({ from, children, delay = 0 }) {
       <div
         style={{
           maxWidth: '80%', padding: '12px 15px', borderRadius: R.bubble, fontSize: 15, lineHeight: 1.42,
-          background: me ? 'linear-gradient(150deg,#8B5CF6,#5F2EDB)' : T.surface,
+          background: me ? T.gradPlum : T.surface,
           color: me ? '#fff' : T.ink,
           borderBottomRightRadius: me ? R.bubbleTail : R.bubble,
           borderBottomLeftRadius: me ? R.bubble : R.bubbleTail,

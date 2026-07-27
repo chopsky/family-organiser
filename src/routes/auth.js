@@ -232,10 +232,14 @@ router.post('/register', requireTurnstile, async (req, res) => {
     // navigating away destroys the in-memory calendar address they pasted.
     const code = generateVerifyCode();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-    await db.createEmailVerificationToken(user.id, token, expiresAt, code);
+    const row = await db.createEmailVerificationToken(user.id, token, expiresAt, code);
+    // Only show a code the row actually HAS. Before the migration runs,
+    // createToken falls back to token-only - printing the code anyway would
+    // hand people six characters that can never work.
+    const storedCode = row?.code || null;
 
     try {
-      await email.sendVerificationEmail(emailLower, name.trim(), token, code);
+      await email.sendVerificationEmail(emailLower, name.trim(), token, storedCode);
     } catch (emailErr) {
       console.error('Failed to send verification email:', emailErr);
     }

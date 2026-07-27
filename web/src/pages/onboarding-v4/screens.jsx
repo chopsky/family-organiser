@@ -106,7 +106,7 @@ export function Splash({ onStart, onLogin, reduced }) {
             <span
               key={src}
               style={{
-                width: 30, height: 30, borderRadius: '50%', background: '#F1EAF9',
+                width: 30, height: 30, borderRadius: '50%', background: T.purpleSoft,
                 boxShadow: `0 0 0 2px ${T.surface}`, marginLeft: i === 0 ? 0 : -9,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
               }}

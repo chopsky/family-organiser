@@ -27,6 +27,15 @@ export const T = {
   purpleDeep: 'var(--color-plum-dark)',
   purpleSoft: 'var(--color-plum-light)',
 
+  // Gradients live here as TOKENS, not inline, because that's how they drifted:
+  // the handoff shipped `#8B5CF6 -> #5F2EDB` on the chat bubble and
+  // `#A97FFF -> #6D38AD` on the progress bar. Both are violets — bluer and
+  // brighter than #6d38ad — so the two most prominent purple surfaces in the
+  // flow were a different purple from the brand. Both now interpolate within
+  // the plum ramp, so they track --color-plum automatically.
+  gradPlum: 'linear-gradient(150deg, var(--color-plum), var(--color-plum-dark))',
+  gradProgress: 'linear-gradient(90deg, var(--color-plum-mid), var(--color-plum))',
+
   // ── Ink ramp ─────────────────────────────────────────────────────────────
   ink: 'var(--color-charcoal)',
   ink2: '#4A4453',                        // NEW: no existing mid-tone between

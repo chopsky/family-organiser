@@ -218,7 +218,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 36 }}>
         {backChevron(onBack)}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44 }}>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44, pointerEvents: 'none' }}>
           <Lockup width={112} />
         </div>
       </div>
@@ -315,7 +315,7 @@ export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', paddingTop: 36 }}>
         {backChevron(onBack)}
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44 }}>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', marginLeft: -44, pointerEvents: 'none' }}>
           <Lockup width={118} />
         </div>
       </div>
