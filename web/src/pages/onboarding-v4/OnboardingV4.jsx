@@ -6,9 +6,10 @@
  * lib/onboardingDraft) and replayed once the account exists, because a calendar
  * feed needs user_id + household_id and a WhatsApp link is a column on users.
  *
- * All twelve screens are the designed ones. The remaining gap is the auth
- * itself: the sign-up and login buttons do not yet call a real provider, so
- * the queued connections in ./replay are wired but not fired.
+ * All twelve screens are the designed ones and auth is live: providers come
+ * from the shared useSocialAuth (the same hook behind the existing signup
+ * page), and useV4Auth turns the resulting session into a finished household —
+ * naming it, replaying the queued calendars, offering WhatsApp pairing.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +27,8 @@ import { RemindersBody, RemindersFooter } from './remindersScreen';
 import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import { setCalUrl } from '../../lib/onboardingDraft';
+import useSocialAuth from '../../hooks/useSocialAuth';
+import useV4Auth from './useV4Auth';
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
@@ -42,6 +45,17 @@ export default function OnboardingV4() {
   // Which provider's connect flow is open, if any. A sub-view of step 08
   // rather than a step of its own, so the progress bar doesn't jump.
   const [connecting, setConnecting] = useState(null);
+
+  // Auth. useV4Auth turns a session into a finished household (naming it,
+  // replaying the queued calendars, marking onboarded); useSocialAuth drives
+  // the providers and hands their payload straight to it. The same hook backs
+  // the existing signup page, so the two can't drift.
+  const v4 = useV4Auth(d);
+  const [authError, setAuthError] = useState('');
+  const socialAuth = useSocialAuth({
+    onSuccess: async (data) => { if (await v4.completeSignup(data)) f.finish(); },
+    onError: setAuthError,
+  });
 
   // Notification permission is a one-shot OS prompt, so the screen owns a busy
   // flag and an explanation line rather than silently doing nothing.
@@ -89,8 +103,11 @@ export default function OnboardingV4() {
       <LoginScreen
         onBack={back}
         onCreate={() => goPhase('flow', 0)}
-        // Real providers + session handling arrive in Phase 5.
-        onPick={() => navigate('/signup')}
+        auth={socialAuth}
+        v4={v4}
+        // An existing account has a household already: straight to the app,
+        // never through the welcome screen, which is for new households.
+        onLoggedIn={() => navigate('/dashboard')}
       />
     );
   }
@@ -100,15 +117,14 @@ export default function OnboardingV4() {
       <SignUpScreen
         d={d}
         onBack={back}
-        // Phase 5 replaces this with real auth, then replays the queued
-        // calendar + WhatsApp connections against the new household.
-        onPick={() => f.finish()}
+        auth={socialAuth}
+        v4={{ ...v4, error: v4.error || authError, setError: (e) => { v4.setError(e); setAuthError(e); } }}
       />
     );
   }
 
   if (phase === 'done') {
-    return <DoneScreen d={d} reduced={reduced} onEnter={() => navigate('/dashboard')} />;
+    return <DoneScreen d={d} reduced={reduced} outcome={v4.outcome} onEnter={() => navigate('/dashboard')} />;
   }
 
   const calCount = Object.keys(d.cals || {}).length;
