@@ -20,6 +20,7 @@ import { Step, Cta, Ghost } from './ui';
 import {
   Splash, PainPicker, ShapePicker, NameStep, RoleStep, HouseStep, HouseSignOverlay,
 } from './screens';
+import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
 
 export default function OnboardingV4() {
   const navigate = useNavigate();
@@ -30,6 +31,16 @@ export default function OnboardingV4() {
   // The house-sign reward sits between submitting the name and advancing, so
   // it's local to the shell rather than a step in its own right.
   const [sign, setSign] = useState(false);
+  // The plan screen's CTA stays disabled until its scripted reply finishes -
+  // letting someone skip past the payback would waste the screen's whole job.
+  const [planDone, setPlanDone] = useState(false);
+
+  // Taking the WhatsApp "yes" records intent only; the real pairing runs after
+  // sign-up (a WhatsApp link is a column on users, and there is no user yet).
+  const connectWhatsApp = () => {
+    update({ wa: true });
+    setTimeout(next, 900);
+  };
 
   if (phase === 'splash') {
     return <Splash reduced={reduced} onStart={() => goPhase('flow', 0)} onLogin={() => goPhase('login')} />;
@@ -64,13 +75,18 @@ export default function OnboardingV4() {
         pct={pct}
         reduced={reduced}
         onBack={back}
-        footer={(
+        footer={step === 'ask' ? (
+          // Screen 09 owns its footer entirely - a green WhatsApp button, not
+          // the standard CTA, and no skip once the answer is in.
+          <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} />
+        ) : (
           <>
             {!autoAdvances(f.i) && (
-              <Cta disabled={!canAdvance} onClick={advance}>
+              <Cta disabled={!canAdvance || (step === 'plan' && !planDone)} onClick={advance}>
                 {step === 'pains'
                   ? ((d.pains || []).length === 0 ? 'Pick at least one' : `That’s my list (${d.pains.length})`)
-                  : step === 'house' ? 'Put the sign up' : 'Continue'}
+                  : step === 'plan' ? (planDone ? 'Sounds good' : 'One sec…')
+                    : step === 'house' ? 'Put the sign up' : 'Continue'}
               </Cta>
             )}
             {skipLabel && <Ghost onClick={skip}>{skipLabel}</Ghost>}
@@ -90,7 +106,10 @@ export default function OnboardingV4() {
         {step === 'role' && <RoleStep d={d} pick={pickAndAdvance} />}
         {step === 'house' && <HouseStep d={d} update={update} onEnter={() => canAdvance && advance()} />}
 
-        {(step === 'plan' || step === 'cals' || step === 'ask' || step === 'reminders') && (
+        {step === 'plan' && <PlanBeat d={d} reduced={reduced} onDone={() => setPlanDone(true)} />}
+        {step === 'ask' && <AskBeat d={d} reduced={reduced} />}
+
+        {(step === 'cals' || step === 'reminders') && (
           <>
             <p style={{ font: '700 11.5px Inter, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple }}>
               {step}
