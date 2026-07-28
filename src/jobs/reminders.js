@@ -531,6 +531,43 @@ async function fetchTodayEvents(householdId, todayStr) {
  *   phone that has the app installed (where push would otherwise always win).
  *   The cron never sets this.
  */
+/**
+ * Ask - once, ever - whether they'd also like the night-before brief.
+ *
+ * Rides their FIRST morning brief rather than the pairing sequence. At
+ * pairing you're asking someone to picture a message they've never seen; here
+ * they've just read one, so "want this twelve hours earlier?" is concrete.
+ *
+ * It also self-selects: the brief router withholds content-free briefs from
+ * people who've never replied, so a household with nothing in it never gets a
+ * brief and so never gets asked - which is right, because an evening brief
+ * would be no more use to them than the morning one.
+ *
+ * Freeform is fine immediately after the template: the template send opens a
+ * 24-hour window. Best-effort throughout - a failed offer must never mark the
+ * brief itself as failed.
+ */
+async function offerEveningBriefOnce(member, variant) {
+  if (variant === 'evening') return;
+  if (!member?.id || !member.whatsapp_phone) return;
+  try {
+    const prefs = await db.getNotificationPreferences(member.id);
+    if (prefs?.evening_brief) return;                       // already on
+    if (await db.hasEveningBriefOfferBeenSent(member.id)) return;
+
+    // Required lazily: the offer copy lives next to the branch that handles
+    // the reply, and bot/handlers is a heavy module this job otherwise
+    // doesn't need.
+    const { EVENING_BRIEF_OFFER_MESSAGE } = require('../bot/handlers');
+    await whatsapp.sendMessage(member.whatsapp_phone, EVENING_BRIEF_OFFER_MESSAGE);
+    // Stamp only after the send succeeds, so a Twilio blip doesn't burn the
+    // one chance we get to ask.
+    await db.stampEveningBriefOfferSent(member.id);
+  } catch (err) {
+    console.error(`[reminders] evening-brief offer to ${member.name} failed:`, err.message);
+  }
+}
+
 async function sendDailyReminders(householdId, singleMember, options = {}) {
   const variant = options.variant === 'evening' ? 'evening' : 'morning';
   const realToday = new Date().toISOString().split('T')[0];
@@ -866,6 +903,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           messageType: variant === 'evening' ? 'evening_brief' : 'daily_reminder',
           body: message,
         });
+        await offerEveningBriefOnce(member, variant);
       } catch (err) {
         console.error(`Failed to send reminder to ${member.name} via WhatsApp:`, err.message);
         await db.logWhatsAppMessage({
@@ -890,4 +928,5 @@ module.exports = {
   chooseDailyBriefChannel,
   whatsappBriefState,
   sendDailyReminders,
+  offerEveningBriefOnce,
 };

@@ -1581,7 +1581,6 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
             .catch((err) => console.error('[whatsapp-verify] displaced notice failed:', err.message));
         }
         const handlers = require('../bot/handlers');
-        handlers.armEveningBriefOffer(req.user.id);
         return whatsapp.sendMessage(record.phone, handlers.BRIEF_INTRO_MESSAGE);
       })
       .catch((err) => {

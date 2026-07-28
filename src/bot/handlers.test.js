@@ -34,6 +34,11 @@ jest.mock('../db/queries', () => ({
   updateUser: jest.fn(() => Promise.resolve({})),
   upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
   getNotificationPreferences: jest.fn(() => Promise.resolve(null)),
+  // Runs before classify on every inbound message - default to "no offer
+  // pending" so it stays out of the way of unrelated tests.
+  takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
+  hasEveningBriefOfferBeenSent: jest.fn(() => Promise.resolve(true)),
+  stampEveningBriefOfferSent: jest.fn(() => Promise.resolve()),
   // Default: pin nudge already claimed (false) so most assertions match on
   // the base copy; the pin-nudge tests opt in by returning true.
   claimPinNudge: jest.fn(() => Promise.resolve(false)),
@@ -1255,17 +1260,27 @@ describe('the night-before offer sent after pairing', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('names the morning brief, how to stop it, and asks about the evening one', () => {
+  // The offer is armed by the FIRST morning brief, not by pairing, and its
+  // pending state lives on the user row (db.takeEveningBriefOffer) rather than
+  // in a Map that a deploy wipes. Arming here = the query says "yes, live".
+  const armOffer = () => db.takeEveningBriefOffer.mockResolvedValueOnce(true);
+
+  it('the pairing intro names the morning brief and how to stop it - and does NOT ask about the evening one', () => {
     // A daily message nobody was warned about is how a link becomes a block,
-    // so the intro has to carry the opt-out as well as the offer.
+    // so the intro still carries the opt-out. The evening question has moved
+    // to the first brief, where the reader has just seen what a brief is.
     expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/each morning/i);
     expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/stop briefs/i);
-    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/night before/i);
-    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/reply \*yes\*/i);
+    expect(handlers.BRIEF_INTRO_MESSAGE).not.toMatch(/night before/i);
+  });
+
+  it('the offer message asks one yes/no question about the night before', () => {
+    expect(handlers.EVENING_BRIEF_OFFER_MESSAGE).toMatch(/night before/i);
+    expect(handlers.EVENING_BRIEF_OFFER_MESSAGE).toMatch(/reply \*yes\*/i);
   });
 
   it('"yes" switches the evening brief on', async () => {
-    handlers.armEveningBriefOffer(parent.id);
+    armOffer();
     const reply = await handlers.handleTextMessage('yes', parent, hh, {});
     expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u-offer', { evening_brief: true });
     expect(reply.response).toMatch(/each evening/i);
@@ -1273,26 +1288,32 @@ describe('the night-before offer sent after pairing', () => {
   });
 
   it('"no thanks" leaves it off and says how to change their mind', async () => {
-    handlers.armEveningBriefOffer(parent.id);
+    armOffer();
     const reply = await handlers.handleTextMessage('no thanks', parent, hh, {});
     expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
     expect(reply.response).toMatch(/start evening briefs/i);
   });
 
   it('does not nag: an unrelated reply drops the offer and is handled normally', async () => {
-    handlers.armEveningBriefOffer(parent.id);
+    armOffer();
     ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
     const reply = await handlers.handleTextMessage('thanks', parent, hh, {});
     expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
     expect(reply.response).not.toMatch(/each evening/i);
   });
 
-  it('is one-shot - a later "yes" is not read as an answer', async () => {
-    handlers.armEveningBriefOffer(parent.id);
-    await handlers.handleTextMessage('thanks', parent, hh, {});
-    jest.clearAllMocks();
+  it('a stale or absent offer never captures a bare "yes"', async () => {
+    // takeEveningBriefOffer returns false once consumed or once the 24h window
+    // has passed, so "yes" to something else entirely is left to classify.
+    db.takeEveningBriefOffer.mockResolvedValue(false);
     ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
     await handlers.handleTextMessage('yes', parent, hh, {});
     expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+  });
+
+  it('survives the offer lookup failing - a broken query must not break the message', async () => {
+    db.takeEveningBriefOffer.mockRejectedValueOnce(new Error('column does not exist'));
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    await expect(handlers.handleTextMessage('hello', parent, hh, {})).resolves.toBeTruthy();
   });
 });

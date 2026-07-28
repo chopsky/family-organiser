@@ -4,6 +4,7 @@
  * → "no child called <pet>", and addChildActivity is never called.
  */
 jest.mock('../db/queries', () => ({
+  takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
   getCalendarEvents: jest.fn(() => Promise.resolve([])),
   getHouseholdActivities: jest.fn(() => Promise.resolve([])),
   getHouseholdMembers: jest.fn(() => Promise.resolve([])),

@@ -380,33 +380,42 @@ function popBriefStartChoice(userId, text) {
 /**
  * The brief intro, sent straight after the pairing welcome.
  *
- * Two jobs. It tells people the morning brief is coming and how to stop it -
- * a daily message nobody was warned about is how a link turns into a block -
- * and it offers the evening one, which is opt-in and otherwise invisible
- * unless someone goes hunting in Settings.
+ * One job now: tell people the morning brief is coming and how to stop it. A
+ * daily message nobody was warned about is how a link turns into a block.
+ *
+ * The evening-brief offer used to be a second paragraph here and has moved to
+ * the first morning brief (jobs/reminders.js). At pairing you are asking
+ * someone to picture a message they have never seen; after their first brief
+ * you are asking whether they want that same thing twelve hours earlier.
  */
-const BRIEF_INTRO_MESSAGE = [
-  '☀️ Each morning at 7 I\'ll send you a quick brief - what\'s on, who\'s where, anything due. Say *stop briefs* any time.',
-  '',
-  'Want a heads-up the night before too? Just reply *yes*.',
-].join('\n');
+const BRIEF_INTRO_MESSAGE =
+  '☀️ Each morning at 7 I\'ll send you a quick brief - what\'s on, who\'s where, anything due. Say *stop briefs* any time.';
 
-// Armed when BRIEF_INTRO_MESSAGE goes out, so the reply lands as an answer
-// rather than being re-classified as chat. One-shot, same TTL as the other
-// follow-ups; an unrelated next message drops it untouched.
-const pendingEveningBriefOffer = new Map(); // userId → { timestamp }
+/**
+ * The offer itself, sent as its own message right after a user's first
+ * morning brief. Freeform is safe there: the brief template opens a 24-hour
+ * window, so a follow-up inside it goes through.
+ */
+const EVENING_BRIEF_OFFER_MESSAGE =
+  'That\'s your morning brief. 🌙 Want the same thing the night before, around 8pm, so tomorrow holds no surprises?\n\nJust reply *yes*.';
 
-function armEveningBriefOffer(userId) {
-  if (!userId) return;
-  pendingEveningBriefOffer.set(userId, { timestamp: Date.now() });
-}
-function popEveningBriefOffer(userId) {
-  const entry = pendingEveningBriefOffer.get(userId);
-  if (!entry) return null;
-  pendingEveningBriefOffer.delete(userId);
-  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
-  return entry;
-}
+// The night-before offer is sent with the user's FIRST morning brief (see
+// jobs/reminders.js) and its pending state lives on the user row, not here.
+//
+// It used to be a process-local Map armed at pairing time with the same
+// 5-minute TTL as the other follow-ups. That was wrong twice over: a deploy
+// wiped every pending offer, and five minutes is no time at all to answer a
+// question about tomorrow evening - which is why evening_brief was true for
+// exactly zero users. db.takeEveningBriefOffer is one-shot the same way pop
+// was, just durable and with a 24-hour window.
+// Belt and braces: the query guards itself too, but this runs before classify
+// on every single message, so a throw here would take down every conversation
+// in the product rather than just the offer.
+const popEveningBriefOffer = (userId) =>
+  db.takeEveningBriefOffer(userId).catch((err) => {
+    console.error('[handlers] evening-brief offer lookup failed:', err.message);
+    return false;
+  });
 
 const pendingInviteOffer = new Map(); // userId → { eventId, householdId, title, timestamp }
 
@@ -2314,7 +2323,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // Answer to the night-before offer sent right after pairing. Checked before
   // classify so a bare "yes" here means the evening brief, not something the
   // model has to guess at.
-  if (popEveningBriefOffer(user.id)) {
+  if (await popEveningBriefOffer(user.id)) {
     const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
     const ans = parseAffirmative(text);
     if (ans === 'yes') {
@@ -4415,7 +4424,7 @@ function formatRecipeResponse(recipe) {
 module.exports = {
   handleTextMessage,
   BRIEF_INTRO_MESSAGE,
-  armEveningBriefOffer,
+  EVENING_BRIEF_OFFER_MESSAGE,
   isGroundedTarget,
   rememberReferents,
   isRecentReferent,

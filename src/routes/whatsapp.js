@@ -256,7 +256,6 @@ router.post('/webhook', async (req, res) => {
                 // linked user looking unlinked.
                 try {
                   await whatsapp.sendMessage(phone, handlers.BRIEF_INTRO_MESSAGE);
-                  handlers.armEveningBriefOffer(row.user_id);
                 } catch (e) {
                   console.error('[whatsapp-pair] brief intro failed:', e.message);
                 }

@@ -8587,6 +8587,71 @@ async function upsertNotificationPreferences(userId, prefs) {
   return data;
 }
 
+// ─── Evening-brief offer ─────────────────────────────────────────────────
+//
+// State for the one-time "want a look at tomorrow the night before?" question
+// that rides a user's first morning brief. Lives on the user row rather than
+// in memory: the old Map lost every pending offer on deploy, and its 5-minute
+// TTL meant nobody ever got to answer. See migration-evening-brief-offer.sql.
+
+const EVENING_BRIEF_OFFER_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Has this user already been asked? Non-null sent_at means never ask again. */
+async function hasEveningBriefOfferBeenSent(userId, db = supabase) {
+  if (!userId) return true; // no id - fail closed rather than spam
+  const { data, error } = await db
+    .from('users')
+    .select('evening_brief_offer_sent_at')
+    .eq('id', userId)
+    .single();
+  // PGRST204/42703 = column missing (migration not run yet). Treat as
+  // "already asked" so the offer stays silent instead of erroring the brief.
+  if (error) return true;
+  return !!data?.evening_brief_offer_sent_at;
+}
+
+async function stampEveningBriefOfferSent(userId, db = supabase) {
+  if (!userId) return;
+  const { error } = await db
+    .from('users')
+    .update({ evening_brief_offer_sent_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+/**
+ * Consume the offer on the user's next inbound message.
+ *
+ * Returns true only if an unanswered offer is live (asked within 24h). Stamps
+ * answered_at either way, so the offer is one-shot: exactly the next message
+ * can answer it, and a stray "yes" tomorrow can't be mistaken for the answer.
+ */
+async function takeEveningBriefOffer(userId, db = supabase) {
+  // This runs on EVERY inbound bot message, before classify. It must never
+  // throw: an unrun migration or a Supabase blip here would take down every
+  // conversation in the product, not just the offer.
+  try {
+    if (!userId) return false;
+    const { data, error } = await db
+      .from('users')
+      .select('evening_brief_offer_sent_at, evening_brief_offer_answered_at')
+      .eq('id', userId)
+      .single();
+    if (error || !data?.evening_brief_offer_sent_at) return false;
+    if (data.evening_brief_offer_answered_at) return false;
+
+    await db.from('users')
+      .update({ evening_brief_offer_answered_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    const age = Date.now() - new Date(data.evening_brief_offer_sent_at).getTime();
+    return Number.isFinite(age) && age >= 0 && age <= EVENING_BRIEF_OFFER_WINDOW_MS;
+  } catch (err) {
+    console.error('[evening-brief-offer] take failed:', err.message);
+    return false;
+  }
+}
+
 // ─── Announcements (admin email broadcaster) ─────────────────────────────
 
 /**
@@ -10037,6 +10102,9 @@ module.exports = {
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  hasEveningBriefOfferBeenSent,
+  stampEveningBriefOfferSent,
+  takeEveningBriefOffer,
   // Announcements (admin email broadcaster)
   resolveAnnouncementAudience,
   createAnnouncement,

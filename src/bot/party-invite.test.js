@@ -5,6 +5,7 @@
  * pulls the whole service chain in at import time).
  */
 jest.mock('../db/queries', () => ({
+  takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
   getCalendarEvents: jest.fn(() => Promise.resolve([])),
   getHouseholdActivities: jest.fn(() => Promise.resolve([])),
   getHouseholdMembers: jest.fn(() => Promise.resolve([])),
