@@ -175,9 +175,6 @@ function buildDailyReminderParts(user, opts = {}) {
   } = opts;
 
   const isEvening = variant === 'evening';
-  // "Today's Schedule" vs "Tomorrow's Schedule" - one word, but getting it
-  // wrong makes the whole message misleading rather than merely awkward.
-  const Day = isEvening ? 'Tomorrow' : 'Today';
   const day = isEvening ? 'tomorrow' : 'today';
 
   const hour = new Date().getHours();
@@ -193,6 +190,11 @@ function buildDailyReminderParts(user, opts = {}) {
     const d = anchorDate ? new Date(`${anchorDate}T12:00:00Z`) : new Date();
     weekday = d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: anchorDate ? 'UTC' : tz });
   } catch { /* leave blank if tz is invalid */ }
+
+  // The schedule heading carries the weekday in the evening ("Thursday's
+  // Schedule"), which lets the opener stay a plain, warm "here's how tomorrow's
+  // looking" instead of cramming the day into a parenthesis after it.
+  const Day = isEvening ? (weekday || 'Tomorrow') : 'Today';
 
   const lines = [];
 
@@ -445,12 +447,12 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
 function buildDailyReminderMessage(user, opts = {}) {
   const { name, greeting, weekday, body } = buildDailyReminderParts(user, opts);
   const isEvening = opts.variant === 'evening';
-  // The evening opener has to say TOMORROW out loud. "Here's your Thursday"
-  // sent at 8pm on Wednesday reads as though it's about the day just ending.
+  // The evening opener says TOMORROW and nothing else - "Here's your Thursday"
+  // sent at 8pm on Wednesday reads as though it's about the day just ending,
+  // and bracketing the weekday after it ("tomorrow (Thursday)") reads like a
+  // database field. The weekday appears a line later, in the schedule heading.
   const opener = isEvening
-    ? (weekday
-      ? `${greeting}, ${name} - here's tomorrow (${weekday}):`
-      : `${greeting}, ${name} - here's how tomorrow looks:`)
+    ? `${greeting}, ${name}! Here's how tomorrow's looking:`
     : (weekday
       ? `${greeting}, ${name}! Here's your ${weekday}:`
       : `${greeting}, ${name}! Here's what's on for today:`);
@@ -544,6 +546,22 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   // The day after the anchor, for the reminders window.
   const tomorrow = addDays(today, 1);
 
+  // How to NAME the two days in a reminder line. In the morning that's
+  // today/tomorrow. In the evening the anchor day IS tomorrow, so labelling it
+  // "today" - which is what comparing against the anchor produced - told
+  // someone at 8pm that a form was due the day that had just ended. The day
+  // after the anchor gets its weekday name; "the day after tomorrow" is a
+  // mouthful nobody says.
+  const whenLabel = (ymd) => {
+    if (variant === 'evening') {
+      if (ymd === today) return 'tomorrow';
+      try {
+        return new Date(`${ymd}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+      } catch { return 'soon'; }
+    }
+    return ymd === today ? 'today' : 'tomorrow';
+  };
+
   // Tasks due today or tomorrow → reminder lines. Pulled once per
   // household run since tasks are household-scoped (we surface them to
   // every recipient; per-assignee filtering could be a follow-up).
@@ -554,7 +572,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       .filter(t => t.due_date === today || t.due_date === tomorrow)
       .map(t => ({
         title: t.title,
-        when: t.due_date === today ? 'today' : 'tomorrow',
+        when: whenLabel(t.due_date),
       }));
   } catch (e) {
     console.warn('[reminders] task fetch failed:', e.message);
@@ -574,7 +592,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       })
       .map(s => ({
         name: s.name,
-        when: String(s.next_renewal_at).slice(0, 10) === today ? 'today' : 'tomorrow',
+        when: whenLabel(String(s.next_renewal_at).slice(0, 10)),
       }));
   } catch (e) {
     console.warn('[reminders] subscription fetch failed:', e.message);

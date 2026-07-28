@@ -55,19 +55,22 @@ describe('the morning brief is untouched', () => {
 });
 
 describe('the evening brief speaks about tomorrow', () => {
-  it('opens by naming tomorrow, not the day it is sent', () => {
+  it('opens warmly, and says tomorrow without bracketing the weekday', () => {
     const msg = buildDailyReminderMessage(USER, { ...OPTS, ...EVENING });
 
-    expect(msg).toContain("here's tomorrow (Thursday)");
+    expect(msg).toContain("Evening, Jade Tayla! Here's how tomorrow's looking:");
+    // "tomorrow (Thursday)" read like a database field, so the weekday moved
+    // down into the schedule heading instead.
+    expect(msg).not.toContain('(Thursday)');
     // "Good morning" at 8pm was the specific thing that made reusing the
     // morning template impossible.
     expect(msg).not.toMatch(/Good morning/i);
   });
 
-  it('labels the schedule and the dinner as tomorrow', () => {
+  it('names the weekday in the schedule heading, and the dinner as tomorrow', () => {
     const msg = buildDailyReminderMessage(USER, { ...OPTS, ...EVENING });
 
-    expect(msg).toContain("Tomorrow's Schedule");
+    expect(msg).toContain("📅 Thursday's Schedule:");
     expect(msg).toContain("Tomorrow's dinner: Fish pie");
   });
 
@@ -117,5 +120,27 @@ describe('template variables follow the same day', () => {
     const vars = buildDailyReminderTemplateVars(USER, { ...OPTS, tz: 'Europe/London' });
 
     expect(vars['7']).toBe("Tonight's dinner: Fish pie - 40 min");
+  });
+});
+
+describe('reminder day labels', () => {
+  // The evening brief's anchor day IS tomorrow, so comparing a due date
+  // against the anchor produced the word "today" - telling someone at 8pm that
+  // a form was due the day that had just ended. Caught by rendering the
+  // message and reading it, which is the only way this kind of thing shows up.
+  const { buildDailyReminderTemplateVars: vars } = require('./reminders');
+
+  it('calls anchor-day items tomorrow, and the day after by name', () => {
+    const out = vars(USER, {
+      ...EVENING,
+      tz: 'Europe/London',
+      taskReminders: [
+        { title: 'Sign the trip form', when: 'tomorrow' },
+        { title: 'Council tax', when: 'Friday' },
+      ],
+    });
+
+    expect(out['5']).toBe('Sign the trip form due tomorrow · Council tax due Friday');
+    expect(out['5']).not.toMatch(/due today/);
   });
 });

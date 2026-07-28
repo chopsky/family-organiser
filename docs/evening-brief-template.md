@@ -26,11 +26,11 @@ through variable values, so the evening brief needs its own approved template.
 ### Body
 
 ```
-Evening, {{1}} 👋 Here's how tomorrow ({{2}}) looks:
+Evening, {{1}}! Here's how tomorrow's looking:
 
 🌤️ {{3}}
 
-📅 Tomorrow's schedule
+📅 {{2}}'s schedule
 {{4}}
 
 📋 Reminders
@@ -40,6 +40,10 @@ Evening, {{1}} 👋 Here's how tomorrow ({{2}}) looks:
 
 💡 {{7}}
 ```
+
+The weekday sits in the schedule heading rather than in the opener. Bracketing
+it after "tomorrow" — "Here's how tomorrow (Thursday) looks" — reads like a
+database field rather than a person.
 
 ### Variables
 
@@ -53,7 +57,7 @@ fallback phrase rather than ever emitting `""`, which would trip 21656.
 | `{{2}}` | Tomorrow's weekday | `Thursday` |
 | `{{3}}` | Weather one-liner | `14-19°, light rain in the afternoon` |
 | `{{4}}` | Tomorrow's events, joined by ` · ` | `08:45 - School run (Jade) · 16:00 - Swimming (Ella)` |
-| `{{5}}` | Tasks + bills due, joined by ` · ` | `Sign the trip form due tomorrow` |
+| `{{5}}` | Tasks + bills due, joined by ` · ` | `Sign the trip form due tomorrow · Council tax due Friday` |
 | `{{6}}` | Shopping count phrase | `3 items on the shopping list` |
 | `{{7}}` | Tomorrow's dinner, else a rotating tip | `Tomorrow's dinner: Fish pie - 40 min` |
 
