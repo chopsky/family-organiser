@@ -386,13 +386,9 @@ function popBriefStartChoice(userId, text) {
  * unless someone goes hunting in Settings.
  */
 const BRIEF_INTRO_MESSAGE = [
-  'One more thing, then I\'ll leave you be 🌅',
+  '☀️ Each morning at 7 I\'ll send you a quick brief - what\'s on, who\'s where, anything due. Say *stop briefs* any time.',
   '',
-  'Each morning at 7 I\'ll send you a short brief: what\'s on that day, who needs to be where, anything due. Most families say it\'s the bit they\'d miss. Say *stop briefs* whenever you like and it stops.',
-  '',
-  'And if you\'re often out the door early, I can send a heads-up the night before as well - so tomorrow\'s no surprise while there\'s still time to do something about it.',
-  '',
-  'Want the night-before one too? Just reply *yes*.',
+  'Want a heads-up the night before too? Just reply *yes*.',
 ].join('\n');
 
 // Armed when BRIEF_INTRO_MESSAGE goes out, so the reply lands as an answer
