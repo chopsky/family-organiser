@@ -39,18 +39,46 @@ function verifyTwilioSignature(req) {
     return true; // dev/test convenience only
   }
   const signature = req.headers['x-twilio-signature'];
-  if (!signature) return false;
-  // Twilio signs the full external URL it POSTed to. `trust proxy` is set
-  // (app.js), so req.protocol/host reflect Railway's X-Forwarded-* headers.
-  // TWILIO_WEBHOOK_URL overrides if the reconstructed URL ever drifts.
-  const url = process.env.TWILIO_WEBHOOK_URL
-    || `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-  try {
-    return twilio.validateRequest(token, signature, url, req.body || {});
-  } catch (err) {
-    console.error('[whatsapp] Twilio signature check threw:', err.message);
+  if (!signature) {
+    console.warn(`[whatsapp] ${req.originalUrl}: no X-Twilio-Signature header - rejected`);
     return false;
   }
+  // Twilio signs the full external URL it POSTed to, so the URL we validate
+  // against has to match the endpoint that was actually hit.
+  //
+  // This router serves TWO signed endpoints: /webhook (inbound messages) and
+  // /status (delivery callbacks). TWILIO_WEBHOOK_URL was a single blanket
+  // override, so setting it to the /webhook URL - the obvious thing to set it
+  // to - made every /status callback fail the check and get a silent 403.
+  // That's why whatsapp_delivery_log sat at 'accepted' forever: the statuses
+  // were arriving and being thrown away. Take the override's ORIGIN and this
+  // request's own path, so one override covers both endpoints.
+  const candidates = [];
+  const override = process.env.TWILIO_WEBHOOK_URL;
+  if (override) {
+    try {
+      candidates.push(`${new URL(override).origin}${req.originalUrl}`);
+    } catch { /* not a parseable URL - the raw value below still gets a go */ }
+    candidates.push(override);
+  }
+  // `trust proxy` is set (app.js), so req.protocol/host reflect Railway's
+  // X-Forwarded-* headers.
+  candidates.push(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
+
+  for (const url of new Set(candidates)) {
+    try {
+      if (twilio.validateRequest(token, signature, url, req.body || {})) return true;
+    } catch (err) {
+      console.error('[whatsapp] Twilio signature check threw:', err.message);
+      return false;
+    }
+  }
+  // Loud on purpose. A silent 403 here is indistinguishable from "Twilio never
+  // called us", which is exactly the ambiguity that hid the delivery-log bug.
+  console.warn(
+    `[whatsapp] ${req.originalUrl}: signature did not match any candidate URL - rejected. Tried: ${[...new Set(candidates)].join(', ')}`
+  );
+  return false;
 }
 
 /**

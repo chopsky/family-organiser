@@ -61,3 +61,55 @@ test('rejects a forged callback (bad signature) and records nothing', async () =
   expect(res.status).toBe(403);
   expect(db.recordWhatsAppDeliveryStatus).not.toHaveBeenCalled();
 });
+
+describe('signature URL candidates', () => {
+  // The live bug: TWILIO_WEBHOOK_URL was a single blanket override for a
+  // router that serves TWO signed endpoints. Set to the /webhook URL - the
+  // obvious value - it made every /status callback fail the check and get a
+  // silent 403, which is why whatsapp_delivery_log never moved off the
+  // submit status. Twilio signs the URL it actually POSTed to.
+  const WEBHOOK = 'https://api.housemait.com/api/whatsapp/webhook';
+  const STATUS = 'https://api.housemait.com/api/whatsapp/status';
+
+  afterEach(() => { delete process.env.TWILIO_WEBHOOK_URL; });
+
+  const fire = () => request(app())
+    .post('/api/whatsapp/status')
+    .set('x-twilio-signature', 'sig').type('form')
+    .send({ MessageSid: 'SM1', To: 'whatsapp:+447700900001', MessageStatus: 'delivered' });
+
+  it('accepts a /status callback while the override names /webhook', async () => {
+    process.env.TWILIO_WEBHOOK_URL = WEBHOOK;
+    // Twilio only ever signs the real URL, so this is the honest stub.
+    twilio.validateRequest.mockImplementation((_t, _s, url) => url === STATUS);
+
+    expect((await fire()).status).toBe(204);
+    expect(db.recordWhatsAppDeliveryStatus).toHaveBeenCalled();
+    expect(twilio.validateRequest).toHaveBeenCalledWith('tok', 'sig', STATUS, expect.anything());
+  });
+
+  it('still accepts a callback signed for the override URL exactly', async () => {
+    process.env.TWILIO_WEBHOOK_URL = STATUS;
+    twilio.validateRequest.mockImplementation((_t, _s, url) => url === STATUS);
+
+    expect((await fire()).status).toBe(204);
+  });
+
+  it('rejects - loudly - when nothing matches', async () => {
+    process.env.TWILIO_WEBHOOK_URL = WEBHOOK;
+    twilio.validateRequest.mockReturnValue(false);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect((await fire()).status).toBe(403);
+    expect(db.recordWhatsAppDeliveryStatus).not.toHaveBeenCalled();
+    // A silent 403 is indistinguishable from "Twilio never called us" - that
+    // ambiguity is what hid this for weeks.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('signature did not match'));
+    warn.mockRestore();
+  });
+
+  it('falls back to the reconstructed URL when no override is set', async () => {
+    twilio.validateRequest.mockImplementation((_t, _s, url) => url.endsWith('/api/whatsapp/status'));
+    expect((await fire()).status).toBe(204);
+  });
+});

@@ -127,9 +127,20 @@ function splitForWhatsApp(text, limit = WHATSAPP_MAX_CHARS) {
 // Absolute URL Twilio POSTs delivery-status updates to (see
 // routes/whatsapp.js POST /status). Only added when API_URL is set, so local
 // dev without a public URL simply doesn't request callbacks.
+let warnedNoStatusCallback = false;
 function statusCallbackUrl() {
   const base = process.env.API_URL;
-  return base ? `${base.replace(/\/+$/, '')}/api/whatsapp/status` : null;
+  if (!base) {
+    // In production this means we're flying blind on delivery: every send
+    // stays at whatever status the API returned at submit time and nothing
+    // ever tells us it failed. Say so once rather than on every send.
+    if (process.env.NODE_ENV === 'production' && !warnedNoStatusCallback) {
+      warnedNoStatusCallback = true;
+      console.warn('[WhatsApp] API_URL unset - not requesting delivery-status callbacks. whatsapp_delivery_log will never move past the submit status.');
+    }
+    return null;
+  }
+  return `${base.replace(/\/+$/, '')}/api/whatsapp/status`;
 }
 
 async function sendOneMessage(to, bodyText, msid) {
