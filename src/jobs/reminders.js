@@ -435,10 +435,15 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   // renumbering rather than sending an empty one - Twilio rejects empty
   // variable values outright (error 21656).
   if (isEvening) {
+    // Weather is {{2}} and the weekday {{3}} - the reverse of the morning
+    // template - because WhatsApp requires variables to appear in ASCENDING
+    // order in the body, and the evening layout puts the weather line above
+    // the schedule heading. Numbering them by meaning instead of by position
+    // (1, 3, 2, …) is what got housemait_evening_brief_v1 rejected.
     return {
       '1': firstName,
-      '2': weekday,
-      '3': weather,
+      '2': weather,
+      '3': weekday,
       '4': events,
       '5': reminders,
       '6': footer,

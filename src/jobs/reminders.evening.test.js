@@ -114,7 +114,11 @@ describe('template variables follow the same day', () => {
       ...EVENING, tz: 'Europe/London', todayEvents: [], taskReminders: [], billReminders: [],
     });
 
-    expect(vars['2']).toBe('Thursday');
+    // Weather is {{2}} and weekday {{3}} in the evening template - the
+    // reverse of the morning one. WhatsApp needs variables to appear in
+    // ascending order in the body, and the evening layout puts weather first.
+    // Numbering by meaning rather than position got v1 rejected.
+    expect(vars['3']).toBe('Thursday');
     expect(vars['4']).toBe('Nothing scheduled tomorrow');
     expect(vars['5']).toBe('Nothing due tomorrow');
   });
@@ -162,5 +166,28 @@ describe('reminder day labels', () => {
 
     expect(out['5']).toBe('Sign the trip form due tomorrow · Council tax due Friday');
     expect(out['5']).not.toMatch(/due today/);
+  });
+});
+
+describe('template variable ORDER matches the body', () => {
+  // housemait_evening_brief_v1 was rejected by WhatsApp. Comparing it against
+  // the approved morning template showed three defects in the spec, all of
+  // which this suite now pins.
+  it('numbers weather before weekday, so the body can run 1,2,3,4,5,6', () => {
+    const vars = buildDailyReminderTemplateVars(USER, {
+      ...OPTS, ...EVENING, weatherLine: '🌦 19°C, wet day in London',
+    });
+
+    expect(vars['2']).toBe('🌦 19°C, wet day in London');
+    expect(vars['3']).toBe('Thursday');
+  });
+
+  it('leaves the approved morning numbering alone', () => {
+    const vars = buildDailyReminderTemplateVars(USER, {
+      ...OPTS, tz: 'Europe/London', anchorDate: THU, weatherLine: '🌦 19°C, wet day in London',
+    });
+
+    expect(vars['2']).toBe('Thursday');
+    expect(vars['3']).toBe('🌦 19°C, wet day in London');
   });
 });
