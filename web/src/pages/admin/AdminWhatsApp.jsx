@@ -15,6 +15,7 @@ export default function AdminWhatsApp() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+  const [forceWhatsApp, setForceWhatsApp] = useState(false);
   const [triggerStatus, setTriggerStatus] = useState(null);
   const [days, setDays] = useState(30);
   const [devices, setDevices] = useState(null);
@@ -119,7 +120,12 @@ export default function AdminWhatsApp() {
     setTriggering(variant);
     setTriggerStatus(null);
     try {
-      const { data } = await api.post('/admin/tools/trigger-morning-brief', { variant });
+      // Push wins whenever the app is installed, so checking the WhatsApp copy
+      // (or a newly approved template) needs the override.
+      const { data } = await api.post('/admin/tools/trigger-morning-brief', {
+        variant,
+        ...(forceWhatsApp ? { channel: 'whatsapp' } : {}),
+      });
       setTriggerStatus({ kind: 'ok', message: `Your ${data.label || 'brief'} went via ${data.where}.` });
       loadDevices(); // dead tokens may have just been pruned
     } catch (err) {
@@ -172,7 +178,17 @@ export default function AdminWhatsApp() {
               Fires a real brief to you on your best channel - a push notification if you have the app installed, otherwise WhatsApp - bypassing the daily lock, weather cache, and your own on/off toggles. <strong>Morning</strong> is today&apos;s, as it goes out at 07:00. <strong>Evening</strong> is tomorrow&apos;s, as it goes out at 20:00 - the only way to read that copy without waiting for 8pm.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <label className="flex items-center gap-2 text-xs text-warm-grey cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={forceWhatsApp}
+                onChange={(e) => setForceWhatsApp(e.target.checked)}
+                className="accent-plum"
+              />
+              Force WhatsApp (otherwise push wins)
+            </label>
+            <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => handleTriggerMorningBrief('morning')}
@@ -189,6 +205,7 @@ export default function AdminWhatsApp() {
             >
               {triggering === 'evening' ? 'Sending…' : 'Evening'}
             </button>
+            </div>
           </div>
         </div>
         {triggerStatus && (

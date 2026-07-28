@@ -526,6 +526,10 @@ async function fetchTodayEvents(householdId, todayStr) {
  * @param {'morning'|'evening'} [options.variant='morning'] - 'evening' builds
  *   the same brief about TOMORROW, for people who are out of the house before
  *   the 07:00 one lands.
+ * @param {'push'|'whatsapp'} [options.forceChannel] - admin self-preview only.
+ *   Skips the channel decision so the WhatsApp copy can be checked from a
+ *   phone that has the app installed (where push would otherwise always win).
+ *   The cron never sets this.
  */
 async function sendDailyReminders(householdId, singleMember, options = {}) {
   const variant = options.variant === 'evening' ? 'evening' : 'morning';
@@ -742,9 +746,13 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     // The evening brief is opt-in, so engagement-based channel retirement
     // doesn't apply: someone who asked for it gets it wherever they can be
     // reached. waState is left out so 'dormant' can't silence it.
-    const channel = variant === 'evening'
+    // forceChannel is for the admin self-preview ONLY. Push wins whenever the
+    // app is installed, which makes the WhatsApp copy - and a newly approved
+    // template - impossible to verify from a phone that has the app on it.
+    // The cron never passes it.
+    const channel = options.forceChannel || (variant === 'evening'
       ? chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState: null, hasContent })
-      : chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent });
+      : chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent }));
     if (!channel) {
       console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled}, state=${waState}, content=${hasContent})`);
       continue;

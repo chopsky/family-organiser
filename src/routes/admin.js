@@ -586,6 +586,10 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
     // so without this the only way to see it was to wait until 8pm.
     const variant = req.body?.variant === 'evening' ? 'evening' : 'morning';
     const label = variant === 'evening' ? 'evening heads-up' : 'morning brief';
+    // Optional channel override. Push wins whenever the app is installed, so
+    // without this the WhatsApp copy - and a newly approved template - can't
+    // be checked at all from a phone with the app on it.
+    const forceChannel = ['push', 'whatsapp'].includes(req.body?.channel) ? req.body.channel : null;
 
     const member = await db.getUserByIdAdmin(req.user.id);
     if (!member) return res.status(404).json({ error: 'Caller not found' });
@@ -597,11 +601,19 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
     const deviceTokens = await db.getActiveDeviceTokens(member.id).catch(() => []);
     const hasDevices = Array.isArray(deviceTokens) && deviceTokens.length > 0;
     const whatsappLinked = !!(member.whatsapp_linked && member.whatsapp_phone);
-    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled: false });
+    const channel = forceChannel || chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled: false });
     if (!channel) {
       return res.status(400).json({
         error: 'You have no app device and no WhatsApp linked. Install the Housemait app (or link WhatsApp in Settings → Notifications) to preview your brief.',
       });
+    }
+    // A forced channel has to actually exist for this admin, or the send is a
+    // silent no-op and they'd sit waiting for a message that can't arrive.
+    if (forceChannel === 'whatsapp' && !whatsappLinked) {
+      return res.status(400).json({ error: 'You have no WhatsApp linked, so it cannot be sent that way. Link it in Settings → Notifications.' });
+    }
+    if (forceChannel === 'push' && !hasDevices) {
+      return res.status(400).json({ error: 'You have no registered push devices, so it cannot be sent that way. Open the app on your phone first.' });
     }
 
     // The evening brief's WhatsApp path needs its own approved template and
@@ -617,7 +629,7 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
     // ignoreOptOut: this is an explicit self-preview, so fire even if the
     // admin has their own toggle for this brief switched off - and the
     // evening one is opt-in, so most admins will not have it on.
-    await sendDailyReminders(member.household_id, member, { ignoreOptOut: true, variant });
+    await sendDailyReminders(member.household_id, member, { ignoreOptOut: true, variant, ...(forceChannel ? { forceChannel } : {}) });
 
     const where = channel === 'push'
       ? `a push notification to your ${deviceTokens.length} device${deviceTokens.length === 1 ? '' : 's'} - check your phone`

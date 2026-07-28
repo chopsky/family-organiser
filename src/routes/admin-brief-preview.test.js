@@ -123,3 +123,54 @@ it('never lets the morning preview be blocked by the evening template', async ()
   expect(res.status).toBe(200);
   if (saved !== undefined) process.env.TWILIO_TEMPLATE_EVENING_BRIEF = saved;
 });
+
+describe('channel override', () => {
+  // Push wins whenever the app is installed, so an admin with the app on their
+  // phone could never see the WhatsApp copy - which is exactly what you need
+  // to check after a template is approved.
+  it('forces WhatsApp when asked, even though push would win', async () => {
+    reminders.chooseDailyBriefChannel.mockReturnValue('push');
+    const saved = process.env.TWILIO_TEMPLATE_EVENING_BRIEF;
+    process.env.TWILIO_TEMPLATE_EVENING_BRIEF = `HX${'b'.repeat(32)}`;
+
+    const res = await fire({ variant: 'evening', channel: 'whatsapp' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.channel).toBe('whatsapp');
+    expect(reminders.sendDailyReminders).toHaveBeenCalledWith(
+      'h1', ADMIN, { ignoreOptOut: true, variant: 'evening', forceChannel: 'whatsapp' },
+    );
+    if (saved === undefined) delete process.env.TWILIO_TEMPLATE_EVENING_BRIEF;
+    else process.env.TWILIO_TEMPLATE_EVENING_BRIEF = saved;
+  });
+
+  it('refuses to force WhatsApp for an admin who has none linked', async () => {
+    db.getUserByIdAdmin.mockResolvedValue({ ...ADMIN, whatsapp_linked: false, whatsapp_phone: null });
+
+    const res = await fire({ variant: 'morning', channel: 'whatsapp' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no WhatsApp linked/i);
+    expect(reminders.sendDailyReminders).not.toHaveBeenCalled();
+  });
+
+  it('refuses to force push for an admin with no registered devices', async () => {
+    db.getActiveDeviceTokens.mockResolvedValue([]);
+
+    const res = await fire({ variant: 'morning', channel: 'push' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no registered push devices/i);
+  });
+
+  it('ignores a nonsense channel and falls back to the normal choice', async () => {
+    reminders.chooseDailyBriefChannel.mockReturnValue('push');
+
+    const res = await fire({ variant: 'morning', channel: 'carrier-pigeon' });
+
+    expect(res.status).toBe(200);
+    expect(reminders.sendDailyReminders).toHaveBeenCalledWith(
+      'h1', ADMIN, { ignoreOptOut: true, variant: 'morning' },
+    );
+  });
+});
