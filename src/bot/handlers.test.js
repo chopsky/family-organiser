@@ -1005,6 +1005,31 @@ describe('in-thread brief stop/start', () => {
     expect(reply.response).toMatch(/tomorrow/i);
   });
 
+  // A bare "start" is the word people reach for after a bare "stop". It used
+  // to require a noun, so it fell through to the classifier and silently did
+  // nothing - someone who stopped could not turn anything back on. Found in
+  // the live log: "stop" at 12:22:41 wrote, "start" at 12:22:53 did not.
+  test.each(['start', 'START', 'restart', 'resume', 'opt in'])(
+    '"%s" on its own turns the morning brief back on',
+    async (msg) => {
+      const reply = await handlers.handleTextMessage(msg, parent, hh, {});
+      expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: true });
+      expect(reply.response).toMatch(/back on/i);
+      expect(ai.classify).not.toHaveBeenCalled();
+    },
+  );
+
+  test('restarting offers the evening brief to someone who has not got it', async () => {
+    const reply = await handlers.handleTextMessage('start', parent, hh, {});
+    expect(reply.response).toMatch(/start evening briefs/i);
+  });
+
+  test('restarting does NOT pitch the evening brief at someone already on it', async () => {
+    db.getNotificationPreferences.mockResolvedValueOnce({ whatsapp_daily_reminder: false, evening_brief: true });
+    const reply = await handlers.handleTextMessage('start', parent, hh, {});
+    expect(reply.response).not.toMatch(/start evening briefs/i);
+  });
+
   test('a generic "start" never opts anyone INTO the evening brief', async () => {
     // The evening brief is opt-in. Restarting the morning one must not quietly
     // sign someone up for an 8pm message they never chose.

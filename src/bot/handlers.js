@@ -741,6 +741,13 @@ function matchBriefStopStart(text) {
   const start = (w = which) => ({ action: 'start', which: w });
 
   if (/^(stop|unsubscribe|opt out)$/.test(t)) return stop('both');
+  // The mirror of a bare "stop", and the word people actually reach for after
+  // sending one. Requiring a noun here (as the phrase rules below do) meant
+  // "start" on its own fell through to the classifier and silently did
+  // nothing - so someone who stopped could not turn anything back on.
+  // Morning only: it's the default-on brief, and restoring it must not sign
+  // anyone up for the opt-in 8pm one they may never have had.
+  if (/^(start|restart|resume|unstop|opt in)$/.test(t)) return start('morning');
   const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?)\b/;
   if (/^(please\s+)?(stop|turn off|switch off|no more|quit)\b/.test(t)
       && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return stop();
@@ -2309,7 +2316,13 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (which === 'evening') {
       return { response: `Lovely - I'll send you a look at tomorrow each evening, starting tonight. 🌙`, actions: noActions };
     }
-    return { response: `Lovely - you're back on. I'll include you in the morning brief from tomorrow. ☀️`, actions: noActions };
+    // Name the evening brief when they haven't got it. Someone restarting
+    // after a "stop" has just lost both, and the 8pm one is opt-in - without
+    // this they have no way of knowing it exists, let alone how to ask.
+    const eveningOffer = eveningWasOn
+      ? ''
+      : `\n\nWant a heads-up the night before too? Say *start evening briefs* and I'll send you a look at tomorrow at 8pm. 🌙`;
+    return { response: `Lovely - you're back on. I'll include you in the morning brief from tomorrow. ☀️${eveningOffer}`, actions: noActions };
   }
 
   // Opener school answer: the capture question "which school do the kids go
