@@ -721,16 +721,32 @@ async function completeSchoolAdd(gias, user, household, ctx, actions) {
 // Deterministic and conservative: bare "stop"/"unsubscribe", or a stop verb
 // paired with a messaging noun. "Stop Logan's swimming club" has neither and
 // classifies normally.
+/**
+ * Returns { action: 'stop'|'start', which: 'morning'|'evening'|'both' } or null.
+ *
+ * `which` matters because there are now two briefs on different schedules. A
+ * plain "stop" means ALL of it - someone reaching for that word is reaching
+ * for the block button next - so it must not leave the 8pm one running. Naming
+ * a time ("stop the evening ones") targets just that brief.
+ */
 function matchBriefStopStart(text) {
   const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
   if (!t || t.split(/\s+/).length > 8) return null;
-  if (/^(stop|unsubscribe|opt out)$/.test(t)) return 'stop';
-  const noun = /\b(morning\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates)\b/;
+
+  const saysEvening = /\b(evening|tonight|night-?time|nightly|8\s*pm|8pm)\b/.test(t);
+  const saysMorning = /\b(morning|7\s*am|7am)\b/.test(t);
+  // Mentioning both, or neither, means all of it.
+  const which = saysEvening === saysMorning ? 'both' : (saysEvening ? 'evening' : 'morning');
+  const stop = (w = which) => ({ action: 'stop', which: w });
+  const start = (w = which) => ({ action: 'start', which: w });
+
+  if (/^(stop|unsubscribe|opt out)$/.test(t)) return stop('both');
+  const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?)\b/;
   if (/^(please\s+)?(stop|turn off|switch off|no more|quit)\b/.test(t)
-      && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return 'stop';
-  if (/^(please\s+)?stop\s+send(ing)?(\s+me)?\s+(these|those|them|this stuff|stuff)\b/.test(t)) return 'stop';
-  if (/^(don'?t|do not)\s+(message|text|whatsapp)\s+me\b/.test(t)) return 'stop';
-  if (/^(please\s+)?(start|restart|resume|turn on|switch on)\b/.test(t) && noun.test(t)) return 'start';
+      && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return stop();
+  if (/^(please\s+)?stop\s+send(ing)?(\s+me)?\s+(these|those|them|this stuff|stuff)\b/.test(t)) return stop('both');
+  if (/^(don'?t|do not)\s+(message|text|whatsapp)\s+me\b/.test(t)) return stop('both');
+  if (/^(please\s+)?(start|restart|resume|turn on|switch on)\b/.test(t) && noun.test(t)) return start();
   return null;
 }
 
@@ -2218,22 +2234,81 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // it instantly and warmly - the alternative outcome is a block.
   const briefToggle = matchBriefStopStart(text);
   if (briefToggle) {
+    const { action, which } = briefToggle;
     const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
-    try {
-      await db.upsertNotificationPreferences(user.id, { whatsapp_daily_reminder: briefToggle === 'start' });
-    } catch (err) {
-      console.error('[handlers] brief toggle failed:', err.message);
-      ctx.intent = 'brief_toggle_error';
-      return { response: "I couldn't update that just now - mind trying again in a minute? You can also manage it in Settings → Notifications.", actions: noActions };
+
+    // Read first so the reply can name what actually changed, and mention the
+    // other brief only when it's genuinely still running. try/catch rather
+    // than .catch() on the result: this must not throw if the read is
+    // unavailable, and knowing their current state is a nicety - stopping the
+    // messages is the part that has to work.
+    let prefs = null;
+    try { prefs = await db.getNotificationPreferences(user.id); } catch { prefs = null; }
+    const eveningWasOn = prefs?.evening_brief === true;
+    const morningWasOn = !(prefs && prefs.whatsapp_daily_reminder === false);
+
+    const patch = {};
+    if (action === 'stop') {
+      if (which !== 'evening') patch.whatsapp_daily_reminder = false;
+      if (which !== 'morning') patch.evening_brief = false;
+    } else if (which === 'evening') {
+      patch.evening_brief = true;
+    } else {
+      // Starting never opts anyone INTO a brief they didn't choose: "start
+      // briefs" brings the morning one back, and the opt-in evening brief has
+      // to be asked for by name.
+      patch.whatsapp_daily_reminder = true;
     }
-    if (briefToggle === 'stop') {
+
+    try {
+      await db.upsertNotificationPreferences(user.id, patch);
+    } catch (err) {
+      // evening_brief may not be migrated yet on this deployment. Stopping the
+      // messages is the one thing that must never fail - the alternative
+      // outcome is a block - so retry without the column rather than tell
+      // someone reaching for "stop" that it didn't work.
+      const morningOnly = Object.prototype.hasOwnProperty.call(patch, 'whatsapp_daily_reminder')
+        ? { whatsapp_daily_reminder: patch.whatsapp_daily_reminder }
+        : null;
+      let recovered = false;
+      if (morningOnly) {
+        try {
+          await db.upsertNotificationPreferences(user.id, morningOnly);
+          recovered = true;
+          console.warn('[handlers] brief toggle fell back to morning-only:', err.message);
+        } catch (err2) {
+          console.error('[handlers] brief toggle retry failed:', err2.message);
+        }
+      }
+      if (!recovered) {
+        console.error('[handlers] brief toggle failed:', err.message);
+        ctx.intent = 'brief_toggle_error';
+        return { response: "I couldn't update that just now - mind trying again in a minute? You can also manage it in Settings → Notifications.", actions: noActions };
+      }
+    }
+
+    if (action === 'stop') {
       ctx.intent = 'brief_optout';
+      const stopped = which === 'evening' ? 'evening'
+        : which === 'morning' ? 'morning'
+          : (eveningWasOn ? 'morning or evening' : 'morning');
+      // Only advertise the other brief when it really is still on, or the
+      // message reads as though we ignored half the request.
+      const remaining = which === 'evening' && morningWasOn
+        ? `\n\nYour morning brief is still on - say *stop morning briefs* if you'd like that off too.`
+        : which === 'morning' && eveningWasOn
+          ? `\n\nYour evening heads-up is still on - say *stop evening briefs* if you'd like that off too.`
+          : '';
       return {
-        response: `Done - no more morning messages from me. 👍\n\nI'm still right here whenever you need me: lists, calendar, reminders - just text. Reply *start briefs* if you'd like the mornings back, or manage it in Settings → Notifications.`,
+        response: `Done - no more ${stopped} messages from me. 👍${remaining}\n\nI'm still right here whenever you need me: lists, calendar, reminders - just text. Reply *start briefs* if you'd like the mornings back, or manage it in Settings → Notifications.`,
         actions: noActions,
       };
     }
+
     ctx.intent = 'brief_optin';
+    if (which === 'evening') {
+      return { response: `Lovely - I'll send you a look at tomorrow each evening, starting tonight. 🌙`, actions: noActions };
+    }
     return { response: `Lovely - you're back on. I'll include you in the morning brief from tomorrow. ☀️`, actions: noActions };
   }
 

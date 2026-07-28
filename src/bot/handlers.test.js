@@ -33,6 +33,7 @@ jest.mock('../db/queries', () => ({
   softDeleteCalendarEvent: jest.fn(() => Promise.resolve()),
   updateUser: jest.fn(() => Promise.resolve({})),
   upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
+  getNotificationPreferences: jest.fn(() => Promise.resolve(null)),
   // Default: pin nudge already claimed (false) so most assertions match on
   // the base copy; the pin-nudge tests opt in by returning true.
   claimPinNudge: jest.fn(() => Promise.resolve(false)),
@@ -951,20 +952,75 @@ describe('in-thread brief stop/start', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // An unqualified stop means ALL of it. Someone reaching for that word is
+  // reaching for the block button next, so leaving the 8pm brief running
+  // would be the worst possible reading of the request.
   test.each([
     'stop',
     'STOP',
     'unsubscribe',
-    'stop the morning messages',
     'please stop messaging me',
     'turn off the briefs',
     'stop sending me these',
     "don't message me",
-  ])('"%s" opts out, replies with the way back in, no LLM call', async (msg) => {
+  ])('"%s" stops BOTH briefs, replies with the way back in, no LLM call', async (msg) => {
     const reply = await handlers.handleTextMessage(msg, parent, hh, {});
-    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: false });
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith(
+      'u9', { whatsapp_daily_reminder: false, evening_brief: false },
+    );
     expect(reply.response).toMatch(/start briefs/i);
     expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  test('naming the morning leaves the evening brief alone', async () => {
+    await handlers.handleTextMessage('stop the morning messages', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: false });
+  });
+
+  test.each([
+    'stop the evening messages',
+    'turn off the evening brief',
+    'no more evening updates',
+  ])('"%s" stops only the evening brief', async (msg) => {
+    await handlers.handleTextMessage(msg, parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { evening_brief: false });
+  });
+
+  test('stopping the evening brief says the morning one is still on', async () => {
+    db.getNotificationPreferences.mockResolvedValueOnce({ whatsapp_daily_reminder: true, evening_brief: true });
+    const reply = await handlers.handleTextMessage('stop the evening ones', parent, hh, {});
+    expect(reply.response).toMatch(/morning brief is still on/i);
+  });
+
+  test('does not claim to have stopped an evening brief they never had', async () => {
+    // prefs mock returns null = no row = evening was never on.
+    const reply = await handlers.handleTextMessage('stop', parent, hh, {});
+    expect(reply.response).toMatch(/no more morning messages/i);
+    expect(reply.response).not.toMatch(/evening/i);
+  });
+
+  test('"start evening briefs" opts IN to the evening one', async () => {
+    const reply = await handlers.handleTextMessage('start evening briefs', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { evening_brief: true });
+    expect(reply.response).toMatch(/tomorrow/i);
+  });
+
+  test('a generic "start" never opts anyone INTO the evening brief', async () => {
+    // The evening brief is opt-in. Restarting the morning one must not quietly
+    // sign someone up for an 8pm message they never chose.
+    await handlers.handleTextMessage('start briefs', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: true });
+  });
+
+  test('stop still works when evening_brief is not migrated yet', async () => {
+    // The column may be missing on a deployment that has the code but not the
+    // migration. Stopping must never fail - that is what produces a block.
+    db.upsertNotificationPreferences
+      .mockRejectedValueOnce(Object.assign(new Error('column does not exist'), { code: '42703' }))
+      .mockResolvedValueOnce({});
+    const reply = await handlers.handleTextMessage('stop', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenLastCalledWith('u9', { whatsapp_daily_reminder: false });
+    expect(reply.response).toMatch(/no more/i);
   });
 
   test('"start briefs" opts back in', async () => {
