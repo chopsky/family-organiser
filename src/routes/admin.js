@@ -582,6 +582,11 @@ router.post('/announcements/:id/send', async (req, res) => {
 
 router.post('/tools/trigger-morning-brief', async (req, res) => {
   try {
+    // Which brief. The evening one is about TOMORROW and goes out at 20:00,
+    // so without this the only way to see it was to wait until 8pm.
+    const variant = req.body?.variant === 'evening' ? 'evening' : 'morning';
+    const label = variant === 'evening' ? 'evening heads-up' : 'morning brief';
+
     const member = await db.getUserByIdAdmin(req.user.id);
     if (!member) return res.status(404).json({ error: 'Caller not found' });
     if (!member.household_id) return res.status(400).json({ error: 'Caller has no household' });
@@ -599,15 +604,25 @@ router.post('/tools/trigger-morning-brief', async (req, res) => {
       });
     }
 
+    // The evening brief's WhatsApp path needs its own approved template and
+    // is skipped without one. Say so up front rather than reporting a send
+    // that will silently do nothing.
+    if (variant === 'evening' && channel === 'whatsapp' && !process.env.TWILIO_TEMPLATE_EVENING_BRIEF) {
+      return res.status(400).json({
+        error: 'TWILIO_TEMPLATE_EVENING_BRIEF is not set, so the evening brief can only go out as a push. Set the approved Content SID, or preview from a device with the app installed.',
+      });
+    }
+
     invalidateHouseholdWeatherCache(member.household_id);
     // ignoreOptOut: this is an explicit self-preview, so fire even if the
-    // admin has their own Morning briefing toggle switched off.
-    await sendDailyReminders(member.household_id, member, { ignoreOptOut: true });
+    // admin has their own toggle for this brief switched off - and the
+    // evening one is opt-in, so most admins will not have it on.
+    await sendDailyReminders(member.household_id, member, { ignoreOptOut: true, variant });
 
     const where = channel === 'push'
       ? `a push notification to your ${deviceTokens.length} device${deviceTokens.length === 1 ? '' : 's'} - check your phone`
       : `WhatsApp (${member.whatsapp_phone})`;
-    return res.json({ ok: true, channel, where });
+    return res.json({ ok: true, channel, variant, where, label });
   } catch (err) {
     console.error('POST /api/admin/tools/trigger-morning-brief error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });

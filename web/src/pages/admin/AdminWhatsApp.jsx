@@ -112,12 +112,15 @@ export default function AdminWhatsApp() {
       .finally(() => setLoading(false));
   }, [days, reloadKey]);
 
-  async function handleTriggerMorningBrief() {
-    setTriggering(true);
+  // variant: 'morning' (today) or 'evening' (tomorrow, 20:00). The evening
+  // brief is opt-in and about a day that hasn't happened, so previewing it on
+  // demand is the only practical way to read the real copy.
+  async function handleTriggerMorningBrief(variant = 'morning') {
+    setTriggering(variant);
     setTriggerStatus(null);
     try {
-      const { data } = await api.post('/admin/tools/trigger-morning-brief');
-      setTriggerStatus({ kind: 'ok', message: `Sent via ${data.where}.` });
+      const { data } = await api.post('/admin/tools/trigger-morning-brief', { variant });
+      setTriggerStatus({ kind: 'ok', message: `Your ${data.label || 'brief'} went via ${data.where}.` });
       loadDevices(); // dead tokens may have just been pruned
     } catch (err) {
       setTriggerStatus({ kind: 'err', message: err.response?.data?.error || err.message });
@@ -164,19 +167,29 @@ export default function AdminWhatsApp() {
       <div className="bg-white border border-light-grey rounded-2xl p-5 mt-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
-            <h2 className="text-sm font-medium text-charcoal">Send my morning brief now</h2>
+            <h2 className="text-sm font-medium text-charcoal">Send a brief to me now</h2>
             <p className="text-xs text-warm-grey mt-1 max-w-md">
-              Fires today's brief to you on your best channel - a push notification if you have the app installed, otherwise WhatsApp - bypassing the daily lock, weather cache, and your own on/off toggle. Use it to preview the real copy without waiting until 07:00 tomorrow.
+              Fires a real brief to you on your best channel - a push notification if you have the app installed, otherwise WhatsApp - bypassing the daily lock, weather cache, and your own on/off toggles. <strong>Morning</strong> is today&apos;s, as it goes out at 07:00. <strong>Evening</strong> is tomorrow&apos;s, as it goes out at 20:00 - the only way to read that copy without waiting for 8pm.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleTriggerMorningBrief}
-            disabled={triggering}
-            className="h-10 px-4 rounded-lg bg-plum hover:bg-plum/90 text-white text-sm font-semibold disabled:opacity-50 shrink-0"
-          >
-            {triggering ? 'Sending…' : 'Send to me'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleTriggerMorningBrief('morning')}
+              disabled={!!triggering}
+              className="h-10 px-4 rounded-lg bg-plum hover:bg-plum/90 text-white text-sm font-semibold disabled:opacity-50"
+            >
+              {triggering === 'morning' ? 'Sending…' : 'Morning'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTriggerMorningBrief('evening')}
+              disabled={!!triggering}
+              className="h-10 px-4 rounded-lg bg-white border-[1.5px] border-plum text-plum hover:bg-plum-light text-sm font-semibold disabled:opacity-50"
+            >
+              {triggering === 'evening' ? 'Sending…' : 'Evening'}
+            </button>
+          </div>
         </div>
         {triggerStatus && (
           <p className={`text-xs mt-3 ${triggerStatus.kind === 'ok' ? 'text-sage' : 'text-coral'}`}>
