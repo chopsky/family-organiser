@@ -790,6 +790,8 @@ export default function Settings() {
       .catch(() => setNotifPrefs({
         calendar_reminders: true, task_assigned: true, shopping_updated: true,
         meal_plan_updated: true, family_activity: true,
+        // Opt-in, so it defaults OFF where every neighbour defaults on.
+        evening_brief: false,
         whatsapp_daily_reminder: true, whatsapp_event_reminders: true,
         whatsapp_weekly_digest: true, whatsapp_overdue_nudge: true,
         whatsapp_subscription_reminder: true,
@@ -2231,6 +2233,33 @@ export default function Settings() {
                 <span
                   className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
                     notifPrefs.whatsapp_daily_reminder !== false ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Evening heads-up - the same brief about TOMORROW, at 8pm. For
+                people who are out of the house before the morning one lands.
+                Opt-IN (=== true), unlike the morning brief above: nobody gets
+                a new 8pm message without asking. Its own preference, so
+                turning the morning brief off doesn't silently take this with
+                it. */}
+            <div className="flex items-center justify-between pb-5 border-b border-cream-border">
+              <div className="min-w-0 flex-1 pr-3">
+                <p className="text-sm font-medium text-bark">Evening heads-up</p>
+                <p className="text-xs text-cocoa">A look at tomorrow, sent at 8pm - handy if you&apos;re out the door before the morning briefing arrives.</p>
+              </div>
+              <button
+                onClick={() => toggleNotifPref('evening_brief')}
+                disabled={savingNotifPref === 'evening_brief'}
+                aria-label="Toggle evening heads-up"
+                className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${
+                  notifPrefs.evening_brief === true ? 'bg-primary' : 'bg-sand'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                    notifPrefs.evening_brief === true ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>

@@ -48,20 +48,29 @@ function clampBody(text, max = 280) {
  * empty-day phrasing by day-of-month so a quiet week doesn't read identically
  * every morning.
  */
-function fallbackBody(name, counts = {}) {
+function fallbackBody(name, counts = {}, variant = 'morning') {
   const { eventCount = 0, taskCount = 0, billCount = 0 } = counts;
-  const greet = name ? `Morning, ${name}!` : 'Morning!';
+  const isEvening = variant === 'evening';
+  const greet = isEvening
+    ? (name ? `Evening, ${name}.` : 'Evening.')
+    : (name ? `Morning, ${name}!` : 'Morning!');
   const bits = [];
   if (eventCount) bits.push(`${eventCount} thing${eventCount > 1 ? 's' : ''} on your calendar`);
   if (taskCount) bits.push(`${taskCount} task${taskCount > 1 ? 's' : ''} to keep an eye on`);
   if (billCount) bits.push(`${billCount} bill${billCount > 1 ? 's' : ''} due soon`);
 
   if (bits.length === 0) {
-    const quiet = [
-      `${greet} Your day looks clear - enjoy the calm, and I've got your back if anything comes up.`,
-      `${greet} Nothing scheduled today, so it's a nice quiet one. Give me a shout if you need anything.`,
-      `${greet} A fresh, open day ahead - I'll let you know the moment anything lands.`,
-    ];
+    const quiet = isEvening
+      ? [
+        `${greet} Tomorrow looks clear - nothing to get ready for tonight.`,
+        `${greet} Nothing scheduled tomorrow, so it's an easy one. Rest up.`,
+        `${greet} Tomorrow's wide open - I'll shout if anything lands overnight.`,
+      ]
+      : [
+        `${greet} Your day looks clear - enjoy the calm, and I've got your back if anything comes up.`,
+        `${greet} Nothing scheduled today, so it's a nice quiet one. Give me a shout if you need anything.`,
+        `${greet} A fresh, open day ahead - I'll let you know the moment anything lands.`,
+      ];
     const idx = new Date().getDate() % quiet.length;
     return quiet[idx];
   }
@@ -69,7 +78,9 @@ function fallbackBody(name, counts = {}) {
   const list = bits.length === 1
     ? bits[0]
     : `${bits.slice(0, -1).join(', ')} and ${bits[bits.length - 1]}`;
-  return `${greet} You've got ${list} today. Tap to see the details.`;
+  return isEvening
+    ? `${greet} Tomorrow you've got ${list}. Tap for the details.`
+    : `${greet} You've got ${list} today. Tap to see the details.`;
 }
 
 /**
@@ -84,22 +95,35 @@ function fallbackBody(name, counts = {}) {
  * @param {object} [ctx] - { householdId, userId } for AI cost attribution
  * @returns {Promise<{ title: string, body: string }>}
  */
-async function generateMorningBriefPush({ name, weekday, summary, counts } = {}, { householdId, userId } = {}) {
+async function generateMorningBriefPush({ name, weekday, summary, counts, variant } = {}, { householdId, userId } = {}) {
   const firstName = (name || '').split(' ')[0] || '';
-  const title = 'Morning briefing';
+  const isEvening = variant === 'evening';
+  const title = isEvening ? 'Tomorrow' : 'Morning briefing';
   let body = null;
 
   try {
-    const dataBlock = summary && summary.trim()
-      ? `Today's briefing data for ${firstName || 'them'}${weekday ? ` (${weekday})` : ''}:\n${summary.trim()}`
-      : `${firstName || 'They'} have nothing scheduled today${weekday ? ` (${weekday})` : ''} - an empty, quiet day.`;
+    // The evening prompt has to be explicit that this is a HEADS-UP about a
+    // day that hasn't happened yet. Handed the same facts without that framing
+    // the model writes them in the present tense, and "you've got swimming at
+    // 4" at 8pm reads as though it's happening now.
+    const dataBlock = isEvening
+      ? (summary && summary.trim()
+        ? `TOMORROW's schedule for ${firstName || 'them'}${weekday ? ` (${weekday})` : ''}:\n${summary.trim()}`
+        : `${firstName || 'They'} have nothing scheduled TOMORROW${weekday ? ` (${weekday})` : ''} - a clear day ahead.`)
+      : (summary && summary.trim()
+        ? `Today's briefing data for ${firstName || 'them'}${weekday ? ` (${weekday})` : ''}:\n${summary.trim()}`
+        : `${firstName || 'They'} have nothing scheduled today${weekday ? ` (${weekday})` : ''} - an empty, quiet day.`);
+
+    const instruction = isEvening
+      ? 'Write their evening heads-up notification for TOMORROW. It is being sent tonight, so write about tomorrow in the future tense, and mention anything worth sorting this evening (kit to find, something to defrost, an early start).'
+      : 'Write their morning briefing notification.';
 
     const { text } = await callWithFailover({
       system: SYSTEM,
-      messages: [{ role: 'user', content: `${dataBlock}\n\nWrite their morning briefing notification.` }],
+      messages: [{ role: 'user', content: `${dataBlock}\n\n${instruction}` }],
       maxTokens: 160,
       useThinking: false,
-      feature: 'morning_brief',
+      feature: isEvening ? 'evening_brief' : 'morning_brief',
       householdId,
       userId,
     });
@@ -110,7 +134,7 @@ async function generateMorningBriefPush({ name, weekday, summary, counts } = {},
     console.warn('[morning-brief] LLM generation failed, using fallback:', err.message);
   }
 
-  if (!body) body = clampBody(fallbackBody(firstName, counts));
+  if (!body) body = clampBody(fallbackBody(firstName, counts, variant));
   return { title, body };
 }
 

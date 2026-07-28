@@ -82,6 +82,14 @@ function chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, wa
   return null;
 }
 
+/** Shift a YYYY-MM-DD date string by n days. UTC arithmetic on a date-only
+ *  string - no timezone drift, because there is no time-of-day to drift. */
+function addDays(dateStr, n) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
 // ─── Message builders (pure functions - easy to test) ─────────────────────────
 
 /**
@@ -157,16 +165,33 @@ function buildDailyReminderParts(user, opts = {}) {
     dinner = null,             // { meal_name, cook_time_mins }
     taskReminders = [],        // [{ title, when: "today"|"tomorrow" }]
     billReminders = [],        // [{ name, when: "today"|"tomorrow" }]
+    // 'morning' (07:00, about today) or 'evening' (20:00, about tomorrow).
+    // The evening variant exists because people who leave early were seeing
+    // the morning brief after they'd already gone.
+    variant = 'morning',
+    // The day the brief is ABOUT, as YYYY-MM-DD. Defaults to today so every
+    // existing caller is byte-identical; the evening job passes tomorrow.
+    anchorDate = null,
   } = opts;
 
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const isEvening = variant === 'evening';
+  // "Today's Schedule" vs "Tomorrow's Schedule" - one word, but getting it
+  // wrong makes the whole message misleading rather than merely awkward.
+  const Day = isEvening ? 'Tomorrow' : 'Today';
+  const day = isEvening ? 'tomorrow' : 'today';
 
-  // Weekday in the household's local timezone so a digest fired at
-  // 07:00 BST says "Thursday" even when the server clock is UTC.
+  const hour = new Date().getHours();
+  const greeting = isEvening
+    ? 'Evening'
+    : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Weekday of the day the brief is ABOUT, in the household's local timezone,
+  // so a digest fired at 07:00 BST says "Thursday" even when the server clock
+  // is UTC - and an evening brief names tomorrow, not tonight.
   let weekday = '';
   try {
-    weekday = new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz });
+    const d = anchorDate ? new Date(`${anchorDate}T12:00:00Z`) : new Date();
+    weekday = d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: anchorDate ? 'UTC' : tz });
   } catch { /* leave blank if tz is invalid */ }
 
   const lines = [];
@@ -196,7 +221,7 @@ function buildDailyReminderParts(user, opts = {}) {
   const allDayEvents = eventsArr.filter(e => e.all_day);
   const timedEvents = eventsArr.filter(e => !e.all_day);
   if (allDayEvents.length > 0 || timedEvents.length > 0) {
-    lines.push("📅 Today's Schedule:");
+    lines.push(`📅 ${Day}'s Schedule:`);
     for (const ev of allDayEvents) {
       const who = formatEventAssignee(ev);
       lines.push(`All day - ${ev.title}${who ? ` _(${who})_` : ''}`);
@@ -213,7 +238,7 @@ function buildDailyReminderParts(user, opts = {}) {
   // list are empty. Bills/tasks/meals don't count as schedule items.
   const hasSchool = Array.isArray(schoolActivities) && schoolActivities.length > 0;
   if (!hasSchool && eventsArr.length === 0) {
-    lines.push('✨ Nothing scheduled today.');
+    lines.push(`✨ Nothing scheduled ${day}.`);
     // Quiet days still earn their place: an empty brief must invite a reply,
     // not read as "this app does nothing".
     lines.push('Anything I should add? Just tell me - "dentist Thursday 2pm" is all it takes.');
@@ -224,7 +249,9 @@ function buildDailyReminderParts(user, opts = {}) {
   // recipe has it; otherwise just the meal name.
   if (dinner && dinner.meal_name) {
     const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
-    lines.push(`🍽️ Dinner: ${dinner.meal_name}${cookTime}`);
+    // Named in the evening because that's the whole point of knowing early:
+    // something may need taking out of the freezer tonight.
+    lines.push(`🍽️ ${isEvening ? "Tomorrow's dinner" : 'Dinner'}: ${dinner.meal_name}${cookTime}`);
     lines.push('');
   }
 
@@ -303,18 +330,24 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
     dinner = null,
     taskReminders = [],
     billReminders = [],
+    variant = 'morning',
+    anchorDate = null,
   } = opts;
+
+  const isEvening = variant === 'evening';
+  const day = isEvening ? 'tomorrow' : 'today';
 
   // First name only - the template greeting "Good morning, {{1}}!" reads
   // weirdly with a full name, and Meta's reviewers used the first-name
   // sample we supplied.
   const firstName = (user.name || 'there').trim().split(/\s+/)[0] || 'there';
 
-  // Weekday in the household tz so a 07:00 BST send says "Thursday"
-  // even when the server clock is UTC.
-  let weekday = 'today';
+  // Weekday of the day the brief is ABOUT, in the household tz, so a 07:00
+  // BST send says "Thursday" even when the server clock is UTC.
+  let weekday = day;
   try {
-    weekday = new Date().toLocaleDateString('en-GB', { weekday: 'long', timeZone: tz });
+    const d = anchorDate ? new Date(`${anchorDate}T12:00:00Z`) : new Date();
+    weekday = d.toLocaleDateString('en-GB', { weekday: 'long', timeZone: anchorDate ? 'UTC' : tz });
   } catch { /* fallback already set */ }
 
   // ── single-line sanitiser ──────────────────────────────────────────
@@ -330,7 +363,7 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
     .trim();
 
   // {{3}} weather - one-liner from the upstream service.
-  const weather = oneLine(weatherLine) || 'Weather unavailable for today';
+  const weather = oneLine(weatherLine) || `Weather unavailable for ${day}`;
 
   // {{4}} events - all-day first, then timed, then school activities,
   // joined by " · " (middle dot + spaces - reads as bullets in WA).
@@ -353,7 +386,7 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   ];
   const events = eventStrings.length > 0
     ? oneLine(eventStrings.join(' · '))
-    : 'Nothing scheduled today';
+    : `Nothing scheduled ${day}`;
 
   // {{5}} reminders - tasks + bills joined by " · ".
   const reminderStrings = [
@@ -362,7 +395,7 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   ];
   const reminders = reminderStrings.length > 0
     ? oneLine(reminderStrings.join(' · '))
-    : 'Nothing due today';
+    : `Nothing due ${day}`;
 
   // {{6}} shopping - the count phrase that previously sat in the body.
   const shopping = shoppingCount > 0
@@ -383,7 +416,7 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   let footer;
   if (dinner && dinner.meal_name) {
     const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
-    footer = `Tonight's dinner: ${dinner.meal_name}${cookTime}`;
+    footer = `${isEvening ? "Tomorrow's" : "Tonight's"} dinner: ${dinner.meal_name}${cookTime}`;
   } else {
     // pickDigestFooter returns a multi-segment string; collapse it.
     footer = oneLine(pickDigestFooter(linkedAt)) || 'Reply /help for all commands';
@@ -411,9 +444,16 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
  */
 function buildDailyReminderMessage(user, opts = {}) {
   const { name, greeting, weekday, body } = buildDailyReminderParts(user, opts);
-  const opener = weekday
-    ? `${greeting}, ${name}! Here's your ${weekday}:`
-    : `${greeting}, ${name}! Here's what's on for today:`;
+  const isEvening = opts.variant === 'evening';
+  // The evening opener has to say TOMORROW out loud. "Here's your Thursday"
+  // sent at 8pm on Wednesday reads as though it's about the day just ending.
+  const opener = isEvening
+    ? (weekday
+      ? `${greeting}, ${name} - here's tomorrow (${weekday}):`
+      : `${greeting}, ${name} - here's how tomorrow looks:`)
+    : (weekday
+      ? `${greeting}, ${name}! Here's your ${weekday}:`
+      : `${greeting}, ${name}! Here's what's on for today:`);
   return body ? `${opener}\n\n${body}` : opener;
 }
 
@@ -459,9 +499,17 @@ async function fetchTodayEvents(householdId, todayStr) {
  * @param {object} [options]
  * @param {boolean} [options.ignoreOptOut] - send even if the member has
  *   turned the brief off (used by the admin "send to me now" preview)
+ * @param {'morning'|'evening'} [options.variant='morning'] - 'evening' builds
+ *   the same brief about TOMORROW, for people who are out of the house before
+ *   the 07:00 one lands.
  */
 async function sendDailyReminders(householdId, singleMember, options = {}) {
-  const today = new Date().toISOString().split('T')[0];
+  const variant = options.variant === 'evening' ? 'evening' : 'morning';
+  const realToday = new Date().toISOString().split('T')[0];
+  // The day the brief is ABOUT. Everything below hangs off this rather than
+  // "now", which is the whole trick: the evening brief is the same brief
+  // pointed one day forward.
+  const today = variant === 'evening' ? addDays(realToday, 1) : realToday;
 
   // Fetch household for timezone (used to render event times in the
   // user's local clock rather than UTC).
@@ -471,11 +519,11 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;
 
-  // Today's calendar events - same scope across all recipients in the
-  // household (events are household-wide, not per-member).
+  // Calendar events for the anchor day - same scope across all recipients in
+  // the household (events are household-wide, not per-member).
   const todayEvents = await fetchTodayEvents(householdId, today);
 
-  // Today's dinner from the meal plan. Pulls just the current date and
+  // The anchor day's dinner from the meal plan. Pulls just that date and
   // picks the first dinner-category row; joined recipes give us
   // cook_time_mins for the digest line. Soft-fail so a meal lookup
   // hiccup never blocks the digest.
@@ -493,12 +541,8 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     console.warn('[reminders] meal fetch failed:', e.message);
   }
 
-  // Tomorrow's date in the household's tz for the reminders window.
-  const tomorrow = (() => {
-    const d = new Date(`${today}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + 1);
-    return d.toISOString().split('T')[0];
-  })();
+  // The day after the anchor, for the reminders window.
+  const tomorrow = addDays(today, 1);
 
   // Tasks due today or tomorrow → reminder lines. Pulled once per
   // household run since tasks are household-scoped (we surface them to
@@ -548,7 +592,9 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   // location → omit.
   let weatherLine = null;
   try {
-    const forecast = await fetchTodayForecastForHousehold(household, householdMembers);
+    const forecast = await fetchTodayForecastForHousehold(household, householdMembers, {
+      dayOffset: variant === 'evening' ? 1 : 0,
+    });
     weatherLine = buildDigestWeatherLine(forecast);
   } catch (e) {
     console.warn('[reminders] weather fetch failed:', e.message);
@@ -561,8 +607,14 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     // the channel-agnostic master switch for the morning brief: default true
     // (a null row, missing column, or any non-false value all mean "send");
     // only an explicit false turns it off.
+    // The evening brief is the mirror image: OPT-IN, so an explicit true is
+    // required. Nobody gets a new 8pm message because we shipped a feature.
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
-    const briefDisabled = !options.ignoreOptOut && !!(prefs && prefs.whatsapp_daily_reminder === false);
+    const briefDisabled = options.ignoreOptOut
+      ? false
+      : variant === 'evening'
+        ? !(prefs && prefs.evening_brief === true)
+        : !!(prefs && prefs.whatsapp_daily_reminder === false);
     const whatsappLinked = !!(member.whatsapp_linked && member.whatsapp_phone);
 
     // App installed? = has ≥1 active push device token. App users get the
@@ -571,13 +623,15 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     try { deviceTokens = (await db.getActiveDeviceTokens(member.id)) || []; } catch { deviceTokens = []; }
     const hasDevices = deviceTokens.length > 0;
 
-    // Get today's school activities for children in this household
-    // Only include if today is during term time (not holidays, half term, INSET, or bank holiday)
+    // School activities for the anchor day. Only include if that day is during
+    // term time (not holidays, half term, INSET, or bank holiday). Derived from
+    // `today` rather than the clock - an evening brief listing this afternoon's
+    // swimming would be worse than listing nothing.
     const schoolActivities = [];
     try {
-      const dayOfWeek = (new Date().getDay() + 6) % 7; // Convert JS day (0=Sun) to our format (0=Mon)
+      const dayOfWeek = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7; // JS day (0=Sun) → ours (0=Mon)
       if (dayOfWeek <= 4) { // Only Mon-Fri
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = today;
         const allMembers = householdMembers;
         const dependents = allMembers.filter(m => m.member_type === 'dependent');
         const householdSchools = await db.getHouseholdSchools(householdId).catch(() => []);
@@ -624,7 +678,10 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     // annoyed user would otherwise block. Stamp FIRST - if the column
     // isn't migrated yet the update fails and we skip, which can repeat
     // nothing; sending first could repeat the sign-off daily.
-    if (waState === 'dormant' && whatsappLinked && !member.whatsapp_brief_signoff_sent_at && !briefDisabled) {
+    // Morning only: the sign-off is about the 07:00 ritual stopping, and the
+    // evening brief is something they explicitly asked for - it doesn't get
+    // retired for silence, and must never fire this message.
+    if (variant === 'morning' && waState === 'dormant' && whatsappLinked && !member.whatsapp_brief_signoff_sent_at && !briefDisabled) {
       try {
         await db.updateUser(member.id, { whatsapp_brief_signoff_sent_at: new Date().toISOString() });
         const { sendBroadcastToMember } = require('../services/whatsapp-templates');
@@ -636,7 +693,12 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       }
     }
 
-    const channel = chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent });
+    // The evening brief is opt-in, so engagement-based channel retirement
+    // doesn't apply: someone who asked for it gets it wherever they can be
+    // reached. waState is left out so 'dormant' can't silence it.
+    const channel = variant === 'evening'
+      ? chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState: null, hasContent })
+      : chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent });
     if (!channel) {
       console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled}, state=${waState}, content=${hasContent})`);
       continue;
@@ -652,6 +714,8 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       dinner,
       taskReminders,
       billReminders,
+      variant,
+      anchorDate: today,
     };
     // ── Push channel (app installed): warm, LLM-generated copy that varies
     // each day, free of WhatsApp's rigid template rules. Reuses the exact
@@ -663,6 +727,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           name: parts.name,
           weekday: parts.weekday,
           summary: parts.body,
+          variant,
           counts: {
             eventCount: todayEvents.length,
             taskCount: taskReminders.length,
@@ -675,10 +740,10 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       try {
         const result = await push.sendPushNotification(
           deviceTokens.map((t) => t.token),
-          { title, body, data: { type: 'morning_brief' } },
+          { title, body, data: { type: variant === 'evening' ? 'evening_brief' : 'morning_brief' } },
         );
         pushSent = result.sent;
-        console.log(`[reminders] Morning brief push → ${member.name}: sent=${result.sent} failed=${result.failed}`);
+        console.log(`[reminders] ${variant === 'evening' ? 'Evening' : 'Morning'} brief push → ${member.name}: sent=${result.sent} failed=${result.failed}`);
       } catch (err) {
         console.error(`Failed to send morning brief push to ${member.name}:`, err.message);
       }
@@ -718,7 +783,18 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     // fallback below - we only flatten to single-line per-section when
     // the template path is in play.
     if (whatsapp.isConfigured()) {
-      const templateSid = process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
+      // The morning template's STATIC body says "Good morning" - Twilio
+      // variables can't carry structure, which is exactly why the greeting
+      // lives there. So the evening brief needs its own approved template and
+      // must never borrow the morning one; without it, WhatsApp is skipped
+      // and app users still get the push.
+      const templateSid = variant === 'evening'
+        ? process.env.TWILIO_TEMPLATE_EVENING_BRIEF
+        : process.env.TWILIO_TEMPLATE_DAILY_REMINDER;
+      if (variant === 'evening' && !templateSid) {
+        console.log(`[reminders] Skipping evening WhatsApp brief for ${member.name} - TWILIO_TEMPLATE_EVENING_BRIEF not set`);
+        continue;
+      }
       const contentVars = buildDailyReminderTemplateVars(member, buildOpts);
 
       try {
@@ -733,7 +809,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           householdId,
           userId: member.id,
           direction: 'outbound',
-          messageType: 'daily_reminder',
+          messageType: variant === 'evening' ? 'evening_brief' : 'daily_reminder',
           body: message,
         });
       } catch (err) {
@@ -742,7 +818,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           householdId,
           userId: member.id,
           direction: 'outbound',
-          messageType: 'daily_reminder',
+          messageType: variant === 'evening' ? 'evening_brief' : 'daily_reminder',
           body: message,
           error: err.message,
         });

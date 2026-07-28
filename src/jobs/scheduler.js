@@ -61,8 +61,18 @@ const DAILY_BRIEF_TIME = '07:00';
 // lock still prevents any duplicate. 30 min is generous headroom for growth.
 const DAILY_BRIEF_WINDOW_MIN = 30;
 
+// The evening brief - the same brief, about TOMORROW - for people who are out
+// of the house before 07:00 lands. Opt-in per member; see the evening_brief
+// preference. 20:00 is late enough that the day's plans have settled and early
+// enough to still act on them (defrost something, find the PE kit).
+const EVENING_BRIEF_TIME = '20:00';
+
 function withinDailyBriefWindow(timezone) {
   return hhmmWithinWindow(currentHHMMInTZ(timezone), DAILY_BRIEF_TIME, DAILY_BRIEF_WINDOW_MIN);
+}
+
+function withinEveningBriefWindow(timezone) {
+  return hhmmWithinWindow(currentHHMMInTZ(timezone), EVENING_BRIEF_TIME, DAILY_BRIEF_WINDOW_MIN);
 }
 
 /**
@@ -90,6 +100,37 @@ async function runDailyReminderCheck() {
     }
   } catch (err) {
     console.error('[scheduler] Daily reminder check failed:', err.message);
+  }
+}
+
+/**
+ * Evening brief - the mirror of runDailyReminderCheck, fired at
+ * EVENING_BRIEF_TIME and built for TOMORROW. Same windowed gate and the same
+ * per-member day-lock, but under its own key: sharing `daily_reminder:<id>`
+ * would mean whichever brief ran first that day silenced the other.
+ *
+ * Opt-in, so most members are skipped inside sendDailyReminders on the
+ * preference check rather than here - the loop stays identical to the
+ * morning's, which is the point.
+ */
+async function runEveningBriefCheck() {
+  try {
+    const households = await db.getAllHouseholds();
+    for (const household of households) {
+      const tz = household.timezone || 'Europe/London';
+      if (!withinEveningBriefWindow(tz)) continue;
+      const members = await db.getHouseholdMembers(household.id);
+      const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
+
+      for (const member of members) {
+        const lockKey = `evening_brief:${member.id}`;
+        const acquired = await db.acquireSchedulerLock(lockKey, todayStr);
+        if (!acquired) continue;
+        await sendDailyReminders(household.id, member, { variant: 'evening' });
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Evening brief check failed:', err.message);
   }
 }
 
@@ -669,6 +710,10 @@ function startScheduler() {
   cron.schedule('* * * * *', () => runDailyReminderCheck());
   console.log('✓ Daily reminder scheduler started (checks every minute)');
 
+  // ── Evening brief: same cadence, fires at 20:00 per household TZ ──────────
+  cron.schedule('* * * * *', () => runEveningBriefCheck());
+  console.log(`✓ Evening brief scheduler started (${EVENING_BRIEF_TIME} per household timezone, opt-in)`);
+
   // ── Overdue nudges: check every minute (fires at 14:00 per household TZ) ───
   cron.schedule('* * * * *', () => runOverdueNudgeCheck());
   console.log('✓ Overdue nudge scheduler started (14:00 per household timezone)');
@@ -838,4 +883,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, refreshAllGoogleFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };
+module.exports = { startScheduler, runDailyReminderCheck, runEveningBriefCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, refreshAllGoogleFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };

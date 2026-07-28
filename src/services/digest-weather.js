@@ -214,13 +214,13 @@ function wwoToWmo(wwo) {
   return undefined; // unknown → weather-line falls through to generic
 }
 
-async function fetchFromOpenMeteo(loc, tz) {
+async function fetchFromOpenMeteo(loc, tz, dayOffset = 0) {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}` +
     `&longitude=${loc.lon}` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
     `&timezone=${encodeURIComponent(tz)}` +
-    `&forecast_days=1`;
+    `&forecast_days=${1 + dayOffset}`;
 
   // Retry on 5xx (occasional 502/503 blips). 4xx is treated as a hard
   // fail - usually a bad lat/lon. Three attempts with 400ms / 1200ms
@@ -246,15 +246,15 @@ async function fetchFromOpenMeteo(loc, tz) {
 
   const data = await res.json();
   const d = data.daily;
-  if (!d || !Array.isArray(d.time) || d.time.length === 0) {
+  if (!d || !Array.isArray(d.time) || d.time.length <= dayOffset) {
     throw new Error('Open-Meteo returned no daily data');
   }
   return {
     cityName: loc.cityName || 'home',
-    code: Number(d.weather_code?.[0]),
-    hi: Math.round(d.temperature_2m_max?.[0]),
-    lo: Math.round(d.temperature_2m_min?.[0]),
-    precipProbability: d.precipitation_probability_max?.[0] ?? 0,
+    code: Number(d.weather_code?.[dayOffset]),
+    hi: Math.round(d.temperature_2m_max?.[dayOffset]),
+    lo: Math.round(d.temperature_2m_min?.[dayOffset]),
+    precipProbability: d.precipitation_probability_max?.[dayOffset] ?? 0,
   };
 }
 
@@ -293,10 +293,13 @@ function metnoToWmo(symbolCode) {
  * date of `nowMs` in `tz`; a morning brief only sees the rest of today's
  * hours, which is fine - the daytime high is what matters for the digest.
  */
-function summariseMetnoToday(timeseries, tz, nowMs = Date.now()) {
+function summariseMetnoToday(timeseries, tz, nowMs = Date.now(), dayOffset = 0) {
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
   const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false });
-  const todayStr = dateFmt.format(new Date(nowMs));
+  // dayOffset 1 = tomorrow, for the evening brief. Tomorrow is actually the
+  // BETTER case here: today only ever has the hours that are left, tomorrow
+  // has all 24.
+  const todayStr = dateFmt.format(new Date(nowMs + dayOffset * 86400000));
 
   const rows = (Array.isArray(timeseries) ? timeseries : [])
     .map((t) => {
@@ -331,7 +334,7 @@ function summariseMetnoToday(timeseries, tz, nowMs = Date.now()) {
   return { hi: Math.round(hi), lo: Math.round(lo), code: metnoToWmo(withSym[0]?.sym), precipProbability };
 }
 
-async function fetchFromMetNo(loc, tz) {
+async function fetchFromMetNo(loc, tz, dayOffset = 0) {
   // MET Norway REQUIRES an identifying User-Agent with contact info, else 403.
   const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${loc.lat}&lon=${loc.lon}`;
   const res = await fetchWithTimeout(url, {
@@ -340,12 +343,12 @@ async function fetchFromMetNo(loc, tz) {
   });
   if (!res.ok) throw new Error(`met.no ${res.status}`);
   const data = await res.json();
-  const today = summariseMetnoToday(data?.properties?.timeseries, tz);
-  if (!today) throw new Error('met.no returned no usable today data');
+  const today = summariseMetnoToday(data?.properties?.timeseries, tz, Date.now(), dayOffset);
+  if (!today) throw new Error('met.no returned no usable forecast data');
   return { cityName: loc.cityName || 'home', ...today };
 }
 
-async function fetchFromWttr(loc) {
+async function fetchFromWttr(loc, dayOffset = 0) {
   // wttr.in accepts "lat,lon" and returns a JSON forecast block.
   // No API key, no rate limit we've ever hit, completely separate
   // infrastructure from Open-Meteo. Good as a "different upstream"
@@ -357,7 +360,7 @@ async function fetchFromWttr(loc) {
   });
   if (!res.ok) throw new Error(`wttr.in ${res.status}`);
   const data = await res.json();
-  const today = data?.weather?.[0];
+  const today = data?.weather?.[dayOffset];
   if (!today) throw new Error('wttr.in returned no weather array');
 
   // chanceofrain lives on the hourly entries (8 per day, 3h apart).
@@ -391,28 +394,34 @@ async function fetchFromWttr(loc) {
  * @returns {Promise<object|null>} shape suitable for buildDigestWeatherLine:
  *   { cityName, code, hi, lo, precipProbability }
  */
-async function fetchTodayForecastForHousehold(household, members = []) {
+async function fetchTodayForecastForHousehold(household, members = [], { dayOffset = 0 } = {}) {
   if (!household?.id) return null;
 
+  // Both cache tiers are keyed by DAY as well as place. Without that, the
+  // evening brief's tomorrow-forecast and the morning brief's today-forecast
+  // would overwrite each other for the same household - and whichever ran
+  // last would quietly hand the other the wrong day's weather.
+  const hhKey = `${household.id}:${dayOffset}`;
+
   // Tier 1: this household was already resolved this run (another member).
-  const hhCached = householdCache.get(household.id);
+  const hhCached = householdCache.get(hhKey);
   if (freshEnough(hhCached)) return hhCached.data;
 
   const loc = await resolveLocation(household, members);
   if (!loc) {
-    householdCache.set(household.id, { data: null, ts: Date.now() });
+    householdCache.set(hhKey, { data: null, ts: Date.now() });
     return null;
   }
 
   const tz = household.timezone || 'auto';
-  const key = coordCacheKey(loc.lat, loc.lon, tz);
+  const key = `${coordCacheKey(loc.lat, loc.lon, tz)}:${dayOffset}`;
 
   // Tier 2: another household at (roughly) this location already fetched.
   // Reuse the forecast but keep THIS household's own city label.
   const coordCached = coordCache.get(key);
   if (freshEnough(coordCached)) {
     const out = coordCached.data ? { ...coordCached.data, cityName: loc.cityName || coordCached.data.cityName } : null;
-    householdCache.set(household.id, { data: out, ts: Date.now() });
+    householdCache.set(hhKey, { data: out, ts: Date.now() });
     return out;
   }
 
@@ -422,9 +431,9 @@ async function fetchTodayForecastForHousehold(household, members = []) {
   // logged with status + latency so the next incident is diagnosable at a
   // glance (429 rate-limit vs 503 outage vs an AbortError timeout).
   const providers = [
-    { name: 'Open-Meteo', run: () => fetchFromOpenMeteo(loc, tz) },
-    { name: 'met.no',     run: () => fetchFromMetNo(loc, tz) },
-    { name: 'wttr.in',    run: () => fetchFromWttr(loc) },
+    { name: 'Open-Meteo', run: () => fetchFromOpenMeteo(loc, tz, dayOffset) },
+    { name: 'met.no',     run: () => fetchFromMetNo(loc, tz, dayOffset) },
+    { name: 'wttr.in',    run: () => fetchFromWttr(loc, dayOffset) },
   ];
   let forecast = null;
   for (const p of providers) {
@@ -444,7 +453,7 @@ async function fetchTodayForecastForHousehold(household, members = []) {
   // household in the same town during the 07:00 run, but recovers soon after.
   const now = Date.now();
   coordCache.set(key, { data: forecast || null, ts: now });
-  householdCache.set(household.id, { data: forecast || null, ts: now });
+  householdCache.set(hhKey, { data: forecast || null, ts: now });
   if (!forecast) {
     console.warn(`[digest-weather] ALL weather providers failed for household ${household.id} - no weather line today`);
   }
