@@ -1586,9 +1586,17 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     }
     const welcome = welcomeLines.join('\n');
 
-    whatsapp.sendMessage(record.phone, welcome).catch((err) => {
-      console.error('[whatsapp-verify] welcome message failed:', err.message);
-    });
+    // Sequential, not parallel: WhatsApp shows them in the order they arrive,
+    // and the brief intro only makes sense after the welcome.
+    whatsapp.sendMessage(record.phone, welcome)
+      .then(() => {
+        const handlers = require('../bot/handlers');
+        handlers.armEveningBriefOffer(req.user.id);
+        return whatsapp.sendMessage(record.phone, handlers.BRIEF_INTRO_MESSAGE);
+      })
+      .catch((err) => {
+        console.error('[whatsapp-verify] welcome message failed:', err.message);
+      });
 
     return res.json({
       success: true,

@@ -377,6 +377,41 @@ function popBriefStartChoice(userId, text) {
   return answer;
 }
 
+/**
+ * The brief intro, sent straight after the pairing welcome.
+ *
+ * Two jobs. It tells people the morning brief is coming and how to stop it -
+ * a daily message nobody was warned about is how a link turns into a block -
+ * and it offers the evening one, which is opt-in and otherwise invisible
+ * unless someone goes hunting in Settings.
+ */
+const BRIEF_INTRO_MESSAGE = [
+  'One more thing, then I\'ll leave you be 🌅',
+  '',
+  'Each morning at 7 I\'ll send you a short brief: what\'s on that day, who needs to be where, anything due. Most families say it\'s the bit they\'d miss. Say *stop briefs* whenever you like and it stops.',
+  '',
+  'And if you\'re often out the door early, I can send a heads-up the night before as well - so tomorrow\'s no surprise while there\'s still time to do something about it.',
+  '',
+  'Want the night-before one too? Just reply *yes*.',
+].join('\n');
+
+// Armed when BRIEF_INTRO_MESSAGE goes out, so the reply lands as an answer
+// rather than being re-classified as chat. One-shot, same TTL as the other
+// follow-ups; an unrelated next message drops it untouched.
+const pendingEveningBriefOffer = new Map(); // userId → { timestamp }
+
+function armEveningBriefOffer(userId) {
+  if (!userId) return;
+  pendingEveningBriefOffer.set(userId, { timestamp: Date.now() });
+}
+function popEveningBriefOffer(userId) {
+  const entry = pendingEveningBriefOffer.get(userId);
+  if (!entry) return null;
+  pendingEveningBriefOffer.delete(userId);
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) return null;
+  return entry;
+}
+
 const pendingInviteOffer = new Map(); // userId → { eventId, householdId, title, timestamp }
 
 function rememberInviteOffer(userId, entry) {
@@ -2280,6 +2315,31 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // In-thread stop/start for the morning brief + proactive messages. Honour
   // it instantly and warmly - the alternative outcome is a block.
+  // Answer to the night-before offer sent right after pairing. Checked before
+  // classify so a bare "yes" here means the evening brief, not something the
+  // model has to guess at.
+  if (popEveningBriefOffer(user.id)) {
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    const ans = parseAffirmative(text);
+    if (ans === 'yes') {
+      try {
+        await db.upsertNotificationPreferences(user.id, { evening_brief: true });
+      } catch (err) {
+        console.error('[handlers] evening brief opt-in failed:', err.message);
+        ctx.intent = 'brief_toggle_error';
+        return { response: "I couldn't switch that on just now - mind trying again in a minute? It's in Settings → Notifications too.", actions: noActions };
+      }
+      ctx.intent = 'brief_optin';
+      return { response: `Done - I'll send you a look at tomorrow each evening around 8. 🌙\n\nSay *stop evening briefs* any time.`, actions: noActions };
+    }
+    if (ans === 'no') {
+      ctx.intent = 'brief_offer_declined';
+      return { response: `No problem - mornings only. If you change your mind, just say *start evening briefs*. 👍`, actions: noActions };
+    }
+    // Anything else: they've moved on. Drop the offer and handle the message
+    // normally rather than nagging.
+  }
+
   // Answer to "which brief would you like back?". Checked before the matcher
   // so a bare "morning" here means the brief, not a calendar query.
   const startChoice = popBriefStartChoice(user.id, text);
@@ -4358,6 +4418,8 @@ function formatRecipeResponse(recipe) {
 
 module.exports = {
   handleTextMessage,
+  BRIEF_INTRO_MESSAGE,
+  armEveningBriefOffer,
   isGroundedTarget,
   rememberReferents,
   isRecentReferent,

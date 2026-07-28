@@ -225,6 +225,20 @@ router.post('/webhook', async (req, res) => {
                 await whatsapp.sendMessage(phone, welcomeLines.join('\n')).catch((e) =>
                   console.error('[whatsapp-pair] welcome failed:', e.message)
                 );
+                // Second message: what the daily brief is, how to stop it, and
+                // the offer of the night-before one. Separate from the welcome
+                // so the ask isn't buried under the "here's what I can do"
+                // list - and so a "yes" clearly answers this and nothing else.
+                //
+                // Wrapped whole: the pairing itself has already succeeded by
+                // this point, and a follow-up that throws must never leave a
+                // linked user looking unlinked.
+                try {
+                  await whatsapp.sendMessage(phone, handlers.BRIEF_INTRO_MESSAGE);
+                  handlers.armEveningBriefOffer(row.user_id);
+                } catch (e) {
+                  console.error('[whatsapp-pair] brief intro failed:', e.message);
+                }
               }
               if (linkedUser?.household_id) cache.invalidate(`members:${linkedUser.household_id}`);
               for (const d of displaced) {

@@ -1246,3 +1246,53 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(ai.classify).toHaveBeenCalled();
   });
 });
+
+// ─── Post-pairing night-before offer ────────────────────────────────────────
+describe('the night-before offer sent after pairing', () => {
+  const ai = require('../services/ai');
+  const hh = { id: 'h9', timezone: 'Europe/London', members: [] };
+  const parent = { id: 'u-offer', name: 'Priya' };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('names the morning brief, how to stop it, and asks about the evening one', () => {
+    // A daily message nobody was warned about is how a link becomes a block,
+    // so the intro has to carry the opt-out as well as the offer.
+    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/each morning/i);
+    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/stop briefs/i);
+    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/night before/i);
+    expect(handlers.BRIEF_INTRO_MESSAGE).toMatch(/reply \*yes\*/i);
+  });
+
+  it('"yes" switches the evening brief on', async () => {
+    handlers.armEveningBriefOffer(parent.id);
+    const reply = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u-offer', { evening_brief: true });
+    expect(reply.response).toMatch(/each evening/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  it('"no thanks" leaves it off and says how to change their mind', async () => {
+    handlers.armEveningBriefOffer(parent.id);
+    const reply = await handlers.handleTextMessage('no thanks', parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(reply.response).toMatch(/start evening briefs/i);
+  });
+
+  it('does not nag: an unrelated reply drops the offer and is handled normally', async () => {
+    handlers.armEveningBriefOffer(parent.id);
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    const reply = await handlers.handleTextMessage('thanks', parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(reply.response).not.toMatch(/each evening/i);
+  });
+
+  it('is one-shot - a later "yes" is not read as an answer', async () => {
+    handlers.armEveningBriefOffer(parent.id);
+    await handlers.handleTextMessage('thanks', parent, hh, {});
+    jest.clearAllMocks();
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+  });
+});

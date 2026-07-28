@@ -38,6 +38,8 @@ jest.mock('../bot/handlers', () => ({
   handleVoiceNote: jest.fn(() => Promise.resolve({ response: 'ok' })),
   handleDocument: jest.fn(() => Promise.resolve({ response: 'ok' })),
   buildBroadcastMessage: jest.fn(() => null),
+  BRIEF_INTRO_MESSAGE: 'brief intro',
+  armEveningBriefOffer: jest.fn(),
 }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), invalidatePattern: jest.fn() }));
 jest.mock('../services/document-extract', () => ({ isSupportedDocument: jest.fn(() => false) }));
