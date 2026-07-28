@@ -50,12 +50,16 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- iPhone is portrait only. Every screen in the app is a single column
+	     designed at 375pt; rotating just stretched it. Upside-down is left
+	     out deliberately - iPhone ignores it anyway on Face ID devices. -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- iPad keeps all four. Locking iPad to portrait requires opting out of
+	     multitasking (UIRequiresFullScreen), which loses Split View and Slide
+	     Over and is a separate product call - see the note in the commit. -->
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
