@@ -170,9 +170,18 @@ api.interceptors.response.use(
     // The /subscription/* URL check prevents loops if /checkout or
     // /portal ever returns 402 (they shouldn't - they're gate-excluded -
     // but belt-and-braces).
+    //
+    // `background: true` opts a request out of the redirect. Housekeeping
+    // writes the user never asked for - the timezone sync on mount, push-token
+    // registration - would otherwise throw an expired household onto the
+    // paywall the instant the app loaded, every load, with no way to reach
+    // Settings. That is how a user ended up unable to DELETE their own
+    // account: the deletion endpoint was never gated, but the screen holding
+    // the button was unreachable. Let those calls fail quietly; the paywall
+    // belongs to actions the user actually took.
     if (err.response?.status === 402) {
       const isSubscriptionRoute = originalRequest.url?.includes('/subscription/');
-      if (!isSubscriptionRoute) {
+      if (!isSubscriptionRoute && !originalRequest.background) {
         window.dispatchEvent(new CustomEvent('subscription:required', {
           detail: err.response.data, // { status, trial_ended_at }
         }));

@@ -34,6 +34,10 @@ export default function usePushNotifications(user) {
             await api.post('/notifications/register-device', {
               token: token.value,
               platform: Capacitor.getPlatform(), // 'ios' | 'android' - routes the token to APNs or FCM server-side
+            }, {
+              // Housekeeping: the user didn't ask for this, so a 402 from an
+              // expired household must not throw them onto the paywall.
+              background: true,
             });
             registered.current = true;
           } catch (err) {

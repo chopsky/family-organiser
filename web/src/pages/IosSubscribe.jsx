@@ -388,6 +388,14 @@ export default function IosSubscribe() {
             {' · '}
             <Link to="/privacy" className="underline hover:text-charcoal">Privacy policy</Link>
           </p>
+
+          <p className="mt-2">
+            {/* An expired household can't mutate anything, and the app used to
+                bounce them here on load - so this was the only screen they could
+                reach. Deletion is never gated (and Apple requires it be
+                reachable in-app), so it needs a door from the paywall. */}
+            <Link to="/settings?section=delete" className="underline hover:text-charcoal">Delete my account</Link>
+          </p>
         </div>
       </div>
     </div>

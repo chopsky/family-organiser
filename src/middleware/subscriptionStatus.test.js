@@ -144,6 +144,25 @@ describe('requireActiveSubscription', () => {
       expect(supabaseAdmin.from).not.toHaveBeenCalled();
     });
 
+    // Deleting your account must never depend on paying for it. Jade Tayla
+    // reported being unable to delete a second account "because my trial has
+    // ended" on 2026-07-28 - the cause was in the frontend (a housekeeping
+    // PATCH 402'd on load and bounced her to the paywall, so she could never
+    // reach Settings), NOT here. Pinned anyway: if this exclusion is ever
+    // dropped, an expired household becomes unable to erase its own data,
+    // which is both a GDPR problem and an App Store 5.1.1(v) failure.
+    test('DELETE /auth/account is never gated, whatever the subscription state', async () => {
+      const req = makeReq({ path: '/auth/account', method: 'DELETE' });
+      const res = makeRes();
+      const next = jest.fn();
+
+      await requireActiveSubscription(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(supabaseAdmin.from).not.toHaveBeenCalled();
+    });
+
     // Guard against over-eager prefix match - /authorize shouldn't hit /auth's exclusion.
     test('prefix-only match: /authorize is NOT treated as excluded', async () => {
       primeChain({ household: { id: HOUSEHOLD_ID, is_internal: false, subscription_status: 'active', trial_ends_at: null } });

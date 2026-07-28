@@ -240,7 +240,10 @@ export default function Layout({ children }) {
     const tzSynced = sessionStorage.getItem('tz_synced');
     if (browserTz && !tzSynced) {
       sessionStorage.setItem('tz_synced', '1');
-      api.patch('/household/profile', { timezone: browserTz }).catch(() => {});
+      // background: a silent sync on mount. Without the flag a 402 from an
+      // expired household bounced the user to /subscribe on every app load,
+      // before they could reach any screen - including Settings.
+      api.patch('/household/profile', { timezone: browserTz }, { background: true }).catch(() => {});
     }
 
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- only sync on mount/login, not every nav

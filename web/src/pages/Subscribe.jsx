@@ -19,7 +19,7 @@
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useSubscription } from '../context/SubscriptionContext';
 import { useAuth } from '../context/AuthContext';
@@ -239,6 +239,13 @@ export default function Subscribe() {
         </div>
 
         <div className="mt-10 text-center">
+          {/* An expired household can't mutate anything, and the app used to
+              bounce them here on load - so this was the only screen they could
+              reach. Deletion is never gated, so it needs a door from the
+              paywall rather than only from a Settings page they can't get to. */}
+          <p className="text-xs text-warm-grey mb-2">
+            <Link to="/settings?section=delete" className="underline hover:text-charcoal">Delete my account</Link>
+          </p>
           <p className="text-xs text-warm-grey">
             Secure checkout powered by Stripe. Cancel anytime from Settings.<br />
             {isTrialing && trialEndsAt && (
