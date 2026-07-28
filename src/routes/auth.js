@@ -1563,36 +1563,23 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     // Send a welcome / onboarding message. Fire-and-forget - a WhatsApp
     // hiccup must not break the connect flow since the DB is already updated.
     //
-    // The welcome stays deliberately tight - three example messages and
-    // nothing else. Feature discovery is dripped via a "💡 Did you know…"
-    // footer on the morning digest for the first 14 days - see
-    // src/utils/whatsapp-tips.js + src/jobs/reminders.js.
-    //
-    // It also ends with NO ask: the brief intro that follows carries the one
-    // question we want answered, and anything here inviting a reply competes
-    // with it. Keep this in step with the same welcome in routes/whatsapp.js.
+    // This is the OTP path: the user typed a code into the app and has never
+    // messaged the bot, so there's no open 24-hour window and only a template
+    // can reach them. sendWelcome handles that - see services/whatsapp.
+    // Copy lives there too, so both pairing routes say the same thing.
     const whatsapp = require('../services/whatsapp');
-    const greetingName = req.user.name ? ` ${req.user.name}` : '';
-    const welcomeLines = [
-      `Hey${greetingName} 👋 Housemait here. You're linked.`,
-      '',
-      `Message me like you'd text a friend:`,
-      '',
-      `  🛒 "We need milk and eggs"`,
-      `  📋 "Remind me to book the dentist"`,
-      `  📅 "Sofia football Saturday 10am"`,
-      '',
-      `Reply /help any time.`,
-    ];
-    if (displaced.length > 0) {
-      welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);
-    }
-    const welcome = welcomeLines.join('\n');
 
     // Sequential, not parallel: WhatsApp shows them in the order they arrive,
     // and the brief intro only makes sense after the welcome.
-    whatsapp.sendMessage(record.phone, welcome)
-      .then(() => {
+    whatsapp.sendWelcome(record.phone, req.user.name)
+      .then(async () => {
+        if (displaced.length > 0) {
+          // Freeform, so it only lands if this number has messaged us before
+          // (which a displaced number usually has). Best-effort by design -
+          // never let it take the brief intro down with it.
+          await whatsapp.sendMessage(record.phone, `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`)
+            .catch((err) => console.error('[whatsapp-verify] displaced notice failed:', err.message));
+        }
         const handlers = require('../bot/handlers');
         handlers.armEveningBriefOffer(req.user.id);
         return whatsapp.sendMessage(record.phone, handlers.BRIEF_INTRO_MESSAGE);

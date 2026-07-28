@@ -205,28 +205,20 @@ router.post('/webhook', async (req, res) => {
                   console.error('[whatsapp-pair] confirm failed:', e.message)
                 );
               } else {
-                const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
-                // Deliberately short, and deliberately ends with NO ask. The
-                // brief intro that follows carries the one question we want
-                // answered ("want the night-before one too?"), so anything
-                // here that invites a reply competes with it.
-                const welcomeLines = [
-                  `Hey${greetingName} 👋 Housemait here. You're linked.`,
-                  '',
-                  `Message me like you'd text a friend:`,
-                  '',
-                  `  🛒 "We need milk and eggs"`,
-                  `  📋 "Remind me to book the dentist"`,
-                  `  📅 "Sofia football Saturday 10am"`,
-                  '',
-                  `Reply /help any time.`,
-                ];
-                if (displaced.length > 0) {
-                  welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);
-                }
-                await whatsapp.sendMessage(phone, welcomeLines.join('\n')).catch((e) =>
+                // Copy + send path both live in services/whatsapp so the two
+                // pairing routes can't drift apart.
+                await whatsapp.sendWelcome(phone, linkedUser?.name).catch((e) =>
                   console.error('[whatsapp-pair] welcome failed:', e.message)
                 );
+                // The displaced-account notice can't ride inside the welcome
+                // template (no variable for it), so it goes separately. This
+                // path always has an open window - the user just messaged us
+                // to pair - so freeform is safe here.
+                if (displaced.length > 0) {
+                  await whatsapp.sendMessage(phone, `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`).catch((e) =>
+                    console.error('[whatsapp-pair] displaced notice failed:', e.message)
+                  );
+                }
                 // Second message: what the daily brief is, how to stop it, and
                 // the offer of the night-before one. Separate from the welcome
                 // so the ask isn't buried under the "here's what I can do"

@@ -28,6 +28,7 @@ jest.mock('../db/queries', () => ({
 }));
 jest.mock('../services/whatsapp', () => ({
   sendMessage: jest.fn(() => Promise.resolve()),
+  sendWelcome: jest.fn(() => Promise.resolve()),
   sendTypingIndicator: jest.fn(() => Promise.resolve(true)),
   isConfigured: jest.fn(() => true),
 }));
@@ -204,7 +205,9 @@ describe('WhatsApp pairing - number handover', () => {
     await postText('hi here is my code K3X9P2');
 
     await waitFor(() => expect(db.updateUser).toHaveBeenCalledWith('u2', expect.objectContaining({ whatsapp_linked: true })));
-    expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/you're linked/i));
+    // The welcome goes through sendWelcome (template when configured), NOT a
+    // raw freeform send - that's what makes it survive the OTP path too.
+    expect(whatsapp.sendWelcome).toHaveBeenCalledWith(PHONE, 'Grant');
   });
 });
 

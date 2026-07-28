@@ -410,10 +410,67 @@ async function sendVerificationCode(phone, code) {
   return sendMessage(phone, `Your Housemait verification code is: ${code}\n\nThis code expires in 10 minutes.`);
 }
 
+/**
+ * The pairing welcome - the message that tells someone they're connected.
+ *
+ * It has to arrive the moment pairing succeeds, on BOTH pairing paths, which
+ * is why it's a template. The "CONNECT ABC123" path has an open 24-hour
+ * window (the user just messaged us) so freeform would do; the OTP path does
+ * not - the user typed a code into the app and has never messaged the bot, so
+ * a freeform send there is rejected with 63016 and they'd be told nothing.
+ * A template ignores the window, so one send path covers both.
+ *
+ * Template body baked into Twilio Content Builder (see
+ * docs/whatsapp-welcome-template.md) - it must stay byte-identical to the
+ * freeform fallback below, or the two pairing paths drift apart:
+ *
+ *   Hey {{1}} 👋 Housemait here. You're linked.
+ *   …
+ *
+ * @param {string} name - the member's name; first name only is used
+ */
+function buildWelcomeBody(name) {
+  // Twilio rejects empty variable values outright (error 21656), so the
+  // greeting always has something to interpolate.
+  const firstName = (name || '').trim().split(/\s+/)[0] || 'there';
+  return {
+    firstName,
+    body: [
+      `Hey ${firstName} 👋 Housemait here. You're linked.`,
+      '',
+      `Message me like you'd text a friend:`,
+      '',
+      `  🛒 "We need milk and eggs"`,
+      `  📋 "Remind me to book the dentist"`,
+      `  📅 "Sofia football Saturday 10am"`,
+      '',
+      `Reply /help any time.`,
+    ].join('\n'),
+  };
+}
+
+async function sendWelcome(phone, name) {
+  const templateSid = process.env.TWILIO_TEMPLATE_WELCOME;
+  const isValidSid = typeof templateSid === 'string' && /^HX[a-f0-9]{32}$/i.test(templateSid);
+  const { firstName, body } = buildWelcomeBody(name);
+
+  if (isValidSid) return sendTemplate(phone, templateSid, { 1: firstName });
+
+  console.warn(
+    '[WhatsApp] TWILIO_TEMPLATE_WELCOME not set - falling back to freeform send. ' +
+    'The welcome will reach users who paired by messaging CONNECT, but OTP pairings ' +
+    'will be rejected with 63016 until a Utility Content Template is approved and ' +
+    'its SID is configured. See docs/whatsapp-welcome-template.md.'
+  );
+  return sendMessage(phone, body);
+}
+
 module.exports = {
   isConfigured,
   sendMessage,
   sendTemplate,
+  sendWelcome,
+  buildWelcomeBody,
   sendTypingIndicator,
   downloadMedia,
   sendVerificationCode,

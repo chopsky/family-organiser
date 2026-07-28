@@ -157,3 +157,68 @@ describe('sendTypingIndicator', () => {
     await expect(sendTypingIndicator('SMabc123')).resolves.toBe(false);
   });
 });
+
+describe('sendWelcome', () => {
+  // The welcome must arrive the instant pairing succeeds on BOTH paths. The
+  // OTP path has no open 24-hour window (the user typed a code into the app
+  // and has never messaged the bot), so only a template reaches them - a
+  // freeform send there is rejected with 63016 and they're told nothing.
+  const VALID_SID = `HX${'a'.repeat(32)}`;
+  let whatsapp;
+
+  beforeEach(() => {
+    jest.resetModules();
+    process.env.TWILIO_ACCOUNT_SID = 'ACtest';
+    process.env.TWILIO_AUTH_TOKEN = 'token';
+    process.env.TWILIO_MESSAGING_SERVICE_SID = 'MGtest';
+    delete process.env.TWILIO_TEMPLATE_WELCOME;
+    whatsapp = require('./whatsapp');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, status: 201, json: () => Promise.resolve({ sid: 'SM1', status: 'queued' }),
+    });
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => { jest.restoreAllMocks(); delete process.env.TWILIO_TEMPLATE_WELCOME; });
+
+  const lastBody = () => new URLSearchParams(global.fetch.mock.calls.at(-1)[1].body);
+
+  it('sends via the template when the SID is configured, passing the first name', async () => {
+    process.env.TWILIO_TEMPLATE_WELCOME = VALID_SID;
+
+    await whatsapp.sendWelcome('+447700900000', 'Grant Shapiro');
+
+    const body = lastBody();
+    expect(body.get('ContentSid')).toBe(VALID_SID);
+    expect(JSON.parse(body.get('ContentVariables'))).toEqual({ 1: 'Grant' });
+    expect(body.get('Body')).toBeNull();
+  });
+
+  it('falls back to freeform - with a warning - when no template is configured', async () => {
+    await whatsapp.sendWelcome('+447700900000', 'Grant');
+
+    expect(lastBody().get('Body')).toContain("You're linked");
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('TWILIO_TEMPLATE_WELCOME'));
+  });
+
+  it('never sends an empty greeting variable (Twilio rejects those with 21656)', async () => {
+    process.env.TWILIO_TEMPLATE_WELCOME = VALID_SID;
+
+    await whatsapp.sendWelcome('+447700900000', null);
+    expect(JSON.parse(lastBody().get('ContentVariables'))).toEqual({ 1: 'there' });
+
+    await whatsapp.sendWelcome('+447700900000', '   ');
+    expect(JSON.parse(lastBody().get('ContentVariables'))).toEqual({ 1: 'there' });
+  });
+
+  it('keeps the freeform fallback byte-identical to the documented template body', () => {
+    // If these drift, the two pairing paths say different things depending on
+    // whether an env var happens to be set. Pin them together.
+    const fs = require('fs');
+    const doc = fs.readFileSync(`${__dirname}/../../docs/whatsapp-welcome-template.md`, 'utf8');
+    const templateBody = doc.match(/### Body\n\n```\n([\s\S]*?)\n```/)[1];
+
+    expect(whatsapp.buildWelcomeBody('Grant').body)
+      .toBe(templateBody.replace('{{1}}', 'Grant'));
+  });
+});
