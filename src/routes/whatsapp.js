@@ -206,18 +206,20 @@ router.post('/webhook', async (req, res) => {
                 );
               } else {
                 const greetingName = linkedUser?.name ? ` ${linkedUser.name}` : '';
+                // Deliberately short, and deliberately ends with NO ask. The
+                // brief intro that follows carries the one question we want
+                // answered ("want the night-before one too?"), so anything
+                // here that invites a reply competes with it.
                 const welcomeLines = [
-                  `👋 Hey${greetingName} - Housemait here.`,
+                  `Hey${greetingName} 👋 Housemait here. You're linked.`,
                   '',
-                  `Your WhatsApp is now linked! Just message me like a friend:`,
+                  `Message me like you'd text a friend:`,
                   '',
                   `  🛒 "We need milk and eggs"`,
                   `  📋 "Remind me to book the dentist"`,
                   `  📅 "Sofia football Saturday 10am"`,
                   '',
-                  `I can also help with recipes, weather, school dates, receipts, and lots more. I'll show you new tricks over the next few days.`,
-                  '',
-                  `Reply /help any time — and it's worth pinning this chat so I'm easy to find. 📌`,
+                  `Reply /help any time.`,
                 ];
                 if (displaced.length > 0) {
                   welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);

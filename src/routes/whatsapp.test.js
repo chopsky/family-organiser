@@ -204,7 +204,7 @@ describe('WhatsApp pairing - number handover', () => {
     await postText('hi here is my code K3X9P2');
 
     await waitFor(() => expect(db.updateUser).toHaveBeenCalledWith('u2', expect.objectContaining({ whatsapp_linked: true })));
-    expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/now linked/i));
+    expect(whatsapp.sendMessage).toHaveBeenCalledWith(PHONE, expect.stringMatching(/you're linked/i));
   });
 });
 

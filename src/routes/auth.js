@@ -1563,23 +1563,26 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     // Send a welcome / onboarding message. Fire-and-forget - a WhatsApp
     // hiccup must not break the connect flow since the DB is already updated.
     //
-    // The welcome stays deliberately tight (only the headline use cases
-    // + a "more to come" line). Feature discovery is dripped via a
-    // "💡 Did you know…" footer on the morning digest for the first 14
-    // days - see src/utils/whatsapp-tips.js + src/jobs/reminders.js.
+    // The welcome stays deliberately tight - three example messages and
+    // nothing else. Feature discovery is dripped via a "💡 Did you know…"
+    // footer on the morning digest for the first 14 days - see
+    // src/utils/whatsapp-tips.js + src/jobs/reminders.js.
+    //
+    // It also ends with NO ask: the brief intro that follows carries the one
+    // question we want answered, and anything here inviting a reply competes
+    // with it. Keep this in step with the same welcome in routes/whatsapp.js.
     const whatsapp = require('../services/whatsapp');
+    const greetingName = req.user.name ? ` ${req.user.name}` : '';
     const welcomeLines = [
-      `👋 Hey ${req.user.name} - Housemait here.`,
+      `Hey${greetingName} 👋 Housemait here. You're linked.`,
       '',
-      `I'm your family's calm second brain. Just message me like a friend:`,
+      `Message me like you'd text a friend:`,
       '',
       `  🛒 "We need milk and eggs"`,
       `  📋 "Remind me to book the dentist"`,
       `  📅 "Sofia football Saturday 10am"`,
       '',
-      `I can also help with recipes, weather, school dates, receipts, and lots more - but no rush. I'll show you new tricks over the next few days.`,
-      '',
-      `Reply /help any time. 📌 Pin this chat (swipe right on iOS, tap-and-hold on Android) so I don't get lost.`,
+      `Reply /help any time.`,
     ];
     if (displaced.length > 0) {
       welcomeLines.push('', `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`);
