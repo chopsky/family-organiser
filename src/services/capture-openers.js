@@ -46,10 +46,21 @@ const OPENERS = [
   },
   {
     key: 'week',
-    // Universal - works for every household, kid-neutral by design.
+    // Universal - works for every household, kid-neutral by design, and so
+    // the one MOST people get: 13 of the first 24 openers were this.
+    //
+    // It used to ask for the whole week ("what's coming up? appointments,
+    // plans, things you mustn't forget") and got 2 replies out of 13, one of
+    // them the founder. The two openers that beat it both ask ONE narrow
+    // question with a short answer ("which school?", "any clubs?"), so this
+    // now does the same. A brain-dump is the largest ask you can make of a
+    // parent mid-morning; one thing they already have in their head is the
+    // smallest. (Caveat for whoever reads the next set of numbers: the
+    // best-performing opener also only fires for households that are further
+    // set up, so some of that gap is selection, not copy.)
     eligible: () => true,
     compose: ({ firstName }) =>
-      `Morning ${firstName}! Let's get your week off your chest and onto your calendar. 📅\n\nWhat's coming up? Appointments, plans, things you mustn't forget - tell me in one message and I'll sort them into the right places.`,
+      `Morning ${firstName}! One question and I'll leave you be: what's the next thing you'd hate to forget? 📅\n\nA few words is plenty - "dentist Thursday 3pm" - and I'll keep hold of it and remind you that morning.`,
   },
   {
     key: 'staples',

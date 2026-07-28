@@ -29,10 +29,25 @@ describe('pickNextOpener eligibility', () => {
     expect(o.message).toMatch(/Aarav/);
   });
 
-  test('no kids → universal what\'s-on question, no kid words', () => {
+  test('no kids → universal question, no kid words', () => {
     const o = pickNextOpener({ user: linkedUser(), members: [], schools: [], activities: [], sentKeys: [] });
     expect(o.key).toBe('week');
     expect(o.message).not.toMatch(/kids|school/i);
+  });
+
+  test('the universal opener asks for ONE thing, not the whole week', () => {
+    // This opener goes to more people than any other, and the brain-dump
+    // version of it got 2 replies out of 13. Keep the ask small: one short
+    // answer, with an example of how short. If a future edit re-opens it to
+    // "tell me everything that's coming up", this is the tripwire.
+    const { message } = pickNextOpener({
+      user: linkedUser(), members: [], schools: [], activities: [], sentKeys: [],
+    });
+
+    expect(message).toMatch(/\?/);                    // ends in something answerable
+    expect(message).toMatch(/dentist Thursday 3pm/);  // shows how short is enough
+    expect(message.split('?').length - 1).toBe(1);    // exactly one question
+    expect(message.length).toBeLessThan(220);
   });
 
   test('pets are NOT children: pet-only household gets the universal opener', () => {
