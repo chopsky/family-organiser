@@ -24,6 +24,9 @@
     "testPathIgnorePatterns": [
       "/node_modules/",
       "<rootDir>/.claude/"
+    ],
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
     ]
   },
   "engines": {
