@@ -210,10 +210,9 @@ router.post('/webhook', async (req, res) => {
                 await whatsapp.sendWelcome(phone, linkedUser?.name).catch((e) =>
                   console.error('[whatsapp-pair] welcome failed:', e.message)
                 );
-                // The displaced-account notice can't ride inside the welcome
-                // template (no variable for it), so it goes separately. This
-                // path always has an open window - the user just messaged us
-                // to pair - so freeform is safe here.
+                // Separate message rather than appended to the welcome: the
+                // welcome is shared copy now, and this notice is a rare
+                // edge case that shouldn't complicate it.
                 if (displaced.length > 0) {
                   await whatsapp.sendMessage(phone, `ℹ️ This number was connected to a different Housemait account before - that link has been replaced, and messages from this number now reach this household.`).catch((e) =>
                     console.error('[whatsapp-pair] displaced notice failed:', e.message)

@@ -413,25 +413,28 @@ async function sendVerificationCode(phone, code) {
 /**
  * The pairing welcome - the message that tells someone they're connected.
  *
- * It has to arrive the moment pairing succeeds, on BOTH pairing paths, which
- * is why it's a template. The "CONNECT ABC123" path has an open 24-hour
- * window (the user just messaged us) so freeform would do; the OTP path does
- * not - the user typed a code into the app and has never messaged the bot, so
- * a freeform send there is rejected with 63016 and they'd be told nothing.
- * A template ignores the window, so one send path covers both.
+ * Freeform, and that's fine on both pairing paths. Worth writing down WHY,
+ * because the obvious reasoning is wrong and cost us a wasted detour:
  *
- * Template body baked into Twilio Content Builder (see
- * docs/whatsapp-welcome-template.md) - it must stay byte-identical to the
- * freeform fallback below, or the two pairing paths drift apart:
+ *   - "CONNECT ABC123" path: the user just messaged us, so the customer-
+ *     service window is open. Obviously fine.
+ *   - OTP path: the user typed a code into the app and has never messaged
+ *     the bot - so it LOOKS like there's no open window and the send should
+ *     be rejected with 63016. It isn't. Sending the verification-code
+ *     TEMPLATE opens a 24-hour business-initiated conversation, and freeform
+ *     is allowed inside that window too. The welcome rides it.
  *
- *   Hey {{1}} 👋 Housemait here. You're linked.
- *   …
+ * So a window is opened by EITHER an inbound message from the user OR a
+ * template we send - not only the former. Verified 2026-07-28 from a real
+ * OTP pairing: code and welcome arrived in the same minute, to a number that
+ * had never messaged the bot.
+ *
+ * Copy lives here rather than in the two route files so the pairing paths
+ * can't drift apart - that duplication was real, even if the bug wasn't.
  *
  * @param {string} name - the member's name; first name only is used
  */
 function buildWelcomeBody(name) {
-  // Twilio rejects empty variable values outright (error 21656), so the
-  // greeting always has something to interpolate.
   const firstName = (name || '').trim().split(/\s+/)[0] || 'there';
   return {
     firstName,
@@ -450,19 +453,7 @@ function buildWelcomeBody(name) {
 }
 
 async function sendWelcome(phone, name) {
-  const templateSid = process.env.TWILIO_TEMPLATE_WELCOME;
-  const isValidSid = typeof templateSid === 'string' && /^HX[a-f0-9]{32}$/i.test(templateSid);
-  const { firstName, body } = buildWelcomeBody(name);
-
-  if (isValidSid) return sendTemplate(phone, templateSid, { 1: firstName });
-
-  console.warn(
-    '[WhatsApp] TWILIO_TEMPLATE_WELCOME not set - falling back to freeform send. ' +
-    'The welcome will reach users who paired by messaging CONNECT, but OTP pairings ' +
-    'will be rejected with 63016 until a Utility Content Template is approved and ' +
-    'its SID is configured. See docs/whatsapp-welcome-template.md.'
-  );
-  return sendMessage(phone, body);
+  return sendMessage(phone, buildWelcomeBody(name).body);
 }
 
 module.exports = {

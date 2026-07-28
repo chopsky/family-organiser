@@ -1,3 +1,8 @@
+// recordDelivery() reaches into db/queries -> db/client, which is a heavy
+// require that also throws without Supabase env. It's swallowed at runtime, but
+// re-requiring it per test (resetModules) took this suite from 0.2s to 47s.
+jest.mock('../db/queries', () => ({ recordWhatsAppSend: jest.fn() }));
+
 const { normalizeWhatsAppMarkdown, splitForWhatsApp } = require('./whatsapp');
 
 describe('splitForWhatsApp', () => {
@@ -159,66 +164,44 @@ describe('sendTypingIndicator', () => {
 });
 
 describe('sendWelcome', () => {
-  // The welcome must arrive the instant pairing succeeds on BOTH paths. The
-  // OTP path has no open 24-hour window (the user typed a code into the app
-  // and has never messaged the bot), so only a template reaches them - a
-  // freeform send there is rejected with 63016 and they're told nothing.
-  const VALID_SID = `HX${'a'.repeat(32)}`;
+  // The interesting case is the OTP path: the user typed a code into the app
+  // and has never messaged the bot, yet the freeform welcome still lands -
+  // because the verification-code TEMPLATE we just sent opened a 24-hour
+  // business-initiated window. Confirmed against a real pairing 2026-07-28.
   let whatsapp;
 
   beforeEach(() => {
     jest.resetModules();
     process.env.TWILIO_ACCOUNT_SID = 'ACtest';
     process.env.TWILIO_AUTH_TOKEN = 'token';
-    process.env.TWILIO_MESSAGING_SERVICE_SID = 'MGtest';
-    delete process.env.TWILIO_TEMPLATE_WELCOME;
     whatsapp = require('./whatsapp');
     global.fetch = jest.fn().mockResolvedValue({
       ok: true, status: 201, json: () => Promise.resolve({ sid: 'SM1', status: 'queued' }),
     });
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  afterEach(() => { jest.restoreAllMocks(); delete process.env.TWILIO_TEMPLATE_WELCOME; });
+  afterEach(() => jest.restoreAllMocks());
 
   const lastBody = () => new URLSearchParams(global.fetch.mock.calls.at(-1)[1].body);
 
-  it('sends via the template when the SID is configured, passing the first name', async () => {
-    process.env.TWILIO_TEMPLATE_WELCOME = VALID_SID;
-
+  it('sends the welcome, greeting the member by first name', async () => {
     await whatsapp.sendWelcome('+447700900000', 'Grant Shapiro');
 
-    const body = lastBody();
-    expect(body.get('ContentSid')).toBe(VALID_SID);
-    expect(JSON.parse(body.get('ContentVariables'))).toEqual({ 1: 'Grant' });
-    expect(body.get('Body')).toBeNull();
+    const sent = lastBody().get('Body');
+    expect(sent).toContain("Hey Grant \u{1F44B} Housemait here. You're linked.");
+    expect(sent).not.toContain('Shapiro');
   });
 
-  it('falls back to freeform - with a warning - when no template is configured', async () => {
-    await whatsapp.sendWelcome('+447700900000', 'Grant');
-
-    expect(lastBody().get('Body')).toContain("You're linked");
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('TWILIO_TEMPLATE_WELCOME'));
-  });
-
-  it('never sends an empty greeting variable (Twilio rejects those with 21656)', async () => {
-    process.env.TWILIO_TEMPLATE_WELCOME = VALID_SID;
-
+  it('falls back to a neutral greeting when the member has no name', async () => {
     await whatsapp.sendWelcome('+447700900000', null);
-    expect(JSON.parse(lastBody().get('ContentVariables'))).toEqual({ 1: 'there' });
+    expect(lastBody().get('Body')).toContain('Hey there');
 
     await whatsapp.sendWelcome('+447700900000', '   ');
-    expect(JSON.parse(lastBody().get('ContentVariables'))).toEqual({ 1: 'there' });
+    expect(lastBody().get('Body')).toContain('Hey there');
   });
 
-  it('keeps the freeform fallback byte-identical to the documented template body', () => {
-    // If these drift, the two pairing paths say different things depending on
-    // whether an env var happens to be set. Pin them together.
-    const fs = require('fs');
-    const doc = fs.readFileSync(`${__dirname}/../../docs/whatsapp-welcome-template.md`, 'utf8');
-    const templateBody = doc.match(/### Body\n\n```\n([\s\S]*?)\n```/)[1];
-
-    expect(whatsapp.buildWelcomeBody('Grant').body)
-      .toBe(templateBody.replace('{{1}}', 'Grant'));
+  it('ends with no ask - the brief intro that follows carries the only question', () => {
+    expect(whatsapp.buildWelcomeBody('Grant').body.trim())
+      .toMatch(/Reply \/help any time\.$/);
   });
 });

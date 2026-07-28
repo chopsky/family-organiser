@@ -1564,9 +1564,9 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     // hiccup must not break the connect flow since the DB is already updated.
     //
     // This is the OTP path: the user typed a code into the app and has never
-    // messaged the bot, so there's no open 24-hour window and only a template
-    // can reach them. sendWelcome handles that - see services/whatsapp.
-    // Copy lives there too, so both pairing routes say the same thing.
+    // messaged the bot. Freeform still reaches them, because the verification-
+    // code template we just sent opened a 24-hour window - see the note on
+    // sendWelcome. Copy lives there so both pairing routes say the same thing.
     const whatsapp = require('../services/whatsapp');
 
     // Sequential, not parallel: WhatsApp shows them in the order they arrive,
