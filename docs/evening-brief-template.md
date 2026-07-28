@@ -36,10 +36,14 @@ Evening, {{1}}! Here's how tomorrow's looking:
 📋 Reminders
 {{5}}
 
-🛒 {{6}}
-
-💡 {{7}}
+💡 {{6}}
 ```
+
+**Six variables, not seven.** The evening brief deliberately carries no
+shopping count and no dinner - a night-before heads-up is about what's
+happening, and both already appear in the morning brief. Twilio rejects empty
+variable values (21656), so a dropped section means renumbering rather than
+sending `""`.
 
 The weekday sits in the schedule heading rather than in the opener. Bracketing
 it after "tomorrow" — "Here's how tomorrow (Thursday) looks" — reads like a
@@ -58,11 +62,10 @@ fallback phrase rather than ever emitting `""`, which would trip 21656.
 | `{{3}}` | Weather one-liner | `14-19°, light rain in the afternoon` |
 | `{{4}}` | Tomorrow's events, joined by ` · ` | `08:45 - School run (Jade) · 16:00 - Swimming (Ella)` |
 | `{{5}}` | Tasks + bills due, joined by ` · ` | `Sign the trip form due tomorrow · Council tax due Friday` |
-| `{{6}}` | Shopping count phrase | `3 items on the shopping list` |
-| `{{7}}` | Tomorrow's dinner, else a rotating tip | `Tomorrow's dinner: Fish pie - 40 min` |
+| `{{6}}` | Rotating discovery tip / help hint | `Reply /help for all commands` |
 
 Empty-state values (also non-empty strings): `{{4}}` → `Nothing scheduled
-tomorrow`, `{{5}}` → `Nothing due tomorrow`, `{{6}}` → `Shopping list is empty`.
+tomorrow`, `{{5}}` → `Nothing due tomorrow`.
 
 ## Notes for the reviewer
 

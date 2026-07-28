@@ -67,11 +67,20 @@ describe('the evening brief speaks about tomorrow', () => {
     expect(msg).not.toMatch(/Good morning/i);
   });
 
-  it('names the weekday in the schedule heading, and the dinner as tomorrow', () => {
+  it('names the weekday in the schedule heading', () => {
     const msg = buildDailyReminderMessage(USER, { ...OPTS, ...EVENING });
 
     expect(msg).toContain("📅 Thursday's Schedule:");
-    expect(msg).toContain("Tomorrow's dinner: Fish pie");
+  });
+
+  it('leaves out the dinner and the shopping list', () => {
+    // A night-before heads-up is about what's HAPPENING. Domestic admin makes
+    // it longer without making it more useful at 8pm, and both still appear in
+    // the morning brief.
+    const msg = buildDailyReminderMessage(USER, { ...OPTS, ...EVENING });
+
+    expect(msg).not.toMatch(/Fish pie/);
+    expect(msg).not.toMatch(/shopping list/i);
   });
 
   it('says nothing scheduled TOMORROW on an empty day', () => {
@@ -110,10 +119,21 @@ describe('template variables follow the same day', () => {
     expect(vars['5']).toBe('Nothing due tomorrow');
   });
 
-  it("calls the meal tomorrow's dinner rather than tonight's", () => {
+  it('is SIX variables in the evening - no shopping, no dinner', () => {
+    // Twilio rejects empty variable values (21656), so a dropped section means
+    // renumbering the template rather than sending an empty string.
     const vars = buildDailyReminderTemplateVars(USER, { ...OPTS, ...EVENING });
 
-    expect(vars['7']).toBe("Tomorrow's dinner: Fish pie - 40 min");
+    expect(Object.keys(vars)).toEqual(['1', '2', '3', '4', '5', '6']);
+    expect(vars['6']).not.toMatch(/Fish pie/);
+    expect(JSON.stringify(vars)).not.toMatch(/shopping list/i);
+  });
+
+  it('is still SEVEN in the morning, shopping and dinner intact', () => {
+    const vars = buildDailyReminderTemplateVars(USER, { ...OPTS, tz: 'Europe/London' });
+
+    expect(Object.keys(vars)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+    expect(vars['6']).toBe('3 items on the shopping list');
   });
 
   it('leaves the morning wording exactly as it was', () => {

@@ -249,11 +249,13 @@ function buildDailyReminderParts(user, opts = {}) {
 
   // Today's dinner from the meal plan. Cook time is included when the
   // recipe has it; otherwise just the meal name.
-  if (dinner && dinner.meal_name) {
+  // Evening deliberately carries NO dinner and NO shopping line. The night-
+  // before message is a heads-up about what's HAPPENING - domestic admin makes
+  // it longer without making it more useful at 8pm, and both are already in
+  // the morning brief.
+  if (!isEvening && dinner && dinner.meal_name) {
     const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
-    // Named in the evening because that's the whole point of knowing early:
-    // something may need taking out of the freezer tonight.
-    lines.push(`🍽️ ${isEvening ? "Tomorrow's dinner" : 'Dinner'}: ${dinner.meal_name}${cookTime}`);
+    lines.push(`🍽️ Dinner: ${dinner.meal_name}${cookTime}`);
     lines.push('');
   }
 
@@ -273,8 +275,8 @@ function buildDailyReminderParts(user, opts = {}) {
     lines.push('');
   }
 
-  // Shopping summary - one line, no bullets.
-  if (shoppingCount > 0) {
+  // Shopping summary - one line, no bullets. Morning only (see above).
+  if (!isEvening && shoppingCount > 0) {
     lines.push(`🛒 ${shoppingCount} item${shoppingCount !== 1 ? 's' : ''} on the shopping list.`);
   }
 
@@ -416,9 +418,9 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   // colliding). Same applies to any other leading-glyph footer that
   // pickDigestFooter may emit in the future.
   let footer;
-  if (dinner && dinner.meal_name) {
+  if (!isEvening && dinner && dinner.meal_name) {
     const cookTime = dinner.cook_time_mins ? ` - ${dinner.cook_time_mins} min` : '';
-    footer = `${isEvening ? "Tomorrow's" : "Tonight's"} dinner: ${dinner.meal_name}${cookTime}`;
+    footer = `Tonight's dinner: ${dinner.meal_name}${cookTime}`;
   } else {
     // pickDigestFooter returns a multi-segment string; collapse it.
     footer = oneLine(pickDigestFooter(linkedAt)) || 'Reply /help for all commands';
@@ -427,6 +429,21 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
   // isn't duplicated. Range covers WhatsApp's common pictographs incl.
   // 💡 (U+1F4A1), 🍽️ (U+1F37D + VS16), etc.
   footer = footer.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}](?:️)?\s*/u, '');
+
+  // The evening template is SIX variables, not seven: no shopping count, and
+  // no dinner (so {{6}} is always the rotating tip). Dropping a variable means
+  // renumbering rather than sending an empty one - Twilio rejects empty
+  // variable values outright (error 21656).
+  if (isEvening) {
+    return {
+      '1': firstName,
+      '2': weekday,
+      '3': weather,
+      '4': events,
+      '5': reminders,
+      '6': footer,
+    };
+  }
 
   return {
     '1': firstName,
@@ -529,9 +546,13 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   // picks the first dinner-category row; joined recipes give us
   // cook_time_mins for the digest line. Soft-fail so a meal lookup
   // hiccup never blocks the digest.
+  // Morning only - the evening brief doesn't print the dinner, so don't ask
+  // the database for it.
   let dinner = null;
   try {
-    const meals = await db.getMealPlanForWeek(householdId, today, today);
+    const meals = variant === 'evening'
+      ? []
+      : await db.getMealPlanForWeek(householdId, today, today);
     const dinnerRow = (meals || []).find(m => m.category === 'dinner');
     if (dinnerRow) {
       dinner = {
@@ -684,9 +705,11 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
 
     // Real content = schedule/dinner/reminders. Weather and tips are garnish
     // and never justify a business-initiated message on their own.
+    // Dinner counts as content in the morning, where it's printed. The evening
+    // brief doesn't carry it, so it mustn't be the reason one gets sent.
     const hasContent = (todayEvents || []).length > 0
       || schoolActivities.length > 0
-      || !!dinner?.meal_name
+      || (variant !== 'evening' && !!dinner?.meal_name)
       || (taskReminders || []).length > 0
       || (billReminders || []).length > 0;
     const waState = whatsappLinked ? whatsappBriefState(member) : null;
