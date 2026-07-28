@@ -1009,25 +1009,62 @@ describe('in-thread brief stop/start', () => {
   // to require a noun, so it fell through to the classifier and silently did
   // nothing - someone who stopped could not turn anything back on. Found in
   // the live log: "stop" at 12:22:41 wrote, "start" at 12:22:53 did not.
+  // A bare "start" names nothing, so it asks instead of guessing. Guessing
+  // either withholds the brief they meant or switches on an 8pm message they
+  // never asked for. STOP is deliberately NOT symmetrical - see below.
   test.each(['start', 'START', 'restart', 'resume', 'opt in'])(
-    '"%s" on its own turns the morning brief back on',
+    '"%s" on its own ASKS which brief, and writes nothing yet',
     async (msg) => {
       const reply = await handlers.handleTextMessage(msg, parent, hh, {});
-      expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: true });
-      expect(reply.response).toMatch(/back on/i);
+      expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+      expect(reply.response).toMatch(/which one/i);
+      expect(reply.response).toMatch(/morning/i);
+      expect(reply.response).toMatch(/evening/i);
       expect(ai.classify).not.toHaveBeenCalled();
     },
   );
 
-  test('restarting offers the evening brief to someone who has not got it', async () => {
-    const reply = await handlers.handleTextMessage('start', parent, hh, {});
-    expect(reply.response).toMatch(/start evening briefs/i);
+  test.each([
+    ['morning', { whatsapp_daily_reminder: true }],
+    ['evening', { evening_brief: true }],
+    ['both', { whatsapp_daily_reminder: true, evening_brief: true }],
+  ])('answering "%s" switches on exactly that', async (answer, patch) => {
+    await handlers.handleTextMessage('start', parent, hh, {});
+    const reply = await handlers.handleTextMessage(answer, parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', patch);
+    expect(reply.response).toMatch(/on|it is/i);
   });
 
-  test('restarting does NOT pitch the evening brief at someone already on it', async () => {
-    db.getNotificationPreferences.mockResolvedValueOnce({ whatsapp_daily_reminder: false, evening_brief: true });
-    const reply = await handlers.handleTextMessage('start', parent, hh, {});
-    expect(reply.response).not.toMatch(/start evening briefs/i);
+  test('declining the question switches nothing on', async () => {
+    await handlers.handleTextMessage('start', parent, hh, {});
+    const reply = await handlers.handleTextMessage('neither', parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(reply.response).toMatch(/nothing switched on/i);
+  });
+
+  test('an unrelated next message is handled normally, not swallowed', async () => {
+    // The question must not hijack whatever they actually wanted to do. It is
+    // handled by whichever path normally would (a deterministic shopping
+    // shortcut here, not necessarily the LLM) - what matters is that it is not
+    // read as an answer and changes no preferences.
+    await handlers.handleTextMessage('start', parent, hh, {});
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    const reply = await handlers.handleTextMessage('thanks', parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(reply.response).not.toMatch(/mornings it is|evenings it is|both back on/i);
+  });
+
+  test('a bare "morning" with no question pending is NOT a brief answer', async () => {
+    // Only a live question turns "morning" into an answer; on its own it is
+    // just a word, and must never flip a notification preference.
+    // A DIFFERENT user, so no question is outstanding for them: the pending
+    // store is per-user and module-level, and an earlier test in this file
+    // leaves one armed for the shared parent.
+    const stranger = { id: 'u-no-question', name: 'Sam' };
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    const reply = await handlers.handleTextMessage('morning', stranger, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+    expect(reply.response).not.toMatch(/mornings it is/i);
   });
 
   test('a generic "start" never opts anyone INTO the evening brief', async () => {

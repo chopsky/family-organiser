@@ -338,6 +338,45 @@ function popBirthdayRecurrence(userId) {
 // When the bot creates an event that looks like a gathering (party-detect,
 // prominence only) it offers a shareable RSVP link. The user's next "yes"
 // mints the link deterministically - no LLM round-trip, no new intent.
+// "start" on its own is ambiguous, so we ask which brief and remember that we
+// asked. One-shot, and only consumed by a reply that actually names one - an
+// unrelated next message ("add milk") falls through to normal handling rather
+// than being swallowed by a question they chose to ignore.
+const pendingBriefStartChoice = new Map(); // userId → { timestamp }
+
+const BRIEF_START_QUESTION = 'Happy to - which one would you like back?\n\n'
+  + '☀️ *Morning* - what\'s on today, at 7am\n'
+  + '🌙 *Evening* - a look at tomorrow, at 8pm\n\n'
+  + 'Say *morning*, *evening*, or *both*.';
+
+function armBriefStartChoice(userId) {
+  if (!userId) return;
+  pendingBriefStartChoice.set(userId, { timestamp: Date.now() });
+}
+
+/** Reads the answer to BRIEF_START_QUESTION. Returns 'morning' | 'evening' |
+ *  'both' | 'cancel', or null when the reply isn't an answer at all (in which
+ *  case the question is dropped and the message handled normally). */
+function popBriefStartChoice(userId, text) {
+  const entry = pendingBriefStartChoice.get(userId);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > DISAMBIGUATION_WINDOW_MS) {
+    pendingBriefStartChoice.delete(userId);
+    return null;
+  }
+  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  if (!t || t.split(/\s+/).length > 6) return null;
+  let answer = null;
+  if (/\bboth\b|\ball\b/.test(t)) answer = 'both';
+  else if (/\bevening\b|\bnight\b|\b8\s*pm\b/.test(t) && /\bmorning\b/.test(t)) answer = 'both';
+  else if (/\bevening\b|\bnight\b|\b8\s*pm\b/.test(t)) answer = 'evening';
+  else if (/\bmorning\b|\b7\s*am\b/.test(t)) answer = 'morning';
+  else if (/^(neither|none|nothing|no thanks|no|cancel|nevermind|never mind)$/.test(t)) answer = 'cancel';
+  if (!answer) return null; // not an answer - leave the message alone
+  pendingBriefStartChoice.delete(userId);
+  return answer;
+}
+
 const pendingInviteOffer = new Map(); // userId → { eventId, householdId, title, timestamp }
 
 function rememberInviteOffer(userId, entry) {
@@ -740,14 +779,16 @@ function matchBriefStopStart(text) {
   const stop = (w = which) => ({ action: 'stop', which: w });
   const start = (w = which) => ({ action: 'start', which: w });
 
+  // STOP is deliberately NOT treated as vague. It is the universal messaging
+  // opt-out keyword - Twilio and Meta both treat it as one, and in several
+  // markets honouring it immediately is a legal requirement, not a courtesy.
+  // Answering "what would you like me to stop?" to someone typing STOP is the
+  // fastest route to a block report. So it acts at once, on everything.
   if (/^(stop|unsubscribe|opt out)$/.test(t)) return stop('both');
-  // The mirror of a bare "stop", and the word people actually reach for after
-  // sending one. Requiring a noun here (as the phrase rules below do) meant
-  // "start" on its own fell through to the classifier and silently did
-  // nothing - so someone who stopped could not turn anything back on.
-  // Morning only: it's the default-on brief, and restoring it must not sign
-  // anyone up for the opt-in 8pm one they may never have had.
-  if (/^(start|restart|resume|unstop|opt in)$/.test(t)) return start('morning');
+  // START has no such convention and is genuinely ambiguous on its own - it
+  // could mean either brief, or something else entirely. The caller asks
+  // which, rather than guessing; see BRIEF_START_QUESTION.
+  if (/^(start|restart|resume|unstop|opt in)$/.test(t)) return { action: 'start', which: 'ask' };
   const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?)\b/;
   if (/^(please\s+)?(stop|turn off|switch off|no more|quit)\b/.test(t)
       && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return stop();
@@ -2239,10 +2280,47 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // In-thread stop/start for the morning brief + proactive messages. Honour
   // it instantly and warmly - the alternative outcome is a block.
+  // Answer to "which brief would you like back?". Checked before the matcher
+  // so a bare "morning" here means the brief, not a calendar query.
+  const startChoice = popBriefStartChoice(user.id, text);
+  if (startChoice) {
+    const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+    if (startChoice === 'cancel') {
+      ctx.intent = 'brief_start_declined';
+      return { response: 'No problem - nothing switched on. Just say the word whenever.', actions: noActions };
+    }
+    const patch = {};
+    if (startChoice !== 'evening') patch.whatsapp_daily_reminder = true;
+    if (startChoice !== 'morning') patch.evening_brief = true;
+    try {
+      await db.upsertNotificationPreferences(user.id, patch);
+    } catch (err) {
+      console.error('[handlers] brief start choice failed:', err.message);
+      ctx.intent = 'brief_toggle_error';
+      return { response: "I couldn't update that just now - mind trying again in a minute? You can also manage it in Settings → Notifications.", actions: noActions };
+    }
+    ctx.intent = 'brief_optin';
+    const said = startChoice === 'both'
+      ? "Both back on - mornings from tomorrow, and a look at tomorrow tonight at 8pm. ☀️🌙"
+      : startChoice === 'evening'
+        ? "Evenings it is - I'll send you a look at tomorrow tonight at 8pm. 🌙"
+        : "Mornings it is - I'll include you from tomorrow. ☀️";
+    return { response: said, actions: noActions };
+  }
+
   const briefToggle = matchBriefStopStart(text);
   if (briefToggle) {
     const { action, which } = briefToggle;
     const noActions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [], eventsAdded: [] };
+
+    // A bare "start" names nothing. Ask rather than guess - guessing either
+    // silently withholds the one they meant, or switches on an 8pm message
+    // they never asked for.
+    if (which === 'ask') {
+      armBriefStartChoice(user.id);
+      ctx.intent = 'brief_start_ask';
+      return { response: BRIEF_START_QUESTION, actions: noActions };
+    }
 
     // Read first so the reply can name what actually changed, and mention the
     // other brief only when it's genuinely still running. try/catch rather
