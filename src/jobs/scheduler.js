@@ -12,6 +12,7 @@ const { processEventReminders } = require('./event-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
+const { runDbHealthCheck } = require('./db-health-monitor');
 const { runCaptureOpenerCheck } = require('./capture-openers');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
 const publicHolidays = require('../services/publicHolidays');
@@ -706,6 +707,12 @@ Only return valid JSON array, nothing else.`;
  * Start all scheduled jobs.
  */
 function startScheduler() {
+  // ── DB health: probe every 2 minutes, email on outage + recovery ──────────
+  // First in the list because it's the one that tells you the others have
+  // stopped working. See src/jobs/db-health-monitor.js for the alert policy.
+  cron.schedule('*/2 * * * *', () => runDbHealthCheck());
+  console.log('✓ DB health monitor started (probes every 2 minutes)');
+
   // ── Daily reminders: check every minute ─────────────────────────────────────
   cron.schedule('* * * * *', () => runDailyReminderCheck());
   console.log('✓ Daily reminder scheduler started (checks every minute)');

@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { feedCryptoReady } = require('./utils/feed-url-crypto');
+const { checkDatabase } = require('./utils/db-health');
 
 const app = express();
 
@@ -108,8 +109,30 @@ if (process.env.NODE_ENV !== 'test') {
   app.use('/api/contact', contactLimiter);
 }
 
-// Health check. `commit` (Railway injects RAILWAY_GIT_COMMIT_SHA) lets us
-// confirm which build is actually live - handy when verifying a deploy landed.
+// ─── Liveness vs readiness ──────────────────────────────────────────────────
+//
+// TWO endpoints on purpose. They answer different questions and MUST NOT be
+// merged:
+//
+//   /health     LIVENESS  - "is this process up?" Never touches the DB, so it
+//                           never fails for reasons outside the container.
+//                           railway.json points its healthcheckPath here, and
+//                           restartPolicyType is ON_FAILURE - so if this ever
+//                           returned 503 during a Supabase outage, Railway
+//                           would fail the healthcheck and restart-loop the
+//                           container, turning a recoverable DB outage into a
+//                           dead API as well. Keep it DB-free.
+//
+//   /health/db  READINESS - "can we actually serve traffic?" Does a real DB
+//                           round-trip and returns 503 when it fails. This is
+//                           what external uptime monitors should watch.
+//
+// The 2026-07-29 outage is why this split exists: Postgres was unreachable for
+// ~35 minutes (PostgREST returning PGRST002) while /health cheerfully reported
+// {"status":"ok"} the whole time, because it only ever read env vars.
+//
+// `commit` (Railway injects RAILWAY_GIT_COMMIT_SHA) lets us confirm which
+// build is actually live - handy when verifying a deploy landed.
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -133,6 +156,25 @@ app.get('/health', (req, res) => {
       botAgent: process.env.BOT_AGENT === '1',
       botVoice: process.env.BOT_VOICE === '1',
     },
+  });
+});
+
+// Readiness probe - point external uptime monitors HERE, not at /health.
+// Does a real DB round-trip and returns 503 when the database is unreachable,
+// which is what an uptime monitor needs to see. Railway must NOT use this as
+// its healthcheckPath (see the note above /health).
+app.get('/health/db', async (req, res) => {
+  const db = await checkDatabase();
+  return res.status(db.ok ? 200 : 503).json({
+    status: db.ok ? 'ok' : 'degraded',
+    database: db.ok ? 'reachable' : 'unreachable',
+    latencyMs: db.latencyMs,
+    // Surfaced so an operator curling this mid-incident gets the actual
+    // PostgREST code (e.g. PGRST002) rather than having to go digging.
+    code: db.code,
+    error: db.message,
+    timestamp: new Date().toISOString(),
+    commit: (process.env.RAILWAY_GIT_COMMIT_SHA || '').slice(0, 7) || null,
   });
 });
 
