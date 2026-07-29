@@ -43,6 +43,12 @@ const { fetchTermDatesPageText, extractTermDatesPreview } = require('./term-date
 const svc = require('./schoolDirectory');
 
 const D = (ay, type, date, end = null) => ({ academic_year: ay, event_type: type, date, end_date: end, label: null });
+
+// Adoption and propagation now drop academic years that are entirely in the
+// past, so any fixture pinned to a real year silently stops propagating the
+// moment that year ends. These roll forward instead.
+const Y = new Date().getFullYear() + 5;
+const AY = `${Y}-${Y + 1}`, AY_NEXT = `${Y + 1}-${Y + 2}`;
 const SCHOOL_ROW = {
   id: 'hs-1', school_name: 'Immanuel College', school_urn: '117659',
   postcode: 'WD23 4EB', local_authority: 'Hertfordshire', directory_school_id: null,
@@ -207,12 +213,12 @@ describe('seedOrCrossCheck', () => {
 // ── Arbitration verdict application ─────────────────────────────────────────
 
 describe('arbitrate', () => {
-  const stored = [D('2025-2026', 'term_start', '2025-09-02')];
-  const fresh = [D('2025-2026', 'term_start', '2025-09-01')];
+  const stored = [D(AY, 'term_start', `${Y}-09-02`)];
+  const fresh = [D(AY, 'term_start', `${Y}-09-01`)];
   const base = {
     directorySchool: DIR_SCHOOL, storedDates: stored, newDates: fresh,
     newSource: { url: 'https://new.example/dates', text: 'new text', type: 'website' },
-    conflictYears: ['2025-2026'], additions: [],
+    conflictYears: [AY], additions: [],
   };
   beforeEach(() => {
     fetchTermDatesPageText.mockResolvedValue('fetched stored page');
@@ -221,16 +227,16 @@ describe('arbitrate', () => {
   });
 
   test('new wins → replace won AYs, reset verified_count, propagate', async () => {
-    callClaude.mockResolvedValue({ text: '{"years":[{"academic_year":"2025-2026","winner":"new","reason":"newer","evidence_quote":"1 September"}]}' });
+    callClaude.mockResolvedValue({ text: JSON.stringify({ years: [{ academic_year: AY, winner: 'new', reason: 'newer', evidence_quote: "1 September" }] }) });
     const res = await svc.arbitrate(base);
     expect(res.outcome).toBe('resolved');
-    expect(dirDb.replaceDirectoryDates).toHaveBeenCalledWith('dir-1', ['2025-2026'], expect.any(Array));
+    expect(dirDb.replaceDirectoryDates).toHaveBeenCalledWith('dir-1', [AY], expect.any(Array));
     expect(dirDb.updateDirectorySchool).toHaveBeenCalledWith('dir-1', expect.objectContaining({ verified_count: 1, status: 'ok' }));
     expect(dirDb.listLinkedHouseholdSchools).toHaveBeenCalled(); // propagation ran
   });
 
   test('stored wins → record kept, propagation still runs (pulls importer back)', async () => {
-    callClaude.mockResolvedValue({ text: '{"years":[{"academic_year":"2025-2026","winner":"stored","reason":"matches page","evidence_quote":"2 September"}]}' });
+    callClaude.mockResolvedValue({ text: JSON.stringify({ years: [{ academic_year: AY, winner: 'stored', reason: 'matches page', evidence_quote: "2 September" }] }) });
     const res = await svc.arbitrate(base);
     expect(res.outcome).toBe('resolved');
     expect(dirDb.replaceDirectoryDates).not.toHaveBeenCalled();
@@ -238,7 +244,7 @@ describe('arbitrate', () => {
   });
 
   test('undecidable → needs_attention, record untouched, NO propagation', async () => {
-    callClaude.mockResolvedValue({ text: '{"years":[{"academic_year":"2025-2026","winner":"undecidable","reason":"not in texts","evidence_quote":null}]}' });
+    callClaude.mockResolvedValue({ text: JSON.stringify({ years: [{ academic_year: AY, winner: 'undecidable', reason: 'not in texts', evidence_quote: null }] }) });
     const res = await svc.arbitrate(base);
     expect(res.outcome).toBe('undecidable');
     expect(dirDb.replaceDirectoryDates).not.toHaveBeenCalled();
@@ -259,12 +265,12 @@ describe('arbitrate', () => {
 
 describe('propagateDirectorySchoolDates', () => {
   test('per-AY replace with school_directory source + meta + cache per household', async () => {
-    dirDb.getDirectorySchoolDates.mockResolvedValue([D('2025-2026', 'term_start', '2025-09-01'), D('2026-2027', 'term_start', '2026-09-01')]);
+    dirDb.getDirectorySchoolDates.mockResolvedValue([D(AY, 'term_start', `${Y}-09-01`), D(AY_NEXT, 'term_start', `${Y + 1}-09-01`)]);
     dirDb.listLinkedHouseholdSchools.mockResolvedValue([{ id: 'hs-1', household_id: 'h1' }, { id: 'hs-2', household_id: 'h2' }]);
     const res = await svc.propagateDirectorySchoolDates('dir-1');
     expect(res.updated).toBe(2);
-    expect(db.deleteTermDatesBySchoolAndAcademicYear).toHaveBeenCalledWith('hs-1', '2025-2026');
-    expect(db.deleteTermDatesBySchoolAndAcademicYear).toHaveBeenCalledWith('hs-2', '2026-2027');
+    expect(db.deleteTermDatesBySchoolAndAcademicYear).toHaveBeenCalledWith('hs-1', AY);
+    expect(db.deleteTermDatesBySchoolAndAcademicYear).toHaveBeenCalledWith('hs-2', AY_NEXT);
     const saved = db.addSchoolTermDates.mock.calls[0][1];
     expect(saved.every((r) => r.source === 'school_directory')).toBe(true);
     expect(db.updateHouseholdSchoolMeta).toHaveBeenCalledWith('hs-1', expect.objectContaining({ term_dates_source: 'school_directory' }));
@@ -272,8 +278,29 @@ describe('propagateDirectorySchoolDates', () => {
     expect(cache.invalidate).toHaveBeenCalledWith('digest:h2');
   });
 
+  test('a finished academic year is not pushed back onto households', async () => {
+    // The failure this guards: a family adopts next year's dates, someone
+    // later corrects one of them, and propagation re-inserts the whole
+    // record - last year's holidays included - onto every linked household.
+    dirDb.getDirectorySchoolDates.mockResolvedValue([
+      D('2019-2020', 'term_start', '2019-09-02'),
+      D('2019-2020', 'term_end', '2020-07-17'),
+      D(AY, 'term_start', `${Y}-09-01`),
+    ]);
+    dirDb.listLinkedHouseholdSchools.mockResolvedValue([{ id: 'hs-1', household_id: 'h1' }]);
+
+    await svc.propagateDirectorySchoolDates('dir-1');
+
+    expect(db.addSchoolTermDates).toHaveBeenCalledWith('hs-1', [
+      expect.objectContaining({ academic_year: AY }),
+    ]);
+    // And the dead year is not even deleted - we do not reach into a
+    // household's history, we just stop adding to it.
+    expect(db.deleteTermDatesBySchoolAndAcademicYear).not.toHaveBeenCalledWith('hs-1', '2019-2020');
+  });
+
   test('one broken household does not block the rest', async () => {
-    dirDb.getDirectorySchoolDates.mockResolvedValue([D('2025-2026', 'term_start', '2025-09-01')]);
+    dirDb.getDirectorySchoolDates.mockResolvedValue([D(AY, 'term_start', `${Y}-09-01`)]);
     dirDb.listLinkedHouseholdSchools.mockResolvedValue([{ id: 'hs-bad', household_id: 'h1' }, { id: 'hs-ok', household_id: 'h2' }]);
     db.deleteTermDatesBySchoolAndAcademicYear.mockImplementation(async (id) => { if (id === 'hs-bad') throw new Error('boom'); });
     const res = await svc.propagateDirectorySchoolDates('dir-1');

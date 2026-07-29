@@ -29,6 +29,7 @@ const db = require('../db/queries');
 const cache = require('./cache');
 const { callClaude, REASONING_TIMEOUT_MS } = require('./ai-client');
 const { fetchTermDatesPageText, extractTermDatesPreview, academicYearsForCountry } = require('./term-date-extract');
+const { dropFinishedAcademicYears } = require('../utils/school-terms');
 
 // Re-verify cadence: how long a system verification is trusted before the next
 // adoption triggers a fresh check. Roughly once a term, matching the LA cache.
@@ -539,7 +540,11 @@ function maybeVerifyDirectorySchool(school) {
  * household must not block the rest). Silent in v1 (no broadcast).
  */
 async function propagateDirectorySchoolDates(directorySchoolId) {
-  const entries = await dirDb.getDirectorySchoolDates(directorySchoolId);
+  // Finished years are filtered here as well as at adoption. Propagation
+  // deletes by academic year and re-inserts, so without this any correction
+  // would push last year's holidays back onto every linked household - the
+  // adoption filter alone would be undone the first time anyone edited.
+  const entries = dropFinishedAcademicYears(await dirDb.getDirectorySchoolDates(directorySchoolId));
   if (entries.length === 0) return { updated: 0 };
   const years = [...new Set(entries.map((e) => e.academic_year))];
   const linked = await dirDb.listLinkedHouseholdSchools(directorySchoolId);
@@ -578,7 +583,11 @@ async function lookupDirectoryDatesForSchool(householdSchool) {
   if (!identity) return null;
   const school = await dirDb.findDirectorySchool(identity);
   if (!school || school.status !== 'ok') return null;
-  const dates = await dirDb.getDirectorySchoolDates(school.id);
+  // A directory record outlives the year it was seeded in. Offering a
+  // household 2025's holidays in 2026 is worse than offering nothing, so a
+  // record with nothing live left reads as no offer at all - the parent is
+  // sent to the fork instead of to a card that imports history.
+  const dates = dropFinishedAcademicYears(await dirDb.getDirectorySchoolDates(school.id));
   if (dates.length === 0) return null;
   return { school, dates };
 }

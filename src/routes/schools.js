@@ -1487,10 +1487,10 @@ router.post('/:schoolId/adopt-directory-dates', requireAuth, requireHousehold, r
         dates: hit.dates,
         count: hit.dates.length,
         source: 'shared',
-        source_label: hit.name || school.school_name,
+        source_label: hit.school.name || school.school_name,
         syncs: true,
-        verified_at: hit.last_verified_at || null,
-        verified_count: hit.verified_count ?? null,
+        verified_at: hit.school.last_verified_at || null,
+        verified_count: hit.school.verified_count ?? null,
         academic_years: [...new Set(hit.dates.map((d) => d.academic_year).filter(Boolean))].sort(),
       });
     }

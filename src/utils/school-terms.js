@@ -144,8 +144,41 @@ async function getSchoolTerms(schoolId) {
   }
 }
 
+/**
+ * Drop academic years that finished before `today`.
+ *
+ * WHOLE YEARS ONLY, and deliberately so. isSchoolInSession above pairs
+ * termStarts[i] with termEnds[i] by index, so dropping individual past rows
+ * would shift every later pair and quietly mis-report term time - which in
+ * turn mis-filters activity reminders. Removing a complete, finished year
+ * takes its matched starts and ends together and leaves the rest aligned.
+ *
+ * This exists for the shared school directory, where one record is adopted by
+ * many households across several years. Without it a family joining in 2026
+ * inherits 2025's holidays, and every later correction propagates them back.
+ *
+ * `today` defaults to the UTC date. A server a few hours behind UK local time
+ * only keeps a just-finished year one extra day, which is the safe direction.
+ */
+function dropFinishedAcademicYears(dates, today = new Date().toISOString().slice(0, 10)) {
+  const rows = dates || [];
+  const lastDayOf = new Map();
+  for (const d of rows) {
+    const ay = d.academic_year || '';
+    const last = d.end_date || d.date || '';
+    if (last > (lastDayOf.get(ay) || '')) lastDayOf.set(ay, last);
+  }
+  // A year with no usable dates at all is left alone rather than silently
+  // binned - that is a data problem to look at, not one to hide.
+  const finished = new Set(
+    [...lastDayOf].filter(([, last]) => last && last < today).map(([ay]) => ay),
+  );
+  return finished.size ? rows.filter((d) => !finished.has(d.academic_year || '')) : rows;
+}
+
 module.exports = {
   isSchoolInSession,
+  dropFinishedAcademicYears,
   deriveTerms,
   currentTerm,
   activityActiveOn,
