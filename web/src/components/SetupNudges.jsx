@@ -211,8 +211,21 @@ export default function SetupNudges({ members = [] }) {
   // be the wrong note entirely.
   const allComplete = tasks.length > 0 && tasks.every((t) => derived[t.id]);
 
+  // "All moved in." marks the MOMENT of finishing, not the state of being
+  // finished. Without this it replayed on every visit to the dashboard:
+  // leaving unmounts the component, coming back remounts it with everything
+  // already complete, and the celebration fired again from scratch.
+  //
+  // So: only celebrate if we actually watched them finish - if this mount ever
+  // saw an unfinished state. Set during render rather than in an effect,
+  // because an effect runs after paint and the celebration would flash for a
+  // frame before being suppressed, which is the same bug just briefer. React
+  // re-runs the component before committing, so this costs no extra paint.
+  const [sawUnfinished, setSawUnfinished] = useState(false);
+  if (derived.ready && !allComplete && !sawUnfinished) setSawUnfinished(true);
+
   useEffect(() => {
-    if (!allComplete || celebratedRef.current) return;
+    if (!allComplete || !sawUnfinished || celebratedRef.current) return;
     celebratedRef.current = true;
     // Reduce Motion collapses both delays to zero rather than branching: the
     // celebration is skipped entirely instead of held-then-faded, and the
@@ -222,7 +235,7 @@ export default function SetupNudges({ members = [] }) {
     const t1 = setTimeout(() => setFading(true), hold);
     const t2 = setTimeout(() => setGone(true), hold + fade);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [allComplete, reducedMotion]);
+  }, [allComplete, sawUnfinished, reducedMotion]);
 
   function dismiss(id) {
     setJustDismissed((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -234,6 +247,8 @@ export default function SetupNudges({ members = [] }) {
   }
 
   if (gone || !derived.ready) return null;
+  // Finished on an earlier visit: nothing to show, and nothing to celebrate.
+  if (allComplete && !sawUnfinished) return null;
   if (!remaining.length && !allComplete) return null;
 
   const transition = reducedMotion ? 'none' : `opacity ${CELEBRATION_FADE_MS}ms ease`;
