@@ -18,7 +18,7 @@ import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { T } from './tokens';
 import { skipLabelAt, autoAdvances } from './machine';
 import useOnboardingFlow from './useOnboardingFlow';
-import { Step, Cta, Ghost } from './ui';
+import { Step, Cta, Ghost, ResumeNotice } from './ui';
 import {
   Splash, PainPicker, ShapePicker, NameStep, RoleStep, HouseStep, HouseSignOverlay,
 } from './screens';
@@ -201,6 +201,9 @@ export default function OnboardingV4({ initialPhase }) {
       <Step
         pct={pct}
         reduced={reduced}
+        // Only while there is something restored to explain. Dismissed by
+        // "Start fresh", which also wipes the draft.
+        notice={f.resumed ? <ResumeNotice onStartFresh={f.startFresh} /> : null}
         // Inside a provider's connect flow, back means "leave this provider",
         // not "leave the calendar step".
         onBack={connecting ? () => setConnecting(null) : back}

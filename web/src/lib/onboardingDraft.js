@@ -22,7 +22,12 @@
  */
 
 const KEY = 'housemait_onboarding_v4_draft';
-const TTL_MS = 7 * 24 * 60 * 60 * 1000; // a week-old draft is not resumable
+// Two hours, not a week. The job here is surviving a torn-down webview, which
+// is a matter of minutes - a week was covering "came back next Tuesday", and
+// silently restoring day-old answers onto what looks like a fresh Step 1 is
+// how someone ends up staring at four pre-ticked boxes they don't remember
+// picking, or at "WhatsApp it is" for a choice they never made this session.
+const TTL_MS = 2 * 60 * 60 * 1000;
 
 /** The shape held between screens. Mirrors the spec's `d` object. */
 export const emptyDraft = () => ({
@@ -46,6 +51,21 @@ export const getAllCalUrls = () => ({ ...volatile.calUrls });
 export const hasCalUrl = (providerId) => Boolean(volatile.calUrls[providerId]);
 /** Called after a successful replay, and on flow exit. */
 export const clearCalUrls = () => { volatile.calUrls = {}; };
+
+/**
+ * Does this draft hold anything the user actually chose?
+ *
+ * Used to decide whether a restore is worth telling them about. A draft that
+ * loaded but holds nothing is indistinguishable from a fresh start, so
+ * announcing it would be noise.
+ */
+export function isDraftEmpty(d) {
+  if (!d) return true;
+  return (d.pains || []).length === 0
+    && !d.shape && !d.you && !d.role && !d.house
+    && Object.keys(d.cals || {}).length === 0
+    && !d.wa && !d.rem;
+}
 
 export function loadDraft() {
   try {

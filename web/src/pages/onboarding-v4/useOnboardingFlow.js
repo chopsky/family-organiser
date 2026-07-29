@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadDraft, saveDraft, clearDraft } from '../../lib/onboardingDraft';
+import { clearDraft, emptyDraft, isDraftEmpty, loadDraft, saveDraft } from '../../lib/onboardingDraft';
 import {
   AUTO_ADVANCE_MS, backFrom, backFromSignup, canAdvance,
   forwardFrom, progressPct, stepAt,
@@ -23,6 +23,28 @@ import {
 export default function useOnboardingFlow(initialPhase = 'splash') {
   const [nav, setNav] = useState({ phase: initialPhase, i: 0 });
   const [d, setD] = useState(loadDraft);
+
+  // Whether THIS mount began from a stored draft rather than a blank one.
+  // Captured once, at mount: `d` fills up as the user answers, so asking later
+  // would report every in-progress flow as a resume. The flag exists so a
+  // restore is never silent - four pre-ticked boxes on what looks like a fresh
+  // Step 1, or a WhatsApp step already showing "WhatsApp it is", read as the
+  // app inventing answers rather than remembering them.
+  const [resumed, setResumed] = useState(() => !isDraftEmpty(loadDraft()));
+
+  /**
+   * Throw the restored answers away and start the flow over.
+   *
+   * Navigation resets too. Clearing only the answers would strand someone who
+   * hit this on, say, the plan step: that screen is built from `pains`, and
+   * emptying them without moving would leave a screen with nothing to show.
+   */
+  const startFresh = useCallback(() => {
+    clearDraft();
+    setD(emptyDraft());
+    setResumed(false);
+    setNav({ phase: 'flow', i: 0 });
+  }, []);
 
   // Mirror answers to localStorage so a backgrounded webview doesn't lose ten
   // screens. Calendar URLs are deliberately excluded (see onboardingDraft.js).
@@ -88,6 +110,7 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
     step: stepAt(nav.i),
     pct: progressPct(nav.i),
     d, update,
+    resumed, startFresh, dismissResume: () => setResumed(false),
     next, back, skip, goPhase, pickAndAdvance, finish,
     canAdvance: canAdvance(nav.i, d),
   };

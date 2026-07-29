@@ -115,7 +115,42 @@ export function Header({ onBack, hideBack, pct = 0, reduced }) {
  * The frame every step screen shares: fixed header, scrolling body, pinned
  * footer. Page padding 0 26px 30px.
  */
-export function Step({ onBack, hideBack, pct, reduced, children, footer }) {
+/**
+ * Shown once, at the top of the flow, when answers were restored from a saved
+ * draft.
+ *
+ * Restoring silently is what made a fresh-looking Step 1 arrive with four
+ * boxes already ticked, and the WhatsApp step already reading "WhatsApp it is"
+ * for a choice the user hadn't made in that session. Remembering is fine;
+ * remembering without saying so reads as the app inventing answers.
+ */
+export function ResumeNotice({ onStartFresh }) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
+        padding: '10px 14px', borderRadius: 14,
+        background: 'rgba(107,63,160,.07)',
+        font: '500 13px Inter, system-ui, sans-serif', color: T.ink2,
+      }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>Picked up where you left off.</span>
+      <button
+        type="button"
+        onClick={onStartFresh}
+        style={{
+          border: 0, background: 'transparent', padding: 0, cursor: 'pointer',
+          font: '600 13px Inter, system-ui, sans-serif', color: T.purple,
+          flexShrink: 0,
+        }}
+      >
+        Start fresh
+      </button>
+    </div>
+  );
+}
+
+export function Step({ onBack, hideBack, pct, reduced, children, footer, notice }) {
   return (
     <div
       className="ob-v4"
@@ -133,7 +168,10 @@ export function Step({ onBack, hideBack, pct, reduced, children, footer }) {
       }}
     >
       <Header onBack={onBack} hideBack={hideBack} pct={pct} reduced={reduced} />
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>{children}</div>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {notice}
+        {children}
+      </div>
       {footer && <div style={{ flexShrink: 0, paddingTop: 12 }}>{footer}</div>}
     </div>
   );
