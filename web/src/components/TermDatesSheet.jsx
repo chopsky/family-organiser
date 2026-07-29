@@ -32,7 +32,13 @@ import api from '../lib/api';
 // Matching src/components/ActivityModal.jsx so the two read as one family.
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.12)';
-const BRAND = '#6C3DD9', BRAND_SOFT = '#EFE9FB', BRAND_DEEP = '#4A22A8';
+// Plum, from the brand tokens in index.css - NOT the handoff's #6C3DD9. This
+// sheet opens over the School page, which is plum throughout, and the bluer
+// purple read as a different product sitting on top of it. Referencing the
+// variables rather than the hex means the sheet follows the token if it moves.
+const BRAND = 'var(--color-plum)';            // #6d38ad
+const BRAND_SOFT = 'var(--color-plum-light)'; // #F3EDFC
+const BRAND_DEEP = 'var(--color-plum-dark)';  // #5A3488
 const GREEN = '#3F8E52', GREEN_SOFT = '#E5F0E2';
 const AMBER_SOFT = '#FBF1DE', AMBER_DEEP = '#8A5F1E';
 const BLUE_SOFT = '#E2ECFA', BLUE_DEEP = '#2E5799';
