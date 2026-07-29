@@ -957,6 +957,56 @@ describe('in-thread brief stop/start', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  // Reported live 2026-07-29. The user asked why no brief arrived, then said
+  // "Please turn it on" - and the bot replied "I can't flip that switch myself
+  // from here", which is false. Two failures at once: the matcher only handled
+  // "turn ON x", never "turn x ON", so this fell through to the model; and the
+  // prompt only ever pointed at Settings, so the model confidently denied a
+  // capability the bot has. The split particle is the common phrasing, not the
+  // edge case.
+  test.each([
+    'Please turn it on',
+    'turn it on',
+    'turn them back on',
+    'can you turn it on',
+  ])('"%s" is treated as a brief request, not a shrug', async (msg) => {
+    const reply = await handlers.handleTextMessage(msg, parent, hh, {});
+    // A pronoun names nothing, so it asks which rather than guessing - but it
+    // must never claim it cannot do this, and must never call the model.
+    expect(reply.response).toMatch(/which one/i);
+    expect(reply.response).not.toMatch(/can'?t|cannot|Settings/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  test('"turn it off" stops everything rather than asking', async () => {
+    // Over-stopping is recoverable; a missed stop is a block report.
+    await handlers.handleTextMessage('please turn it off', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith(
+      'u9', { whatsapp_daily_reminder: false, evening_brief: false },
+    );
+  });
+
+  test('a stop is never read as an answer to "which one would you like back?"', async () => {
+    // The choice parser matches the word "morning" anywhere in the reply, so
+    // with the question armed this switched ON the brief they asked to stop.
+    await handlers.handleTextMessage('turn it on', parent, hh, {});   // arms the question
+    jest.clearAllMocks();
+
+    await handlers.handleTextMessage('stop the morning messages', parent, hh, {});
+
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith('u9', { whatsapp_daily_reminder: false });
+  });
+
+  test.each([
+    'turn on the oven',
+    'can you turn the lights on',
+    "stop Logan's swimming club",
+  ])('"%s" is NOT a brief toggle', async (msg) => {
+    ai.classify.mockResolvedValue({ intent: 'chat', response_message: 'ok' });
+    await handlers.handleTextMessage(msg, parent, hh, {});
+    expect(db.upsertNotificationPreferences).not.toHaveBeenCalled();
+  });
+
   // An unqualified stop means ALL of it. Someone reaching for that word is
   // reaching for the block button next, so leaving the 8pm brief running
   // would be the worst possible reading of the request.

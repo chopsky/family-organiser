@@ -366,6 +366,15 @@ function popBriefStartChoice(userId, text) {
   }
   const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
   if (!t || t.split(/\s+/).length > 6) return null;
+  // A plainly-worded STOP is never an answer to "which would you like back?".
+  // The checks below match on the word "morning" appearing anywhere, so
+  // "stop the morning messages" was being read as choosing morning - and
+  // switching ON the very thing they had just asked to stop. Drop the pending
+  // question and let the message fall through to the stop path.
+  if (/\b(stop|unsubscribe|opt\s+out|no\s+more)\b|\b(turn|switch)(\s+\w+){0,3}\s+off\b/.test(t)) {
+    pendingBriefStartChoice.delete(userId);
+    return null;
+  }
   let answer = null;
   if (/\bboth\b|\ball\b/.test(t)) answer = 'both';
   else if (/\bevening\b|\bnight\b|\b8\s*pm\b/.test(t) && /\bmorning\b/.test(t)) answer = 'both';
@@ -830,11 +839,32 @@ function matchBriefStopStart(text) {
   // which, rather than guessing; see BRIEF_START_QUESTION.
   if (/^(start|restart|resume|unstop|opt in)$/.test(t)) return { action: 'start', which: 'ask' };
   const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?)\b/;
-  if (/^(please\s+)?(stop|turn off|switch off|no more|quit)\b/.test(t)
-      && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return stop();
+
+  // English lets the particle move: "turn on the brief" and "turn the brief
+  // on" are the same sentence. Only the first form was matched, so "please
+  // turn it on" - exactly how someone phrases it straight after asking why
+  // their brief didn't arrive - fell through to the model, which then told
+  // them it couldn't do a thing it can. Allow up to three words between the
+  // verb and its particle, which covers "turn it on", "turn them back on",
+  // "switch the morning brief off".
+  const lead = '^(please\\s+|can\\s+you\\s+|could\\s+you\\s+|pls\\s+)*';
+  const onVerb = new RegExp(`${lead}(start|restart|resume|(turn|switch)(\\s+\\w+){0,3}\\s+(back\\s+)?on)\\b`);
+  const offVerb = new RegExp(`${lead}(stop|quit|no more|(turn|switch)(\\s+\\w+){0,3}\\s+off)\\b`);
+  // A bare pronoun names nothing on its own - see the 'ask' handling above.
+  const pronounObject = /\b(it|them|these|those|that|this)\b/;
+
+  if (offVerb.test(t) && (noun.test(t) || /\b(messag|text|whatsapp)\w*\s+me\b/.test(t))) return stop();
   if (/^(please\s+)?stop\s+send(ing)?(\s+me)?\s+(these|those|them|this stuff|stuff)\b/.test(t)) return stop('both');
   if (/^(don'?t|do not)\s+(message|text|whatsapp)\s+me\b/.test(t)) return stop('both');
-  if (/^(please\s+)?(start|restart|resume|turn on|switch on)\b/.test(t) && noun.test(t)) return start();
+  if (onVerb.test(t) && noun.test(t)) return start();
+
+  // Pronoun with no noun: "turn it on", "switch them off". Stopping acts on
+  // everything - over-stopping is recoverable and never worth a block report -
+  // but starting asks which, for the same reason a bare "start" does: guessing
+  // either withholds the one they meant or switches on an 8pm message they
+  // never asked for.
+  if (offVerb.test(t) && pronounObject.test(t)) return stop('both');
+  if (onVerb.test(t) && pronounObject.test(t)) return { action: 'start', which: 'ask' };
   return null;
 }
 
