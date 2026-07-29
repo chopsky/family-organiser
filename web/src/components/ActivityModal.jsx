@@ -199,7 +199,7 @@ export default function ActivityModal({ child = null, childOptions = [], members
         {/* Header - serif 22 + soft square close, matching the Calendar /
             Tasks / Rewards modals. */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
+          <h2 className="serif-display" style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
             {editing ? 'Edit activity' : 'Add activity'}
           </h2>
           <button

@@ -458,7 +458,7 @@ function WhoCompletedModal({ task, members, currentUserId, onClose, onPick }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: INTER }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 22, width: '100%', maxWidth: 420, padding: 24, boxShadow: '0 30px 80px -20px rgba(26,22,32,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: INK }}>Who completed this task?</h2>
+          <h2 className="serif-display" style={{ margin: 0, fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: INK }}>Who completed this task?</h2>
           <button onClick={onClose} aria-label="Close" style={{ ...cardBtn, width: 34, height: 34, flexShrink: 0 }}><IcClose s={18} c={INK2} /></button>
         </div>
         <div style={{ fontSize: 13, color: INK3, marginBottom: 18 }}>
@@ -886,7 +886,7 @@ function Celebration({ data, onClose, onGo }) {
       ))}
       <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', background: '#fff', borderRadius: 24, padding: '32px 28px', width: '100%', maxWidth: 380, textAlign: 'center', boxShadow: '0 30px 80px -20px rgba(26,22,32,0.5)', animation: 'chorePop .35s ease both' }}>
         <div style={{ fontSize: 52, marginBottom: 8 }}>🎉</div>
-        <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: INK }}>Amazing, {data.member?.name}!</h2>
+        <h2 className="serif-display" style={{ margin: 0, fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: INK }}>Amazing, {data.member?.name}!</h2>
         <p style={{ margin: '8px 0 18px', fontSize: 14, color: INK2 }}>All your star tasks are done for today.</p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: STAR_BG, borderRadius: 99, padding: '8px 18px', marginBottom: 20 }}>
           <StarFill s={22} /><span style={{ fontSize: 26, fontWeight: 800, color: '#A9772A' }}>{data.balance}</span>
@@ -963,7 +963,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
     <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[520px]">
       <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{t.id ? 'Edit task' : (isAnyone ? 'New shared chore' : 'New task')}</h2>
+          <h2 className="serif-display" style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{t.id ? 'Edit task' : (isAnyone ? 'New shared chore' : 'New task')}</h2>
           <button onClick={onClose} aria-label="Close" style={{ ...cardBtn, width: 34, height: 34 }}><IcClose s={18} c={INK2} /></button>
         </div>
 

@@ -34,7 +34,7 @@ export default function KidNotePopup({ note, currentUserId, onReact, onClose, on
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between" style={{ gap: 8 }}>
-          <h2 style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, color: '#1A1620', margin: 0, minWidth: 0 }}>
+          <h2 className="serif-display" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 22, color: '#1A1620', margin: 0, minWidth: 0 }}>
             A note from {note.child_name || 'the kids'} 💌
           </h2>
           <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>

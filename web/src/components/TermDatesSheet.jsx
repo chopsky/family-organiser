@@ -102,7 +102,7 @@ function OptionRow({ icon, tintBg, tintFg, title, sub, onClick }) {
 }
 
 function Heading({ children }) {
-  return <h2 style={{ margin: '0 0 6px', fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK, lineHeight: 1.2 }}>{children}</h2>;
+  return <h2 className="serif-display" style={{ margin: '0 0 6px', fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK, lineHeight: 1.2 }}>{children}</h2>;
 }
 function Sub({ children }) {
   return <p style={{ margin: '0 0 16px', fontSize: 13, color: INK2, lineHeight: 1.45 }}>{children}</p>;
@@ -654,7 +654,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
               <div style={{ width: 64, height: 64, borderRadius: '50%', background: GREEN_SOFT, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                 <Icon name="tick" color={GREEN} size={30} />
               </div>
-              <h2 style={{ margin: '0 0 6px', fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>On the family calendar.</h2>
+              <h2 className="serif-display" style={{ margin: '0 0 6px', fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>On the family calendar.</h2>
               <p style={{ margin: 0, fontSize: 13, color: INK2 }}>
                 {preview?.syncs ? 'These will keep themselves up to date.' : 'Half terms and INSET days can be added any time.'}
               </p>

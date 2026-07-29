@@ -2766,7 +2766,7 @@ export default function Calendar() {
             {/* Header - serif 22 + soft square close button, matching the
                 Tasks/Rewards modals. */}
             <div className="flex items-center justify-between px-6 pt-2" style={{ marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
+              <h2 className="serif-display" style={{ margin: 0, fontFamily: M_SERIF, fontSize: 22, fontWeight: 400, color: M_INK }}>
                 {editingEvent ? 'Edit event' : createKind === 'activity' ? 'New activity' : 'New event'}
               </h2>
               <button
@@ -3581,7 +3581,7 @@ export default function Calendar() {
             style={{ maxWidth: 380, background: '#fff', borderRadius: 20, padding: 20, boxShadow: '0 18px 50px rgba(26,22,32,0.25)' }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ margin: 0, fontFamily: M_SERIF, fontSize: 20, fontWeight: 400, color: M_INK }}>
+            <h2 className="serif-display" style={{ margin: 0, fontFamily: M_SERIF, fontSize: 20, fontWeight: 400, color: M_INK }}>
               This event repeats
             </h2>
             <div style={{ fontSize: 14, color: M_INK2, marginTop: 6 }}>

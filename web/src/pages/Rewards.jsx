@@ -337,7 +337,7 @@ function RewardModal({ onClose, onSave, kids, reward }) {
     <BottomSheet open onDismiss={onClose} desktopWidthClass="sm:w-[460px]">
       <div className="overflow-y-auto min-h-0" style={{ padding: '8px 24px 24px', fontFamily: INTER }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
+          <h2 className="serif-display" style={{ margin: 0, fontFamily: SERIF, fontSize: 22, fontWeight: 400, color: INK }}>{editing ? 'Edit reward' : 'New reward'}</h2>
           <button onClick={onClose} aria-label="Close" style={{ width: 34, height: 34, borderRadius: 8, border: 0, background: BG_SOFT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IcClose s={18} c={INK2} /></button>
         </div>
         <div style={{ marginBottom: 16 }}>

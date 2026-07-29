@@ -355,6 +355,16 @@
   html.platform-ios h2 {
     font-weight: 600 !important;
   }
+  /* …but that bump is for SYSTEM-FONT section headings only. Recoleta
+     display headings (modal titles) are designed at 400, and Recoleta has
+     no 600 cut - the bump lands on the Medium face, so every modal title
+     quietly rendered a heavier typeface on iPhone while h1s stayed
+     Regular. Inline font-weight cannot out-rank !important, so serif
+     headings opt out with this class. Any new h2 that sets
+     --font-serif-display must carry className="serif-display". */
+  html.platform-ios h2.serif-display {
+    font-weight: 400 !important;
+  }
 
   /* iOS Safari / WKWebView gives input[type="date"] and
      input[type="time"] an intrinsic min-width based on the native
