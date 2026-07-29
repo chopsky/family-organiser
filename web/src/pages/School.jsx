@@ -730,6 +730,23 @@ export default function School() {
                     )}
                   </div>
 
+                  {/* GIAS says independent, but the saved dates came from the
+                      council - the exact wrong-import the stepped sheet now
+                      prevents, surfaced for households who did it under the
+                      old six-option sheet. Shown to every member (management
+                      is deliberately shared here), because whoever notices
+                      first should be able to fix it. */}
+                  {/independent/i.test(school.school_type || '') && dates.some(d => d.source === 'local_authority') && (
+                    <div className="px-3.5 py-2.5 rounded-[11px] text-xs" style={{ background: '#FBF1DE', color: '#8A5F1E' }}>
+                      <span className="font-semibold">These dates may be wrong.</span>{' '}
+                      {school.school_name} is an independent school and sets its own term dates, but the dates on
+                      your calendar came from {school.local_authority ? `${school.local_authority} Council` : 'the local council'}.
+                      <button onClick={() => openUpdateTermDates(school)} className="block mt-1.5 font-bold underline">
+                        Review the dates
+                      </button>
+                    </div>
+                  )}
+
                   {brk && (
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-[11px] text-xs font-semibold bg-plum-light text-plum">
                       <IconBell className="h-3.5 w-3.5" />

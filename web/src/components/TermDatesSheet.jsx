@@ -155,6 +155,10 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
   // first row is simply the national dates.
   const isSa = country === 'ZA';
   const council = school?.local_authority || null;
+  // From GIAS via household_schools.school_type; null for manually-typed
+  // schools, so this can miss but never mislabels.
+  const isIndependent = /independent/i.test(school?.school_type || '');
+  const [councilCaution, setCouncilCaution] = useState(false);
   const manualDirty = useMemo(
     () => terms.some((t) => t.name.trim() || t.start || t.end),
     [terms],
@@ -411,6 +415,17 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
                 </div>
               )}
 
+              {/* GIAS knows this school is independent, so lead with the
+                  answer instead of asking the question cold: own-dates row
+                  first, and the council row demands a second, explicit tap.
+                  This is the misroute that filled two households' calendars
+                  with a year of the wrong council's holidays. */}
+              {isIndependent && (
+                <OptionRow icon="flag" tintBg={AMBER_SOFT} tintFg={AMBER_DEEP}
+                  title="Sets its own dates"
+                  sub="This school is listed as independent - independent schools set their own."
+                  onClick={() => setStep('methods')} />
+              )}
               {/* No council on file (typical for independent schools) means
                   this row would only ever 400 - so it isn't offered. */}
               {isSa ? (
@@ -421,13 +436,28 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
               ) : council && (
                 <OptionRow icon="bank" tintBg={BRAND_SOFT} tintFg={BRAND_DEEP}
                   title={`Follows ${council}`}
-                  sub="Most state schools use their council's dates as they are."
-                  onClick={previewCouncil} />
+                  sub={isIndependent
+                    ? 'Unusual for an independent school - the council dates are probably not this school\'s.'
+                    : "Most state schools use their council's dates as they are."}
+                  onClick={() => (isIndependent && !councilCaution ? setCouncilCaution(true) : previewCouncil())} />
               )}
-              <OptionRow icon="flag" tintBg={AMBER_SOFT} tintFg={AMBER_DEEP}
-                title="Sets its own dates"
-                sub="Independent schools, and state schools that adjust the council dates."
-                onClick={() => setStep('methods')} />
+              {council && councilCaution && (
+                <div style={{ background: AMBER_SOFT, borderRadius: 14, padding: '11px 13px', fontSize: 12.5, color: AMBER_DEEP, lineHeight: 1.45, margin: '-4px 0 10px' }}>
+                  <strong style={{ fontWeight: 700 }}>Are you sure?</strong>{' '}
+                  {school.school_name} is listed as an independent school, and independent schools set their own
+                  term dates. {council}&apos;s dates would probably put the wrong holidays on your calendar.
+                  <button type="button" onClick={previewCouncil}
+                    style={{ display: 'block', marginTop: 8, padding: 0, border: 0, background: 'transparent', color: AMBER_DEEP, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}>
+                    Show me {council}&apos;s dates anyway
+                  </button>
+                </div>
+              )}
+              {!isIndependent && (
+                <OptionRow icon="flag" tintBg={AMBER_SOFT} tintFg={AMBER_DEEP}
+                  title="Sets its own dates"
+                  sub="Independent schools, and state schools that adjust the council dates."
+                  onClick={() => setStep('methods')} />
+              )}
 
               <button type="button" onClick={() => setNotSure((v) => !v)} style={{ ...ghost, marginTop: 4 }}>
                 Not sure which?
