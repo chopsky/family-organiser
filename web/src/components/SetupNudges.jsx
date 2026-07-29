@@ -25,11 +25,14 @@
  *    device, so dismissing on your phone leaves it sitting on your laptop.
  *    A one-person household has nobody to invite, and the × has to stick.
  *
- * Reminders is phone-only. There is no web push in this app, so on desktop
- * that tile could never tick itself off — and the Settings toggle it would
- * otherwise key off is inert for a web user with no WhatsApp (push needs the
- * app; the brief needs a channel). A tile that can never complete is exactly
- * the nagging this design exists to avoid, so desktop gets three tasks.
+ * Reminders is NATIVE-APP-only, not "small screen"-only. There is no web
+ * push in this app, so in any browser — a desktop one, or a desktop one
+ * narrowed to phone width, or Safari on an actual phone — that tile could
+ * never tick itself off; the permission it keys off exists only inside the
+ * iOS/Android app. A viewport check looked right on real phones and then
+ * showed the tile to anyone who resized a desktop window. A tile that can
+ * never complete is exactly the nagging this design exists to avoid, so
+ * browsers get three tasks.
  *
  * Design handoff: design_handoff_nudges/README.md. Values there are exact;
  * the reference JSX is a prototype and was not ported.
@@ -40,6 +43,7 @@ import { useAuth } from '../context/AuthContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import usePrefersReducedMotion from '../hooks/usePrefersReducedMotion';
 import { getNotificationPermission } from '../lib/notificationPermission';
+import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
 
 // Fixed order. The grid reflows as tiles leave; it never re-sorts.
@@ -50,7 +54,7 @@ const TASKS = [
   // they change (and, on iOS, opens as the section popup).
   { id: 'wa', label: 'Connect WhatsApp', to: '/settings?section=whatsapp' },
   { id: 'cal', label: 'Add your calendars', to: '/settings?section=calendars' },
-  { id: 'rem', label: 'Turn on reminders', to: '/settings?section=notifications', phoneOnly: true },
+  { id: 'rem', label: 'Turn on reminders', to: '/settings?section=notifications', nativeOnly: true },
 ];
 
 // Flat tint fill, no border, no shadow. All content in the tint's fg.
@@ -195,9 +199,12 @@ export default function SetupNudges({ members = [] }) {
   const [gone, setGone] = useState(false);
   const celebratedRef = useRef(false);
 
+  // isMobile (viewport width) is for LAYOUT only. Task eligibility uses the
+  // platform: width says nothing about whether push permission can exist.
+  const isNative = useMemo(() => { try { return Capacitor.isNativePlatform(); } catch { return false; } }, []);
   const tasks = useMemo(
-    () => TASKS.filter((t) => !t.phoneOnly || isMobile),
-    [isMobile],
+    () => TASKS.filter((t) => !t.nativeOnly || isNative),
+    [isNative],
   );
 
   const dismissed = useMemo(
