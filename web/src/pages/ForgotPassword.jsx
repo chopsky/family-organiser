@@ -99,9 +99,9 @@ export default function ForgotPassword() {
           }}
         >
           {sent ? (
-            <>Check your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>inbox.</em></>
+            <>Check your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>inbox.</em></>
           ) : (
-            <>Forgot your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>password?</em></>
+            <>Forgot your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>password?</em></>
           )}
         </h1>
 

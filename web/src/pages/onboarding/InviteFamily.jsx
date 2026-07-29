@@ -98,7 +98,7 @@ export default function InviteFamily({ user, household, next, setError }) {
           Invite family
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          Who's <i>in the house</i>?
+          Who's <span style={{ color: 'var(--color-plum)' }}>in the house</span>?
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           Invite the grown-ups by email, and add the kids by name. This is

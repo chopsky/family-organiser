@@ -15,7 +15,7 @@ export default function Welcome({ user, household, next }) {
         {household?.name ? household.name : 'Your Household'}
       </p>
       <h1 className={serifHeading} style={serifHeadingStyle}>
-        Welcome, <i>{firstName}</i>.
+        Welcome, <span style={{ color: 'var(--color-plum)' }}>{firstName}</span>.
       </h1>
       <p className="text-cocoa mt-5 max-w-md mx-auto">
         One quick thing and you're chatting with Housemait on WhatsApp.

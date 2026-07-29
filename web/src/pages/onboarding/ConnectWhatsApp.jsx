@@ -15,7 +15,7 @@ import WhatsAppPairing from '../../components/WhatsAppPairing';
 import DeviceCalendarSync from '../../components/DeviceCalendarSync';
 import { isDeviceCalendarSupported } from '../../lib/deviceCalendar';
 import {
-  serifHeading, serifHeadingStyle, kicker, primaryBtn, skipLink,
+  serifHeading, serifHeadingLong, serifHeadingStyle, kicker, primaryBtn, skipLink,
 } from './_styles';
 
 export default function ConnectWhatsApp({ next, setError }) {
@@ -29,8 +29,13 @@ export default function ConnectWhatsApp({ next, setError }) {
           <p className={kicker} style={{ color: 'var(--color-plum)', marginBottom: 10 }}>
             WhatsApp
           </p>
-          <h1 className={serifHeading} style={serifHeadingStyle}>
-            Manage everything from <i>WhatsApp</i>.
+          {/* serifHeadingLong, not serifHeading: this is the longest headline
+              in the flow and at 40/48px it wrapped to two dominating lines.
+              The emphasis is colour only - Recoleta ships Regular and Medium,
+              both font-style: normal, so an <i> here was a browser-faked
+              oblique rather than a real italic cut. */}
+          <h1 className={serifHeadingLong} style={serifHeadingStyle}>
+            Manage everything from <span style={{ color: 'var(--color-plum)' }}>WhatsApp</span>.
           </h1>
           <p className="text-cocoa mt-5 max-w-md mx-auto">
             Add tasks, tick things off, check your calendar, scan receipts - just by
@@ -70,7 +75,7 @@ export default function ConnectWhatsApp({ next, setError }) {
             WhatsApp
           </p>
           <h1 className={serifHeading} style={serifHeadingStyle}>
-            Send us a <i>quick message</i>.
+            Send us a <span style={{ color: 'var(--color-plum)' }}>quick message</span>.
           </h1>
           <p className="text-cocoa mt-5 max-w-md mx-auto">
             Tap the button below to open WhatsApp with the message pre-typed.
@@ -111,7 +116,7 @@ export default function ConnectWhatsApp({ next, setError }) {
         WhatsApp connected
       </p>
       <h1 className={serifHeading} style={serifHeadingStyle}>
-        You&apos;re <i>chatting</i>.
+        You&apos;re <span style={{ color: 'var(--color-plum)' }}>chatting</span>.
       </h1>
       <p className="text-cocoa mt-5 max-w-md mx-auto">
         We&apos;ve sent you a welcome message. Pin the chat so it stays at the top.

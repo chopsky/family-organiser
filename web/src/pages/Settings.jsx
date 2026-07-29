@@ -565,7 +565,17 @@ export default function Settings() {
       return undefined;
     }
     const t = setTimeout(() => {
-      document.getElementById(`settings-section-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const el = document.getElementById(`settings-section-${section}`);
+      if (!el) return;
+      // Open it, don't just scroll to it. Web sections are <details> accordions
+      // that start closed, so the old behaviour landed people on a collapsed
+      // header - they'd been sent here BY a prompt to do this exact thing and
+      // still had to find and click it. Setting .open directly is enough: the
+      // element is uncontrolled, and name="settings-accordion" makes the
+      // browser close whichever section was open before.
+      const details = el.matches('details') ? el : el.querySelector('details');
+      if (details) details.open = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
     return () => clearTimeout(t);
     // Mount-only by design: the param is consumed once on arrival.

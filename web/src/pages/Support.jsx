@@ -36,7 +36,7 @@ export default function Support() {
             }}
           >
             How can we{' '}
-            <em style={{ fontStyle: 'italic', color: '#6B2FB8' }}>help?</em>
+            <em style={{ fontStyle: 'normal', color: '#6B2FB8' }}>help?</em>
           </h1>
           <p className="text-cocoa mt-2">
             Drop us a note and we'll get back to you within one working day.

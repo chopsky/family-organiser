@@ -125,9 +125,9 @@ export default function Verify() {
           }}
         >
           {error ? (
-            <>Something <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>went wrong.</em></>
+            <>Something <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>went wrong.</em></>
           ) : (
-            <>Verifying your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>account…</em></>
+            <>Verifying your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>account…</em></>
           )}
         </h1>
 

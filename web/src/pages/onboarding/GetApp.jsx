@@ -25,7 +25,7 @@ export default function GetApp({ next }) {
         One last thing
       </p>
       <h1 className={serifHeading} style={serifHeadingStyle}>
-        Get the <i>full</i> Housemait.
+        Get the <span style={{ color: 'var(--color-plum)' }}>full</span> Housemait.
       </h1>
       <p className="text-cocoa mt-4 max-w-md mx-auto">
         You’re on an iPhone - the app gives you everything the website can’t.

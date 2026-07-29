@@ -131,7 +131,7 @@ export default function ResetPassword() {
     return (
       <Stage>
         <h1 className="text-center" style={headlineStyle}>
-          Invalid <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>link.</em>
+          Invalid <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>link.</em>
         </h1>
         <p className="text-center" style={{ marginTop: 16, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453' }}>
           The reset link is missing or has expired. Request a new one to try again.
@@ -146,7 +146,7 @@ export default function ResetPassword() {
   return (
     <Stage>
       <h1 className="text-center" style={headlineStyle}>
-        Set a new <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>password.</em>
+        Set a new <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>password.</em>
       </h1>
 
       <div style={{ marginTop: 24 }}>

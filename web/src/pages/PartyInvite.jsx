@@ -216,7 +216,7 @@ export default function PartyInvite() {
             <>
               <h1 className="text-center" style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#1A1620', margin: 0 }}>
                 {phase === 'expired' ? (
-                  <>This invite has <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>expired.</em></>
+                  <>This invite has <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>expired.</em></>
                 ) : (
                   <>This invite isn't available.</>
                 )}
@@ -335,9 +335,9 @@ export default function PartyInvite() {
               </div>
               <h1 className="text-center" style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#1A1620', margin: 0 }}>
                 {result.status === 'yes' ? (
-                  <>See you <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>there!</em></>
+                  <>See you <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>there!</em></>
                 ) : (
-                  <>Thanks for letting {invite.hostFirstName ? `${invite.hostFirstName} ` : 'them '}<em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>know.</em></>
+                  <>Thanks for letting {invite.hostFirstName ? `${invite.hostFirstName} ` : 'them '}<em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>know.</em></>
                 )}
               </h1>
               <p className="text-center" style={{ marginTop: 10, fontFamily: 'var(--font-sans)', fontSize: 14, color: '#4A4453', lineHeight: 1.6 }}>

@@ -80,7 +80,7 @@ export default function Verified() {
             margin: 0,
           }}
         >
-          Email <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>verified.</em>
+          Email <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>verified.</em>
         </h1>
 
         <p

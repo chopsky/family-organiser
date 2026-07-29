@@ -76,7 +76,7 @@ export default function CheckEmail() {
             margin: 0,
           }}
         >
-          Check your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>email.</em>
+          Check your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>email.</em>
         </h1>
 
         <p

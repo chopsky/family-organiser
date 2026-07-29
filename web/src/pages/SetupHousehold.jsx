@@ -187,8 +187,8 @@ export default function SetupHousehold() {
           }}
         >
           {mode === 'create'
-            ? <>Create your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>household.</em></>
-            : <>Join your <em style={{ fontStyle: 'italic', color: '#6B3FA0' }}>household.</em></>
+            ? <>Create your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>household.</em></>
+            : <>Join your <em style={{ fontStyle: 'normal', color: '#6B3FA0' }}>household.</em></>
           }
         </h1>
 

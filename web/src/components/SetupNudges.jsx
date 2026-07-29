@@ -45,7 +45,10 @@ import api from '../lib/api';
 // Fixed order. The grid reflows as tiles leave; it never re-sorts.
 const TASKS = [
   { id: 'invite', label: 'Invite your family', to: '/family' },
-  { id: 'wa', label: 'Connect WhatsApp', to: '/connect-whatsapp' },
+  // Settings, not the standalone /connect-whatsapp screen: both connect tiles
+  // should land in the same place, and Settings keeps them next to the state
+  // they change (and, on iOS, opens as the section popup).
+  { id: 'wa', label: 'Connect WhatsApp', to: '/settings?section=whatsapp' },
   { id: 'cal', label: 'Add your calendars', to: '/settings?section=calendars' },
   { id: 'rem', label: 'Turn on reminders', to: '/settings?section=notifications', phoneOnly: true },
 ];

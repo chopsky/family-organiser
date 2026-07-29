@@ -120,7 +120,7 @@ export default function InviteStep({ auth, form, update, next, setError }) {
     <div>
       <Kicker>Share the load</Kicker>
       <Title>Who's <Em>in the house?</Em></Title>
-      <Lead>Inviting people is what makes it <i>shared</i>, not just another list only you can see.</Lead>
+      <Lead>Inviting people is what makes it <span style={{ color: 'var(--color-plum)' }}>shared</span>, not just another list only you can see.</Lead>
 
       {hasAny && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', margin: '20px 0 4px' }}>

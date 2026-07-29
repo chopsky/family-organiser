@@ -71,7 +71,7 @@ export default function ConnectCalendar({ next, setError }) {
           Step 4 - Calendar
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          See Housemait in your <i>calendar</i>.
+          See Housemait in your <span style={{ color: 'var(--color-plum)' }}>calendar</span>.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           {isIosPlatform

@@ -101,7 +101,7 @@ export default function Notifications({ next, setError }) {
           Step 6 - notifications
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          Stay in the <i>loop</i>.
+          Stay in the <span style={{ color: 'var(--color-plum)' }}>loop</span>.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           Get pinged when someone in the household adds a shopping item, ticks

@@ -11,6 +11,13 @@
 export const serifHeading =
   'font-normal leading-none tracking-[-0.8px] text-[40px] md:text-[48px]';
 
+// Same treatment, one step down. For headlines long enough to wrap to two
+// lines at the full size, where 48px stops reading as a headline and starts
+// reading as a wall (see ConnectWhatsApp). Leading is nudged up because two
+// wrapped lines at leading-none collide.
+export const serifHeadingLong =
+  'font-normal leading-[1.06] tracking-[-0.6px] text-[32px] md:text-[38px]';
+
 // Apply alongside the serifHeading class:
 //   <h1 className={serifHeading} style={serifHeadingStyle}>...</h1>
 export const serifHeadingStyle = {

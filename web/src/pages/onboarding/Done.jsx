@@ -28,7 +28,7 @@ export default function Done({ user, household, next, finishing }) {
         All set
       </p>
       <h1 className={serifHeading} style={serifHeadingStyle}>
-        You're ready, <i>{firstName}</i>.
+        You're ready, <span style={{ color: 'var(--color-plum)' }}>{firstName}</span>.
       </h1>
       <p className="text-cocoa mt-5 max-w-md mx-auto">
         {household?.name ? <><strong>{household.name}</strong> is ready to go.</> : <>Your household is ready to go.</>}{' '}

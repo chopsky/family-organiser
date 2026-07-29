@@ -93,7 +93,7 @@ export default function SubscribeCalendar({ next, setError }) {
           Calendar added
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          You're <i>all in one place</i>.
+          You're <span style={{ color: 'var(--color-plum)' }}>all in one place</span>.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           Events from your subscribed calendar will appear in Housemait within a minute.
@@ -109,7 +109,7 @@ export default function SubscribeCalendar({ next, setError }) {
           Step 5 - Calendar
         </p>
         <h1 className={serifHeading} style={serifHeadingStyle}>
-          Pull in your <i>other calendars</i>.
+          Pull in your <span style={{ color: 'var(--color-plum)' }}>other calendars</span>.
         </h1>
         <p className="text-cocoa mt-5 max-w-md mx-auto">
           See your work, school, or personal events alongside everything
