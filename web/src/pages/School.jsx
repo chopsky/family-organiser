@@ -11,6 +11,7 @@ import { isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
 import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import ActivityModal from '../components/ActivityModal';
+import TermDatesSheet from '../components/TermDatesSheet';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
@@ -84,14 +85,9 @@ export default function School() {
   const [showTermDateOptions, setShowTermDateOptions] = useState(false);
   const [termDateSchoolId, setTermDateSchoolId] = useState(null);
   const [termDateSchoolName, setTermDateSchoolName] = useState('');
-  const [termDateSchoolLA, setTermDateSchoolLA] = useState('');
-  const [importingLA, setImportingLA] = useState(false);
   // Shared school-directory offer for the term-dates import sheet: dates
   // another parent at the same school already imported ({found, school, dates}).
   const [directoryOffer, setDirectoryOffer] = useState(null);
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [importingWebsite, setImportingWebsite] = useState(false);
-  const [importingPdf, setImportingPdf] = useState(false);
   // Draft import: holds the AI-extracted rows + source-text snippet
   // between the /preview call and the admin's "Save" tap. null while
   // not previewing. Each row carries a `warnings: string[]` from the
@@ -100,8 +96,6 @@ export default function School() {
   const [draftImport, setDraftImport] = useState(null);
   const [savingDraftImport, setSavingDraftImport] = useState(false);
   const [showSourceQuoteFor, setShowSourceQuoteFor] = useState(null); // row index whose quote tooltip is open
-  const [termImportIcalUrl, setTermImportIcalUrl] = useState('');
-  const [importingTermIcal, setImportingTermIcal] = useState(false);
   const [importError, setImportError] = useState('');
   const [showAllDates, setShowAllDates] = useState(false);
   // Add-a-school modal (create a school without first adding a child).
@@ -251,180 +245,6 @@ export default function School() {
     }
   }
 
-  // South African national term-date import. The unified national
-  // calendar (effective 2026 onwards) applies to every public school,
-  // so there's no per-school lookup negotiation - one tap copies the
-  // canonical national dates onto this household_schools row.
-  async function handleImportSaTermDates() {
-    if (!termDateSchoolId) return;
-    setImportingLA(true); // reuse the LA-import busy flag - only one
-                          // primary import button is on screen per country
-    setImportError('');
-    try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-sa-term-dates`);
-      if (!data?.count) {
-        setImportError(data?.message || 'No South African term dates available for this year yet.');
-        return;
-      }
-      setSuccess(data.message || 'Term dates imported!');
-      setTimeout(() => setSuccess(''), 3000);
-      setShowTermDateOptions(false);
-      setImportError('');
-      await loadSchools();
-    } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not import South African term dates. Try another option below.');
-    } finally {
-      setImportingLA(false);
-    }
-  }
-
-  async function handleImportLADates() {
-    if (!termDateSchoolId) return;
-    setImportingLA(true);
-    setImportError('');
-    try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-la-dates`);
-      if (data.imported === 0) {
-        setImportError(data.message || 'No term dates found. Try another import method.');
-        return;
-      }
-      setSuccess(data.message || 'Term dates imported!');
-      setTimeout(() => setSuccess(''), 3000);
-      setShowTermDateOptions(false);
-      setImportError('');
-      await loadSchools();
-    } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not import LA dates. Try another option below.');
-    } finally {
-      setImportingLA(false);
-    }
-  }
-
-  /**
-   * One-tap import from the shared school directory - dates another parent
-   * at this school already imported and reviewed (and the system verifies).
-   * Zero AI calls; response shape mirrors the LA import.
-   */
-  async function handleAdoptDirectoryDates() {
-    if (!termDateSchoolId) return;
-    setImportingLA(true);
-    setImportError('');
-    try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/adopt-directory-dates`);
-      setSuccess(data.message || 'Term dates imported!');
-      setTimeout(() => setSuccess(''), 3000);
-      setShowTermDateOptions(false);
-      setDirectoryOffer(null);
-      await loadSchools();
-    } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not import the shared term dates. Try another option below.');
-    } finally {
-      setImportingLA(false);
-    }
-  }
-
-  async function handleImportWebsite() {
-    // Step 1 of 2: fetch a preview from the backend (no DB writes yet).
-    // The admin then reviews, edits, and confirms in a separate panel -
-    // see handleConfirmImportWebsite below.
-    if (!termDateSchoolId || !websiteUrl.trim()) return;
-    // Normalise the URL: users often paste "school.com/term-dates" with
-    // no scheme. Auto-prepend https:// so the server-side fetch doesn't
-    // explode with an unhelpful error. Reject only obviously-malformed
-    // input (whitespace mid-string, no dot in the host).
-    let normalisedUrl = websiteUrl.trim();
-    if (!/^https?:\/\//i.test(normalisedUrl)) normalisedUrl = `https://${normalisedUrl}`;
-    try {
-      const u = new URL(normalisedUrl);
-      if (!u.hostname.includes('.')) throw new Error('bad host');
-    } catch {
-      setImportError("That doesn't look like a valid website address. Make sure it starts with https://");
-      return;
-    }
-    setImportingWebsite(true);
-    setImportError('');
-    try {
-      // 90s ceiling: the AI extraction legitimately takes 30-60s, but
-      // without a cap a slow/blocking school server leaves the button stuck
-      // on "Finding…" forever with no way to tell it apart from progress.
-      const { data } = await api.post(
-        `/schools/${termDateSchoolId}/import-website/preview`,
-        { website_url: normalisedUrl },
-        { timeout: 90000 },
-      );
-      if (!Array.isArray(data.dates) || data.dates.length === 0) {
-        setImportError(data.message || 'No term dates found on that page. Try a different URL or another import method.');
-        setShowTermDateOptions(true);
-        return;
-      }
-      setDraftImport({
-        schoolId: termDateSchoolId,
-        schoolName: termDateSchoolName,
-        sourceUrl: data.source_url || normalisedUrl,
-        sourceTextPreview: data.source_text_preview || '',
-        // Full extracted text + type, forwarded on confirm so the shared
-        // school directory can arbitrate divergent imports against the source.
-        sourceText: data.source_text || '',
-        sourceType: 'website',
-        dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
-      });
-      setShowTermDateOptions(false);
-    } catch (err) {
-      const timedOut = err.code === 'ECONNABORTED' || /timeout/i.test(err.message || '');
-      setImportError(
-        timedOut
-          ? "This is taking longer than we'd expect — the school's website may be slow or blocking us. Try 'Upload the school's PDF' below, or add the dates manually."
-          : (err.response?.data?.error || 'Could not import from website. Try another option below.'),
-      );
-      // If the admin closed this dialog while we were working, bring it back
-      // so the error is actually seen rather than silently swallowed.
-      setShowTermDateOptions(true);
-    } finally {
-      setImportingWebsite(false);
-    }
-  }
-
-  /**
-   * Alternative to the URL flow: the user uploads the school's
-   * term-dates PDF directly. Useful when the school hosts the PDF
-   * behind SharePoint / Google Drive auth, or when the term-dates
-   * page is JavaScript-rendered and our HTML scrape returns gibberish.
-   *
-   * Same preview-and-confirm pattern as the URL flow — the response
-   * shape is identical, so the same review panel + confirm endpoint
-   * handle it from here.
-   */
-  async function handleImportPdf(file) {
-    if (!termDateSchoolId || !file) return;
-    setImportingPdf(true);
-    setImportError('');
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-pdf/preview`, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      if (!Array.isArray(data.dates) || data.dates.length === 0) {
-        setImportError(data.message || 'No term dates found in that PDF. Try a different file.');
-        return;
-      }
-      setDraftImport({
-        schoolId: termDateSchoolId,
-        schoolName: termDateSchoolName,
-        sourceUrl: data.source_url || file.name,
-        sourceTextPreview: data.source_text_preview || '',
-        sourceText: data.source_text || '',
-        sourceType: 'pdf',
-        dates: data.dates.map((d, i) => ({ ...d, _id: `draft-${i}` })),
-      });
-      setShowTermDateOptions(false);
-    } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not read that PDF. Try a different file or another import method.');
-    } finally {
-      setImportingPdf(false);
-    }
-  }
-
   // Step 2 of 2: commit the admin-approved draft to the database.
   async function handleConfirmImportWebsite() {
     if (!draftImport || !draftImport.schoolId) return;
@@ -464,28 +284,6 @@ export default function School() {
       ...prev,
       dates: prev.dates.filter(d => d._id !== rowId),
     } : prev);
-  }
-
-  async function handleImportTermIcal() {
-    if (!termDateSchoolId || !termImportIcalUrl.trim()) return;
-    setImportingTermIcal(true);
-    setImportError('');
-    try {
-      const { data } = await api.post(`/schools/${termDateSchoolId}/import-ical`, { ical_url: termImportIcalUrl.trim() });
-      if (data.imported === 0) {
-        setImportError(data.message || 'No events found in that calendar feed. Try another option.');
-        return;
-      }
-      setSuccess(data.message || 'Calendar imported!');
-      setTimeout(() => setSuccess(''), 3000);
-      setShowTermDateOptions(false);
-      setImportError('');
-      await loadSchools();
-    } catch (err) {
-      setImportError(err.response?.data?.error || 'Could not import calendar. Try another option below.');
-    } finally {
-      setImportingTermIcal(false);
-    }
   }
 
   // UK academic year runs Sept-Aug, so a Jan date belongs to the AY
@@ -644,10 +442,7 @@ export default function School() {
     if (!school) return;
     setTermDateSchoolId(school.id);
     setTermDateSchoolName(school.school_name);
-    setTermDateSchoolLA(school.local_authority || '');
     setImportError('');
-    setWebsiteUrl('');
-    setTermImportIcalUrl('');
     // Shared-directory offer: has another parent at this school already
     // imported reviewed dates? Fetched async; renders a one-tap card when
     // found. Reset first so a previous school's offer never flashes.
@@ -1181,248 +976,31 @@ export default function School() {
         />
       )}
 
-      {/* Term Date Import Options Modal */}
-      {showTermDateOptions && (
-        <BottomSheet open onDismiss={() => { if (!(importingWebsite || importingPdf || importingLA || importingTermIcal)) setShowTermDateOptions(false); }} desktopWidthClass="sm:w-[512px]">
-          <div className="overflow-y-auto min-h-0 p-6 pt-1">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base md:text-lg font-medium text-bark">Import term dates</h2>
-              <button onClick={() => setShowTermDateOptions(false)} className="text-cocoa hover:text-bark p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-sm text-cocoa mb-4">
-              How would you like to set up term dates for <span className="font-medium text-bark">{termDateSchoolName}</span>?
-            </p>
-
-            {importError && (
-              <div className="bg-coral/10 border border-coral/30 rounded-xl px-4 py-3 mb-4 flex items-start gap-2">
-                <span className="text-coral text-sm mt-0.5">⚠️</span>
-                <div>
-                  <p className="text-sm text-bark font-medium">{importError}</p>
-                  <p className="text-xs text-cocoa mt-1">Please try another option below.</p>
-                </div>
-              </div>
-            )}
-
-            {/* In-progress banner so a 30-60s AI extraction never looks
-                frozen. Pinned at the top of the dialog and mirrored inline
-                under each option's button. */}
-            {(importingWebsite || importingPdf || importingLA || importingTermIcal) && (
-              <div className="bg-white border border-cream-border rounded-xl px-4 py-3 mb-4 flex items-start gap-2.5">
-                <svg className="h-4 w-4 text-primary animate-spin mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <div>
-                  <p className="text-sm text-bark font-medium">Finding term dates…</p>
-                  <p className="text-xs text-cocoa mt-1">This can take up to a minute. Keep this window open — we'll pop up the dates for you to review as soon as they're ready.</p>
-                </div>
-              </div>
-            )}
-
-            {/* Four equal options, no recommended badge or section headers
-                - the user already knows which type of school their kid
-                attends, and each card's subtitle says when it applies. The
-                top card varies by country: UK gets the LA import, SA gets
-                the unified national term-date import. The three fallback
-                cards (website / iCal / manual) are identical across
-                countries - they're generic over school type. */}
-            <div className="space-y-3">
-              {/* Shared school directory - another parent at this school
-                  already imported + reviewed these dates (and the system
-                  re-verifies them). One tap, zero AI calls, and everyone at
-                  the school stays on identical dates. */}
-              {directoryOffer?.found && (
-                <div className="bg-primary/5 rounded-xl border-2 border-primary/40 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-bark">🏫 Use {directoryOffer.school.name}'s saved term dates</h3>
-                      <p className="text-xs text-cocoa mt-1">
-                        Another Housemait parent at this school already imported and checked these dates
-                        — {directoryOffer.school.date_count} dates ({(directoryOffer.school.academic_years || []).join(', ')}).
-                        Used by {(directoryOffer.school.adopted_count || 0) + 1} famil{(directoryOffer.school.adopted_count || 0) + 1 === 1 ? 'y' : 'ies'}
-                        {(directoryOffer.school.last_verified_at || directoryOffer.school.last_imported_at)
-                          ? ` · checked ${new Date(directoryOffer.school.last_verified_at || directoryOffer.school.last_imported_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                          : ''}
-                        {directoryOffer.school.source_type === 'pdf' ? ' · from PDF' : ''}.
-                        Your school stays in sync if the dates are ever corrected.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleAdoptDirectoryDates}
-                      disabled={importingLA}
-                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                    >
-                      {importingLA ? 'Importing...' : 'Import'}
-                    </button>
-                  </div>
-                </div>
-              )}
-              {/* Country-specific top card - UK: LA, SA: national. */}
-              {isSa ? (
-                <div className="bg-white rounded-xl border border-cream-border p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-bark">🇿🇦 Import South African national term dates</h3>
-                      <p className="text-xs text-cocoa mt-1">
-                        From 2026, a unified national calendar applies to every
-                        public school across all nine provinces. One tap copies
-                        those dates onto this school.
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleImportSaTermDates}
-                      disabled={importingLA}
-                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                    >
-                      {importingLA ? 'Importing...' : 'Import'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // The LA path resolves a council from GIAS and scrapes
-                // their term-dates page. It only applies to state
-                // schools — private/independent schools have no
-                // local authority, so the button would just 400. When
-                // we have no LA on the school record, demote the card
-                // visually and point the user toward Website / PDF /
-                // Manual instead.
-                <div className={`bg-white rounded-xl border p-4 ${termDateSchoolLA ? 'border-cream-border' : 'border-cream-border/60 opacity-70'}`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-bark">🏛️ Import from local authority</h3>
-                      <p className="text-xs text-cocoa mt-1">
-                        {termDateSchoolLA
-                          ? `Most state schools follow their council's term dates. We will import them from ${termDateSchoolLA} council.`
-                          : "Doesn't apply to this school — there's no local authority on file (typical for private or independent schools). Use Import from school website or Upload the school's PDF instead."}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleImportLADates}
-                      disabled={importingLA || !termDateSchoolLA}
-                      className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {importingLA ? 'Importing...' : 'Import'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Option: Import from school website */}
-              <div className="bg-white rounded-xl border border-cream-border p-4">
-                <h3 className="text-sm font-semibold text-bark">🌐 Import from school website</h3>
-                <p className="text-xs text-cocoa mt-1">Paste the URL of your school's term dates page.</p>
-                <div className="flex gap-2 mt-2">
-                  <input
-                    type="url"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    placeholder="https://school.com/term-dates"
-                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                  <button
-                    onClick={handleImportWebsite}
-                    disabled={importingWebsite || !websiteUrl.trim()}
-                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                  >
-                    {importingWebsite ? 'Finding…' : 'Find dates'}
-                  </button>
-                </div>
-                {importingWebsite && (
-                  <p className="text-[11px] text-cocoa mt-2">Reading the page and extracting dates — this can take up to a minute.</p>
-                )}
-              </div>
-
-              {/* Option: Upload a PDF directly. Fallback for schools
-                  that host the term-dates PDF behind SharePoint /
-                  Google Drive share links (common at private schools)
-                  or whose term-dates page is a JS-rendered SPA we
-                  can't scrape. User downloads the PDF from their
-                  browser and uploads it here. */}
-              <div className="bg-white rounded-xl border border-cream-border p-4">
-                <h3 className="text-sm font-semibold text-bark">📄 Upload the school's PDF</h3>
-                <p className="text-xs text-cocoa mt-1">If the website link above doesn't work, download the term-dates PDF from your browser and upload it.</p>
-                <label className="mt-2 inline-flex items-center gap-2 cursor-pointer">
-                  <span className="bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed transition-colors">
-                    {importingPdf ? 'Reading…' : 'Choose PDF'}
-                  </span>
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    disabled={importingPdf}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      // Reset the input so the same file can be picked
-                      // again later (useful if a first parse failed).
-                      e.target.value = '';
-                      if (file) handleImportPdf(file);
-                    }}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              {/* Option 3: iCal import */}
-              <div className="bg-white rounded-xl border border-cream-border p-4">
-                <h3 className="text-sm font-semibold text-bark">📅 Import from iCal feed</h3>
-                <p className="text-xs text-cocoa mt-1">Paste the iCal calendar URL from your school's website or parent portal.</p>
-                <div className="flex gap-2 mt-2">
-                  <input
-                    type="url"
-                    value={termImportIcalUrl}
-                    onChange={(e) => setTermImportIcalUrl(e.target.value)}
-                    placeholder="https://school.com/calendar.ics"
-                    className="flex-1 border border-cream-border rounded-lg px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-accent"
-                  />
-                  <button
-                    onClick={handleImportTermIcal}
-                    disabled={importingTermIcal || !termImportIcalUrl.trim()}
-                    className="shrink-0 bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed disabled:opacity-50 transition-colors"
-                  >
-                    {importingTermIcal ? 'Importing...' : 'Import'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Option 4: Manual. Opens the "View & edit all dates"
-                  panel with the Add-date form pre-expanded so the user
-                  can start typing dates immediately. */}
-              <div className="bg-white rounded-xl border border-cream-border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-bark">✏️ Add manually</h3>
-                    <p className="text-xs text-cocoa mt-1">Enter term dates yourself, one at a time. Useful for schools without a published calendar URL.</p>
-                  </div>
-                  <div className="shrink-0 flex flex-col gap-2 items-end">
-                    <button
-                      onClick={() => {
-                        // Seed the all-dates panel with the current school's
-                        // saved dates (it's keyed by termDateSchoolId).
-                        const school = householdSchools.find(s => s.id === termDateSchoolId);
-                        setEditTermDates(school?.term_dates || []);
-                        setShowTermDateOptions(false);
-                        setShowAllDates(true);
-                        setShowAddTermDate(true);
-                      }}
-                      className="bg-primary text-white text-xs font-medium px-4 py-2 rounded-lg hover:bg-primary-pressed transition-colors"
-                    >
-                      Add now
-                    </button>
-                    <button
-                      onClick={() => setShowTermDateOptions(false)}
-                      className="border border-cream-border text-cocoa text-xs font-medium px-4 py-2 rounded-lg hover:bg-sand transition-colors"
-                    >
-                      Skip for now
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </BottomSheet>
+      {/* The stepped term-dates import: one decision per screen, routed by
+          school type, with a mandatory preview. Mounted only while open so
+          every opening starts from a clean slate rather than the last
+          parent's half-finished import. */}
+      {showTermDateOptions && termDateSchoolId && (
+        <TermDatesSheet
+          open
+          school={householdSchools.find((s) => s.id === termDateSchoolId) || { id: termDateSchoolId, school_name: termDateSchoolName }}
+          sharedDates={directoryOffer?.found ? {
+            count: directoryOffer.school.date_count || 0,
+            year_label: (directoryOffer.school.academic_years || []).join(', '),
+            // Only a human check earns "checked <date>" - an import is not a
+            // verification, and the card must not imply someone looked.
+            verified_at: directoryOffer.school.last_verified_at || null,
+          } : null}
+          country={household?.country}
+          onClose={() => setShowTermDateOptions(false)}
+          onImported={async () => {
+            setSuccess('Term dates added.');
+            setTimeout(() => setSuccess(''), 3000);
+            setDirectoryOffer(null);
+            await loadSchools();
+          }}
+          onReview={setDraftImport}
+        />
       )}
 
       {/* Review Imported Dates Panel - opens after /import-website/preview

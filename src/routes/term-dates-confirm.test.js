@@ -22,6 +22,13 @@ jest.mock('../middleware/auth', () => ({
 }));
 jest.mock('../services/cache', () => ({ invalidate: jest.fn(), get: jest.fn(), set: jest.fn() }));
 jest.mock('../db/client', () => ({ supabase: { from: jest.fn() }, supabaseAdmin: { from: jest.fn() }, getUserClient: jest.fn() }));
+jest.mock('../services/saTermDates', () => ({
+  getNationalTermDates: jest.fn(async (year) => ([
+    { event_type: 'term_start', date: `${year}-01-15`, label: 'Term 1 begins' },
+    { event_type: 'term_end', date: `${year}-03-27`, label: 'Term 1 ends' },
+  ])),
+  importToSchool: jest.fn(async () => 2),
+}));
 jest.mock('../services/term-date-extract', () => ({
   extractTermDatesPreview: jest.fn(),
   fetchTermDatesPageText: jest.fn(),
@@ -98,4 +105,50 @@ it('refuses an unknown source', async () => {
 it('refuses an empty set', async () => {
   const res = await post({ dates: [], source: 'council' });
   expect(res.status).toBe(400);
+});
+
+/**
+ * South Africa runs one national calendar for every public school, so the
+ * sheet's first fork option is the national dates rather than a council. It
+ * has to reach the same preview-then-confirm path as everything else - a
+ * parent who taps it must still see the dates before they land.
+ */
+describe('South African national dates', () => {
+  const sa = require('../services/saTermDates');
+
+  it('previews without writing, and offers this year and next', async () => {
+    const res = await request(app())
+      .post('/api/schools/s1/import-sa-term-dates')
+      .send({ preview: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.preview).toBe(true);
+    expect(res.body.source).toBe('sa_national');
+    expect(res.body.dates).toHaveLength(4); // two years, two rows each
+    expect(sa.importToSchool).not.toHaveBeenCalled();
+    expect(db.addSchoolTermDates).not.toHaveBeenCalled();
+  });
+
+  it('tags rows with the slash-form academic year the SA import writes', async () => {
+    const res = await request(app())
+      .post('/api/schools/s1/import-sa-term-dates')
+      .send({ preview: true });
+
+    // A hyphen here would split one school year across two headings in the
+    // grouped term view, which is exactly the bug the UK fallback once had.
+    for (const d of res.body.dates) expect(d.academic_year).toMatch(/^\d{4}\/\d{4}$/);
+  });
+
+  it('still writes immediately on the legacy one-tap path', async () => {
+    const res = await request(app()).post('/api/schools/s1/import-sa-term-dates').send({});
+    expect(res.status).toBe(200);
+    expect(sa.importToSchool).toHaveBeenCalled();
+  });
+
+  it('confirms an approved national set under its own source', async () => {
+    await post({ dates: [{ ...ROW, academic_year: '2026/2027' }], source: 'sa_national' });
+    expect(db.addSchoolTermDates).toHaveBeenCalledWith('s1', [
+      expect.objectContaining({ source: 'sa-national' }),
+    ]);
+  });
 });

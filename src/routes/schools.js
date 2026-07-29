@@ -682,11 +682,40 @@ router.post('/:schoolId/import-sa-term-dates', requireAuth, requireHousehold, re
     const school = schools.find(s => s.id === req.params.schoolId);
     if (!school) return res.status(404).json({ error: 'School not found.' });
 
+    const thisYear = new Date().getFullYear();
     const years = Array.isArray(req.body?.years) && req.body.years.length
       ? req.body.years.filter((y) => Number.isInteger(y) && y >= 2026 && y <= 2100)
-      : [new Date().getFullYear()];
+      // The preview flow saves in one go and replaces what is there, so it
+      // offers this year AND next rather than leaving the parent to come back
+      // in December. The legacy one-tap path keeps its single-year default.
+      : (req.body?.preview ? [thisYear, thisYear + 1] : [thisYear]);
 
     if (!years.length) return res.status(400).json({ error: 'No valid years provided.' });
+
+    // Preview: hand back the national rows without writing, so the stepped
+    // import sheet can show them before anything reaches the calendar.
+    if (req.body?.preview) {
+      const dates = [];
+      for (const year of years) {
+        for (const d of await saTermDates.getNationalTermDates(year)) {
+          // Slash, not hyphen: SA academic years are stored this way by
+          // importToSchool, and the grouped term UI splits on the same shape.
+          dates.push({ ...d, academic_year: `${year}/${year + 1}` });
+        }
+      }
+      if (!dates.length) {
+        return res.status(404).json({ error: 'The national term dates for that year have not been published yet.' });
+      }
+      return res.json({
+        preview: true,
+        dates,
+        count: dates.length,
+        source: 'sa_national',
+        source_label: 'South African national calendar',
+        syncs: false,
+        academic_years: years.map((y) => `${y}/${y + 1}`),
+      });
+    }
 
     const inserted = await saTermDates.importToSchool(school.id, years);
 
@@ -1704,6 +1733,7 @@ router.post('/:schoolId/term-dates/confirm', requireAuth, requireHousehold, requ
     website: 'website_scrape',
     pdf: 'pdf_upload',
     manual: 'manual',
+    sa_national: 'sa-national',
   };
   if (!Array.isArray(dates) || dates.length === 0) {
     return res.status(400).json({ error: 'No dates to save.' });
