@@ -606,6 +606,22 @@ Only return valid JSON array, nothing else.`;
       });
     }
 
+    // Preview stops here - see the council route for why this is a flag on
+    // the existing endpoint rather than a parallel one. Note the iCal URL is
+    // NOT saved on a preview either: a feed the parent hasn't approved must
+    // not start syncing into their calendar behind the preview screen.
+    if (req.body?.preview === true) {
+      return res.json({
+        preview: true,
+        dates: termDates,
+        count: termDates.length,
+        source: 'ical',
+        source_label: ical_url.trim(),
+        syncs: true,
+        academic_years: [...new Set(termDates.map((d) => d.academic_year).filter(Boolean))].sort(),
+      });
+    }
+
     // Safe to replace now that we know termDates is non-empty.
     await db.deleteAllTermDatesBySchool(req.params.schoolId);
     await db.addSchoolTermDates(req.params.schoolId, termDates);
@@ -826,6 +842,25 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
       academic_year: d.academic_year || academicYear,
       source: 'local_authority',
     }));
+
+    // preview:true resolves the dates and stops. The stepped import sheet
+    // shows them, and nothing reaches the calendar until the parent approves
+    // on the preview screen. Deliberately a flag on THIS route rather than a
+    // separate endpoint: every resolution path above (directory -> cache ->
+    // live scrape, with its own error responses) then stays byte-identical
+    // between preview and import, so the two can never drift. Older app
+    // builds never send the flag and behave exactly as before.
+    if (req.body?.preview === true) {
+      return res.json({
+        preview: true,
+        dates: termDates,
+        count: termDates.length,
+        source: 'council',
+        source_label: school.local_authority,
+        syncs: true,
+        academic_years: [...new Set(termDates.map((d) => d.academic_year).filter(Boolean))].sort(),
+      });
+    }
 
     // Full clean replace: the directory/scrape gives the complete set we want,
     // so wipe the school's existing term dates and add the lot. Simpler and
@@ -1413,6 +1448,24 @@ router.post('/:schoolId/adopt-directory-dates', requireAuth, requireHousehold, r
     const hit = await schoolDirectory.lookupDirectoryDatesForSchool(school);
     if (!hit) return res.status(404).json({ error: 'No shared term dates found for this school yet.' });
 
+    // Same preview contract as the council route - resolve, show, save only
+    // on approval. `verified_at` is null until a SYSTEM verification, which is
+    // what lets the card say "checked <date>" honestly instead of passing an
+    // import off as a check.
+    if (req.body?.preview === true) {
+      return res.json({
+        preview: true,
+        dates: hit.dates,
+        count: hit.dates.length,
+        source: 'shared',
+        source_label: hit.name || school.school_name,
+        syncs: true,
+        verified_at: hit.last_verified_at || null,
+        verified_count: hit.verified_count ?? null,
+        academic_years: [...new Set(hit.dates.map((d) => d.academic_year).filter(Boolean))].sort(),
+      });
+    }
+
     const years = [...new Set(hit.dates.map(d => d.academic_year))];
     for (const ay of years) {
       await db.deleteTermDatesBySchoolAndAcademicYear(school.id, ay);
@@ -1624,6 +1677,100 @@ router.patch('/:id', requireAuth, requireHousehold, requireAdmin, async (req, re
   } catch (err) {
     console.error('PATCH /api/schools/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/schools/:schoolId/term-dates/confirm
+ *
+ * The single save-after-preview endpoint. Every source in the stepped import
+ * sheet - council, iCal, shared, website, PDF - previews first and lands here
+ * once the parent taps "Add N dates to the calendar". Nothing before this
+ * point writes to the calendar.
+ *
+ * Deliberately additive: import-website/confirm stays exactly as it is,
+ * because app builds already in the App Store call it and will keep calling
+ * it for months.
+ *
+ * The client can edit anything it was shown, so every row is re-validated
+ * here rather than trusted.
+ */
+router.post('/:schoolId/term-dates/confirm', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { dates, source, source_label } = req.body || {};
+  const SOURCE_MAP = {
+    council: 'local_authority',
+    ical: 'ical',
+    shared: 'school_directory',
+    website: 'website_scrape',
+    pdf: 'pdf_upload',
+    manual: 'manual',
+  };
+  if (!Array.isArray(dates) || dates.length === 0) {
+    return res.status(400).json({ error: 'No dates to save.' });
+  }
+  if (!SOURCE_MAP[source]) {
+    return res.status(400).json({ error: 'Unknown import source.' });
+  }
+
+  const cleaned = [];
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i] || {};
+    if (!VALID_EVENT_TYPES.has(d.event_type)) {
+      return res.status(400).json({ error: `Row ${i + 1}: unrecognised type "${d.event_type}".` });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) {
+      return res.status(400).json({ error: `Row ${i + 1}: invalid date.` });
+    }
+    if (d.end_date && !/^\d{4}-\d{2}-\d{2}$/.test(d.end_date)) {
+      return res.status(400).json({ error: `Row ${i + 1}: invalid end date.` });
+    }
+    if (!d.academic_year || typeof d.academic_year !== 'string') {
+      return res.status(400).json({ error: `Row ${i + 1}: missing academic year.` });
+    }
+    cleaned.push({
+      event_type: d.event_type,
+      date: d.date,
+      end_date: d.end_date || null,
+      label: d.label || '',
+      academic_year: d.academic_year,
+      source: SOURCE_MAP[source],
+    });
+  }
+
+  try {
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find((x) => x.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+
+    // Full clean replace, matching every existing import path. This is also
+    // the "wrong import" recovery route: re-running the sheet and approving a
+    // different source replaces what is there.
+    await db.deleteAllTermDatesBySchool(req.params.schoolId);
+    await db.addSchoolTermDates(req.params.schoolId, cleaned);
+    await db.updateHouseholdSchoolMeta(req.params.schoolId, {
+      term_dates_source: SOURCE_MAP[source],
+      term_dates_last_updated: new Date().toISOString(),
+    });
+
+    // An iCal feed only starts syncing once the parent has approved what it
+    // produced - see the preview branch on the import-ical route.
+    if (source === 'ical' && source_label) {
+      await db.updateHouseholdSchool(req.params.schoolId, { ical_url: String(source_label).trim() });
+    }
+
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+
+    const years = [...new Set(cleaned.map((d) => d.academic_year).filter(Boolean))].sort();
+    return res.json({
+      imported: cleaned.length,
+      academic_years: years,
+      source,
+      message: `Added ${cleaned.length} dates for ${years.join(' and ')}.`,
+    });
+  } catch (err) {
+    console.error('POST /api/schools/:id/term-dates/confirm error:', err);
+    return res.status(500).json({ error: 'Could not save those dates. Please try again.' });
   }
 });
 
