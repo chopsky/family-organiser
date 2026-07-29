@@ -20,7 +20,9 @@ import { isIos } from '../lib/platform';
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
-const BRAND = '#6C3DD9', BG_SOFT = '#F3EEE5';
+// Literal hex, not var(--color-plum): BRAND gets '1C' appended for an
+// alpha tint below, and hex+alpha only works on a real hex value.
+const BRAND = '#6d38ad', BG_SOFT = '#F3EEE5';
 const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 const TODOS_ID = '__todos__';
@@ -61,7 +63,7 @@ const IcChevDown = (p) => <Svg {...p}><path d="M6 9l6 6 6-6" /></Svg>;
 const IcPencil = (p) => <Svg {...p}><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></Svg>;
 const Tick = ({ s = 12, c = '#fff' }) => <svg width={s} height={s} viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
-const DEFAULT_TINTS = ['#6C3DD9', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
+const DEFAULT_TINTS = ['#6d38ad', '#6BA368', '#5B8DE0', '#D8788A', '#D89B3A', '#3AADA0'];
 
 // Shopping items display capitalised (first letter), e.g. "milk" -> "Milk".
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -890,7 +892,7 @@ function ListModal({ initial, title = 'New list', cta = 'Create', onClose, onSav
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: INK2, marginBottom: 7 }}>Icon</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {LIST_EMOJIS.map((em) => <button key={em} onClick={() => setEmoji(em)} style={{ width: 38, height: 38, borderRadius: 10, fontSize: 19, cursor: 'pointer', background: emoji === em ? '#EFE9FB' : '#fff', border: emoji === em ? `1.5px solid ${BRAND}` : `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{em}</button>)}
+            {LIST_EMOJIS.map((em) => <button key={em} onClick={() => setEmoji(em)} style={{ width: 38, height: 38, borderRadius: 10, fontSize: 19, cursor: 'pointer', background: emoji === em ? 'var(--color-plum-light)' : '#fff', border: emoji === em ? `1.5px solid ${BRAND}` : `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{em}</button>)}
           </div>
         </div>
         <div style={{ marginBottom: 18 }}>

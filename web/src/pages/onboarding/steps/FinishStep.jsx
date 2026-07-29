@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../../../lib/api';
 import { Title, Em, Kicker, PrimaryButton } from './_ui';
 
-const AVATAR_COLOURS = ['#6C3DD9', '#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#B05B9E'];
+const AVATAR_COLOURS = ['#6d38ad', '#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#B05B9E'];
 const initialOf = (s) => (s || '?').trim().charAt(0).toUpperCase() || '?';
 
 // Step 9. Personalised wrap-up: the first name, the household, the people just

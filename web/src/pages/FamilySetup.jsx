@@ -1418,7 +1418,7 @@ export default function FamilySetup() {
           onClick={handleSaveAllergies}
           disabled={savingAllergies}
           className="bg-plum hover:bg-plum/90 disabled:opacity-50 text-white font-semibold px-7 py-3 rounded-[14px] text-[15px] transition-colors"
-          style={{ boxShadow: '0 2px 8px rgba(108,61,217,0.3)' }}
+          style={{ boxShadow: '0 2px 8px rgba(109,56,173,0.3)' }}
         >
           {savingAllergies ? 'Saving…' : 'Save'}
         </button>

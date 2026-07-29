@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 
 const INK = '#1A1620', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
-const BRAND = '#6C3DD9', BRAND_SOFT = '#EFE9FB', BG_SOFT = '#F3EEE5';
+const BRAND = 'var(--color-plum)', BRAND_SOFT = 'var(--color-plum-light)', BG_SOFT = '#F3EEE5';
 const INTER = '"Inter", system-ui, sans-serif';
 
 const Svg = (p) => <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24" fill="none" stroke={p.c || 'currentColor'} strokeWidth={p.w || 2} strokeLinecap="round" strokeLinejoin="round">{p.children}</svg>;

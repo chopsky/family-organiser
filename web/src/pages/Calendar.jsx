@@ -68,7 +68,7 @@ const COLOR_HEX = {
 // mirror Chores.jsx exactly.
 const M_INK = '#1A1620', M_INK2 = '#4A4453', M_INK3 = '#8A8493';
 const M_LINE_STRONG = 'rgba(26,22,32,0.12)';
-const M_BRAND = '#6C3DD9', M_BRAND_SOFT = '#EFE9FB';
+const M_BRAND = 'var(--color-plum)', M_BRAND_SOFT = 'var(--color-plum-light)';
 const M_BG_SOFT = '#F3EEE5';
 const M_SERIF = 'var(--font-serif-display)';
 const mInput = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${M_LINE_STRONG}`, fontSize: 14, color: M_INK, outline: 'none', background: '#fff', fontFamily: 'inherit' };

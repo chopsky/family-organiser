@@ -64,8 +64,8 @@ const INK = '#1A1620';
 const INK2 = '#4A4453';
 const INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)';
-const BRAND = '#6C3DD9';
-const BRAND_DEEP = '#4A22A8';
+const BRAND = 'var(--color-plum)';
+const BRAND_DEEP = 'var(--color-plum-dark)';
 
 export default function WeatherStrip({ onOpenAI }) {
   const [data, setData] = useState(null);

@@ -18,7 +18,7 @@ import { REWARD_PLUS_TASK_CATS, searchRewardPlusTaskEmojis } from '../lib/reward
 
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
-const BRAND = '#6C3DD9', BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
+const BRAND = 'var(--color-plum)', BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
 const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 // A child dependent, never a pet - pets don't earn or spend stars.
@@ -375,5 +375,5 @@ function RewardModal({ onClose, onSave, kids, reward }) {
 const input = { width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: `1px solid ${LINE_STRONG}`, fontFamily: INTER, fontSize: 14, color: INK, outline: 'none', background: '#fff' };
 const stepBtn = { width: 34, height: 34, borderRadius: 9, border: `1px solid ${LINE_STRONG}`, background: '#fff', cursor: 'pointer', fontSize: 18, lineHeight: 1, color: INK2 };
 function Chip({ on, onClick, children }) {
-  return <button onClick={onClick} style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, border: on ? `1.5px solid ${BRAND}` : `1px solid ${LINE_STRONG}`, background: on ? '#EFE9FB' : '#fff', color: on ? BRAND : INK2 }}>{children}</button>;
+  return <button onClick={onClick} style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, border: on ? `1.5px solid ${BRAND}` : `1px solid ${LINE_STRONG}`, background: on ? 'var(--color-plum-light)' : '#fff', color: on ? BRAND : INK2 }}>{children}</button>;
 }

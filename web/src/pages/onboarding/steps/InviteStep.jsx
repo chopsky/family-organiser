@@ -4,7 +4,7 @@ import { Title, Em, Kicker, Lead, PrimaryButton, Ghost } from './_ui';
 import { inputStyle } from './_styles';
 
 // Vibrant per-member avatar colours (brand palette).
-const AVATAR_COLOURS = ['#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#6C3DD9', '#B05B9E'];
+const AVATAR_COLOURS = ['#D8788A', '#5B8DE0', '#D89B3A', '#6BA368', '#6d38ad', '#B05B9E'];
 const initialOf = (s) => (s || '?').trim().charAt(0).toUpperCase() || '?';
 // Dedupe key: an adult by email (their natural id), a kid by name.
 const dupKey = (e) => `${e.kind}:${(e.kind === 'adult' ? (e.email || e.label) : e.label || '').trim().toLowerCase()}`;

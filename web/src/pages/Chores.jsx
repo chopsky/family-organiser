@@ -23,7 +23,7 @@ import { maybeRequestReview } from '../lib/appReview';
 // Design-handoff tokens (page-local; member colours come from each record).
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
-const BRAND = '#6C3DD9', BRAND_SOFT = '#EFE9FB';
+const BRAND = 'var(--color-plum)', BRAND_SOFT = 'var(--color-plum-light)';
 const BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
 const BG_APP = '#FBF8F3'; // page background — the gap colour in the selected-avatar halo
 const SERIF = 'var(--font-serif-display)';
@@ -877,7 +877,7 @@ function Celebration({ data, onClose, onGo }) {
     s.textContent = '@keyframes choreFall{0%{transform:translateY(-40px) rotate(0);opacity:1}100%{transform:translateY(900px) rotate(680deg);opacity:.9}}@keyframes chorePop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.06);opacity:1}100%{transform:scale(1);opacity:1}}';
     document.head.appendChild(s);
   }, []);
-  const colors = ['#6C3DD9', '#D89B3A', '#6BA368', '#D8788A', '#5B8DE0'];
+  const colors = ['#6d38ad', '#D89B3A', '#6BA368', '#D8788A', '#5B8DE0'];
   const bits = Array.from({ length: 60 }, (_, i) => i);
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(26,22,32,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflow: 'hidden', fontFamily: INTER }}>

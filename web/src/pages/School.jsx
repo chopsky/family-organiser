@@ -644,7 +644,7 @@ export default function School() {
           <Link
             to="/family"
             className="inline-block mt-6 bg-plum hover:bg-plum/90 text-white font-semibold px-7 py-3 rounded-[14px] text-[15px] transition-colors"
-            style={{ boxShadow: '0 2px 8px rgba(108,61,217,0.3)' }}
+            style={{ boxShadow: '0 2px 8px rgba(109,56,173,0.3)' }}
           >
             Add your children
           </Link>

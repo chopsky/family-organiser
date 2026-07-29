@@ -55,7 +55,7 @@ const TASKS = [
 
 // Flat tint fill, no border, no shadow. All content in the tint's fg.
 const TINT = {
-  invite: { bg: '#EFE9FB', fg: '#4A22A8' },
+  invite: { bg: 'var(--color-plum-light)', fg: 'var(--color-plum-dark)' },
   wa: { bg: '#E5F0E2', fg: '#2E6B44' },
   cal: { bg: '#E2ECFA', fg: '#2E5799' },
   rem: { bg: '#FBF1DE', fg: '#8A5F1E' },

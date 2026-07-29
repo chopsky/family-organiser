@@ -557,7 +557,7 @@ function MealPlanView({ setError }) {
                             <td
                               key={i}
                               className="p-2.5 align-top"
-                              style={{ borderLeft: '1px solid var(--color-light-grey)', borderBottom: lastRow ? 'none' : '1px solid var(--color-light-grey)', background: isToday ? 'rgba(108,61,217,0.03)' : 'transparent', minWidth: 90 }}
+                              style={{ borderLeft: '1px solid var(--color-light-grey)', borderBottom: lastRow ? 'none' : '1px solid var(--color-light-grey)', background: isToday ? 'rgba(109,56,173,0.03)' : 'transparent', minWidth: 90 }}
                               onDragOver={(e) => e.preventDefault()}
                               onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain'); if (id) moveMeal(id, ds, category); }}
                             >
