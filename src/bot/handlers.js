@@ -823,8 +823,17 @@ function matchBriefStopStart(text) {
 
   const saysEvening = /\b(evening|tonight|night-?time|nightly|8\s*pm|8pm)\b/.test(t);
   const saysMorning = /\b(morning|7\s*am|7am)\b/.test(t);
-  // Mentioning both, or neither, means all of it.
-  const which = saysEvening === saysMorning ? 'both' : (saysEvening ? 'evening' : 'morning');
+  // Saying "both" out loud is different from naming nothing, and starting
+  // treats them differently: an explicit "both" opts into the 8pm brief,
+  // while an unqualified "start briefs" only brings the morning one back
+  // (see the start branch - nobody gets opted into an evening message they
+  // didn't ask for). Stopping treats the two the same: all of it, at once.
+  const saysBoth = /\b(both|all|everything)\b/.test(t);
+  const named = (saysEvening && saysMorning) || saysBoth;
+  const which = named ? 'both'
+    : saysEvening ? 'evening'
+      : saysMorning ? 'morning'
+        : 'unspecified';
   const stop = (w = which) => ({ action: 'stop', which: w });
   const start = (w = which) => ({ action: 'start', which: w });
 
@@ -838,7 +847,12 @@ function matchBriefStopStart(text) {
   // could mean either brief, or something else entirely. The caller asks
   // which, rather than guessing; see BRIEF_START_QUESTION.
   if (/^(start|restart|resume|unstop|opt in)$/.test(t)) return { action: 'start', which: 'ask' };
-  const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?)\b/;
+  // "both" and "all" earn their place here: BRIEF_START_QUESTION literally
+  // tells people to say "morning, evening, or both", so "switch on both" is a
+  // phrasing WE taught and the matcher has to know it. Live 2026-07-29 it
+  // didn't, fell through to the model, and the model announced success for a
+  // toggle nothing had flipped.
+  const noun = /\b(morning\s+|evening\s+)?(message|messages|messaging|brief|briefs|reminder|reminders|notification|notifications|texts?|updates|ones?|both|all of (it|them)|everything)\b/;
 
   // English lets the particle move: "turn on the brief" and "turn the brief
   // on" are the same sentence. Only the first form was matched, so "please
@@ -2433,10 +2447,14 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       if (which !== 'morning') patch.evening_brief = false;
     } else if (which === 'evening') {
       patch.evening_brief = true;
+    } else if (which === 'both') {
+      // They named it - "switch on both" is asking for the 8pm one out loud.
+      patch.whatsapp_daily_reminder = true;
+      patch.evening_brief = true;
     } else {
-      // Starting never opts anyone INTO a brief they didn't choose: "start
-      // briefs" brings the morning one back, and the opt-in evening brief has
-      // to be asked for by name.
+      // Nothing named. Starting never opts anyone INTO a brief they didn't
+      // choose: "start briefs" brings the morning one back, and the opt-in
+      // evening brief has to be asked for by name.
       patch.whatsapp_daily_reminder = true;
     }
 

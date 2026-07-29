@@ -986,6 +986,24 @@ describe('in-thread brief stop/start', () => {
     );
   });
 
+  // Live 2026-07-29: after "stop", the user sent "switch on both". The matcher
+  // had no idea what "both" meant, so it fell through to the model - which
+  // replied "You're back on for both" while the toggles stayed off. Our own
+  // BRIEF_START_QUESTION tells people to say "both", so this is a phrasing we
+  // taught and then failed to understand.
+  test.each([
+    'switch on both',
+    'turn on both',
+    'turn them both back on',
+  ])('"%s" turns BOTH briefs on', async (msg) => {
+    const reply = await handlers.handleTextMessage(msg, parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenCalledWith(
+      'u9', { whatsapp_daily_reminder: true, evening_brief: true },
+    );
+    expect(reply.response).toMatch(/back on|both/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
   test('a stop is never read as an answer to "which one would you like back?"', async () => {
     // The choice parser matches the word "morning" anywhere in the reply, so
     // with the question armed this switched ON the brief they asked to stop.
