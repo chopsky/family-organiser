@@ -328,6 +328,18 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
           {error && (
             <div style={{ background: '#FDF0EB', border: '1px solid rgba(232,114,74,.3)', borderRadius: 12, padding: '10px 12px', fontSize: 12.5, color: '#8A3D22', marginBottom: 14, lineHeight: 1.45 }}>
               {error}
+              {/* A dead end is where parents give up. Every failure that has
+                  somewhere else to go offers the door rather than leaving them
+                  to work out that the back chevron is the way out. */}
+              {step !== 'fork' && step !== 'methods' && (
+                <button
+                  type="button"
+                  onClick={() => { setError(''); setUrl(''); setStep('methods'); }}
+                  style={{ display: 'block', marginTop: 8, padding: 0, border: 0, background: 'transparent', color: '#8A3D22', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}
+                >
+                  Try another method
+                </button>
+              )}
             </div>
           )}
 
