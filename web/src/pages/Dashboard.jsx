@@ -20,6 +20,8 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { setBadgeCount } from '../lib/badge';
 import WeatherStrip from '../components/WeatherStrip';
 import AfterSchoolCard from '../components/AfterSchoolCard';
+import SetupNudges from '../components/SetupNudges';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 
@@ -379,6 +381,7 @@ function DashboardAiInput() {
 export default function Dashboard() {
   const { user, household } = useAuth();
   const { enabled: childMode } = useChildMode();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const hid = household?.id;
@@ -642,6 +645,12 @@ export default function Dashboard() {
         </h1>
       </div>
 
+      {/* Setup nudges - phone placement: first item in the feed, under the
+          greeting and ABOVE the weather strip. Desktop puts it under the AI
+          composer instead (below), so this is gated rather than CSS-hidden:
+          mounting both would double every lookup the component makes. */}
+      {!childMode && isMobile && <SetupNudges members={members} />}
+
       {/* Weather widget - sits directly below the greeting and above the
           AI composer (per design handoff). Renders nothing when the
           household has no address set or the upstream is down. Tapping
@@ -664,6 +673,11 @@ export default function Dashboard() {
           <DashboardAiInput />
         </WriteGate>
       </div>
+
+      {/* Setup nudges - desktop placement: directly under the AI composer,
+          above the dashboard cards. Phone renders it above the weather strip
+          instead (see above). */}
+      {!childMode && !isMobile && <SetupNudges members={members} />}
 
       {/* "Up Next" card - the soonest upcoming timed event today, with a
           lead-up progress bar. Sits between the AI composer and the day's

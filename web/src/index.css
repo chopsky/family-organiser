@@ -482,3 +482,14 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(45, 42, 51, 0.34);
 }
+
+/* Home-screen setup nudges (components/SetupNudges.jsx).
+   Desktop hides the dismiss × until the tile is hovered; on touch there is no
+   hover, so the component passes hideUntilHover={false} and this class is
+   never applied there. Hover stays quiet by design - no shadow, no lift. */
+.hm-nudge .hm-nudge-x { opacity: 0; transition: opacity .15s ease; }
+.hm-nudge:hover .hm-nudge-x,
+.hm-nudge:focus-within .hm-nudge-x { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .hm-nudge .hm-nudge-x { transition: none; }
+}

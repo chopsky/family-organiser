@@ -18,6 +18,33 @@
  */
 import { Capacitor } from '@capacitor/core';
 
+/**
+ * Read the current permission WITHOUT prompting.
+ *
+ * requestNotificationPermission() below can surface the OS dialog, which is
+ * one-shot — so anything that merely wants to *know* the answer (the home
+ * screen's setup nudges, for one) has to ask this instead. Spending the single
+ * prompt on a render would be unforgivable.
+ *
+ * Returns 'granted' | 'denied' | 'prompt' | 'unavailable'. Web is always
+ * 'unavailable': there is no web push in this app, so no permission exists to
+ * hold. Callers must treat 'unavailable' as "this task cannot be completed
+ * here" rather than as a refusal.
+ */
+export async function getNotificationPermission() {
+  if (!Capacitor.isNativePlatform()) return 'unavailable';
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const perm = await PushNotifications.checkPermissions();
+    if (perm.receive === 'granted') return 'granted';
+    if (perm.receive === 'denied') return 'denied';
+    return 'prompt';
+  } catch (err) {
+    console.warn('Notification permission check failed:', err?.message || err);
+    return 'unavailable';
+  }
+}
+
 export async function requestNotificationPermission() {
   if (!Capacitor.isNativePlatform()) return 'unavailable';
 

@@ -1,0 +1,355 @@
+/**
+ * Home-screen setup nudges — "finish moving in".
+ *
+ * A quiet prompt for the setup steps people skip during onboarding. Two
+ * presentations, one rule:
+ *
+ *   more than one task left  → tinted tile grid (2 columns on phone, one row
+ *                              on desktop)
+ *   exactly one task left    → a single full-width tinted bar
+ *   none left                → a brief "All moved in." if the last one was
+ *                              COMPLETED, nothing at all if it was dismissed;
+ *                              then gone for good
+ *
+ * Two rules that matter more than the layout:
+ *
+ * 1. Completion is DERIVED from real state — a second adult in the household,
+ *    WhatsApp linked, a calendar connected, notification permission granted.
+ *    Never from the tile being tapped. Do that and the tile lies: it would
+ *    tick itself off for someone who opened the invite sheet and closed it
+ *    again, and it would fail to notice the same task being completed in
+ *    Settings. Tiles deep-link to the real flows and reflect their outcome.
+ *
+ * 2. Dismissal is per-task, per-USER, permanent. Stored server-side rather
+ *    than in localStorage — every other nudge in this app dismisses per
+ *    device, so dismissing on your phone leaves it sitting on your laptop.
+ *    A one-person household has nobody to invite, and the × has to stick.
+ *
+ * Reminders is phone-only. There is no web push in this app, so on desktop
+ * that tile could never tick itself off — and the Settings toggle it would
+ * otherwise key off is inert for a web user with no WhatsApp (push needs the
+ * app; the brief needs a channel). A tile that can never complete is exactly
+ * the nagging this design exists to avoid, so desktop gets three tasks.
+ *
+ * Design handoff: design_handoff_nudges/README.md. Values there are exact;
+ * the reference JSX is a prototype and was not ported.
+ */
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import usePrefersReducedMotion from '../hooks/usePrefersReducedMotion';
+import { getNotificationPermission } from '../lib/notificationPermission';
+import api from '../lib/api';
+
+// Fixed order. The grid reflows as tiles leave; it never re-sorts.
+const TASKS = [
+  { id: 'invite', label: 'Invite your family', to: '/family' },
+  { id: 'wa', label: 'Connect WhatsApp', to: '/connect-whatsapp' },
+  { id: 'cal', label: 'Add your calendars', to: '/settings?section=calendars' },
+  { id: 'rem', label: 'Turn on reminders', to: '/settings?section=notifications', phoneOnly: true },
+];
+
+// Flat tint fill, no border, no shadow. All content in the tint's fg.
+const TINT = {
+  invite: { bg: '#EFE9FB', fg: '#4A22A8' },
+  wa: { bg: '#E5F0E2', fg: '#2E6B44' },
+  cal: { bg: '#E2ECFA', fg: '#2E5799' },
+  rem: { bg: '#FBF1DE', fg: '#8A5F1E' },
+};
+
+const CELEBRATION_HOLD_MS = 1600;
+const CELEBRATION_FADE_MS = 450;
+
+function Glyph({ id, fg, size }) {
+  const common = {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: fg, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round',
+  };
+  if (id === 'wa') {
+    return <svg {...common}><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z" /></svg>;
+  }
+  if (id === 'cal') {
+    return (
+      <svg {...common}>
+        <rect x="3" y="5" width="18" height="16" rx="3" />
+        <path d="M8 3v4M16 3v4M3 10h18" />
+      </svg>
+    );
+  }
+  if (id === 'rem') {
+    return (
+      <svg {...common}>
+        <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7" />
+        <path d="M13.7 20a2 2 0 0 1-3.4 0" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20" />
+      <circle cx="9" cy="7" r="3.5" />
+      <path d="M22 20v-1.5a4 4 0 0 0-3-3.87M16 3.6a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function Tick({ fg, size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={fg}
+      strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12l5 5L20 6" />
+    </svg>
+  );
+}
+
+function DismissX({ fg, onClick, label, hideUntilHover }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={hideUntilHover ? 'hm-nudge-x' : undefined}
+      style={{
+        position: 'absolute', top: 9, right: 9, width: 26, height: 26,
+        borderRadius: '50%', border: 0, background: 'transparent',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 0,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fg} strokeWidth="2" strokeLinecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * Which of the four are already done, from real app state.
+ *
+ * `members` comes from the dashboard digest, so invite/wa/dismissals cost no
+ * extra request. Calendars need one call. Notification permission is read
+ * WITHOUT prompting — the OS dialog is one-shot and must never be spent on a
+ * render.
+ */
+function useDerivedCompletion(members) {
+  const { user } = useAuth();
+  const [calConnected, setCalConnected] = useState(null);
+  const [notifGranted, setNotifGranted] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/calendar/external-feeds')
+      .then((res) => {
+        if (cancelled) return;
+        const feeds = (res.data?.feeds || []).filter((f) => f.sync_enabled !== false);
+        setCalConnected(feeds.length > 0);
+      })
+      // On a transient error, assume connected: under-prompting beats nagging
+      // someone who has already done it.
+      .catch(() => { if (!cancelled) setCalConnected(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getNotificationPermission().then((p) => {
+      if (!cancelled) setNotifGranted(p === 'granted');
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const me = members.find((m) => m.id === user?.id) || null;
+
+  // A second ADULT, not a second row. getHouseholdMembers returns dependents
+  // too, so a solo parent who added one child during onboarding would
+  // otherwise see "Invite your family" tick itself off without inviting
+  // anyone.
+  const adults = members.filter((m) => (m.member_type || 'account') === 'account');
+
+  return {
+    invite: adults.length >= 2,
+    wa: !!me?.whatsapp_linked,
+    cal: calConnected,
+    rem: notifGranted,
+    // Null anywhere means "not known yet" - hold the whole component back
+    // rather than flash a tile that is about to vanish.
+    ready: calConnected !== null && notifGranted !== null && members.length > 0,
+    dismissed: Array.isArray(me?.setup_nudges_dismissed) ? me.setup_nudges_dismissed : [],
+  };
+}
+
+export default function SetupNudges({ members = [] }) {
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const reducedMotion = usePrefersReducedMotion();
+  const derived = useDerivedCompletion(members);
+
+  // Locally-dismissed ids, merged over the server list so the tile leaves on
+  // tap rather than after the digest refreshes.
+  const [justDismissed, setJustDismissed] = useState([]);
+  const [fading, setFading] = useState(false);
+  const [gone, setGone] = useState(false);
+  const celebratedRef = useRef(false);
+
+  const tasks = useMemo(
+    () => TASKS.filter((t) => !t.phoneOnly || isMobile),
+    [isMobile],
+  );
+
+  const dismissed = useMemo(
+    () => new Set([...derived.dismissed, ...justDismissed]),
+    [derived.dismissed, justDismissed],
+  );
+
+  const remaining = tasks.filter((t) => !derived[t.id] && !dismissed.has(t.id));
+  // Celebrate only when the last one was COMPLETED. If it was dismissed the
+  // component just disappears - congratulating someone for opting out would
+  // be the wrong note entirely.
+  const allComplete = tasks.length > 0 && tasks.every((t) => derived[t.id]);
+
+  useEffect(() => {
+    if (!allComplete || celebratedRef.current) return;
+    celebratedRef.current = true;
+    // Reduce Motion collapses both delays to zero rather than branching: the
+    // celebration is skipped entirely instead of held-then-faded, and the
+    // state changes still happen in a callback rather than during the effect.
+    const hold = reducedMotion ? 0 : CELEBRATION_HOLD_MS;
+    const fade = reducedMotion ? 0 : CELEBRATION_FADE_MS;
+    const t1 = setTimeout(() => setFading(true), hold);
+    const t2 = setTimeout(() => setGone(true), hold + fade);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [allComplete, reducedMotion]);
+
+  function dismiss(id) {
+    setJustDismissed((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    api.post('/household/setup-nudges/dismiss', { task: id })
+      // Local state already hid it; a failed write means it returns next load,
+      // which is better than pretending and better than an error the user
+      // can do nothing about.
+      .catch(() => { /* no-op */ });
+  }
+
+  if (gone || !derived.ready) return null;
+  if (!remaining.length && !allComplete) return null;
+
+  const transition = reducedMotion ? 'none' : `opacity ${CELEBRATION_FADE_MS}ms ease`;
+
+  // ── Celebration / single bar ──────────────────────────────────────────
+  if (allComplete || remaining.length === 1) {
+    const task = remaining[0];
+    const tint = allComplete ? TINT.wa : TINT[task.id];
+    return (
+      <div style={{ opacity: fading ? 0 : 1, transition }}>
+        <div
+          className={allComplete ? undefined : 'hm-nudge'}
+          onClick={allComplete ? undefined : () => navigate(task.to)}
+          role={allComplete ? undefined : 'button'}
+          tabIndex={allComplete ? undefined : 0}
+          onKeyDown={allComplete ? undefined : (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(task.to); }
+          }}
+          style={{
+            position: 'relative',
+            borderRadius: isMobile ? 22 : 18,
+            background: tint.bg,
+            padding: isMobile ? '15px 16px' : '15px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? 13 : 14,
+            cursor: allComplete ? 'default' : 'pointer',
+          }}
+        >
+          {allComplete ? (
+            <>
+              <Tick fg={tint.fg} />
+              <div style={{ fontSize: isMobile ? 14.5 : 15, fontWeight: 600, color: tint.fg }}>All moved in.</div>
+            </>
+          ) : (
+            <>
+              <Glyph id={task.id} fg={tint.fg} size={isMobile ? 23 : 24} />
+              {isMobile ? (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: tint.fg, letterSpacing: -0.1 }}>{task.label}</div>
+                  <div style={{ fontSize: 11.5, fontWeight: 500, color: tint.fg, opacity: 0.65, marginTop: 1 }}>1 step left</div>
+                </div>
+              ) : (
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: tint.fg, letterSpacing: -0.1 }}>{task.label}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 500, color: tint.fg, opacity: 0.65 }}>1 step left</span>
+                </div>
+              )}
+              <DismissX
+                fg={tint.fg}
+                label={`Dismiss ${task.label}`}
+                hideUntilHover={!isMobile}
+                onClick={(e) => { e.stopPropagation(); dismiss(task.id); }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Grid ──────────────────────────────────────────────────────────────
+  // Phone: 2 columns. Desktop: one row, one column per task in the platform's
+  // set — three here, since reminders is phone-only. Columns are fixed at that
+  // count so tiles keep their width as others leave rather than stretching.
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${tasks.length}, 1fr)`,
+        gap: isMobile ? 10 : 14,
+      }}
+    >
+      {remaining.map((task) => {
+        const tint = TINT[task.id];
+        return (
+          <div
+            key={task.id}
+            className="hm-nudge"
+            onClick={() => navigate(task.to)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(task.to); }
+            }}
+            style={{
+              position: 'relative',
+              minHeight: isMobile ? 104 : 106,
+              borderRadius: isMobile ? 22 : 20,
+              padding: isMobile ? '14px 15px 13px' : '16px 18px 14px',
+              background: tint.bg,
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <DismissX
+              fg={tint.fg}
+              label={`Dismiss ${task.label}`}
+              hideUntilHover={!isMobile}
+              onClick={(e) => { e.stopPropagation(); dismiss(task.id); }}
+            />
+            <div style={{ height: isMobile ? 27 : 26, display: 'flex', alignItems: 'center' }}>
+              <Glyph id={task.id} fg={tint.fg} size={isMobile ? 23 : 24} />
+            </div>
+            <div style={{
+              fontSize: isMobile ? 14.5 : 15,
+              fontWeight: 600,
+              color: tint.fg,
+              lineHeight: 1.3,
+              letterSpacing: -0.1,
+              paddingRight: 6,
+            }}>
+              {task.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

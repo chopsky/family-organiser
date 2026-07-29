@@ -181,6 +181,34 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
  * classifier). Surfaced so families can REVIEW what the bot has learned and
  * delete wrong inferences. member_name is resolved server-side.
  */
+/**
+ * POST /api/household/setup-nudges/dismiss  { task: 'invite'|'wa'|'cal'|'rem' }
+ *
+ * Permanently hides one home-screen setup tile for THIS user. Deliberately not
+ * per-household: a one-person household dismissing "Invite your family" says
+ * nothing about anyone else, and a second adult joining later shouldn't inherit
+ * the first one's dismissals.
+ *
+ * There is no undo endpoint by design - the × has to mean what it says. The
+ * task id is validated against a server-side allowlist in db.dismissSetupNudge.
+ */
+router.post('/setup-nudges/dismiss', requireAuth, requireHousehold, async (req, res) => {
+  const task = String(req.body?.task || '');
+  if (!db.SETUP_NUDGE_IDS.includes(task)) {
+    return res.status(400).json({ error: 'Unknown setup task' });
+  }
+  try {
+    const dismissed = await db.dismissSetupNudge(req.user.id, task);
+    // The dashboard reads dismissals off the cached digest, so drop it -
+    // otherwise a dismissed tile reappears for up to a minute on next load.
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ dismissed });
+  } catch (err) {
+    console.error('POST /api/household/setup-nudges/dismiss error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/preferences', requireAuth, requireHousehold, async (req, res) => {
   try {
     const [prefs, members] = await Promise.all([

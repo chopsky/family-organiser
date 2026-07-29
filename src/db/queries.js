@@ -8587,6 +8587,40 @@ async function upsertNotificationPreferences(userId, prefs) {
   return data;
 }
 
+// ─── Home-screen setup nudges ────────────────────────────────────────────
+
+/** The four home-screen setup tasks. Server-side allowlist so a client can't
+ *  write arbitrary strings into the array. */
+const SETUP_NUDGE_IDS = ['invite', 'wa', 'cal', 'rem'];
+
+/**
+ * Record a permanent, per-user dismissal of one setup task.
+ *
+ * Append-only and idempotent: dismissing twice is a no-op, and a dismissal is
+ * never cleared. Completion is derived from real state elsewhere, so this
+ * column only ever answers "did they tell us to stop showing this one".
+ */
+async function dismissSetupNudge(userId, taskId, db = supabase) {
+  if (!userId || !SETUP_NUDGE_IDS.includes(taskId)) return null;
+  const { data: row, error: readErr } = await db
+    .from('users')
+    .select('setup_nudges_dismissed')
+    .eq('id', userId)
+    .single();
+  if (readErr) throw readErr;
+
+  const current = Array.isArray(row?.setup_nudges_dismissed) ? row.setup_nudges_dismissed : [];
+  if (current.includes(taskId)) return current;
+
+  const next = [...current, taskId];
+  const { error } = await db
+    .from('users')
+    .update({ setup_nudges_dismissed: next })
+    .eq('id', userId);
+  if (error) throw error;
+  return next;
+}
+
 // ─── Evening-brief offer ─────────────────────────────────────────────────
 //
 // State for the one-time "want a look at tomorrow the night before?" question
@@ -10105,6 +10139,8 @@ module.exports = {
   hasEveningBriefOfferBeenSent,
   stampEveningBriefOfferSent,
   takeEveningBriefOffer,
+  dismissSetupNudge,
+  SETUP_NUDGE_IDS,
   // Announcements (admin email broadcaster)
   resolveAnnouncementAudience,
   createAnnouncement,
