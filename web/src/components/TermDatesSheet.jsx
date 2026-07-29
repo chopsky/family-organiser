@@ -154,6 +154,31 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
     [terms],
   );
 
+  /**
+   * Past vs still-to-come, and which five rows are worth showing.
+   *
+   * A school year's dates are mostly history by the summer, so the first five
+   * rows chronologically are usually the least useful five - "Autumn term
+   * begins, Sept 2025" tells a parent checking in July nothing. Show what is
+   * actually still ahead of them, and fall back to the most recent when there
+   * is nothing ahead at all. A half term counts as upcoming until its last
+   * day, not its first.
+   */
+  const split = useMemo(() => {
+    const rows = preview?.dates || [];
+    // Local, not toISOString(): term dates are plain calendar days, and in BST
+    // a UTC "today" is yesterday for the first hour after midnight.
+    const n = new Date();
+    const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+    const sorted = [...rows].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const upcoming = sorted.filter((d) => (d.end_date || d.date || '') >= today);
+    return {
+      upcoming,
+      past: sorted.length - upcoming.length,
+      shown: upcoming.length ? upcoming.slice(0, 5) : sorted.slice(-5),
+    };
+  }, [preview]);
+
   if (!open || !school) return null;
 
   function abandon() {
@@ -536,30 +561,53 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
               <Heading>Do these look right?</Heading>
               <Sub>
                 {preview.source_label ? `${preview.source_label} · ` : ''}
-                {preview.dates.length} dates, {yearSpan(preview.dates)}. Nothing is saved until you say so.
+                {preview.dates.length} dates, {yearSpan(preview.dates)}
+                {split.past > 0 && `, ${split.past} already passed`}
+                . Nothing is saved until you say so.
               </Sub>
               <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', marginBottom: 10 }}>
-                {preview.dates.slice(0, 5).map((d, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderBottom: i < Math.min(5, preview.dates.length) - 1 ? `1px solid ${LINE}` : 0 }}>
+                {split.shown.map((d, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderBottom: i < split.shown.length - 1 ? `1px solid ${LINE}` : 0 }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, color: INK }}>{d.label || d.event_type}</span>
                     <span style={{ fontSize: 12.5, color: INK3, flexShrink: 0 }}>{fmtRange(d.date, d.end_date)}</span>
                   </div>
                 ))}
               </div>
-              {preview.dates.length > 5 && (
+              {preview.dates.length > split.shown.length && (
                 <p style={{ margin: '0 0 12px', fontSize: 12, color: INK3, textAlign: 'center' }}>
-                  and {preview.dates.length - 5} more
+                  and {preview.dates.length - split.shown.length} more
                 </p>
               )}
-              {/* Only for sources that genuinely re-check. Website and PDF are
-                  snapshots and must never claim to stay current. */}
-              {preview.syncs && (
-                <div style={{ background: GREEN_SOFT, borderRadius: 14, padding: '11px 13px', fontSize: 12.5, color: GREEN, lineHeight: 1.45 }}>
-                  <strong style={{ fontWeight: 600 }}>Stays in sync.</strong>{' '}
-                  {preview.source === 'council'
-                    ? `If ${preview.source_label || 'the council'} moves a date, your calendar updates too.`
-                    : 'If the source changes a date, your calendar updates too.'}
+
+              {/* The failure this catches is silent: a school that has not put
+                  next year up yet returns last year's dates, the import
+                  succeeds, and the parent believes they are covered until
+                  September arrives and the calendar is empty. Say it plainly
+                  and point at the way out. */}
+              {split.upcoming.length === 0 ? (
+                <div style={{ background: AMBER_SOFT, borderRadius: 14, padding: '11px 13px', fontSize: 12.5, color: AMBER_DEEP, lineHeight: 1.45 }}>
+                  <strong style={{ fontWeight: 700 }}>These have all already happened.</strong>{' '}
+                  Nothing here is still to come, so {school?.school_name || 'the school'} may not have published the
+                  coming year yet. Saving keeps them as a record, but your calendar gains nothing upcoming.
+                  <button
+                    type="button"
+                    onClick={() => { setPreview(null); setUrl(''); setStep('methods'); }}
+                    style={{ display: 'block', marginTop: 8, padding: 0, border: 0, background: 'transparent', color: AMBER_DEEP, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' }}
+                  >
+                    Try another method
+                  </button>
                 </div>
+              ) : (
+                /* Only for sources that genuinely re-check. Website and PDF are
+                   snapshots and must never claim to stay current. */
+                preview.syncs && (
+                  <div style={{ background: GREEN_SOFT, borderRadius: 14, padding: '11px 13px', fontSize: 12.5, color: GREEN, lineHeight: 1.45 }}>
+                    <strong style={{ fontWeight: 600 }}>Stays in sync.</strong>{' '}
+                    {preview.source === 'council'
+                      ? `If ${preview.source_label || 'the council'} moves a date, your calendar updates too.`
+                      : 'If the source changes a date, your calendar updates too.'}
+                  </div>
+                )
               )}
             </>
           )}
