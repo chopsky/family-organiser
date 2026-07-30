@@ -18,14 +18,16 @@
 	<string>Housemait uses your location to show local weather on your home screen and to answer questions that depend on where you are. You can also set a home address instead under Family Setup.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Housemait uses your location to show local weather on your home screen and to answer questions that depend on where you are. You can also set a home address instead under Family Setup.</string>
-	<!-- NSCalendarsUsageDescription / NSCalendarsFullAccessUsageDescription were
-	     removed for 1.10.0. On-device calendar reading is off in this build
-	     (DEVICE_CALENDAR_ENABLED in web/src/lib/deviceCalendar.js), so the app
-	     declared a reason for a permission it never requests - which invites a
-	     question at App Store review. The native EventKit bridge is untouched:
-	     re-add both keys, with the previous "Housemait reads the calendars you
-	     choose… never changes, adds or deletes anything" copy, if that flag is
-	     ever flipped back on. -->
+	<!-- These two keys MUST stay while EventKitReaderPlugin.swift is compiled
+	     into the app. Removing them for 1.10.0 (feature is off via
+	     DEVICE_CALENDAR_ENABLED) bounced build 27 with ITMS-90683: Apple's
+	     upload scanner flags the EventKit API reference in the BINARY, and a
+	     purpose string is required even for APIs the app never calls. Either
+	     the Swift bridge goes or the keys stay - not neither. -->
+	<key>NSCalendarsUsageDescription</key>
+	<string>Housemait reads the calendars you choose so your existing events appear in your family calendar. Housemait never changes, adds or deletes anything in your calendars.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Housemait reads the calendars you choose so your existing events appear in your family calendar. Housemait never changes, adds or deletes anything in your calendars.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
