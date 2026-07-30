@@ -395,16 +395,37 @@ router.get('/analytics', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
     const cohortWeeks = Math.min(parseInt(req.query.cohortWeeks, 10) || 12, 26);
-    const [analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop] = await Promise.all([
+    const [analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAdsUsers] = await Promise.all([
       db.getAnalytics({ days }),
       db.getRetentionCohorts({ weeks: cohortWeeks }),
       db.getChannelCohortStats(),
       db.getCalendarConnectionStats(),
       db.getAcquisitionFunnel({ days: Math.min(days, 30) }),
       db.getInviteLoopFunnel({ days: Math.min(days, 30) }),
+      // Missing column (migration pending) must not take the whole page down.
+      db.getAppleAdsAttributedUsers().catch(() => []),
     ]);
+
+    // Apple Ads: users whose install Apple attributed to a campaign, rolled
+    // up per campaign with the two activation signals that matter. The
+    // result set is tiny (ad-attributed users only), so JS aggregation is fine.
+    const byCampaign = new Map();
+    for (const u of appleAdsUsers) {
+      const id = String(u.ad_attribution?.campaignId ?? 'unknown');
+      const row = byCampaign.get(id) || { campaignId: id, users: 0, whatsappLinked: 0, onboarded: 0, redownloads: 0 };
+      row.users += 1;
+      if (u.whatsapp_linked) row.whatsappLinked += 1;
+      if (u.onboarded_at) row.onboarded += 1;
+      if (u.ad_attribution?.conversionType === 'Redownload') row.redownloads += 1;
+      byCampaign.set(id, row);
+    }
+    const appleAds = {
+      totalAttributed: appleAdsUsers.length,
+      campaigns: [...byCampaign.values()].sort((a, b) => b.users - a.users),
+    };
+
     return res.json({
-      ...analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop,
+      ...analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAds,
     });
   } catch (err) {
     console.error('GET /api/admin/analytics error:', err);

@@ -7,6 +7,7 @@ import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconList, IconGift, IconStar, IconMail, IconSchool } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
+import { useAdAttribution } from '../lib/adAttribution';
 import KidNoteAlert from './KidNoteAlert';
 import TrialEndedOverlay from './TrialEndedOverlay';
 import OfflineBanner from './OfflineBanner';
@@ -169,6 +170,8 @@ export default function Layout({ children }) {
 
   // Register for push notifications on iOS
   usePushNotifications(user);
+  // One-time Apple Ads install attribution (iOS app only; no-ops elsewhere)
+  useAdAttribution(user);
 
   // Close "More" sheet on navigation
   useEffect(() => { setMoreOpen(false); }, [location.pathname]);

@@ -8621,6 +8621,42 @@ async function dismissSetupNudge(userId, taskId, db = supabase) {
   return next;
 }
 
+// ─── Apple Ads attribution ───────────────────────────────────────────────
+
+/** { ad_attribution, ad_attribution_at } for one user. Throws on a missing
+ *  column so the route can answer "not stored" while the migration is
+ *  pending, instead of pretending success. */
+async function getUserAdAttribution(userId, db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .select('ad_attribution, ad_attribution_at')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Record Apple's answer verbatim (attributed payload or {attribution:false}
+ *  for organic). Stamped once; the route treats an existing stamp as final. */
+async function setUserAdAttribution(userId, payload, db = supabase) {
+  const { error } = await db
+    .from('users')
+    .update({ ad_attribution: payload, ad_attribution_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
+/** Every user Apple attributed to an ad, with the two activation signals the
+ *  admin cohort card shows. Small result set (only ad-attributed users). */
+async function getAppleAdsAttributedUsers(db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .select('id, created_at, whatsapp_linked, onboarded_at, ad_attribution')
+    .not('ad_attribution', 'is', null);
+  if (error) throw error;
+  return (data || []).filter((u) => u.ad_attribution?.attribution === true);
+}
+
 // ─── Evening-brief offer ─────────────────────────────────────────────────
 //
 // State for the one-time "want a look at tomorrow the night before?" question
@@ -10141,6 +10177,9 @@ module.exports = {
   takeEveningBriefOffer,
   dismissSetupNudge,
   SETUP_NUDGE_IDS,
+  getUserAdAttribution,
+  setUserAdAttribution,
+  getAppleAdsAttributedUsers,
   // Announcements (admin email broadcaster)
   resolveAnnouncementAudience,
   createAnnouncement,

@@ -33,7 +33,7 @@ export default function AdminAnalytics() {
 
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
-    retention = null, channelCohorts = null, calendarConnection = null,
+    retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
     acquisition = null, inviteLoop = null,
   } = data || {};
 
@@ -225,6 +225,21 @@ export default function AdminAnalytics() {
         <ChannelCohorts channelCohorts={channelCohorts} />
       </div>
 
+      {/* Apple Ads - installs Apple attributed to a campaign, and whether
+          they became real households. This is the "cost per activated
+          household" half of the ads picture; spend lives in the Apple Ads
+          console. Empty until app builds with the AdAttribution plugin ship. */}
+      <div className="mt-8">
+        <h2 className="font-display text-lg font-medium text-charcoal mb-3">Apple Ads installs</h2>
+        <p className="text-xs text-warm-grey mb-3">
+          Users whose install Apple attributed to an ad tap, by campaign. <strong>WhatsApp linked</strong> and
+          <strong> onboarded</strong> are the activation signals - divide campaign spend by these, not by
+          installs. Organic installs are recorded but not shown. Collection starts with app builds that
+          carry the attribution plugin.
+        </p>
+        <AppleAdsCard appleAds={appleAds} />
+      </div>
+
       {/* DAU Timeline */}
       <div className="mt-8">
         <h2 className="font-display text-lg font-medium text-charcoal mb-3">Daily Active Users</h2>
@@ -299,6 +314,52 @@ function CalendarConnection({ stats }) {
           <p className="text-xs text-warm-grey font-medium mt-0.5">via calendar link</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Campaign ids from the Apple Ads console - names live only there, so the
+// map is maintained by hand. Unknown ids (new campaigns) fall back to the id.
+const APPLE_ADS_CAMPAIGNS = {
+  2144260688: 'UK - Brand',
+  2144260257: 'UK - Category',
+  2144258775: 'UK - Competitor',
+  2144259176: 'UK - Discovery',
+};
+
+function AppleAdsCard({ appleAds }) {
+  if (!appleAds || appleAds.totalAttributed === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
+        <p className="text-sm text-warm-grey">No attributed installs yet.</p>
+      </div>
+    );
+  }
+  const th = 'px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider';
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-light-grey text-left">
+            <th className={th}>Campaign</th>
+            <th className={`${th} text-right`}>Attributed users</th>
+            <th className={`${th} text-right`}>WhatsApp linked</th>
+            <th className={`${th} text-right`}>Onboarded</th>
+            <th className={`${th} text-right`}>Redownloads</th>
+          </tr>
+        </thead>
+        <tbody>
+          {appleAds.campaigns.map((c) => (
+            <tr key={c.campaignId} className="border-b border-light-grey last:border-0">
+              <td className="px-4 py-3 font-medium text-charcoal">{APPLE_ADS_CAMPAIGNS[c.campaignId] || c.campaignId}</td>
+              <td className="px-4 py-3 text-right font-semibold text-charcoal">{c.users}</td>
+              <td className="px-4 py-3 text-right text-charcoal">{c.whatsappLinked}</td>
+              <td className="px-4 py-3 text-right text-charcoal">{c.onboarded}</td>
+              <td className="px-4 py-3 text-right text-warm-grey">{c.redownloads}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
