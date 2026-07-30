@@ -299,6 +299,8 @@ export default function FamilySetup() {
   // Family Setup is all collaborative management, so gate on canManage (any
   // adult member), not the legacy single-admin flag.
   const { household, user, canManage: isAdmin, login, token } = useAuth();
+  // "Mum" for most of the world, "Mom" for US/CA/ZA households.
+  const FAMILY_ROLES = familyRolesFor(household?.country);
   const canWrite = useCanWrite();
   const navigate = useNavigate();
   // Schools themselves (and term dates + activities) live on the School
