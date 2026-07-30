@@ -35,6 +35,16 @@ import { replayQueued } from './replay';
 // pasted calendar address, which lives in memory only.
 const CLIENT = isNative() ? 'app' : undefined;
 
+// Single-flight guard for finishHousehold, at MODULE scope on purpose. Two
+// paths can both try to finish the same signup - completeSignup right after
+// verification, and the resume effect when the route remounts (auth.login
+// flips routing state mid-signup, and any ref inside the hook dies with the
+// unmount). In 1.10.1 they overlapped and created two households. A module
+// binding survives the remount, so whoever arrives second awaits the same
+// run instead of starting another. Reset only on failure, so a retry is
+// possible but a completed signup can never run twice per page load.
+let finishRun = null;
+
 export default function useV4Auth(d) {
   const auth = useAuth();
   // Campaign promo + acquisition tag, exactly as the existing flow reads them.
@@ -55,6 +65,19 @@ export default function useV4Auth(d) {
    * with, only an existing session.
    */
   const finishHousehold = useCallback(async (existingHousehold) => {
+    if (!finishRun) {
+      finishRun = runFinish(existingHousehold).catch((err) => {
+        finishRun = null;
+        throw err;
+      });
+    }
+    const replay = await finishRun;
+    setOutcome(replay);
+    return true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth, d]);
+
+  const runFinish = async (existingHousehold) => {
     clearSignupPromo();
     clearSignupSource();
 
@@ -92,9 +115,8 @@ export default function useV4Auth(d) {
       console.warn('[v4] mark-onboarded failed:', err?.response?.data?.error || err.message);
     }
 
-    setOutcome(replay);
-    return true;
-  }, [auth, d]);
+    return replay;
+  };
 
   /**
    * Runs once a provider hands back a session. Returns true when the flow
