@@ -35,8 +35,15 @@ export const SHAPES = [
   { id: 'mates', emoji: '🤝', label: 'Housemates', note: 'Bills, bins and rotas' },
 ];
 
-/** Screen 06 role chips. */
-export const ROLES = ['Mum', 'Dad', 'Parent', 'Guardian', 'Grandparent', 'Carer', 'Partner', 'Housemate'];
+/**
+ * Screen 06 role chips - the app's canonical family roles, NOT the handoff's
+ * list. The handoff shipped Mum/Dad/Grandparent/Carer/Housemate, none of
+ * which exist in lib/familyRoles: whatever is picked here becomes the
+ * member's family_role, and a value outside that list haunts the Family
+ * page's dropdowns forever as a legacy extra option. One import, one truth -
+ * if the founder trims the list again, this screen follows.
+ */
+export { FAMILY_ROLES as ROLES } from '../../lib/familyRoles';
 
 /**
  * Screen 01 sticky-note pile. The fade down the stack is deliberate - the
