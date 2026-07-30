@@ -676,7 +676,8 @@ describe('POST /api/auth/create-household', () => {
   test('creates household and makes user admin', async () => {
     const noHouseholdToken = signToken({ userId: 'u-3', householdId: null, name: 'New User', role: 'member' });
     db.createHousehold.mockResolvedValue({ id: 'hh-new', name: 'New Fam' });
-    db.updateUser.mockResolvedValue({ id: 'u-3', name: 'New User', role: 'admin', household_id: 'hh-new' });
+    // The assignment is the atomic claim now (the 1.10.1 duplicate-household fix).
+    db.claimHouseholdForUser.mockResolvedValue({ id: 'u-3', name: 'New User', role: 'admin', household_id: 'hh-new' });
     db.getHouseholdById.mockResolvedValue({ id: 'hh-new', name: 'New Fam', join_code: 'XYZ789', reminder_time: '08:00:00' });
     db.seedStarterRecipes.mockResolvedValue({ seeded: 0, skipped: true });
 

@@ -8621,6 +8621,44 @@ async function dismissSetupNudge(userId, taskId, db = supabase) {
   return next;
 }
 
+// ─── Household creation race guard ───────────────────────────────────────
+
+/**
+ * Atomically assign a fresh household to a user who has NONE. The
+ * `.is('household_id', null)` predicate is the whole point: two concurrent
+ * create-household calls can both pass the route's early guard, but only one
+ * of them can win this update. Returns the updated user row, or null when
+ * another call got there first.
+ */
+async function claimHouseholdForUser(userId, householdId, colorTheme, db = supabase) {
+  const { data, error } = await db
+    .from('users')
+    .update({ household_id: householdId, role: 'admin', color_theme: colorTheme })
+    .eq('id', userId)
+    .is('household_id', null)
+    .select();
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+/**
+ * Remove a household only if nobody lives in it - the loser of the creation
+ * race deletes the row it just made. The occupancy check keeps this safe to
+ * call even if something unexpected attached a user in between.
+ */
+async function deleteEmptyHousehold(householdId, db = supabase) {
+  const { data: occupants, error: readErr } = await db
+    .from('users')
+    .select('id')
+    .eq('household_id', householdId)
+    .limit(1);
+  if (readErr) throw readErr;
+  if (occupants?.length) return false;
+  const { error } = await db.from('households').delete().eq('id', householdId);
+  if (error) throw error;
+  return true;
+}
+
 // ─── Apple Ads attribution ───────────────────────────────────────────────
 
 /** { ad_attribution, ad_attribution_at } for one user. Throws on a missing
@@ -10177,6 +10215,8 @@ module.exports = {
   takeEveningBriefOffer,
   dismissSetupNudge,
   SETUP_NUDGE_IDS,
+  claimHouseholdForUser,
+  deleteEmptyHousehold,
   getUserAdAttribution,
   setUserAdAttribution,
   getAppleAdsAttributedUsers,

@@ -491,7 +491,22 @@ router.post('/create-household', requireAuth, async (req, res) => {
     // returns the first colour in the canonical list (red). Subsequent
     // members will fall through to the next unused colour.
     const color_theme = await db.pickColorForNewMember(household.id);
-    const user = await db.updateUser(req.user.id, { household_id: household.id, role: 'admin', color_theme });
+
+    // Atomic claim: the early req.householdId guard above cannot stop two
+    // CONCURRENT calls (v4's completeSignup and its resume effect both fired
+    // for the same signup in 1.10.1, and neither had a household yet when
+    // checked). Only one call can win this conditional update; the loser
+    // deletes the household it just created and answers with the winner's
+    // session, so the duplicate call still succeeds from the app's side -
+    // no orphaned 0-member household, no second operator alert.
+    const user = await db.claimHouseholdForUser(req.user.id, household.id, color_theme);
+    if (!user) {
+      db.deleteEmptyHousehold(household.id)
+        .catch((err) => console.error('[create-household] orphan cleanup failed for', household.id, err.message));
+      const current = await db.getUserById(req.user.id);
+      const response = await authResponse(current, req);
+      return res.status(200).json(response);
+    }
 
     // Seed public holidays in the background (don't block response)
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
