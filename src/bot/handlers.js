@@ -2507,6 +2507,13 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (which === 'evening') {
       return { response: `Lovely - I'll send you a look at tomorrow each evening, starting tonight. 🌙`, actions: noActions };
     }
+    if (which === 'both') {
+      // Confirm BOTH by name. The generic reply below confirms the morning
+      // brief and then offers the evening one - which this branch just
+      // switched on. Offering someone the thing they asked for reads as
+      // though half the request was ignored.
+      return { response: `Lovely - you're on for both. Morning brief each day, and a look at tomorrow each evening at 8pm. ☀️🌙`, actions: noActions };
+    }
     // Name the evening brief when they haven't got it. Someone restarting
     // after a "stop" has just lost both, and the 8pm one is opt-in - without
     // this they have no way of knowing it exists, let alone how to ask.

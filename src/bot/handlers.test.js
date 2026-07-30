@@ -1001,6 +1001,11 @@ describe('in-thread brief stop/start', () => {
       'u9', { whatsapp_daily_reminder: true, evening_brief: true },
     );
     expect(reply.response).toMatch(/back on|both/i);
+    // The confirmation must name the EVENING brief it just enabled - the
+    // generic reply used to confirm the morning one and then OFFER the
+    // evening one, which read as though half the request was ignored.
+    expect(reply.response).toMatch(/evening|8pm/i);
+    expect(reply.response).not.toMatch(/say \*start evening briefs\*/i);
     expect(ai.classify).not.toHaveBeenCalled();
   });
 
