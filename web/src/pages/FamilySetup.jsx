@@ -18,7 +18,7 @@ import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
-import { FAMILY_ROLES } from '../lib/familyRoles';
+import { familyRolesFor } from '../lib/familyRoles';
 import { FAMILY_AVATARS } from '../lib/avatarSet';
 
 // Soft warm sand for inset chips / day pills (shared literal across the
