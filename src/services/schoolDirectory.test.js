@@ -158,6 +158,17 @@ describe('seedOrCrossCheck', () => {
   const dates = [D('2025-2026', 'term_start', '2025-09-01')];
   const args = { householdSchool: SCHOOL_ROW, dates, sourceUrl: 'https://school.example/term-dates', sourceText: 'text', sourceType: 'website', householdId: 'h1' };
 
+  test('a non-GB school never enters the directory - not even via a GIAS name collision', async () => {
+    // The directory is GIAS-anchored and feeds the PUBLIC UK term-dates
+    // site. Before the explicit gate, an SA school whose name uniquely
+    // matched some UK school would have been mis-linked and published.
+    const res = await svc.seedOrCrossCheck({ ...args, country: 'ZA' });
+    expect(res.action).toBe('skipped');
+    expect(res.reason).toMatch(/non-GB/);
+    expect(dirDb.createDirectorySchool).not.toHaveBeenCalled();
+    expect(dirDb.matchGiasByExactNameUnique).not.toHaveBeenCalled();
+  });
+
   test('miss → creates record (verified_count 1) + dates + link', async () => {
     const res = await svc.seedOrCrossCheck(args);
     expect(res.action).toBe('seeded');

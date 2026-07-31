@@ -168,6 +168,17 @@ function cleanEntries(dates) {
  */
 async function seedOrCrossCheck({ householdSchool, dates, sourceUrl, sourceText, sourceType, householdId, country = 'GB' }) {
   try {
+    // UK only, EXPLICITLY. The directory is anchored on GIAS and surfaces on
+    // the public UK term-dates site (termDatesSsr reads it), so a non-GB
+    // school has no business in it. Until 2026-07-31 this was only true by
+    // accident - SA schools carry no URN or postcode so identity resolution
+    // failed - with one hole: an SA school whose name happened to uniquely
+    // match a GIAS school would have been MIS-LINKED to that UK school's
+    // URN, seeded with the wrong identity, and published. Refusing by
+    // country closes that before any GIAS lookup can run.
+    if ((country || 'GB') !== 'GB') {
+      return { action: 'skipped', reason: `non-GB country (${country}) - directory is UK-only` };
+    }
     const identity = await resolveIdentity(householdSchool, { heal: true });
     if (!identity) return { action: 'skipped', reason: 'no resolvable identity (no URN, no postcode, no unique GIAS name match)' };
 
