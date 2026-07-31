@@ -8704,6 +8704,27 @@ async function getAppleAdsAttributedUsers(db = supabase) {
 
 const EVENING_BRIEF_OFFER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Arm (or RE-arm) the offer so the user's very next message can answer it.
+ * Used when the offer rides an in-conversation reply - "Want a heads-up the
+ * night before too?" appended to the morning opt-in confirmation. Live
+ * 2026-07-31: the bot asked that question, the user said "yes", and nothing
+ * was listening - the offer text existed but the one-shot state was only ever
+ * armed by the scheduled post-brief offer. Resets answered_at so someone who
+ * answered a previous round can be offered again.
+ */
+async function armEveningBriefOffer(userId, db = supabase) {
+  if (!userId) return;
+  const { error } = await db
+    .from('users')
+    .update({
+      evening_brief_offer_sent_at: new Date().toISOString(),
+      evening_brief_offer_answered_at: null,
+    })
+    .eq('id', userId);
+  if (error) throw error;
+}
+
 /** Has this user already been asked? Non-null sent_at means never ask again. */
 async function hasEveningBriefOfferBeenSent(userId, db = supabase) {
   if (!userId) return true; // no id - fail closed rather than spam
@@ -10210,6 +10231,7 @@ module.exports = {
   getHouseholdDeviceTokens,
   getNotificationPreferences,
   upsertNotificationPreferences,
+  armEveningBriefOffer,
   hasEveningBriefOfferBeenSent,
   stampEveningBriefOfferSent,
   takeEveningBriefOffer,

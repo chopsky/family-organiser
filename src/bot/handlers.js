@@ -2520,6 +2520,16 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     const eveningOffer = eveningWasOn
       ? ''
       : `\n\nWant a heads-up the night before too? Say *start evening briefs* and I'll send you a look at tomorrow at 8pm. 🌙`;
+    // A question has to be answerable: arm the same one-shot state the
+    // scheduled offer uses, so a plain "yes" to this exact question flips the
+    // toggle instead of falling through to the model (which now - correctly -
+    // refuses to pretend it can). Fire-and-forget: if the column is missing
+    // (migration pending) the offer still reads fine, "yes" just isn't
+    // understood, which is precisely today's behaviour.
+    if (eveningOffer) {
+      db.armEveningBriefOffer(user.id)
+        .catch((err) => console.warn('[handlers] could not arm evening-brief offer:', err.message));
+    }
     return { response: `Lovely - you're back on. I'll include you in the morning brief from tomorrow. ☀️${eveningOffer}`, actions: noActions };
   }
 

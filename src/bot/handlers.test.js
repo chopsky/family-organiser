@@ -37,6 +37,7 @@ jest.mock('../db/queries', () => ({
   // Runs before classify on every inbound message - default to "no offer
   // pending" so it stays out of the way of unrelated tests.
   takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
+  armEveningBriefOffer: jest.fn(() => Promise.resolve()),
   hasEveningBriefOfferBeenSent: jest.fn(() => Promise.resolve(true)),
   stampEveningBriefOfferSent: jest.fn(() => Promise.resolve()),
   // Default: pin nudge already claimed (false) so most assertions match on
@@ -1007,6 +1008,30 @@ describe('in-thread brief stop/start', () => {
     expect(reply.response).toMatch(/evening|8pm/i);
     expect(reply.response).not.toMatch(/say \*start evening briefs\*/i);
     expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  // Live 2026-07-31: "turn on briefs" appended "Want a heads-up the night
+  // before too?" - and a plain "yes" fell through to the model, because the
+  // inline offer never armed the one-shot state the scheduled offer uses.
+  // A question the bot asks must be answerable with the word it invites.
+  test('the inline evening offer arms the state so "yes" can answer it', async () => {
+    const reply = await handlers.handleTextMessage('turn on briefs', parent, hh, {});
+    expect(reply.response).toMatch(/heads-up the night before/i);
+    expect(db.armEveningBriefOffer).toHaveBeenCalledWith('u9');
+
+    // The next message consumes the armed offer and flips the toggle.
+    db.takeEveningBriefOffer.mockResolvedValueOnce(true);
+    const answer = await handlers.handleTextMessage('yes', parent, hh, {});
+    expect(db.upsertNotificationPreferences).toHaveBeenLastCalledWith('u9', { evening_brief: true });
+    expect(answer.response).toMatch(/each evening/i);
+    expect(ai.classify).not.toHaveBeenCalled();
+  });
+
+  test('the offer is NOT armed when the evening brief is already on', async () => {
+    db.getNotificationPreferences.mockResolvedValueOnce({ whatsapp_daily_reminder: false, evening_brief: true });
+    const reply = await handlers.handleTextMessage('turn on briefs', parent, hh, {});
+    expect(reply.response).not.toMatch(/heads-up the night before/i);
+    expect(db.armEveningBriefOffer).not.toHaveBeenCalled();
   });
 
   test('a stop is never read as an answer to "which one would you like back?"', async () => {

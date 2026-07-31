@@ -5,6 +5,7 @@
  */
 jest.mock('../db/queries', () => ({
   takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
+  armEveningBriefOffer: jest.fn(() => Promise.resolve()),
   getCalendarEvents: jest.fn(() => Promise.resolve([])),
   getHouseholdActivities: jest.fn(() => Promise.resolve([])),
   getHouseholdMembers: jest.fn(() => Promise.resolve([])),
