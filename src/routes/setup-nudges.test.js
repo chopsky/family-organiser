@@ -8,7 +8,7 @@
  */
 jest.mock('../db/queries', () => ({
   dismissSetupNudge: jest.fn(async () => ['invite']),
-  SETUP_NUDGE_IDS: ['invite', 'wa', 'cal', 'rem'],
+  SETUP_NUDGE_IDS: ['invite', 'wa', 'cal', 'rem', 'school'],
   getHouseholdPreferences: jest.fn(),
   getHouseholdMembers: jest.fn(),
 }));
@@ -53,7 +53,12 @@ it('drops the digest cache so the tile does not reappear for a minute', async ()
   expect(cache.invalidate).toHaveBeenCalledWith('digest:h1');
 });
 
-it('rejects a task id that is not one of the four', async () => {
+it('accepts the school task (added 2026-07-31, gated client-side on having a child)', async () => {
+  const res = await request(app()).post('/api/household/setup-nudges/dismiss').send({ task: 'school' });
+  expect(res.status).toBe(200);
+});
+
+it('rejects a task id that is not on the allowlist', async () => {
   const res = await fire({ task: 'wipe_everything' });
 
   expect(res.status).toBe(400);

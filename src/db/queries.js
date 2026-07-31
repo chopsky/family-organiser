@@ -8591,7 +8591,7 @@ async function upsertNotificationPreferences(userId, prefs) {
 
 /** The four home-screen setup tasks. Server-side allowlist so a client can't
  *  write arbitrary strings into the array. */
-const SETUP_NUDGE_IDS = ['invite', 'wa', 'cal', 'rem'];
+const SETUP_NUDGE_IDS = ['invite', 'wa', 'cal', 'rem', 'school'];
 
 /**
  * Record a permanent, per-user dismissal of one setup task.

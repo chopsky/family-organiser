@@ -55,6 +55,10 @@ const TASKS = [
   { id: 'wa', label: 'Connect WhatsApp', to: '/settings?section=whatsapp' },
   { id: 'cal', label: 'Add your calendars', to: '/settings?section=calendars' },
   { id: 'rem', label: 'Turn on reminders', to: '/settings?section=notifications', nativeOnly: true },
+  // Only offered once the household has a CHILD dependent - a school nudge
+  // for a couple with no kids is noise, and the tile appearing right after
+  // they add their first child is the moment it is most likely to land.
+  { id: 'school', label: "Add their school", to: '/school', needsChild: true },
 ];
 
 // Flat tint fill, no border, no shadow. All content in the tint's fg.
@@ -63,6 +67,7 @@ const TINT = {
   wa: { bg: '#E5F0E2', fg: '#2E6B44' },
   cal: { bg: '#E2ECFA', fg: '#2E5799' },
   rem: { bg: '#FBF1DE', fg: '#8A5F1E' },
+  school: { bg: '#F3EDFC', fg: '#5A3488' },
 };
 
 const CELEBRATION_HOLD_MS = 1600;
@@ -89,6 +94,15 @@ function Glyph({ id, fg, size }) {
       <svg {...common}>
         <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7" />
         <path d="M13.7 20a2 2 0 0 1-3.4 0" />
+      </svg>
+    );
+  }
+  if (id === 'school') {
+    return (
+      <svg {...common}>
+        <path d="M12 4 2 9l10 5 10-5-10-5z" />
+        <path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5" />
+        <path d="M22 9v5" />
       </svg>
     );
   }
@@ -143,6 +157,31 @@ function useDerivedCompletion(members) {
   const { user } = useAuth();
   const [calConnected, setCalConnected] = useState(null);
   const [notifGranted, setNotifGranted] = useState(null);
+  const [schoolAdded, setSchoolAdded] = useState(null);
+
+  // Legacy dependents predate dependent_kind and are all children - a null
+  // kind must count, or every pre-split family loses the school nudge.
+  const hasChild = members.some(
+    (m) => m.member_type === 'dependent' && (m.dependent_kind || 'child') === 'child',
+  );
+
+  useEffect(() => {
+    // Fetched only for households the tile can apply to; for everyone else
+    // the answer is irrelevant and the request would be pure noise. Re-runs
+    // when a child is added mid-session, which is exactly when the tile
+    // should appear.
+    // No reset on the way OUT of eligibility: while there is no child the
+    // task is filtered from the list and readiness ignores this value, so a
+    // stale answer is unreachable.
+    if (!hasChild) return undefined;
+    let cancelled = false;
+    api.get('/schools')
+      .then((res) => { if (!cancelled) setSchoolAdded((res.data?.schools || []).length > 0); })
+      // Same lean as the calendar check: on error assume done - under-
+      // prompting beats nagging someone who has already added the school.
+      .catch(() => { if (!cancelled) setSchoolAdded(true); });
+    return () => { cancelled = true; };
+  }, [hasChild]);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,9 +218,13 @@ function useDerivedCompletion(members) {
     wa: !!me?.whatsapp_linked,
     cal: calConnected,
     rem: notifGranted,
+    school: schoolAdded,
+    hasChild,
     // Null anywhere means "not known yet" - hold the whole component back
-    // rather than flash a tile that is about to vanish.
-    ready: calConnected !== null && notifGranted !== null && members.length > 0,
+    // rather than flash a tile that is about to vanish. The school answer
+    // only gates readiness for households the tile applies to.
+    ready: calConnected !== null && notifGranted !== null && members.length > 0
+      && (!hasChild || schoolAdded !== null),
     dismissed: Array.isArray(me?.setup_nudges_dismissed) ? me.setup_nudges_dismissed : [],
   };
 }
@@ -228,8 +271,8 @@ export default function SetupNudges({ members = [] }) {
   // platform: width says nothing about whether push permission can exist.
   const isNative = useMemo(() => { try { return Capacitor.isNativePlatform(); } catch { return false; } }, []);
   const tasks = useMemo(
-    () => TASKS.filter((t) => !t.nativeOnly || isNative),
-    [isNative],
+    () => TASKS.filter((t) => (!t.nativeOnly || isNative) && (!t.needsChild || derived.hasChild)),
+    [isNative, derived.hasChild],
   );
 
   const dismissed = useMemo(
