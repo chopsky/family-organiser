@@ -96,8 +96,11 @@ export default function OnboardingV4({ initialPhase }) {
     const { granted, note } = await askForNudges();
     setRemBusy(false);
     update({ rem: granted });
-    if (!granted && note) {
-      // Show why, briefly, then move on - this step is never a gate.
+    if (note) {
+      // Show the outcome briefly, then move on - this step is never a gate.
+      // Notes exist for BOTH answers now: a decline explains where the switch
+      // lives, and an already-granted device says the step worked - without
+      // it, iOS's one-shot prompt staying hidden reads as a broken button.
       setRemNote(note);
       setTimeout(next, 1400);
       return;

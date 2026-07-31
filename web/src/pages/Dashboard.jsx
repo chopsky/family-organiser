@@ -93,84 +93,6 @@ function formatTaskDueLabel(dueDateStr) {
   return { text: due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), overdue: false };
 }
 
-// ── Calendar setup nudge ────────────────────────────────────────
-// Soft banner giving a low-pressure entry point to calendar sync (the
-// signup wizard deliberately has no calendar step - activation stays
-// focused on WhatsApp pairing). Trigger is PER PERSON, not per household:
-//
-//   - iPhone app: shown until THIS user's phone feeds at least one
-//     calendar - even when the rest of the household is already
-//     connected. The whole point of device sync is each parent
-//     connecting their own phone, so "someone else did it" must not
-//     silence the prompt for the second parent.
-//   - Web: shown only while the household has no calendar connections
-//     at all (the web can't device-sync, so once anything is connected
-//     there's nothing for this surface to add).
-//
-// Copy leads with the two-tap iPhone flow (the URL-subscription flow
-// remains available inside Settings). Dismissal is per-user so one
-// person's "Not now" doesn't hide it from everyone who shares the
-// device... and the old pre-rename global key is still honoured so
-// users who already dismissed it aren't re-prompted.
-function CalendarSetupNudge() {
-  const { user } = useAuth();
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    // Dismissal checks first - cheap, no API call needed.
-    try {
-      if (localStorage.getItem('housemait_calendar_nudge_dismissed') === '1') return;
-      if (localStorage.getItem(`housemait_calendar_nudge_dismissed:${user.id}`) === '1') return;
-    } catch { return; }
-    // Silently skips on transient API error (better to under-prompt than nag).
-    // Device sync is retired, so the conduit is ICS subscribe for everyone -
-    // prompt only while the household has no calendar connections at all.
-    api.get('/calendar/external-feeds')
-      .then((res) => {
-        const feeds = (res.data?.feeds || []).filter((f) => f.sync_enabled !== false);
-        if (feeds.length === 0) setShow(true);
-      })
-      .catch(() => { /* no-op */ });
-  }, [user?.id]);
-
-  function dismiss() {
-    try { localStorage.setItem(`housemait_calendar_nudge_dismissed:${user?.id}`, '1'); } catch { /* private mode */ }
-    setShow(false);
-  }
-
-  if (!show) return null;
-
-  return (
-    <div
-      className="rounded-2xl p-4 mb-4 flex items-start gap-3"
-      style={{ background: 'rgba(243, 237, 252, 0.55)', border: '1px solid rgba(107, 63, 160, 0.18)' }}
-    >
-      <div className="text-2xl leading-none mt-0.5" aria-hidden="true">📅</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-bark">
-          See work, school and family calendars in one place
-        </p>
-        <p className="text-xs text-cocoa mt-1 leading-relaxed">
-          Subscribe to your Apple, Google or Outlook calendar by link and it shows up here — kept in sync automatically, read-only.
-        </p>
-        <div className="mt-3 flex items-center gap-4">
-          <Link to="/settings?section=calendars" className="text-xs font-semibold text-primary hover:underline">
-            Set up calendars →
-          </Link>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="text-xs text-cocoa hover:text-bark transition-colors"
-          >
-            Not now
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Promo "claim your discount" nudge ───────────────────────────
 // Shown when the account signed up with a campaign promo (school-fair
 // HILLELFEST etc.) and hasn't subscribed yet. Reminds them, through the
@@ -739,7 +661,6 @@ export default function Dashboard() {
           first thing a brand-new user sees but doesn't push existing
           content off the fold. */}
       {!childMode && <PromoClaimNudge />}
-      {!childMode && <CalendarSetupNudge />}
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

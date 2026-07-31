@@ -76,8 +76,19 @@ export async function requestNotificationPermission() {
  * presentation, and the screen file must export only components.
  */
 export async function askForNudges() {
+  // iOS shows the permission dialog once per install, ever. On a device that
+  // answered it before (a previous account, an earlier build), request
+  // resolves silently with the old answer - and a silent grant looks exactly
+  // like a broken button. Detect that case and SAY it, so the person who
+  // tapped "Turn on nudges" and saw no dialog knows the step worked.
+  const before = await getNotificationPermission();
   const result = await requestNotificationPermission();
-  if (result === 'granted') return { granted: true, note: '' };
+  if (result === 'granted') {
+    return {
+      granted: true,
+      note: before === 'granted' ? 'Nudges are already on for this phone. ✓' : '',
+    };
+  }
   if (result === 'denied') {
     // Never a dead end. The flow moves on either way; this just says where the
     // switch lives now that the one-shot prompt is spent.
