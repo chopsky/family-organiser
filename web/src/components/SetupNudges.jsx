@@ -158,6 +158,28 @@ function useDerivedCompletion(members) {
   const [calConnected, setCalConnected] = useState(null);
   const [notifGranted, setNotifGranted] = useState(null);
   const [schoolAdded, setSchoolAdded] = useState(null);
+  const [inviteSent, setInviteSent] = useState(null);
+
+  // Computed up here because two effects key off it. A second ADULT, not a
+  // second row - dependents don't count as invited family.
+  const soloAdult = members.length > 0
+    && members.filter((m) => (m.member_type || 'account') === 'account').length < 2;
+
+  useEffect(() => {
+    // The invite tile's task is INVITING, and sending the invite is the last
+    // act the user controls - completion must not wait on the partner
+    // opening their email (live 2026-07-31: sent an invite, came back, tile
+    // still there). A pending invite therefore counts as done. Checked only
+    // while there is a single adult; once a second account exists the
+    // members list answers by itself.
+    if (!soloAdult) return undefined;
+    let cancelled = false;
+    api.get('/household/invites')
+      .then((res) => { if (!cancelled) setInviteSent((res.data?.invites || []).length > 0); })
+      // Same lean as every check here: on error assume done.
+      .catch(() => { if (!cancelled) setInviteSent(true); });
+    return () => { cancelled = true; };
+  }, [soloAdult]);
 
   // Legacy dependents predate dependent_kind and are all children - a null
   // kind must count, or every pre-split family loses the school nudge.
@@ -214,7 +236,7 @@ function useDerivedCompletion(members) {
   const adults = members.filter((m) => (m.member_type || 'account') === 'account');
 
   return {
-    invite: adults.length >= 2,
+    invite: adults.length >= 2 || inviteSent === true,
     wa: !!me?.whatsapp_linked,
     cal: calConnected,
     rem: notifGranted,
@@ -224,7 +246,8 @@ function useDerivedCompletion(members) {
     // rather than flash a tile that is about to vanish. The school answer
     // only gates readiness for households the tile applies to.
     ready: calConnected !== null && notifGranted !== null && members.length > 0
-      && (!hasChild || schoolAdded !== null),
+      && (!hasChild || schoolAdded !== null)
+      && (!soloAdult || inviteSent !== null),
     dismissed: Array.isArray(me?.setup_nudges_dismissed) ? me.setup_nudges_dismissed : [],
   };
 }
