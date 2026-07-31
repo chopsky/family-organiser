@@ -600,11 +600,15 @@ function SchoolsCard({ schools }) {
               <Detail label="Added" value={formatDate(s.created_at)} />
             </div>
 
-            {childCount === 0 && (
-              <p className="text-xs text-coral mt-3">
-                School added but no child is assigned to it - term dates won&apos;t appear on anyone&apos;s calendar.
-              </p>
-            )}
+            {/* No warning for zero linked children: since schools became
+                first-class household entities (July 2026), term dates land on
+                the family calendar for every household school regardless of
+                child links - the calendar, bot, kids views and digest all
+                read by household school id. The old "won't appear on anyone's
+                calendar" warning described the retired per-child model and
+                was flagging every school in every household. Child links
+                still matter for activity term-context and pickup, which the
+                Children column above already shows. */}
           </div>
         );
       })}
