@@ -186,15 +186,40 @@ function useDerivedCompletion(members) {
   };
 }
 
+/* ── local dismissal echo ──────────────────────────────────────────────────
+   Keyed per user so a shared device can't leak one person's dismissals into
+   another's dashboard. Complements (never replaces) users.setup_nudges_
+   dismissed: entries are added only after the server confirmed the write. */
+const echoKey = (userId) => `hm_setup_nudges_echo:${userId || 'anon'}`;
+function readDismissEcho(userId) {
+  try { return JSON.parse(localStorage.getItem(echoKey(userId)) || '[]'); } catch { return []; }
+}
+function writeDismissEcho(userId, id) {
+  try {
+    const cur = new Set(readDismissEcho(userId));
+    cur.add(id);
+    localStorage.setItem(echoKey(userId), JSON.stringify([...cur]));
+  } catch { /* private mode etc. - the server row still holds the truth */ }
+}
+
 export default function SetupNudges({ members = [] }) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reducedMotion = usePrefersReducedMotion();
   const derived = useDerivedCompletion(members);
 
-  // Locally-dismissed ids, merged over the server list so the tile leaves on
-  // tap rather than after the digest refreshes.
-  const [justDismissed, setJustDismissed] = useState([]);
+  // Locally-dismissed ids, merged over the server list. Two jobs: the tile
+  // leaves on tap rather than after the digest refreshes, and - via the
+  // localStorage echo - a dismissal this device made SURVIVES navigation.
+  // The dashboard paints cache-first, so returning to it renders a digest
+  // snapshot that can predate the dismissal; without the echo, the tile the
+  // user just killed walks back in until the fresh fetch lands. The echo is
+  // written only after the server accepts the write, and only ever UNIONED
+  // with the server list - it can't mask another device's state, and server
+  // truth still wins for everything else. (Live 2026-07-31: X'd tile
+  // reappeared on navigate-away-and-back.)
+  const [justDismissed, setJustDismissed] = useState(() => readDismissEcho(user?.id));
   const [fading, setFading] = useState(false);
   const [gone, setGone] = useState(false);
   const celebratedRef = useRef(false);
@@ -247,6 +272,10 @@ export default function SetupNudges({ members = [] }) {
   function dismiss(id) {
     setJustDismissed((prev) => (prev.includes(id) ? prev : [...prev, id]));
     api.post('/household/setup-nudges/dismiss', { task: id })
+      // Echo only a CONFIRMED write: an echoed-but-never-stored dismissal
+      // would hide the tile on this device forever while other devices keep
+      // showing it - the exact split-brain the server column exists to end.
+      .then(() => writeDismissEcho(user?.id, id))
       // Local state already hid it; a failed write means it returns next load,
       // which is better than pretending and better than an error the user
       // can do nothing about.
