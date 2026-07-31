@@ -215,6 +215,47 @@ router.get('/users/:id/usage', async (req, res) => {
   }
 });
 
+// ─── Empty households (0 users) ─────────────────────────────────────────────
+//
+// The residue of abandoned signups and the pre-fix creation race. GET lists
+// them so the admin sees exactly what would go; POST purges them. Deletion
+// goes through deleteEmptyHousehold, which re-checks occupancy at delete
+// time - so even a user who appears between list and purge is safe. The
+// query already excludes households under an hour old (in-flight signups).
+// adminAudit records the purge like every other mutating admin action.
+
+router.get('/empty-households', async (req, res) => {
+  try {
+    const households = await db.getEmptyHouseholds();
+    return res.json({ households, count: households.length });
+  } catch (err) {
+    console.error('GET /api/admin/empty-households error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/empty-households/purge', async (req, res) => {
+  try {
+    const candidates = await db.getEmptyHouseholds();
+    let deleted = 0;
+    let skipped = 0;
+    for (const h of candidates) {
+      try {
+        const removed = await db.deleteEmptyHousehold(h.id);
+        if (removed) deleted += 1; else skipped += 1;
+      } catch (err) {
+        // One stubborn row (FK surprises etc.) must not abort the sweep.
+        skipped += 1;
+        console.error('[admin] empty-household purge failed for', h.id, err.message);
+      }
+    }
+    return res.json({ deleted, skipped, considered: candidates.length });
+  } catch (err) {
+    console.error('POST /api/admin/empty-households/purge error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/households ──────────────────────────────────────────────
 
 router.get('/households', async (req, res) => {

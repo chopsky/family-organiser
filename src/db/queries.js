@@ -8642,6 +8642,38 @@ async function claimHouseholdForUser(userId, householdId, colorTheme, db = supab
 }
 
 /**
+ * Households with no user rows at all - the residue of abandoned signups and
+ * the pre-fix creation race. Paginated on both sides because unpaginated
+ * Supabase selects silently cap at 1000 rows, which is exactly how a diff
+ * read like this one starts lying as the tables grow.
+ *
+ * Households younger than an hour are excluded: a signup in flight has a
+ * legitimately empty household for the moment between creation and the
+ * atomic claim, and a purge must never race it.
+ */
+async function getEmptyHouseholds(db = supabase) {
+  const pageAll = async (table, columns) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from(table).select(columns).range(from, from + 999);
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  };
+
+  const [households, users] = await Promise.all([
+    pageAll('households', 'id, name, join_code, created_at'),
+    pageAll('users', 'household_id'),
+  ]);
+  const occupied = new Set(users.map((u) => u.household_id).filter(Boolean));
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  return households.filter(
+    (h) => !occupied.has(h.id) && new Date(h.created_at).getTime() < cutoff,
+  );
+}
+
+/**
  * Remove a household only if nobody lives in it - the loser of the creation
  * race deletes the row it just made. The occupancy check keeps this safe to
  * call even if something unexpected attached a user in between.
@@ -10239,6 +10271,7 @@ module.exports = {
   SETUP_NUDGE_IDS,
   claimHouseholdForUser,
   deleteEmptyHousehold,
+  getEmptyHouseholds,
   getUserAdAttribution,
   setUserAdAttribution,
   getAppleAdsAttributedUsers,

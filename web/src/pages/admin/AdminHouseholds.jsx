@@ -46,6 +46,38 @@ export default function AdminHouseholds() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Empty households (0 users): abandoned signups + pre-fix creation-race
+  // orphans. Fetched separately so the main list stays untouched; the banner
+  // only renders when there is something to clean.
+  const [emptyHouseholds, setEmptyHouseholds] = useState([]);
+  const [purging, setPurging] = useState(false);
+  const loadEmpty = useCallback(async () => {
+    try {
+      const { data } = await api.get('/admin/empty-households');
+      setEmptyHouseholds(data.households || []);
+    } catch { setEmptyHouseholds([]); }
+  }, []);
+  useEffect(() => { loadEmpty(); }, [loadEmpty]);
+
+  async function purgeEmpty() {
+    const names = emptyHouseholds.slice(0, 5).map((h) => h.name).join(', ');
+    const more = emptyHouseholds.length > 5 ? ` and ${emptyHouseholds.length - 5} more` : '';
+    if (!window.confirm(
+      `Delete ${emptyHouseholds.length} empty household${emptyHouseholds.length === 1 ? '' : 's'} (${names}${more})?\n\n` +
+      'Only households with zero users are deleted, each one re-checked at delete time. This cannot be undone.',
+    )) return;
+    setPurging(true);
+    try {
+      const { data } = await api.post('/admin/empty-households/purge');
+      window.alert(`Deleted ${data.deleted}${data.skipped ? `, skipped ${data.skipped} (no longer empty or refused)` : ''}.`);
+      await Promise.all([loadEmpty(), loadHouseholds()]);
+    } catch {
+      window.alert('Purge failed - nothing may have been deleted. Try again.');
+    } finally {
+      setPurging(false);
+    }
+  }
+
   const loadHouseholds = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -105,6 +137,22 @@ export default function AdminHouseholds() {
     <div>
       <h1 className="font-display text-2xl font-bold text-charcoal tracking-tight">Households</h1>
       <p className="text-warm-grey text-sm mt-1">{total} total household{total !== 1 ? 's' : ''}</p>
+
+      {emptyHouseholds.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-coral/30 bg-coral/5">
+          <p className="text-sm text-charcoal flex-1 min-w-[240px]">
+            <span className="font-semibold">{emptyHouseholds.length} empty household{emptyHouseholds.length === 1 ? '' : 's'}</span>
+            {' '}with 0 users - abandoned signups. Safe to remove; each is re-checked for emptiness at delete time.
+          </p>
+          <button
+            onClick={purgeEmpty}
+            disabled={purging}
+            className="px-4 py-2 rounded-xl bg-coral text-white text-sm font-semibold hover:bg-coral/90 disabled:opacity-50"
+          >
+            {purging ? 'Deleting…' : `Delete ${emptyHouseholds.length}`}
+          </button>
+        </div>
+      )}
 
       {/* Search + Filter */}
       <div className="mt-4 flex flex-wrap gap-2">
