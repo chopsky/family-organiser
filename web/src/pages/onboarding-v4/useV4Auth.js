@@ -104,6 +104,23 @@ export default function useV4Auth(d) {
       }
     }
 
+    // Step 06's answer. It was collected before the account existed, so this
+    // is the first moment it CAN be saved - and until 2026-07-31 it never
+    // was: the chip was picked, stored in the draft, and quietly dropped
+    // (picked "Dad", profile showed no role). Runs after create-household
+    // because the profile route requires a household; invitees already have
+    // one. Best-effort - a failed save must never block finishing signup,
+    // and the Family page can always set it later.
+    const chosenRole = (d.role || '').trim();
+    if (chosenRole) {
+      try {
+        const res = await api.patch('/household/profile', { family_role: chosenRole });
+        if (res.data?.user) auth.updateUser(res.data.user);
+      } catch (err) {
+        console.warn('[v4] family_role save failed:', err?.response?.data?.error || err.message);
+      }
+    }
+
     const replay = await replayQueued(d).catch(() => ({ calendars: { connected: [], failed: [] }, whatsapp: null }));
 
     try {
