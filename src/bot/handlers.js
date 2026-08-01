@@ -3662,7 +3662,20 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     && !(actions.eventsAdded?.length)
     && !actions.tasksUnmatched?.length;
   if (nothingHappened && ACTION_VERB_REGEX.test(response)) {
-    console.warn('[handlers] Reconciliation hit: response claimed an action but nothing was emitted. Original:', response.slice(0, 200));
+    // Retry OURSELVES before asking the human to repeat themselves. Live
+    // 2026-08-01: "apply for UK citizenship... remind 2 days before" - the
+    // first pass claimed "added" with an empty task list (77 output tokens),
+    // and the user's verbatim retry 27s later worked (272 tokens). If a
+    // straight re-run fixes it, making the USER be the retry loop is a
+    // silly error in a flagship feature. One shot only: the flag rides ctx,
+    // so a second miss falls through to the honest ask-again below.
+    if (!ctx._reconciliationRetried) {
+      console.warn('[handlers] Reconciliation hit - auto-retrying classify once. Claimed:', response.slice(0, 160));
+      ctx._reconciliationRetried = true;
+      ctx.intent = 'reconciliation_retry';
+      return handleTextMessage(text, user, household, ctx);
+    }
+    console.warn('[handlers] Reconciliation hit twice - giving the honest ask-again. Original:', response.slice(0, 200));
     response = "I caught what you said but didn't quite manage to save it - sorry about that. Could you say that again? If it's a task or event, try to include the date.";
   }
 

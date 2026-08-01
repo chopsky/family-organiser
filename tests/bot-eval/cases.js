@@ -668,6 +668,25 @@ module.exports = [
     },
   },
 
+  // ── 2026-08-01: "apply for UK citizenship on 18 March 2027, remind 2 days
+  // before" - the first pass claimed "added" with an EMPTY task list (77
+  // output tokens); the honesty backstop caught it and the verbatim retry
+  // worked. The handler now auto-retries once, but the model should get the
+  // far-future task with a reminder offset right on the first pass.
+  {
+    name: 'far-future task with relative reminder: citizenship 18 Mar 2027, remind 2 days before',
+    message: 'I need to apply for UK citizenship on 18 March 2027. Remind 2 days before.',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent !== 'add' && r.intent !== 'add_task') return `intent ${r.intent}`;
+      const t = (r.tasks || [])[0];
+      if (!t) return 'tasks[] empty - the exact live failure';
+      if (!/citizenship/i.test(t.title || t.name || '')) return `title "${t.title || t.name}"`;
+      if (!/2027-03-1[68]/.test(t.due_date || '')) return `due_date ${t.due_date}`;
+      return null;
+    },
+  },
+
   // ── 2026-07-20: school_add intent (activation opener). The model must
   // carry the user's words into school_query and NEVER answer as if it
   // matched a school itself - the handler owns GIAS search + confirmation.
