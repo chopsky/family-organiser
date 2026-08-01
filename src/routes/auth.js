@@ -1034,7 +1034,7 @@ router.delete('/account', requireAuth, async (req, res) => {
     // audit row is missing.
     try {
       const { supabaseAdmin } = require('../db/client');
-      await supabaseAdmin.from('deletion_audit_log').insert({
+      const baseRow = {
         user_id: user.id,
         user_email: user.email || null,
         household_id: household?.id || null,
@@ -1045,10 +1045,54 @@ router.delete('/account', requireAuth, async (req, res) => {
         stripe_cancelled:       stripeCancelled,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
-      });
+      };
+      // Churn context - the difference between a ledger and an answer to
+      // "who signs up and then deletes?". Falls back to the base row while
+      // migration-deletion-audit-churn.sql is pending, because the enriched
+      // columns must never block a deletion.
+      const enrichedRow = {
+        ...baseRow,
+        user_created_at: user.created_at || null,
+        country: household?.country || null,
+        signup_source: user.signup_source || null,
+        signup_promo_code: user.signup_promo_code || null,
+        whatsapp_linked: !!user.whatsapp_linked,
+        onboarded: !!user.onboarded_at,
+        ad_attribution: user.ad_attribution || null,
+      };
+      const { error: enrichedErr } = await supabaseAdmin.from('deletion_audit_log').insert(enrichedRow);
+      if (enrichedErr) {
+        const { error: baseErr } = await supabaseAdmin.from('deletion_audit_log').insert(baseRow);
+        if (baseErr) throw baseErr;
+        console.warn('[delete-account] enriched audit insert failed (migration pending?) - base row written:', enrichedErr.message);
+      }
     } catch (err) {
       console.error('[delete-account] audit log insert failed - continuing with deletion:', err.message);
     }
+
+    // Operator alert - the signup alert's missing twin. Before this, an
+    // account could sign up (email arrives) and delete (nothing arrives),
+    // which read as "it just vanishes". Fire-and-forget; never blocks the
+    // deletion the user asked for.
+    (async () => {
+      try {
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const ageDays = user.created_at
+          ? Math.max(0, Math.round((Date.now() - new Date(user.created_at).getTime()) / 86400000))
+          : null;
+        const src = [user.signup_source, user.signup_promo_code].filter(Boolean).join(' / ');
+        await email.sendAdminAlert(
+          `Account deleted: ${household?.name || user.email || 'unknown'}`,
+          `<strong>${esc(user.name)}</strong> (${esc(user.email)}) deleted their account.<br/>` +
+          `Household: ${esc(household?.name || '-')} - ${deletionMode === 'household_deleted' ? 'household deleted with them' : 'other members remain'}<br/>` +
+          (ageDays !== null ? `Account age: ${ageDays} day${ageDays === 1 ? '' : 's'}<br/>` : '') +
+          (src ? `Signup source: ${esc(src)}<br/>` : '') +
+          `WhatsApp linked: ${user.whatsapp_linked ? 'yes' : 'no'}`
+        );
+      } catch (err) {
+        console.error('[delete-account] admin alert failed:', err.message);
+      }
+    })();
 
     // ── Actual deletion ──
     if (willDeleteHousehold) {

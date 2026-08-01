@@ -256,6 +256,22 @@ router.post('/empty-households/purge', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/deletions ───────────────────────────────────────────────
+// The deletion ledger (deletion_audit_log) has captured every account
+// deletion since Phase 8, but nothing surfaced it - deletions read as
+// "it just vanishes". Read-only view, newest first.
+
+router.get('/deletions', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const deletions = await db.getDeletionLog(limit);
+    return res.json({ deletions, count: deletions.length });
+  } catch (err) {
+    console.error('GET /api/admin/deletions error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/households ──────────────────────────────────────────────
 
 router.get('/households', async (req, res) => {

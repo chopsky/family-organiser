@@ -79,6 +79,7 @@ const AdminAnalytics       = lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminAnnouncements   = lazy(() => import('./pages/admin/AdminAnnouncements'));
 const AdminPromoCodes      = lazy(() => import('./pages/admin/AdminPromoCodes'));
 const AdminAuditLog        = lazy(() => import('./pages/admin/AdminAuditLog'));
+const AdminDeletions       = lazy(() => import('./pages/admin/AdminDeletions'));
 
 /** Skeleton loading screen shown while a lazy chunk downloads */
 function PageLoader() {
@@ -341,6 +342,7 @@ function AppRoutes() {
         <Route path="/admin/analytics" element={<RequirePlatformAdmin><AdminLayout><AdminAnalytics /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/promo-codes" element={<RequirePlatformAdmin><AdminLayout><AdminPromoCodes /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="/admin/audit-log" element={<RequirePlatformAdmin><AdminLayout><AdminAuditLog /></AdminLayout></RequirePlatformAdmin>} />
+        <Route path="/admin/deletions" element={<RequirePlatformAdmin><AdminLayout><AdminDeletions /></AdminLayout></RequirePlatformAdmin>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       </RouteTransition>

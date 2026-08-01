@@ -8691,6 +8691,21 @@ async function deleteEmptyHousehold(householdId, db = supabase) {
   return true;
 }
 
+/**
+ * The deletion ledger, newest first. Selects * so the enriched churn columns
+ * (migration-deletion-audit-churn.sql) appear as soon as the migration runs,
+ * without a code change.
+ */
+async function getDeletionLog(limit = 50, db = supabase) {
+  const { data, error } = await db
+    .from('deletion_audit_log')
+    .select('*')
+    .order('deleted_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
 // ─── Apple Ads attribution ───────────────────────────────────────────────
 
 /** { ad_attribution, ad_attribution_at } for one user. Throws on a missing
@@ -10272,6 +10287,7 @@ module.exports = {
   claimHouseholdForUser,
   deleteEmptyHousehold,
   getEmptyHouseholds,
+  getDeletionLog,
   getUserAdAttribution,
   setUserAdAttribution,
   getAppleAdsAttributedUsers,

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   IconBarChart, IconUsers, IconHome, IconShield,
   IconCpu, IconMessageCircle, IconRefresh, IconTrendingUp,
-  IconArrowLeft, IconFileText, IconMail, IconGift,
+  IconArrowLeft, IconFileText, IconMail, IconGift, IconBan,
 } from './Icons';
 
 const adminNav = [
@@ -18,6 +18,7 @@ const adminNav = [
   { to: '/admin/analytics',      label: 'Analytics',      Icon: IconTrendingUp },
   { to: '/admin/promo-codes',    label: 'Discount codes', Icon: IconGift },
   { to: '/admin/audit-log',      label: 'Audit log',      Icon: IconShield },
+  { to: '/admin/deletions',      label: 'Deletions',      Icon: IconBan },
 ];
 
 export default function AdminLayout({ children }) {
