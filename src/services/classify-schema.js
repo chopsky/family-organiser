@@ -69,7 +69,7 @@ const INTENTS = [
   'subscription_list', 'create_event', 'update_event', 'delete_event',
   'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item',
   'recipe', 'recipe_followup', 'weather', 'school_activity', 'school_event',
-  'school_add', 'web_search', 'chat',
+  'school_add', 'meal_plan_add', 'web_search', 'chat',
 ];
 const SHOPPING_CATEGORIES = [
   'Dairy & Eggs', 'Produce', 'Meat & Seafood', 'Pantry & Grains', 'Bakery',
@@ -185,6 +185,14 @@ const CLASSIFY_SCHEMA = obj({
     key: en(['allergy', 'dietary', 'dislike', 'like', 'schedule', 'preference']),
     value: str,
     member_name: opt(str),
+  }))),
+  // meal_plan_add: every meal to plan, one entry per meal per day. The
+  // handler links a Recipe Box recipe by fuzzy name match; the model only
+  // supplies name + resolved date + category.
+  meal_plan_entries: opt(arr(obj({
+    date: str,
+    meal_name: str,
+    category: opt(en(['breakfast', 'lunch', 'snack', 'dinner'])),
   }))),
   web_search_query: opt(str),
   query_start: opt(str),

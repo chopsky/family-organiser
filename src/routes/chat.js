@@ -114,7 +114,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const today = new Date().toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
-  const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences, activities] = await Promise.all([
+  const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences, activities, mealPlan] = await Promise.all([
     db.getHouseholdMembers(householdId),
     db.getHouseholdNotes(householdId),
     db.getShoppingList(householdId),
@@ -125,6 +125,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     db.getRecipes(householdId).catch(() => []),
     db.getHouseholdPreferences(householdId).catch(() => []),
     db.getHouseholdActivities(householdId).catch(() => []),
+    db.getMealPlanForWeek(householdId, today, twoWeeks).catch(() => []),
   ]);
 
   // Fetch term dates for the household's schools so the AI can answer
@@ -258,6 +259,22 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
       }).join('\n')
     : '(none)';
 
+  // The next fortnight's meal plan, day-labelled, so "add these to my meal
+  // plan" can spread meals over genuinely free days and "what's for dinner
+  // Thursday?" answers from real data. Days absent from the list are free -
+  // the prompt says so, so an empty plan needs no special copy.
+  const weekday = (dateStr) => {
+    try {
+      return new Date(`${dateStr}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long' });
+    } catch { return ''; }
+  };
+  const mealPlanStr = (mealPlan || []).length > 0
+    ? mealPlan.map((mp) => {
+        const name = mp.meal_name || mp.recipes?.name || 'meal';
+        return `- ${mp.date} (${weekday(mp.date)}) ${mp.category || 'dinner'}: ${name}`;
+      }).join('\n')
+    : '(nothing planned yet - every day is free)';
+
   // Learned family preferences - the same block the WhatsApp classifier sees,
   // so the web/app assistant honours allergies, dietary rules, dislikes and
   // schedule anchors instead of only the legacy household.allergies field.
@@ -286,7 +303,8 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
     .replace(/{{NOTES}}/g, notesStr)
     .replace(/{{PREFERENCES}}/g, preferencesStr)
     .replace(/{{RECIPES}}/g, recipesStr)
-    .replace(/{{ACTIVITIES}}/g, activitiesStr);
+    .replace(/{{ACTIVITIES}}/g, activitiesStr)
+    .replace(/{{MEAL_PLAN}}/g, mealPlanStr);
 
   if (allergiesStr) {
     context += `\n\nHOUSEHOLD ALLERGIES & DIETARY REQUIREMENTS: ${allergiesStr}\nALWAYS avoid these allergens/restrictions when suggesting recipes, meals, or food-related advice.`;
@@ -337,20 +355,33 @@ function extractActions(content) {
   // lazy-to-first-} regex silently dropped any block with nesting, and the
   // lowercase-only tag dropped ```JSON. A dropped block = an action the
   // model emitted but we never executed, while the prose claims success.
+  //
+  // A fence may hold SEVERAL objects, one per line ("add 5 easy dinners"
+  // produced five create_recipe objects in one ```json fence; parsing only
+  // the first saved 1 of 5 recipes while the prose claimed all five). Walk
+  // the fence body object-by-object until the closing backticks.
   const fenceOpen = /```[a-zA-Z]*\s*\n?\s*(?=\{)/g;
   let m;
   while ((m = fenceOpen.exec(content)) !== null) {
-    const jsonText = balancedJson(content, m.index + m[0].length);
-    if (!jsonText) continue;
-    try {
-      const parsed = JSON.parse(jsonText);
-      if (take(parsed)) {
-        // Strip the whole fence (opening tag + JSON + closing backticks if present).
-        const closeAt = content.indexOf('```', m.index + m[0].length + jsonText.length);
-        const fullBlock = content.slice(m.index, closeAt >= 0 ? closeAt + 3 : m.index + m[0].length + jsonText.length);
-        cleanContent = cleanContent.replace(fullBlock, '');
-      }
-    } catch { /* skip malformed JSON */ }
+    let cursor = m.index + m[0].length;
+    const fenceEnd = content.indexOf('```', cursor);
+    const limit = fenceEnd >= 0 ? fenceEnd : content.length;
+    let took = false;
+    while (cursor < limit) {
+      const nextBrace = content.indexOf('{', cursor);
+      if (nextBrace < 0 || nextBrace >= limit) break;
+      const jsonText = balancedJson(content, nextBrace);
+      if (!jsonText) break;
+      try {
+        if (take(JSON.parse(jsonText))) took = true;
+      } catch { /* skip malformed JSON */ }
+      cursor = nextBrace + jsonText.length;
+    }
+    if (took) {
+      // Strip the whole fence (opening tag + JSON + closing backticks if present).
+      const fullBlock = content.slice(m.index, fenceEnd >= 0 ? fenceEnd + 3 : cursor);
+      cleanContent = cleanContent.replace(fullBlock, '');
+    }
   }
 
   // 2. Bare inline {"action": ...} objects (not in fences) - brace-balanced
@@ -870,6 +901,37 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               await db.deleteRecipe(act.recipe_id, req.householdId);
               executedActions.push({ type: 'delete_recipe', name: target.name, id: act.recipe_id });
             }
+          }
+
+        } else if (act.action === 'add_meal_plan' && Array.isArray(act.meals) && act.meals.length > 0) {
+          // Plan meals onto real days. Each entry needs a proper date and a
+          // name; a recipe_id is linked only after verifying it belongs to
+          // this household (a hallucinated or foreign id degrades to a
+          // name-only entry rather than failing the meal or leaking).
+          const VALID_CATEGORIES = new Set(['breakfast', 'lunch', 'snack', 'dinner']);
+          const planned = [];
+          for (const meal of act.meals.slice(0, 21)) {
+            const date = typeof meal?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(meal.date) ? meal.date : null;
+            const name = typeof meal?.meal_name === 'string' ? meal.meal_name.trim() : '';
+            if (!date || !name) {
+              console.warn('[chat] add_meal_plan entry missing date or meal_name - skipping', meal?.date, meal?.meal_name);
+              continue;
+            }
+            let recipeId = null;
+            if (meal.recipe_id) {
+              const recipe = await db.getRecipeById(meal.recipe_id, req.householdId).catch(() => null);
+              recipeId = recipe ? meal.recipe_id : null;
+            }
+            const category = VALID_CATEGORIES.has(String(meal.category || '').toLowerCase())
+              ? String(meal.category).toLowerCase()
+              : 'dinner';
+            const entry = await db.createMealPlanEntry(req.householdId, {
+              date, category, recipe_id: recipeId, meal_name: name,
+            }, req.user.id);
+            planned.push({ date, name, category, id: entry.id });
+          }
+          if (planned.length > 0) {
+            executedActions.push({ type: 'add_meal_plan', meals: planned });
           }
         }
       } catch (actionErr) {

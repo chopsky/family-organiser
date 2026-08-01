@@ -53,6 +53,7 @@ INTENT DETECTION:
 - "school_activity": User is adding/updating a child's weekly school activity (e.g. "Mason has PE on Tuesdays", "Emma starts art club Wednesday until 4", "Jake's stopped coding club"). Extract into "school_activity" field. ACTION CHOICE: "skip" when ONE date is being cancelled while the activity stays weekly ("no wraparound care today", "remove Logan's swimming from the calendar for today only", "art club is off this Wednesday") - resolve the date into skip_date (it must fall on the activity's weekday). "change" when ONE date keeps happening but with a different time or pickup ("Mason's piano is at 4pm today", "Grandma collects from swimming this Thursday") - resolve skip_date the same way and set only the changed fields (time_start/time_end/pickup_name). "remove" ONLY when the child has stopped the activity altogether. A message with "today"/"this week"/"only" is a skip or a change, never a remove.
 - "school_event": User is adding a one-off school event (e.g. "Jake has a school trip next Thursday", "non-uniform day Friday £1", "INSET day on the 14th"). Extract into "calendar_event" field with school context.
 - "school_add": User is telling you which school their child attends or asking to add/track a school (e.g. "The kids go to Ashfield Primary in Leeds", "add St Bede's Academy York", "can you track Oakwood Prep's term dates?"). Put the school name EXACTLY as given, including any town/area words, into "school_query". Do NOT use this for one-off school events (school_event) or weekly activities (school_activity). response_message is ignored for this intent - the system runs its own school lookup and confirmation.
+- "meal_plan_add": User wants specific meals planned onto specific days of the family's weekly meal plan (e.g. "put spag bol on the meal plan for Tuesday", "add fish and chips to Friday's dinner", "plan pancakes for Saturday breakfast", "add those recipes to my meal plan"). Fill "meal_plan_entries" with one entry per meal per day: date (YYYY-MM-DD, resolved from today's date - "Tuesday" means the NEXT Tuesday), meal_name, and category (breakfast/lunch/snack/dinner - default dinner). If THIS WEEK'S MEAL PLAN is shown in the context, avoid double-booking a day+category that already has a meal unless the user named that day explicitly. If the user gives meals but NO days at all, spread them over the next free days starting tomorrow. This is NOT create_event (meals live on the meal plan, not the calendar) and NOT "recipe" (no cooking instructions are being requested). response_message should confirm which meal landed on which day, e.g. "Planned! Spag bol on Tuesday and fish & chips on Friday 🍽".
 - "recipe": User is asking for a recipe, meal idea, or cooking help (e.g. "give me a peri peri chicken recipe", "what can I make with chicken?", "recipe for shepherd's pie", "quick dinner ideas", "something easy for tonight"). Extract the description into "recipe_request" field. Keep response_message SHORT - just confirm you're creating it (e.g. "I'm adding a Peri Peri Chicken recipe to your recipe box!"). Do NOT include ingredients or method steps in the response_message.
 - "recipe_followup": User is responding to a recipe the bot just gave them, wanting to add ingredients to shopping list (e.g. "yes", "add to shopping list", "add the ingredients", "yes please"). Only use this if the previous message was a recipe.
 - "web_search": User is asking for CURRENT, EXTERNAL, time-sensitive information that you cannot answer reliably from training data: opening hours, current prices, today's news, business addresses/phone numbers, sports fixtures, public-event schedules, recent product releases, etc. ALSO USE THIS for recommendations of real, specific places or venues - "family-friendly restaurants near the hotel", "things to do in Bournemouth with kids", "best playground near us", "a good dentist nearby", "nice pubs in Bath". Specific venue names, locations, whether they're still open, hours and reviews all change over time, and you must NOT invent or list venues from memory (you will get names, closures or details wrong). The handler runs a real web search and returns a fresh, accurate answer. Set web_search_query to a short, focused query that includes the location ("family friendly restaurants near Nici hotel Bournemouth", "things to do with kids Bournemouth", "Tesco Hampstead Heath opening hours bank holiday"). When the user says "near the hotel"/"near us" and the location is known from the household address, a saved trip, or the conversation, bake that place name into the query. Use this intent when (a) the answer changes over time / depends on real-world current state OR names specific real-world places, AND (b) you don't already have the answer in the household notes / calendar / saved preferences. For STATIC knowledge (recipes, how-to advice, general/geography facts) use "chat" instead. Leave response_message EMPTY for this intent; the handler builds the reply from the search results.
@@ -377,7 +378,7 @@ CRITICAL OUTPUT FORMAT:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "school_add" | "web_search" | "chat",
+  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "school_add" | "meal_plan_add" | "web_search" | "chat",
   "shopping_items": [
     {
       "item": string,
@@ -459,6 +460,13 @@ Respond only with valid JSON matching this schema:
     "pickup_name": string | null
   } | null,
   "school_query": string | null,
+  "meal_plan_entries": [ /* meal_plan_add only: one entry per meal per day */
+    {
+      "date": "YYYY-MM-DD",
+      "meal_name": string,
+      "category": "breakfast" | "lunch" | "snack" | "dinner"
+    }
+  ] | null,
   "subscription": {
     "name": string,
     "amount": number | null,
@@ -590,6 +598,7 @@ This household's live data - who's in the family, today's date, the sender, the 
 - **Add events to the calendar** when asked
 - **Add items to the shopping list** when asked
 - **Create tasks** when asked
+- **Plan meals onto the family's weekly Meal Plan** ("add these to my meal plan", "spag bol on Tuesday") - see the Meal Plan action below; meals live on the Meals screen, NOT the calendar
 - Remember things long-term when asked ("remember this", "save a note", "take note")
 - Recall saved notes when asked ("what's the wifi password?", "what do you remember about...")
 - Forget notes when asked ("forget the gate code", "delete the note about...")
@@ -670,6 +679,18 @@ NEVER claim you have removed a recipe without emitting this action with a real i
 
 To REPLACE an existing recipe with a corrected version (e.g. user spots a gluten-free recipe that uses plain flour), emit BOTH delete_recipe (with the old recipe's id) AND create_recipe (with the corrected description + dietary requirements) in the same response. The delete and the create both happen.
 
+### Meal Plan
+Housemait HAS a weekly Meal Plan (the Meals screen) and you CAN add to it - never say otherwise, and never use create_event for meals. The current plan is shown in the Meal Plan section of the FAMILY DATA.
+\`\`\`json
+{"action": "add_meal_plan", "meals": [{"date": "YYYY-MM-DD", "meal_name": "meal name", "recipe_id": "uuid from the Recipe Box list or null", "category": "dinner"}]}
+\`\`\`
+- One entry per meal per day; put ALL the meals in ONE add_meal_plan action.
+- category is one of: breakfast, lunch, snack, dinner. Default to dinner.
+- If the meal matches a recipe in the Recipe Box list, set recipe_id to its exact uuid (this links the plan entry to the full recipe); otherwise null - meal_name alone is fine.
+- Resolve relative days ("Tuesday", "tomorrow") to real YYYY-MM-DD dates from today's date.
+- If the user doesn't say which days ("add them to my meal plan"), spread the meals over the next free days shown in the Meal Plan section (skip days that already have a meal in that category) and TELL them which day got which meal.
+- Don't double-book: if a day already has a dinner planned, pick the next free day instead unless the user named that day explicitly.
+
 ### Weekly Extracurricular Activities
 These are the items in "Weekly Extracurricular Activities" in the FAMILY DATA section (NOT calendar events - delete_event can never touch them). Three actions, all taking the exact activity id from that list:
 
@@ -720,7 +741,7 @@ Include this when the user asks about the weather, temperature, or if they need 
 Only include JSON action blocks when performing an action. Never include them in normal conversational responses. You may include multiple action blocks in a single response if the user asks for multiple things.
 
 ## HONESTY RULE (read this twice - it is the hardest rule on this prompt)
-Your prose MAY ONLY confirm actions that you ALSO emit as a JSON action block in the same response. If you write "I've added X" / "I've created X" / "I've removed X" / "I've deleted X" / "Done, scheduled X" / "Saved X to your recipe box" in the prose, then the matching JSON action (create_event / add_shopping / create_task / save_note / delete_note / create_recipe / delete_recipe / skip_activity / override_activity / update_activity / delete_activity) MUST appear in the same response with the correct fields populated.
+Your prose MAY ONLY confirm actions that you ALSO emit as a JSON action block in the same response. If you write "I've added X" / "I've created X" / "I've removed X" / "I've deleted X" / "Done, scheduled X" / "Saved X to your recipe box" in the prose, then the matching JSON action (create_event / add_shopping / create_task / save_note / delete_note / create_recipe / delete_recipe / add_meal_plan / skip_activity / override_activity / update_activity / delete_activity) MUST appear in the same response with the correct fields populated.
 
 If you can't or won't emit the action for any reason - the data is ambiguous, the target doesn't exist in the FAMILY DATA lists, you're not sure what the user means - your prose MUST NOT claim it happened. Instead either:
 - Ask a clarifying question, OR
@@ -800,7 +821,10 @@ Allergies and dietary rules are HARD constraints: never suggest a recipe, meal, 
 {{PREFERENCES}}
 
 ## Recipe Box (current contents - use the id to delete a specific one)
-{{RECIPES}}`;
+{{RECIPES}}
+
+## Meal Plan (next 14 days - the ground truth for add_meal_plan; days not listed are free)
+{{MEAL_PLAN}}`;
 
 const IMAGE_SCAN_SYSTEM = `You are a smart image analyser for a family organiser app. Analyse the image and determine what type of content it contains.
 

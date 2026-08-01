@@ -61,6 +61,7 @@ beforeEach(() => {
   db.getHouseholdPreferences.mockResolvedValue([]);
   db.getHouseholdActivities.mockResolvedValue([{ ...ACTIVITY, skips: [] }]);
   db.getTermDatesBySchoolIds.mockResolvedValue([]);
+  db.getMealPlanForWeek.mockResolvedValue([]);
   db.createConversation.mockResolvedValue({ id: 'c1' });
   db.getChatHistory.mockResolvedValue([]);
   db.saveChatMessage.mockResolvedValue({});

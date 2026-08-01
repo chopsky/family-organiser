@@ -711,4 +711,29 @@ module.exports = [
       return null;
     },
   },
+
+  // ── 2026-08-01: "add them to my meal plan" - the assistant claimed there
+  // was NO meal plan feature (Meals is a main nav tab) because no meal-plan
+  // write intent existed. Two named meals on two named days must route to
+  // meal_plan_add with resolved dates, and NEVER to create_event.
+  {
+    name: 'meal_plan_add: two meals on two named days route to the meal plan, not the calendar',
+    message: 'Put spaghetti bolognese on the meal plan for Tuesday and fish and chips on Friday',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent === 'create_event') return 'misrouted to create_event - meals are not calendar events';
+      if (r.intent !== 'meal_plan_add') return `intent ${r.intent}`;
+      const entries = r.meal_plan_entries || [];
+      if (entries.length !== 2) return `${entries.length} entries (wanted 2)`;
+      const spag = entries.find((e) => /bologn|spag/i.test(e.meal_name || ''));
+      const fish = entries.find((e) => /fish/i.test(e.meal_name || ''));
+      if (!spag || !fish) return `entries ${JSON.stringify(entries.map((e) => e.meal_name))}`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(spag.date || '')) return `spag date ${spag.date}`;
+      // Tuesday resolves to the NEXT Tuesday; both dates must land on the right weekday.
+      const dow = (d) => new Date(`${d}T12:00:00Z`).getUTCDay();
+      if (dow(spag.date) !== 2) return `spag bol on weekday ${dow(spag.date)} (wanted Tuesday)`;
+      if (dow(fish.date) !== 5) return `fish & chips on weekday ${dow(fish.date)} (wanted Friday)`;
+      return null;
+    },
+  },
 ];

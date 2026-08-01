@@ -3079,6 +3079,54 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     return await handleSubscriptionList(household, actions);
   }
 
+  // Plan meals onto the weekly meal plan ("spag bol on Tuesday"). Before this
+  // intent existed the bot (and web chat) claimed there was no meal plan
+  // feature - while Meals is a main nav tab. Entries are linked to a Recipe
+  // Box recipe by name when one matches, so the planned meal opens the full
+  // recipe in the app.
+  if (result.intent === 'meal_plan_add') {
+    const entries = Array.isArray(result.meal_plan_entries) ? result.meal_plan_entries.filter(Boolean) : [];
+    const valid = entries.filter((e) => typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
+      && typeof e.meal_name === 'string' && e.meal_name.trim());
+    if (valid.length === 0) {
+      return { response: "Which meal should go on which day? Tell me like 'spag bol on Tuesday' and I'll pop it on the meal plan. 🍽", actions };
+    }
+    const recipes = await db.getRecipes(household.id).catch(() => []);
+    const findRecipe = (name) => {
+      const n = name.trim().toLowerCase();
+      return recipes.find((r) => {
+        const rn = String(r.name || '').toLowerCase();
+        return rn === n || rn.includes(n) || n.includes(rn);
+      }) || null;
+    };
+    const MEAL_CATEGORIES = new Set(['breakfast', 'lunch', 'snack', 'dinner']);
+    const planned = [];
+    for (const entry of valid.slice(0, 21)) {
+      const category = MEAL_CATEGORIES.has(String(entry.category || '').toLowerCase())
+        ? String(entry.category).toLowerCase()
+        : 'dinner';
+      const created = await db.createMealPlanEntry(household.id, {
+        date: entry.date,
+        category,
+        recipe_id: findRecipe(entry.meal_name)?.id || null,
+        meal_name: entry.meal_name.trim(),
+      }, user.id).catch((err) => {
+        console.error('[handlers] meal_plan_add insert failed:', err.message);
+        return null;
+      });
+      if (created) planned.push({ date: entry.date, meal_name: entry.meal_name.trim(), category });
+    }
+    if (planned.length === 0) {
+      return { response: "⚠️ I couldn't save that to the meal plan just now - please try again.", actions };
+    }
+    const dayLabel = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+    const lines = planned.map((p) => `• ${dayLabel(p.date)}${p.category !== 'dinner' ? ` (${p.category})` : ''}: *${p.meal_name}*`).join('\n');
+    const failNote = planned.length < valid.length
+      ? `\n⚠️ ${valid.length - planned.length} of them couldn't be saved - try those again.`
+      : '';
+    return { response: `🍽 On the meal plan:\n${lines}${failNote}`, actions };
+  }
+
   // Handle calendar event creation (primary path - intent explicitly create_event)
   // Multi-event messages ("swimming Tue 4pm and dentist Thu 9am") arrive in
   // result.calendar_events (Phase 3); a single event stays in
