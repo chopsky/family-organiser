@@ -872,13 +872,15 @@ router.post('/events', async (req, res) => {
         // suffix degrades gracefully: an undated everyone-event just
         // reads "Padel".
         const titleWithWhen = `${event.title}${when ? ` - ${when}` : ''}${who}`;
-        const pushBody = `${creatorName} added "${titleWithWhen}"`;
-        push.sendToHousehold(req.householdId, req.user.id, {
+        // One notification per member: toHousehold routes push-first (app
+        // users) with WhatsApp only for members without the app. Never pair
+        // this with push.sendToHousehold - that's the double-notification
+        // bug (2026-08-03).
+        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${titleWithWhen}`, {
           title: 'New event',
-          body: pushBody,
+          body: `${creatorName} added "${titleWithWhen}"`,
           category: 'calendar_reminders',
-        }).catch((err) => console.error('[calendar] push failed:', err.message));
-        broadcast.toHousehold(req.user.id, members, `📅 ${creatorName} added event: ${titleWithWhen}`);
+        });
       } catch (err) {
         console.error('[calendar] notify household failed:', err.message);
       }

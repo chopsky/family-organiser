@@ -1413,12 +1413,11 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       const { summariseEventChanges, summariseTaskChanges } = require('../utils/notification-format');
       const eventDiff = summariseEventChanges(hit, eventUpdates, household.timezone || 'Europe/London');
       const eventTail = eventDiff ? ` - ${eventDiff}` : '';
-      broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}${eventTail}`);
-      push.sendToHousehold(household.id, user.id, {
+      broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}${eventTail}`, {
         title: 'Event updated',
         body: `${user.name} updated "${updated.title}"${eventTail}`,
         category: 'calendar_reminders',
-      }).catch((err) => console.error('[handlers] update_event push failed:', err.message));
+      });
       // Tell the user exactly what changed, not just "updated" - e.g.
       // 'Updated "Mason Piano" - moved to Thu 18 Jun at 16:00.'
       const updTemplate = `✏️ Updated "${updated.title}"${eventTail}.`;
@@ -1788,17 +1787,11 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
     actions.eventsAdded.push(created || { title: ev.title });
     rememberAdd(user.id, 'event', [created.id], `"${ev.title}"`);
 
-    // iOS push for household members living in the native app. Include
-    // the date/time tail so the lock-screen preview is useful at a
-    // glance ("Grant added 'Padel - Today, 09:00-10:00'").
-    const { formatEventWhen } = require('../utils/event-when');
-    const pushWhen = formatEventWhen(created || ev, household.timezone || 'Europe/London');
-    const pushTail = pushWhen ? ` - ${pushWhen}` : '';
-    push.sendToHousehold(household.id, user.id, {
-      title: 'New event',
-      body: `${user.name} added "${ev.title}${pushTail}"`,
-      category: 'calendar_reminders',
-    }).catch((err) => console.error('[handlers] calendar push failed:', err.message));
+    // No separate push here: the combined broadcast built by
+    // buildBroadcastMessage (sent from whatsapp.js after the turn) routes
+    // per member - app users get it as a push, WhatsApp-only members as a
+    // message. A push here on top gave app users the same event twice
+    // (2026-08-03).
 
     return { kind: 'created', created };
   } catch (err) {
