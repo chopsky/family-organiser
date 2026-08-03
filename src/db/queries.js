@@ -8692,6 +8692,34 @@ async function deleteEmptyHousehold(householdId, db = supabase) {
 }
 
 /**
+ * Schools whose family chose LA dates but where no import ever ran - the
+ * term-dates backfill sweep's worklist. Both sides paginated (Supabase's
+ * silent 1000-row cap would otherwise make a school look empty just because
+ * its dates fell past the first page of school_term_dates).
+ */
+async function getSchoolsWithNoTermDates(db = supabase) {
+  const pageAll = async (table, columns, filter) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = db.from(table).select(columns).range(from, from + 999);
+      if (filter) q = filter(q);
+      const { data, error } = await q;
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  };
+  const [schools, dates] = await Promise.all([
+    pageAll('household_schools',
+      'id, household_id, school_name, school_urn, school_type, local_authority, postcode, uses_la_dates, directory_school_id',
+      (q) => q.eq('uses_la_dates', true)),
+    pageAll('school_term_dates', 'school_id'),
+  ]);
+  const withDates = new Set(dates.map((d) => d.school_id));
+  return schools.filter((s) => !withDates.has(s.id));
+}
+
+/**
  * The deletion ledger, newest first. Selects * so the enriched churn columns
  * (migration-deletion-audit-churn.sql) appear as soon as the migration runs,
  * without a code change.
@@ -10287,6 +10315,7 @@ module.exports = {
   claimHouseholdForUser,
   deleteEmptyHousehold,
   getEmptyHouseholds,
+  getSchoolsWithNoTermDates,
   getDeletionLog,
   getUserAdAttribution,
   setUserAdAttribution,

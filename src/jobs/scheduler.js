@@ -799,6 +799,35 @@ function startScheduler() {
     console.log('• Monthly LA term-dates import disabled (set LA_IMPORT_CRON_ENABLED=true to enable)');
   }
 
+  // ── Term-dates backfill sweep: Mondays 04:30 UTC ───────────────────────────
+  // Fills schools whose family chose "use my council's dates" but where the
+  // import never ran (POST /api/schools only stores the flag). Free reads
+  // only - shared school directory, LA directory, LA scrape cache - never a
+  // live council scrape, so it is safe to run unattended and needs no env
+  // gate. Weekly lock so one instance runs it; the admin alert makes silent
+  // fills visible.
+  cron.schedule('30 4 * * 1', async () => {
+    try {
+      const weekKey = new Date().toISOString().slice(0, 10);
+      if (!(await db.acquireSchedulerLock('term-dates-backfill', weekKey))) return;
+      const { backfillEmptyTermDates } = require('../services/term-dates-backfill');
+      const result = await backfillEmptyTermDates();
+      console.log(`[term-backfill] considered=${result.considered} filled=${result.filled.length} skipped=${result.skipped.length}`);
+      if (result.filled.length > 0) {
+        const { sendAdminAlert } = require('../services/email');
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        await sendAdminAlert(
+          `Term-dates backfill: filled ${result.filled.length} school(s)`,
+          result.filled.map((f) => `<strong>${esc(f.school)}</strong>: ${f.count} dates from ${esc(f.source)}`).join('<br/>') +
+          (result.skipped.length ? `<br/><br/>Still empty: ${result.skipped.map((s) => esc(s.school)).join(', ')}` : ''),
+        );
+      }
+    } catch (err) {
+      console.error('[term-backfill] weekly sweep failed:', err.message);
+    }
+  });
+  console.log('✓ Term-dates backfill sweep scheduled (Mondays 04:30 UTC)');
+
   // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
   // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
   // for 3+ days - opening the app is itself the fix (foreground sync).

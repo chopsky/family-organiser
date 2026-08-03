@@ -577,11 +577,24 @@ function SchoolsCard({ schools }) {
                     No term dates
                   </span>
                 )}
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
-                  s.uses_la_dates ? 'bg-plum-light text-plum' : 'bg-cream text-warm-grey'
-                }`}>
-                  {s.uses_la_dates ? 'LA dates' : 'Own dates'}
-                </span>
+                {/* uses_la_dates records the family's CHOICE at add time, not
+                    what was imported. With zero dates present, a bare "LA
+                    dates" badge contradicts the "No term dates" one - say
+                    what actually happened instead. */}
+                {s.uses_la_dates && !hasDates ? (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-warm-grey text-xs font-semibold"
+                    title="The family chose council dates when adding the school, but the import never ran - the weekly backfill sweep will fill it from the directory or LA cache when possible."
+                  >
+                    LA dates chosen · never imported
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    s.uses_la_dates ? 'bg-plum-light text-plum' : 'bg-cream text-warm-grey'
+                  }`}>
+                    {s.uses_la_dates ? 'LA dates' : 'Own dates'}
+                  </span>
+                )}
                 {s.ical_url && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-plum-light text-plum text-xs font-semibold" title={s.ical_url}>
                     iCal feed
