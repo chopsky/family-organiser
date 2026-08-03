@@ -121,6 +121,63 @@ describe('importAuthority', () => {
     expect(res.status).toBe('failed');
     expect(res.error).toMatch(/socket hang up/);
   });
+
+  // The Bexley trap (2026-08-03): a STORED year-stamped source_url kept
+  // re-importing last year's page while reporting "ok". When the stored page
+  // yields nothing for the NEXT academic year, the importer must look up
+  // next year's own page, merge its dates, and store the fresh URL.
+  test('stored URL with no next-year dates → next-year top-up merges and re-points source_url', async () => {
+    const STORED = { ...LA, source_url: 'https://barnet.gov.uk/term-dates-2025-2026' };
+    fetchTermDatesPageText
+      .mockResolvedValueOnce('old year page')
+      .mockResolvedValueOnce('new year page');
+    extractTermDatesPreview
+      .mockResolvedValueOnce({ ok: true, body: { dates: [
+        { event_type: 'term_start', date: '2025-09-03', academic_year: '2025-2026', label: 'Autumn term' },
+      ] } })
+      .mockResolvedValueOnce({ ok: true, body: { dates: [
+        { event_type: 'term_start', date: '2026-09-02', academic_year: '2026-2027', label: 'Term one begins' },
+      ] } });
+    findOfficialTermDatesUrl.mockResolvedValue('https://barnet.gov.uk/term-dates-2026-2027');
+
+    const res = await importAuthority(STORED, AYS);
+
+    expect(res.status).toBe('ok');
+    expect(res.dateCount).toBe(2); // merged: old year + topped-up new year
+    // The next-year search was for the NEXT academic year specifically.
+    expect(findOfficialTermDatesUrl).toHaveBeenCalledWith({ localAuthority: 'Barnet', academicYear: '2026-2027' });
+    // Provenance re-points at the fresher page so next month's run reads it.
+    expect(lastStatus().source_url).toBe('https://barnet.gov.uk/term-dates-2026-2027');
+  });
+
+  test('no top-up when the stored page already carries next year', async () => {
+    const STORED = { ...LA, source_url: 'https://barnet.gov.uk/term-dates' };
+    fetchTermDatesPageText.mockResolvedValue('page with both years');
+    extractTermDatesPreview.mockResolvedValue({ ok: true, body: { dates: [
+      { event_type: 'term_start', date: '2025-09-03', academic_year: '2025-2026', label: 'Autumn term' },
+      { event_type: 'term_start', date: '2026-09-02', academic_year: '2026-2027', label: 'Term one begins' },
+    ] } });
+
+    await importAuthority(STORED, AYS);
+
+    expect(findOfficialTermDatesUrl).not.toHaveBeenCalled();
+    expect(fetchTermDatesPageText).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failed top-up never loses the current-year import', async () => {
+    const STORED = { ...LA, source_url: 'https://barnet.gov.uk/term-dates-2025-2026' };
+    fetchTermDatesPageText.mockResolvedValueOnce('old year page');
+    extractTermDatesPreview.mockResolvedValueOnce({ ok: true, body: { dates: [
+      { event_type: 'term_start', date: '2025-09-03', academic_year: '2025-2026', label: 'Autumn term' },
+    ] } });
+    findOfficialTermDatesUrl.mockRejectedValue(new Error('search quota'));
+
+    const res = await importAuthority(STORED, AYS);
+
+    expect(res.status).toBe('ok');
+    expect(res.dateCount).toBe(1);
+    expect(lastStatus().source_url).toBe('https://barnet.gov.uk/term-dates-2025-2026');
+  });
 });
 
 describe('dedupeDates', () => {

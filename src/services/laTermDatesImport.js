@@ -60,7 +60,7 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
     // found (stored on the LA), which skips a whole web_search per authority.
     // A stale/broken cached URL just fails the direct fetch and falls through
     // to the search path below, exactly like a council we have never resolved.
-    const url = la.source_url || await findOfficialTermDatesUrl({ localAuthority: la.name, academicYear: ays.currentAY });
+    let url = la.source_url || await findOfficialTermDatesUrl({ localAuthority: la.name, academicYear: ays.currentAY });
 
     // ── 1) Direct: read the council's own page. ────────────────────────────
     let dates = [];
@@ -79,6 +79,37 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
         }
       } catch (err) {
         directError = `Found ${url} but could not read it: ${err.message}`;
+      }
+    }
+
+    // ── 1b) Next-year top-up when a STORED url came up short. ──────────────
+    // A stored source_url is a shortcut, not gospel: councils publish
+    // year-stamped pages (…/school-term-dates-2025-2026), and a URL that was
+    // right last year keeps re-importing last year while reporting "ok" -
+    // found live 2026-08-03, when Bexley's refresh re-read its 2025-26 page
+    // and 15 more councils held year-stamped URLs. The year-roll on 1 Sept
+    // self-heals this (the old page then yields nothing in-year and the
+    // search fallback takes over); the blind spot is the summer window,
+    // which is exactly when families want next year. So: if the stored page
+    // produced dates but nothing for the NEXT academic year, look up next
+    // year's own page, merge what it has, and store IT as the new source.
+    if (la.source_url && dates.length && !dates.some((d) => d.academic_year === ays.nextAY)) {
+      try {
+        const freshUrl = await findOfficialTermDatesUrl({ localAuthority: la.name, academicYear: ays.nextAY });
+        if (freshUrl && freshUrl !== url) {
+          const pageText = await fetchTermDatesPageText(freshUrl);
+          const result = await extractTermDatesPreview({ pageText, country: 'GB', currentAY: ays.currentAY, nextAY: ays.nextAY, sourceLabel: freshUrl });
+          const nextYearDates = result.ok
+            ? (result.body.dates || []).filter((d) => d.academic_year === ays.nextAY)
+            : [];
+          if (nextYearDates.length) {
+            dates = [...dates, ...nextYearDates];
+            url = freshUrl;
+          }
+        }
+      } catch (err) {
+        // Top-up is best-effort - the current year's dates still import.
+        console.log(`[la-import] next-year top-up for ${la.name} failed: ${err.message}`);
       }
     }
 
