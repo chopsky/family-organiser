@@ -8720,6 +8720,50 @@ async function getSchoolsWithNoTermDates(db = supabase) {
 }
 
 /**
+ * LA-sourced schools whose dates have ALL passed - the Hopwood case
+ * (2026-08-03): a family imported council dates in July, the year ended,
+ * and the school sat on 14 expired rows that the empty-school sweep never
+ * touched. Only term_dates_source='local_authority' qualifies: that data
+ * came from the LA import, so replacing it with the council's newer year
+ * is safe. Manual/website/iCal-sourced dates are the family's own work and
+ * are never refreshed behind their back.
+ */
+async function getLaSourcedSchoolsWithStaleDates(db = supabase) {
+  const pageAll = async (table, columns, filter) => {
+    const out = [];
+    for (let from = 0; ; from += 1000) {
+      let q = db.from(table).select(columns).range(from, from + 999);
+      if (filter) q = filter(q);
+      const { data, error } = await q;
+      if (error) throw error;
+      out.push(...(data || []));
+      if (!data || data.length < 1000) return out;
+    }
+  };
+  const [schools, dates] = await Promise.all([
+    pageAll('household_schools',
+      'id, household_id, school_name, school_urn, school_type, local_authority, postcode, uses_la_dates, directory_school_id, term_dates_source',
+      (q) => q.eq('term_dates_source', 'local_authority')),
+    pageAll('school_term_dates', 'school_id, event_type, date, end_date'),
+  ]);
+  // Staleness is judged on TERM BOUNDARIES only. A trailing "Summer holiday
+  // 22 Jul → 28 Aug" row keeps the max date looking fresh all summer while
+  // the school can't answer "when does school go back" - the exact shape
+  // that hid Hopwood Primary from the first version of this query.
+  const hasDates = new Set();
+  const lastBoundaryOf = new Map();
+  for (const d of dates) {
+    hasDates.add(d.school_id);
+    if (d.event_type !== 'term_start' && d.event_type !== 'term_end') continue;
+    const last = d.end_date || d.date || '';
+    if (last > (lastBoundaryOf.get(d.school_id) || '')) lastBoundaryOf.set(d.school_id, last);
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  return schools.filter((s) => hasDates.has(s.id)
+    && (!lastBoundaryOf.has(s.id) || lastBoundaryOf.get(s.id) < today));
+}
+
+/**
  * The deletion ledger, newest first. Selects * so the enriched churn columns
  * (migration-deletion-audit-churn.sql) appear as soon as the migration runs,
  * without a code change.
@@ -10316,6 +10360,7 @@ module.exports = {
   deleteEmptyHousehold,
   getEmptyHouseholds,
   getSchoolsWithNoTermDates,
+  getLaSourcedSchoolsWithStaleDates,
   getDeletionLog,
   getUserAdAttribution,
   setUserAdAttribution,

@@ -6,6 +6,7 @@
  */
 jest.mock('../db/queries', () => ({
   getSchoolsWithNoTermDates: jest.fn(),
+  getLaSourcedSchoolsWithStaleDates: jest.fn(() => Promise.resolve([])),
   deleteAllTermDatesBySchool: jest.fn(() => Promise.resolve()),
   addSchoolTermDates: jest.fn(() => Promise.resolve([])),
   updateHouseholdSchoolMeta: jest.fn(() => Promise.resolve()),
@@ -47,6 +48,8 @@ beforeEach(() => {
   // mockResolvedValue survives clearAllMocks - re-prime the defaults so one
   // test's stub can't bleed into the next.
   lookupDirectoryDatesForSchool.mockResolvedValue(null);
+  db.getSchoolsWithNoTermDates.mockResolvedValue([]);
+  db.getLaSourcedSchoolsWithStaleDates.mockResolvedValue([]);
   propagateDirectorySchoolDates.mockResolvedValue({ updated: 1 });
   dirDb.linkHouseholdSchoolToDirectory.mockResolvedValue(true);
   laDb.getDirectoryTermDatesByName.mockResolvedValue([]);
@@ -103,6 +106,21 @@ test('an independent school NEVER receives council dates', async () => {
 test('a school with no LA (a nursery) skips the council paths cleanly', async () => {
   const r = await backfillSchoolTermDates({ ...SCHOOL, local_authority: null });
   expect(r).toEqual({ filled: false, reason: 'no_local_authority' });
+});
+
+test('an LA-sourced school with only PAST dates is refreshed by the sweep (the Hopwood case)', async () => {
+  db.getSchoolsWithNoTermDates.mockResolvedValue([]);
+  db.getLaSourcedSchoolsWithStaleDates.mockResolvedValue([
+    { ...SCHOOL, id: 's-stale', school_name: 'Hopwood Community Primary', term_dates_source: 'local_authority' },
+  ]);
+  laDb.getDirectoryTermDatesByName.mockResolvedValue(LA_DATES);
+
+  const result = await backfillEmptyTermDates();
+
+  expect(result.filled).toHaveLength(1);
+  expect(result.filled[0]).toMatchObject({ school: 'Hopwood Community Primary', refresh: true, source: 'la_directory' });
+  // Full clean replace: the expired rows go, the live year lands.
+  expect(db.deleteAllTermDatesBySchool).toHaveBeenCalledWith('s-stale');
 });
 
 test('the sweep survives one broken school and reports the tally', async () => {

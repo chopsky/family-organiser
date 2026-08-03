@@ -130,17 +130,35 @@ async function backfillSchoolTermDates(school) {
 }
 
 /**
- * The sweep: every school still waiting on its chosen-but-never-imported LA
- * dates. One school failing never aborts the rest.
+ * The sweep, over two candidate sets:
+ *   1. Empty schools whose family chose LA dates but no import ever ran.
+ *   2. LA-sourced schools whose dates have ALL passed (the Hopwood case:
+ *      imported in July, the year ended, and the family sat on 14 expired
+ *      rows). Refreshing these is safe - the data came from the LA import,
+ *      not the family's own work - and the same liveTermYears gate means a
+ *      refresh only happens when the council has genuinely newer data.
+ * One school failing never aborts the rest.
  */
 async function backfillEmptyTermDates() {
-  const candidates = await db.getSchoolsWithNoTermDates();
+  const [empty, stale] = await Promise.all([
+    db.getSchoolsWithNoTermDates(),
+    db.getLaSourcedSchoolsWithStaleDates().catch(() => []),
+  ]);
+  const candidates = [
+    ...empty,
+    ...stale.map((s) => ({ ...s, __refresh: true })),
+  ];
   const filled = [];
   const skipped = [];
   for (const school of candidates) {
     try {
       const result = await backfillSchoolTermDates(school);
-      const entry = { school: school.school_name, household_id: school.household_id, ...result };
+      const entry = {
+        school: school.school_name,
+        household_id: school.household_id,
+        ...(school.__refresh ? { refresh: true } : {}),
+        ...result,
+      };
       (result.filled ? filled : skipped).push(entry);
     } catch (err) {
       console.error(`[term-backfill] failed for ${school.school_name}:`, err.message);
