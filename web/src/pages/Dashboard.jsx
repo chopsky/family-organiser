@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useChildMode } from '../context/ChildModeContext';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
+import { maybeRequestEarnedReview } from '../lib/appReview';
 import { getItemEmoji } from '../lib/shopping-constants';
 import { isAndroid } from '../lib/platform';
 import Spinner from '../components/Spinner';
@@ -360,6 +361,15 @@ export default function Dashboard() {
   }, [queryClient, hid]);
   const ptr = usePullToRefresh(refreshAll);
   useAppForegroundRefresh(refreshAll);
+
+  // Review prompt, earned by the wins engine (lib/appReview). Requested HERE
+  // and nowhere else: the Dashboard is hidden in Child Mode (kids land on
+  // /tasks), so whoever is looking at this screen is an adult. Small delay
+  // so the sheet never races the page paint.
+  useEffect(() => {
+    const id = setTimeout(maybeRequestEarnedReview, 2000);
+    return () => clearTimeout(id);
+  }, []);
 
   // The AI chat overlay mutates digest data (events, tasks, shopping)
   // while this page stays mounted - refetch on its broadcast so the

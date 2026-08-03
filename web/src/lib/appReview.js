@@ -44,16 +44,27 @@ export function markAppSeen() {
 }
 
 /**
- * Record one moment of value and ask for a review once enough have stacked
- * up. Cheap enough to call from any success path; every guard lives in
- * maybeRequestReview, so callers never need to think about policy.
+ * Record one moment of value. Counting ONLY - the sheet is never shown from
+ * a win site, because the finger on the screen at a win moment is often a
+ * child's (chores especially). Callers must not count wins that are likely
+ * kid-initiated (a tick on a dependent's chore doesn't qualify).
  */
 export function recordWin() {
   try {
     if (!Capacitor.isNativePlatform()) return;
-    const wins = Number(safeGet(WINS_KEY) || 0) + 1;
-    safeSet(WINS_KEY, String(wins));
-    if (wins >= MIN_WINS) maybeRequestReview();
+    safeSet(WINS_KEY, String(Number(safeGet(WINS_KEY) || 0) + 1));
+  } catch { /* never surface */ }
+}
+
+/**
+ * Show the review sheet if the family has earned it. Called ONLY from the
+ * Dashboard on mount - a screen Child Mode cannot reach (kids land on
+ * /tasks), so the person looking at it is an adult. All other guards
+ * (native, 7 days, once per version) live in maybeRequestReview.
+ */
+export function maybeRequestEarnedReview() {
+  try {
+    if (Number(safeGet(WINS_KEY) || 0) >= MIN_WINS) maybeRequestReview();
   } catch { /* never surface */ }
 }
 

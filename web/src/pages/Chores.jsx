@@ -18,7 +18,7 @@ import DesktopChoresWeek from './chores/DesktopChoresWeek';
 import { useChildMode } from '../context/ChildModeContext';
 import { useAuth } from '../context/AuthContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
-import { maybeRequestReview, recordWin } from '../lib/appReview';
+import { recordWin } from '../lib/appReview';
 
 // Design-handoff tokens (page-local; member colours come from each record).
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -576,7 +576,10 @@ export default function Chores() {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next, slot: task.slot || '' });
       if (data.balances) setBalances(data.balances);
       if (justFinishedAll) setCelebrate({ member, balance: data.balances?.[mid] ?? 0 });
-      if (next) recordWin();
+      // Review-prompt win: adult ticks only. A tick on a kid's chore is often
+      // the kid's own finger on a shared device, and children must never be
+      // steered toward the review sheet.
+      if (next && member && !isKid(member)) recordWin();
     } catch {
       setTasks((ts) => ts.map((t) => ((t.occurrence_key || t.id) === ek ? { ...t, done: { ...t.done, [mid]: !next } } : t))); // revert
     }
@@ -621,7 +624,8 @@ export default function Chores() {
     try {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: memberId, date: selDateStr, done });
       if (data.balances) setBalances(data.balances);
-      if (done) recordWin();
+      const who = members.find((m) => m.id === memberId);
+      if (done && who && !isKid(who)) recordWin();
     } catch { loadDay(selDateStr); }
   }, [selDateStr, loadDay]);
 
@@ -674,7 +678,8 @@ export default function Chores() {
     try {
       const { data } = await api.post(`/chores/${def.id}/complete`, { member_id: memberId, date: dateStr, done: nextDone, slot: slot || '' });
       if (data.balances) setWeekData((wd) => (wd ? { ...wd, balances: data.balances } : wd));
-      if (nextDone) recordWin();
+      const who = members.find((m) => m.id === memberId);
+      if (nextDone && who && !isKid(who)) recordWin();
     } catch { loadWeek(weekRefStr); }
   }, [weekRefStr, loadWeek]);
 
@@ -865,7 +870,10 @@ export default function Chores() {
           sheet. This page only renders OUTSIDE Child Mode (ChildGate swaps
           /tasks to KidsShell), so unlike the kids' quest celebration an adult
           is holding the device. Guarded in lib/appReview.js. */}
-      {celebrate && <Celebration data={celebrate} onClose={() => { setCelebrate(null); maybeRequestReview(); }} onGo={() => { const mid = celebrate.member?.id; setCelebrate(null); maybeRequestReview(); navigate(mid ? `/rewards?member=${mid}` : '/rewards'); }} />}
+      {/* No review request here any more: the celebrating member is often a
+          child, and the tap dismissing the celebration may be theirs. The
+          sheet now only ever appears on the Dashboard (adult-only surface). */}
+      {celebrate && <Celebration data={celebrate} onClose={() => setCelebrate(null)} onGo={() => { const mid = celebrate.member?.id; setCelebrate(null); navigate(mid ? `/rewards?member=${mid}` : '/rewards'); }} />}
       {claim && <WhoCompletedModal task={claim} members={members} currentUserId={user?.id} onClose={() => setClaim(null)} onPick={(mid) => { setAnyoneDone(claim, mid, true); setClaim(null); }} />}
     </div>
   );
