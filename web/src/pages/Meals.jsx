@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { recordWin } from '../lib/appReview';
 import { loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
 import { PageListSkeleton } from '../components/Skeleton';
@@ -349,6 +350,7 @@ function MealPlanView({ setError }) {
           date: pickerCell.date,
           category: categoryLower,
         });
+        recordWin();
       }
       setPickerCell(null);
       setEditingMeal(null);
@@ -1930,6 +1932,7 @@ function RecipeDetailModal({ recipe: initialRecipe, onClose, onEdit, onDelete, s
     setAddingToPlan(true);
     try {
       await api.post('/meals', { date: planDay, category: planCategory.toLowerCase(), recipe_id: recipe.id, meal_name: recipe.name });
+      recordWin();
       alert('Added to meal plan!');
       setAddingToPlan(false);
       setPlanDay('');

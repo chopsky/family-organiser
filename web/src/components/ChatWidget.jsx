@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
+import { recordWin } from '../lib/appReview';
 import { getDeviceLocation } from '../lib/location';
 import { useAuth } from '../context/AuthContext';
 import Sheet from './ui/Sheet';
@@ -498,6 +499,9 @@ I'm always here if you need me!`;
       // add Padel, it confirmed, but there's nothing there.")
       if (data.actions?.length) {
         window.dispatchEvent(new Event('housemait:data-changed'));
+        // The assistant just did something real for the family - one of the
+        // "moments of value" the review prompt waits for.
+        recordWin();
       }
     } catch {
       const errorMsg = { role: 'assistant', content: 'Sorry, I had trouble responding. Please try again.', created_at: new Date().toISOString() };
@@ -562,6 +566,9 @@ I'm always here if you need me!`;
       // create events or tick off shopping items.
       if (data.actions?.length) {
         window.dispatchEvent(new Event('housemait:data-changed'));
+        // The assistant just did something real for the family - one of the
+        // "moments of value" the review prompt waits for.
+        recordWin();
       }
     } catch {
       const errorMsg = {

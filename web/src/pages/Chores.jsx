@@ -18,7 +18,7 @@ import DesktopChoresWeek from './chores/DesktopChoresWeek';
 import { useChildMode } from '../context/ChildModeContext';
 import { useAuth } from '../context/AuthContext';
 import { CHORE_EMOJI_CATS, searchChoreEmojis } from '../lib/choreIcons';
-import { maybeRequestReview } from '../lib/appReview';
+import { maybeRequestReview, recordWin } from '../lib/appReview';
 
 // Design-handoff tokens (page-local; member colours come from each record).
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -576,6 +576,7 @@ export default function Chores() {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: mid, date: selDateStr, done: next, slot: task.slot || '' });
       if (data.balances) setBalances(data.balances);
       if (justFinishedAll) setCelebrate({ member, balance: data.balances?.[mid] ?? 0 });
+      if (next) recordWin();
     } catch {
       setTasks((ts) => ts.map((t) => ((t.occurrence_key || t.id) === ek ? { ...t, done: { ...t.done, [mid]: !next } } : t))); // revert
     }
@@ -620,6 +621,7 @@ export default function Chores() {
     try {
       const { data } = await api.post(`/chores/${task.id}/complete`, { member_id: memberId, date: selDateStr, done });
       if (data.balances) setBalances(data.balances);
+      if (done) recordWin();
     } catch { loadDay(selDateStr); }
   }, [selDateStr, loadDay]);
 
@@ -672,6 +674,7 @@ export default function Chores() {
     try {
       const { data } = await api.post(`/chores/${def.id}/complete`, { member_id: memberId, date: dateStr, done: nextDone, slot: slot || '' });
       if (data.balances) setWeekData((wd) => (wd ? { ...wd, balances: data.balances } : wd));
+      if (nextDone) recordWin();
     } catch { loadWeek(weekRefStr); }
   }, [weekRefStr, loadWeek]);
 
