@@ -298,7 +298,6 @@
 .lv-appstore .lines { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
 .lv-appstore .l1 { font-size: 10.5px; letter-spacing: 0.06em; opacity: 0.8; }
 .lv-appstore .l2 { font-size: 17px; font-weight: 700; }
-.lv-android { display: inline-flex; align-items: center; padding: 15.5px 22px; border-radius: 16px; border: 1.5px solid rgba(252, 250, 246, 0.4); color: rgba(252, 250, 246, 0.9); font-size: 14px; font-weight: 600; }
 .lv-cta-web { position: relative; display: block; margin-top: 22px; }
 .lv-cta-web a { color: rgba(252, 250, 246, 0.85); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .lv-cta-web a:hover { color: #fff; }

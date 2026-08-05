@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import '../landing.css'
 import { useLocale } from '../hooks/useLocale'
 import HreflangTags from '../components/HreflangTags'
-import { APP_STORE_URL, APP_STORE_CONFIGURED } from '../lib/app-store'
+import { APP_STORE_URL, APP_STORE_CONFIGURED, PLAY_STORE_URL, PLAY_STORE_CONFIGURED } from '../lib/app-store'
 
 /**
  * Housemait marketing site — "scroll story" design, ported from
@@ -89,7 +89,7 @@ function buildFaqs(locale) {
     { q: 'Do both parents see the same thing?', a: 'Yes. Everyone in the family shares the same calendar, lists and plans, live. Add something on the school run and it’s on your partner’s phone before you’re home.' },
     { q: 'Is it safe for kids?', a: 'Child Mode is a separate, playful space with their quests, stars and countdowns, and nothing else. No ads, no messages from strangers, no social feed. You decide what they see.' },
     { q: 'How much does it cost?', a: `Housemait is ${p.monthly} a month, or ${p.annual} a year (two months free). One subscription covers the whole household, and you can cancel anytime.` },
-    { q: 'Which phones does it work on?', a: 'Housemait is on iPhone today, and the WhatsApp assistant works from any phone. Android is on the way.' },
+    { q: 'Which phones does it work on?', a: 'Housemait is on iPhone and Android, and the WhatsApp assistant works from any phone.' },
   ]
 }
 
@@ -144,7 +144,7 @@ const FileIcon = () => (
  * on every pointer/keyboard entry, since scroll changes the answer). Touch
  * devices never see the popover (CSS hover gate) — a tap just navigates.
  */
-function QrLink({ href, className, children, ariaLabel, preferUp = false }) {
+function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '/assets/app-store-qr.svg' }) {
   const wrapRef = useRef(null)
   const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
   const recompute = () => {
@@ -161,7 +161,7 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false }) {
     <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} onMouseEnter={recompute} onFocus={recompute}>
       <a href={href} className={className} aria-label={ariaLabel}>{children}</a>
       <span className="lv-qrpop" role="tooltip" aria-hidden="true">
-        <img src="/assets/app-store-qr.svg" alt="" width="150" height="150" loading="lazy" />
+        <img src={qr} alt="" width="150" height="150" loading="lazy" />
       </span>
     </span>
   )
@@ -223,7 +223,7 @@ export default function LandingPage() {
         '@type': 'SoftwareApplication',
         name: 'Housemait',
         applicationCategory: 'LifestyleApplication',
-        operatingSystem: 'iOS',
+        operatingSystem: 'iOS, Android',
         url: 'https://housemait.com',
         installUrl: APP_STORE_URL,
         description: locale.seo?.description,
@@ -737,7 +737,15 @@ export default function LandingPage() {
                 <span className="l2">App Store</span>
               </span>
             </QrLink>
-            <span className="lv-android">Android coming soon</span>
+            {PLAY_STORE_CONFIGURED && (
+              <QrLink href={PLAY_STORE_URL} className="lv-appstore" preferUp qr="/assets/play-store-qr.svg" ariaLabel="Get Housemait on Google Play — or hover to scan the QR code">
+                <svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true"><path fill="#EA4335" d="M47 20.4C41.6 26.1 38.5 34.9 38.5 46.3v419.4c0 11.4 3.1 20.2 8.5 25.9l1.4 1.3 234.9-234.9v-5.5L48.4 19.1z" transform="translate(0)"/><path fill="#FBBC04" d="M361.2 340.5l-78.3-78.4v-5.5l78.4-78.4 1.8 1 92.8 52.7c26.5 15 26.5 39.7 0 54.8l-92.8 52.7z"/><path fill="#34A853" d="M362.9 339.5L282.9 259.4 47 495.6c8.7 9.2 23.2 10.4 39.5 1.2z"/><path fill="#4285F4" d="M362.9 179.3L86.5 22.5C70.2 13.3 55.7 14.5 47 23.7l236 235.7z"/></svg>
+                <span className="lines">
+                  <span className="l1">GET IT ON</span>
+                  <span className="l2">Google Play</span>
+                </span>
+              </QrLink>
+            )}
           </div>
           <div className="lv-cta-web">
             <Link to={SIGNUP_URL}>or try Housemait on the web →</Link>

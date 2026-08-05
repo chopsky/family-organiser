@@ -16,6 +16,14 @@ export const APP_STORE_ID = '6762131562';
 /** Direct link to the App Store product page. */
 export const APP_STORE_URL = `https://apps.apple.com/app/housemait/id${APP_STORE_ID}`;
 
+/** Android package + direct link to the Google Play product page. */
+export const PLAY_STORE_ID = 'com.housemait.app';
+export const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${PLAY_STORE_ID}`;
+
+/** True once the Android app is live on Google Play — the landing page uses
+ *  this to show the Play badge (mirrors APP_STORE_CONFIGURED). */
+export const PLAY_STORE_CONFIGURED = PLAY_STORE_ID !== 'REPLACE_WITH_PACKAGE_NAME';
+
 /**
  * Deep link that opens Apple's offer-code redemption straight onto our
  * listing with the code PRE-FILLED. Only works once a matching Custom Offer
