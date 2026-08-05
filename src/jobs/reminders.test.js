@@ -2,7 +2,7 @@
 jest.mock('../db/queries');
 jest.mock('../db/client', () => ({ supabase: { from: jest.fn() } }));
 
-const { buildDailyReminderMessage, chooseDailyBriefChannel } = require('./reminders');
+const { buildDailyReminderMessage, chooseDailyBriefChannel, effectiveBriefWaState } = require('./reminders');
 
 const SARAH = { id: 'u1', name: 'Sarah' };
 
@@ -156,6 +156,35 @@ describe('buildDailyReminderMessage()', () => {
   test('omits the Reminders block entirely when no tasks or bills due', () => {
     const msg = buildDailyReminderMessage(SARAH, {});
     expect(msg).not.toContain('Reminders');
+  });
+});
+
+describe('effectiveBriefWaState()', () => {
+  // The 2026-08-05 report: morning arrived on WhatsApp, evening as a push -
+  // because the evening path nulled waState entirely, skipping the chooser's
+  // WhatsApp branch for anyone with the app. Only 'dormant' may be coerced.
+  test('evening keeps an ACTIVE user on WhatsApp', () => {
+    expect(effectiveBriefWaState('evening', 'active')).toBe('active');
+    expect(chooseDailyBriefChannel({
+      hasDevices: true, whatsappLinked: true, briefDisabled: false,
+      waState: effectiveBriefWaState('evening', 'active'), hasContent: true,
+    })).toBe('whatsapp');
+  });
+
+  test('evening treats dormant as active - opt-in is never retired for silence', () => {
+    expect(effectiveBriefWaState('evening', 'dormant')).toBe('active');
+  });
+
+  test('morning passes every state through untouched', () => {
+    for (const s of ['active', 'new', 'lapsed', 'dormant', null]) {
+      expect(effectiveBriefWaState('morning', s)).toBe(s);
+    }
+  });
+
+  test('evening passes new/lapsed/null through untouched', () => {
+    for (const s of ['new', 'lapsed', null]) {
+      expect(effectiveBriefWaState('evening', s)).toBe(s);
+    }
   });
 });
 

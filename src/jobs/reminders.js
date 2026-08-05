@@ -82,6 +82,17 @@ function chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, wa
   return null;
 }
 
+/** The WhatsApp engagement state a brief variant should route on. The
+ *  evening brief is opt-in, so 'dormant' is coerced to 'active' - dormancy
+ *  must neither silence nor reroute something the user explicitly asked
+ *  for. Every other state passes through untouched: nulling the whole state
+ *  (the previous approach) skipped the chooser's entire WhatsApp branch and
+ *  pushed the evening brief at WhatsApp-ACTIVE app owners too, splitting
+ *  their briefs across channels (real report 2026-08-05). */
+function effectiveBriefWaState(variant, waState) {
+  return variant === 'evening' && waState === 'dormant' ? 'active' : waState;
+}
+
 /** Shift a YYYY-MM-DD date string by n days. UTC arithmetic on a date-only
  *  string - no timezone drift, because there is no time-of-day to drift. */
 function addDays(dateStr, n) {
@@ -781,15 +792,19 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     }
 
     // The evening brief is opt-in, so engagement-based channel retirement
-    // doesn't apply: someone who asked for it gets it wherever they can be
-    // reached. waState is left out so 'dormant' can't silence it.
+    // doesn't apply: dormancy must neither silence it nor reroute it - the
+    // user explicitly asked for it. Coerce 'dormant' to 'active' rather than
+    // nulling the whole state: nulling skipped the ENTIRE WhatsApp branch of
+    // the chooser, so every app-owning member fell to push - including
+    // WhatsApp-ACTIVE users whose morning brief (and the in-thread "yes"
+    // that enabled evenings) lives in the WhatsApp thread. Real report
+    // 2026-08-05: morning arrived on WhatsApp, evening as a push.
     // forceChannel is for the admin self-preview ONLY. Push wins whenever the
     // app is installed, which makes the WhatsApp copy - and a newly approved
     // template - impossible to verify from a phone that has the app on it.
     // The cron never passes it.
-    const channel = options.forceChannel || (variant === 'evening'
-      ? chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState: null, hasContent })
-      : chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState, hasContent }));
+    const channel = options.forceChannel
+      || chooseDailyBriefChannel({ hasDevices, whatsappLinked, briefDisabled, waState: effectiveBriefWaState(variant, waState), hasContent });
     if (!channel) {
       console.log(`[reminders] Skipping ${member.name} - no channel (devices=${hasDevices}, whatsapp=${whatsappLinked}, disabled=${briefDisabled}, state=${waState}, content=${hasContent})`);
       continue;
@@ -926,6 +941,7 @@ module.exports = {
   buildDailyReminderParts,
   buildDailyReminderTemplateVars,
   chooseDailyBriefChannel,
+  effectiveBriefWaState,
   whatsappBriefState,
   sendDailyReminders,
   offerEveningBriefOnce,
