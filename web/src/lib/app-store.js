@@ -57,3 +57,24 @@ export function isIos() {
   if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
   return false;
 }
+
+/** Detect an Android device on the web (marketing-site UA sniff). */
+export function isAndroid() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
+/**
+ * Which store the current visitor should be pointed at:
+ *   'ios'     → App Store   'android' → Google Play   'web' → offer both.
+ * Drives the hero CTA: on a phone we deep-link to the right store; on
+ * desktop/other we show both QR codes to scan. Returns 'web' during the
+ * build-time prerender (headless Chrome reports a desktop UA), so the
+ * static HTML ships the both-QR variant and the client swaps in the
+ * phone-specific one on boot.
+ */
+export function getAppPlatform() {
+  if (isIos()) return 'ios';
+  if (isAndroid()) return 'android';
+  return 'web';
+}

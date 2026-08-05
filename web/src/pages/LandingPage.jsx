@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import '../landing.css'
 import { useLocale } from '../hooks/useLocale'
 import HreflangTags from '../components/HreflangTags'
-import { APP_STORE_URL, APP_STORE_CONFIGURED, PLAY_STORE_URL, PLAY_STORE_CONFIGURED } from '../lib/app-store'
+import { APP_STORE_URL, APP_STORE_CONFIGURED, PLAY_STORE_URL, PLAY_STORE_CONFIGURED, getAppPlatform } from '../lib/app-store'
 
 /**
  * Housemait marketing site — "scroll story" design, ported from
@@ -144,7 +144,10 @@ const FileIcon = () => (
  * on every pointer/keyboard entry, since scroll changes the answer). Touch
  * devices never see the popover (CSS hover gate) — a tap just navigates.
  */
-function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '/assets/app-store-qr.svg' }) {
+function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '/assets/app-store-qr.svg', qrs }) {
+  // One code by default; pass `qrs` (array of {src, label}) to show several
+  // side by side — the web hero shows both the App Store and Play codes.
+  const codes = qrs && qrs.length ? qrs : [{ src: qr }]
   const wrapRef = useRef(null)
   const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
   const recompute = () => {
@@ -161,7 +164,12 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '
     <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} onMouseEnter={recompute} onFocus={recompute}>
       <a href={href} className={className} aria-label={ariaLabel}>{children}</a>
       <span className="lv-qrpop" role="tooltip" aria-hidden="true">
-        <img src={qr} alt="" width="150" height="150" loading="lazy" />
+        {codes.map((c, i) => (
+          <span key={c.src || i} className="lv-qrcode">
+            <img src={c.src} alt="" width="150" height="150" loading="lazy" />
+            {c.label && <span className="lv-qrlabel">{c.label}</span>}
+          </span>
+        ))}
       </span>
     </span>
   )
@@ -182,6 +190,23 @@ export default function LandingPage() {
   const el = useRef({})
   const setEl = (name) => (node) => { el.current[name] = node }
   const marqueePaused = useRef(false)
+
+  // Hero "Get the app": on a phone, deep-link to that platform's store and
+  // show only its QR; on desktop/other, link to the App Store but reveal
+  // both codes to scan. Computed once — on the client navigator is the real
+  // device; during prerender it's headless Chrome → 'web' (both codes).
+  const heroApp = useMemo(() => {
+    const platform = getAppPlatform()
+    if (platform === 'ios') return { href: APP_STORE_URL, qrs: [{ src: '/assets/app-store-qr.svg' }] }
+    if (platform === 'android') return { href: PLAY_STORE_URL, qrs: [{ src: '/assets/play-store-qr.svg' }] }
+    return {
+      href: APP_STORE_URL,
+      qrs: [
+        { src: '/assets/app-store-qr.svg', label: 'iPhone' },
+        { src: '/assets/play-store-qr.svg', label: 'Android' },
+      ],
+    }
+  }, [])
 
   const na = isNA(locale)
   const reviews = useMemo(() => buildReviews(locale), [locale])
@@ -432,7 +457,7 @@ export default function LandingPage() {
           <p className="lv-hero-sub">One home for the family calendar, meals, lists and chores, with an AI assistant in WhatsApp that does it all for you.</p>
           <div className="lv-hero-ctas">
             {APP_STORE_CONFIGURED ? (
-              <QrLink href={APP_STORE_URL} className="lv-btn-shine" preferUp ariaLabel="Get the Housemait app on the App Store — or hover to scan the QR code">
+              <QrLink href={heroApp.href} className="lv-btn-shine" preferUp qrs={heroApp.qrs} ariaLabel="Get the Housemait app — hover to scan the App Store or Google Play code">
                 Get the app
               </QrLink>
             ) : (
