@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
+import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
@@ -538,17 +539,32 @@ export default function Chores() {
   const dayLabel = dayOffset === 0 ? 'Today' : selDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
   const loadDay = useCallback(async (dateStr) => {
-    const { data } = await api.get('/chores', { params: { date: dateStr } });
-    setTasks(data.tasks || []);
-    setBalances(data.balances || {});
+    const fetcher = async () => {
+      const { data } = await api.get('/chores', { params: { date: dateStr } });
+      return { tasks: data.tasks || [], balances: data.balances || {} };
+    };
+    const apply = (d) => { setTasks(d.tasks || []); setBalances(d.balances || {}); };
+    // Cache-first for TODAY only - the landing view on cold start. Other
+    // dates are browse-and-go; caching each would bloat storage for views
+    // nobody lands on.
+    if (dateStr === dateStrLocal(new Date())) {
+      await loadCached('chores:today', fetcher, apply);
+    } else {
+      apply(await fetcher());
+    }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [{ data: hh }] = await Promise.all([api.get('/household')]);
-        if (!cancelled) setMembers(hh.members || []);
+        // Shared 'household:members' cache key (same as FamilySetup) so the
+        // members-changed invalidation in offlineCache covers this page too.
+        await loadCached(
+          'household:members',
+          () => api.get('/household').then((r) => r.data?.members ?? []),
+          (m) => { if (!cancelled) setMembers(Array.isArray(m) ? m : []); },
+        );
         await loadDay(selDateStr);
       } catch { /* surfaced as empty */ } finally { if (!cancelled) setLoading(false); }
     })();

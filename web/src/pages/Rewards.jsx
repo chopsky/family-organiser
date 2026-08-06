@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
+import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
@@ -112,12 +113,21 @@ export default function Rewards() {
   const pending = redemptions.filter((r) => !r.fulfilled).length;
 
   const load = useCallback(async () => {
-    const [{ data: hh }, { data: rw }] = await Promise.all([api.get('/household'), api.get('/rewards')]);
-    setMembers(hh.members || []);
-    setRewards(rw.rewards || []);
-    setBalances(rw.balances || {});
-    setRedemptions(rw.redemptions || []);
-    return hh.members || [];
+    // Cache-first cold start (same pattern as Calendar/Meals).
+    const data = await loadCached(
+      'rewards:index',
+      async () => {
+        const [{ data: hh }, { data: rw }] = await Promise.all([api.get('/household'), api.get('/rewards')]);
+        return { members: hh.members || [], rewards: rw.rewards || [], balances: rw.balances || {}, redemptions: rw.redemptions || [] };
+      },
+      (d) => {
+        setMembers(d.members || []);
+        setRewards(d.rewards || []);
+        setBalances(d.balances || {});
+        setRedemptions(d.redemptions || []);
+      },
+    );
+    return data?.members || [];
   }, []);
 
   useEffect(() => {

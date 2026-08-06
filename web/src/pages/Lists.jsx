@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
+import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
@@ -149,7 +150,11 @@ export default function Lists() {
     if (!list) return;
     setLoadingItems(true);
     const apply = (arr) => setItems(arr);
-    try {
+    // Cache-first per list: the last snapshot paints instantly, then the
+    // network result replaces it. Caveat carried knowingly: to-do time
+    // buckets are stamped at fetch time, so a cached paint can show
+    // yesterday's bucketing for the moment before the refresh lands.
+    const fetcher = async () => {
       if (list.kind === 'todos') {
         const [{ data: open }, { data: done }] = await Promise.all([
           api.get('/tasks', { params: { all: true } }),
@@ -164,17 +169,19 @@ export default function Lists() {
           id: t.id, text: t.title, done: isDone, section: null, whoIds: t.assigned_to_ids || [],
           ...decorateTodo(t.due_date ? String(t.due_date).slice(0, 10) : null, today, eow, stale),
         });
-        apply([...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))]);
-      } else {
-        const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
-        apply((data.items || []).map((i) => ({
-          id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
-          text: i.quantity ? `${cap(i.item)} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : cap(i.item),
-          completed_at: i.completed_at || null, // drives the "most recently checked off first" Done order
-          // raw fields kept so the Edit-item form can prefill
-          item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
-        })));
+        return [...(open.tasks || []).map((t) => map(t, false)), ...(done.tasks || []).map((t) => map(t, true))];
       }
+      const { data } = await api.get('/shopping', { params: { list_id: list.id, completed: true } });
+      return (data.items || []).map((i) => ({
+        id: i.id, done: !!i.completed, section: i.aisle_category || 'Other', emoji: getItemEmoji(i.item, i.aisle_category),
+        text: i.quantity ? `${cap(i.item)} · ${i.quantity}${i.unit ? ` ${i.unit}` : ''}` : cap(i.item),
+        completed_at: i.completed_at || null, // drives the "most recently checked off first" Done order
+        // raw fields kept so the Edit-item form can prefill
+        item: i.item, quantity: i.quantity || '', unit: i.unit || '', description: i.description || '', aisle_category: i.aisle_category || 'Other',
+      }));
+    };
+    try {
+      await loadCached(`lists:items:${list.kind === 'todos' ? 'todos' : list.id}`, fetcher, apply);
     } catch { apply([]); } finally { setLoadingItems(false); }
   }, []);
 
@@ -182,11 +189,22 @@ export default function Lists() {
     let cancelled = false;
     (async () => {
       try {
-        const [{ data: hh }, { data: sl }] = await Promise.all([api.get('/household'), api.get('/shopping-lists')]);
+        // Cache-first cold start (same pattern as Calendar/Meals): the list
+        // rail paints instantly from the last snapshot, then refreshes.
+        const data = await loadCached(
+          'lists:index',
+          async () => {
+            const [{ data: hh }, { data: sl }] = await Promise.all([api.get('/household'), api.get('/shopping-lists')]);
+            return { members: hh.members || [], lists: sl.lists || [] };
+          },
+          (d) => {
+            if (cancelled) return;
+            setMembers(d.members || []);
+            setLists(buildDescriptors(d.lists));
+          },
+        );
         if (cancelled) return;
-        setMembers(hh.members || []);
-        const descriptors = buildDescriptors(sl.lists);
-        setLists(descriptors);
+        const descriptors = buildDescriptors(data?.lists || []);
         loadCounts(descriptors);
         // ?list=shopping is a sentinel (the Dashboard's "Open list" links here
         // without knowing the grocery list's real id): resolve it to the

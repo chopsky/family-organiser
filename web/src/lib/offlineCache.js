@@ -103,6 +103,9 @@ if (typeof window !== 'undefined') {
     removeCache('household:members');
     removeCache('schools');
     removeCache('household:activities');
+    // These snapshots embed the member roster too.
+    removeCache('lists:index');
+    removeCache('rewards:index');
   });
 }
 

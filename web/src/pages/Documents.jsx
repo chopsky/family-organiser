@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api';
+import { loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
@@ -112,25 +113,38 @@ export default function Documents() {
       // At root, the file list is "Recently added" across every folder; inside
       // a folder it's that folder's files. allSettled so one failing endpoint
       // (e.g. mid-deploy) doesn't blank the whole page.
-      const [foldersRes, filesRes, usageRes] = await Promise.allSettled([
-        api.get('/documents/folders', { params: folderParams }),
-        folderId
-          ? api.get('/documents', { params: { folder_id: folderId } })
-          : api.get('/documents/recent', { params: { limit: 8 } }),
-        api.get('/documents/usage'),
-      ]);
-
-      const rawFolders = foldersRes.status === 'fulfilled' ? foldersRes.value.data : [];
-      const rawFiles = filesRes.status === 'fulfilled' ? filesRes.value.data : [];
-      setFolders(Array.isArray(rawFolders) ? rawFolders : []);
-      setFiles(Array.isArray(rawFiles) ? rawFiles : []);
-      setUsage(usageRes.status === 'fulfilled' ? usageRes.value.data : null);
-
-      const failures = [foldersRes, filesRes, usageRes].filter(r => r.status === 'rejected');
-      const allFailed = failures.length === 3;
-      const nonNotFoundFailure = failures.find(f => f.reason?.response?.status !== 404);
-      if (allFailed && nonNotFoundFailure) {
-        setError(nonNotFoundFailure.reason?.response?.data?.error || 'Failed to load documents');
+      const runFetch = async () => {
+        const [foldersRes, filesRes, usageRes] = await Promise.allSettled([
+          api.get('/documents/folders', { params: folderParams }),
+          folderId
+            ? api.get('/documents', { params: { folder_id: folderId } })
+            : api.get('/documents/recent', { params: { limit: 8 } }),
+          api.get('/documents/usage'),
+        ]);
+        const rawFolders = foldersRes.status === 'fulfilled' ? foldersRes.value.data : [];
+        const rawFiles = filesRes.status === 'fulfilled' ? filesRes.value.data : [];
+        const failures = [foldersRes, filesRes, usageRes].filter(r => r.status === 'rejected');
+        const nonNotFoundFailure = failures.find(f => f.reason?.response?.status !== 404);
+        if (failures.length === 3 && nonNotFoundFailure) {
+          throw new Error(nonNotFoundFailure.reason?.response?.data?.error || 'Failed to load documents');
+        }
+        return {
+          folders: Array.isArray(rawFolders) ? rawFolders : [],
+          files: Array.isArray(rawFiles) ? rawFiles : [],
+          usage: usageRes.status === 'fulfilled' ? usageRes.value.data : null,
+        };
+      };
+      const applyData = (d) => {
+        setFolders(d.folders || []);
+        setFiles(d.files || []);
+        setUsage(d.usage ?? null);
+      };
+      // Cache-first for the ROOT view only (the cold-start landing);
+      // folder drill-downs are browse-and-go and fetch live.
+      if (folderId) {
+        applyData(await runFetch());
+      } else {
+        await loadCached('documents:root', runFetch, applyData);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load documents');
