@@ -170,7 +170,10 @@ function MealPlanView({ setError }) {
       await loadCached(
         `meals:${weekParam}`,
         () => api.get('/meals', { params: { week: weekParam } }).then(r => r.data?.meals ?? r.data),
-        (rawMeals) => setMeals(Array.isArray(rawMeals) ? rawMeals : []),
+        // Drop the skeleton the moment anything paints — on a cache hit that's
+        // synchronous, so a slow refresh no longer holds a "Loading…" screen
+        // in front of data we've already rendered.
+        (rawMeals) => { setMeals(Array.isArray(rawMeals) ? rawMeals : []); setLoading(false); },
       );
     } catch {
       setError('Could not load meal plan.');

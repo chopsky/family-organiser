@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
-import { loadCached } from '../lib/offlineCache';
+import { loadCached, readCache } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
@@ -26,7 +26,6 @@ const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
 const LINE = 'rgba(26,22,32,0.07)', LINE_STRONG = 'rgba(26,22,32,0.12)';
 const BRAND = 'var(--color-plum)', BRAND_SOFT = 'var(--color-plum-light)';
 const BG_SOFT = '#F3EEE5', STAR = '#D89B3A', STAR_BG = '#FBF1DE';
-const BG_APP = '#FBF8F3'; // page background — the gap colour in the selected-avatar halo
 const SERIF = 'var(--font-serif-display)';
 const INTER = '"Inter", system-ui, sans-serif';
 
@@ -560,12 +559,21 @@ export default function Chores() {
       try {
         // Shared 'household:members' cache key (same as FamilySetup) so the
         // members-changed invalidation in offlineCache covers this page too.
-        await loadCached(
-          'household:members',
-          () => api.get('/household').then((r) => r.data?.members ?? []),
-          (m) => { if (!cancelled) setMembers(Array.isArray(m) ? m : []); },
-        );
-        await loadDay(selDateStr);
+        // Both loads start together: each paints its cached snapshot
+        // synchronously before touching the network, so on a warm cache the
+        // page is renderable immediately — drop the skeleton now rather than
+        // holding "Loading…" for the refresh round-trips (which previously
+        // also ran in sequence, doubling the wait).
+        const settled = Promise.all([
+          loadCached(
+            'household:members',
+            () => api.get('/household').then((r) => r.data?.members ?? []),
+            (m) => { if (!cancelled) setMembers(Array.isArray(m) ? m : []); },
+          ),
+          loadDay(selDateStr),
+        ]);
+        if (!cancelled && readCache('household:members') && readCache('chores:today')) setLoading(false);
+        await settled;
       } catch { /* surfaced as empty */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
@@ -800,7 +808,7 @@ export default function Chores() {
         // paddingBottom clears the floating AI chat button once scrolled to the end.
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', paddingBottom: 160 }}>
           {/* member avatars */}
-          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '7px 0 16px', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '2px 0 11px', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
             {baseMembers.map((m) => {
               const sel = !anyoneActive && m.id === (activeMember?.id);
               const all = tasksFor(m.id); const dn = all.filter((t) => t.done?.[m.id]).length;
@@ -808,11 +816,17 @@ export default function Chores() {
               return (
                 <button key={m.id} onClick={() => goToMember(m.id)} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 64, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
                   <div style={{ position: 'relative' }}>
-                    <div style={{ borderRadius: '50%', boxShadow: sel ? `0 0 0 3px ${BG_APP}, 0 0 0 5px ${hexFor(m)}` : 'none', opacity: sel ? 1 : 0.85, transition: 'all .15s ease' }}>
+                    {/* Selection ring is a real border (not a box-shadow halo): the
+                        element always occupies the same 62px box, so deselection
+                        repaints within bounds. The old outset shadow lived in the
+                        composited scroll layer and iOS WebKit sometimes failed to
+                        invalidate its region on removal, leaving a stale arc of the
+                        previous member's ring (real report 2026-08-06). */}
+                    <div style={{ borderRadius: '50%', padding: 3, border: `2px solid ${sel ? hexFor(m) : 'transparent'}`, opacity: sel ? 1 : 0.85, transition: 'border-color .15s ease, opacity .15s ease' }}>
                       <Avatar member={m} size={52} bg="#fff" />
                     </div>
                     {showStar && (
-                      <div style={{ position: 'absolute', bottom: -4, right: -8, display: 'flex', alignItems: 'center', gap: 2, background: '#fff', borderRadius: 99, padding: '2px 6px', boxShadow: '0 2px 6px rgba(26,22,32,0.15)' }}>
+                      <div style={{ position: 'absolute', bottom: 1, right: -3, display: 'flex', alignItems: 'center', gap: 2, background: '#fff', borderRadius: 99, padding: '2px 6px', boxShadow: '0 2px 6px rgba(26,22,32,0.15)' }}>
                         <StarFill s={10} /><span style={{ fontSize: 10, fontWeight: 800, color: '#A9772A' }}>{balances[m.id] || 0}</span>
                       </div>
                     )}
@@ -824,7 +838,7 @@ export default function Chores() {
             })}
             {showAnyone && (
               <button onClick={() => goToMember('anyone')} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 64, padding: 0, background: 'transparent', border: 0, cursor: 'pointer', fontFamily: INTER }}>
-                <div style={{ borderRadius: '50%', boxShadow: anyoneActive ? `0 0 0 3px ${BG_APP}, 0 0 0 5px ${INK}` : 'none', opacity: anyoneActive ? 1 : 0.85, transition: 'all .15s ease' }}>
+                <div style={{ borderRadius: '50%', padding: 3, border: `2px solid ${anyoneActive ? INK : 'transparent'}`, opacity: anyoneActive ? 1 : 0.85, transition: 'border-color .15s ease, opacity .15s ease' }}>
                   <span style={{ width: 52, height: 52, borderRadius: '50%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BG_SOFT, border: `1px solid ${LINE_STRONG}` }}><IcPeople s={22} c={INK3} /></span>
                 </div>
                 <div style={{ fontSize: 12, fontWeight: anyoneActive ? 700 : 600, color: anyoneActive ? INK : INK3 }}>Anyone</div>

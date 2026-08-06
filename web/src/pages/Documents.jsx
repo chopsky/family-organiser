@@ -138,6 +138,9 @@ export default function Documents() {
         setFolders(d.folders || []);
         setFiles(d.files || []);
         setUsage(d.usage ?? null);
+        // A cache hit paints synchronously — drop the skeleton now instead of
+        // holding "Loading…" in front of painted data until the refresh lands.
+        setLoading(false);
       };
       // Cache-first for the ROOT view only (the cold-start landing);
       // folder drill-downs are browse-and-go and fetch live.

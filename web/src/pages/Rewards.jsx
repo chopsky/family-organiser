@@ -112,8 +112,11 @@ export default function Rewards() {
   const earners = childMode ? members.filter(isKid) : members.filter((m) => !isPetMember(m));
   const pending = redemptions.filter((r) => !r.fulfilled).length;
 
-  const load = useCallback(async () => {
-    // Cache-first cold start (same pattern as Calendar/Meals).
+  const load = useCallback(async (onPaint) => {
+    // Cache-first cold start (same pattern as Calendar/Meals). onPaint fires
+    // on every paint — synchronously for a cache hit, again when the network
+    // refresh lands — so the mount effect can drop its skeleton immediately
+    // instead of holding "Loading…" in front of already-painted data.
     const data = await loadCached(
       'rewards:index',
       async () => {
@@ -125,6 +128,7 @@ export default function Rewards() {
         setRewards(d.rewards || []);
         setBalances(d.balances || {});
         setRedemptions(d.redemptions || []);
+        onPaint?.(d);
       },
     );
     return data?.members || [];
@@ -132,16 +136,25 @@ export default function Rewards() {
 
   useEffect(() => {
     let cancelled = false;
+    let focusInitDone = false;
     (async () => {
       try {
-        const m = await load();
-        if (cancelled) return;
-        // Honour ?member=<id> (deep-link from a member's "Rewards ›" on Tasks):
-        // focus that member and switch to the focused view; else default to the
-        // first member.
-        const wanted = focusParam && m.some((x) => x.id === focusParam);
-        setFocusKid(wanted ? focusParam : (m[0] || {}).id || null);
-        if (wanted) setView('focused');
+        await load((d) => {
+          if (cancelled) return;
+          setLoading(false);
+          // Honour ?member=<id> (deep-link from a member's "Rewards ›" on
+          // Tasks): focus that member and switch to the focused view; else
+          // default to the first member. Runs on cache AND fresh paints —
+          // apply once, so the second paint can't yank back a focus/view
+          // the user has already changed.
+          if (focusInitDone) return;
+          const m = d.members || [];
+          if (!m.length) return; // cache may predate members — wait for fresh
+          focusInitDone = true;
+          const wanted = focusParam && m.some((x) => x.id === focusParam);
+          setFocusKid((cur) => cur ?? (wanted ? focusParam : (m[0] || {}).id || null));
+          if (wanted) setView('focused');
+        });
       } catch { /* empty */ } finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };

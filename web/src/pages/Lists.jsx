@@ -149,7 +149,7 @@ export default function Lists() {
   const loadItems = useCallback(async (list) => {
     if (!list) return;
     setLoadingItems(true);
-    const apply = (arr) => setItems(arr);
+    const apply = (arr) => { setItems(arr); setLoadingItems(false); };
     // Cache-first per list: the last snapshot paints instantly, then the
     // network result replaces it. Caveat carried knowingly: to-do time
     // buckets are stamped at fetch time, so a cached paint can show
@@ -201,6 +201,10 @@ export default function Lists() {
             if (cancelled) return;
             setMembers(d.members || []);
             setLists(buildDescriptors(d.lists));
+            // Cache paint is synchronous — drop the skeleton now rather than
+            // holding it until the network refresh lands (slow connections
+            // kept "Loading…" up in front of already-painted data).
+            setLoading(false);
           },
         );
         if (cancelled) return;
