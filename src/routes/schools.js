@@ -413,6 +413,40 @@ router.get('/terms/:childId', requireAuth, requireHousehold, async (req, res) =>
 });
 
 /**
+ * POST /api/schools/activities/clear-expired
+ * Bulk-remove FINISHED activities (end_date in the past) - the start-of-term
+ * cleanup that previously took one delete dialog per activity. Optional
+ * body.child_id narrows to one child. Ownership comes free: only activities
+ * returned by the household-scoped query can be deleted, and future or
+ * ongoing (undated) activities are never touched.
+ */
+router.post('/activities/clear-expired', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  const { child_id } = req.body || {};
+  try {
+    const all = await db.getHouseholdActivities(req.householdId);
+    const today = new Date().toISOString().slice(0, 10);
+    const targets = (all || []).filter((a) => a.end_date && a.end_date < today
+      && (!child_id || a.child_id === child_id));
+    let deleted = 0;
+    for (const a of targets) {
+      try {
+        await db.deleteChildActivity(a.id);
+        deleted += 1;
+      } catch (err) {
+        // One stubborn row must not abort the sweep.
+        console.error('[schools] clear-expired failed for activity', a.id, err.message);
+      }
+    }
+    cache.invalidate(`schools:${req.householdId}`);
+    cache.invalidate(`digest:${req.householdId}`);
+    return res.json({ deleted, considered: targets.length });
+  } catch (err) {
+    console.error('POST /api/schools/activities/clear-expired error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * DELETE /api/schools/activities/:activityId
  * Remove a weekly activity.
  */

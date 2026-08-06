@@ -73,6 +73,8 @@ export default function School() {
   // itself is the shared <ActivityModal> (also used by the Calendar's
   // activity sheet); this holds { child, activity|null } while it's open.
   const [activityModal, setActivityModal] = useState(null);
+  // { kid, activities } - the start-of-term rollover sheet for one child.
+  const [newTermModal, setNewTermModal] = useState(null);
 
   // ── Term-dates machinery state ─────────────────────────────────────
   const [editTermDates, setEditTermDates] = useState([]);
@@ -157,6 +159,19 @@ export default function School() {
   // Open the shared ActivityModal in ADD / EDIT mode for a child. The
   // modal owns the form, term selector and API calls (it's the same
   // component the Calendar's activity sheet uses).
+  // Bulk-remove a child's finished activities - one confirm instead of one
+  // delete dialog per activity (the founder's own start-of-term complaint).
+  async function clearExpiredActivities(kid, count) {
+    const noun = count === 1 ? 'finished activity' : 'finished activities';
+    if (!window.confirm(`Remove ${count} ${noun} for ${kid.name}? This can't be undone.`)) return;
+    try {
+      await api.post('/schools/activities/clear-expired', { child_id: kid.id });
+      loadActivities();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not clear the finished activities.');
+    }
+  }
+
   function openAddActivity(child) {
     if (child) setActivityModal({ child, activity: null });
   }
@@ -965,12 +980,29 @@ export default function School() {
                       ) : (
                         <div className="px-5 pb-2 -mt-1.5 text-xs text-warm-grey">No activities running this term.</div>
                       )}
-                      {other.length > 0 && (
-                        <>
-                          <div className="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-warm-grey" style={{ borderTop: '1px solid var(--color-light-grey)' }}>Other terms</div>
-                          {other.map(a => renderRow(kid, a, true))}
-                        </>
-                      )}
+                      {other.length > 0 && (() => {
+                        // "Start new term" / "Clear" act only on FINISHED
+                        // activities. `other` also holds future-dated ones
+                        // (start_date ahead of today) - those are already
+                        // sorted for next term and must survive both actions.
+                        const todayYmd = new Date().toISOString().slice(0, 10);
+                        const finished = other.filter((a) => a.end_date && a.end_date < todayYmd);
+                        return (
+                          <>
+                            <div className="flex items-center px-5 pt-3 pb-1" style={{ borderTop: '1px solid var(--color-light-grey)' }}>
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-warm-grey">Other terms</span>
+                              {isAdmin && finished.length > 0 && (
+                                <>
+                                  <div className="flex-1" />
+                                  <button onClick={() => setNewTermModal({ kid, activities: finished })} className="text-[11px] font-semibold text-plum hover:text-plum/80 shrink-0">Start new term</button>
+                                  <button onClick={() => clearExpiredActivities(kid, finished.length)} className="ml-3 text-[11px] font-semibold text-warm-grey hover:text-coral shrink-0">Clear</button>
+                                </>
+                              )}
+                            </div>
+                            {other.map(a => renderRow(kid, a, true))}
+                          </>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -990,6 +1022,18 @@ export default function School() {
           members={members}
           onClose={() => setActivityModal(null)}
           onChanged={loadActivities}
+        />
+      )}
+
+      {/* Start-of-term rollover: tick-list of last term's activities, moved
+          into a new window in one action. Mounted only while open. */}
+      {newTermModal && (
+        <NewTermModal
+          kid={newTermModal.kid}
+          activities={newTermModal.activities}
+          school={householdSchools.find((s) => s.id === newTermModal.kid.school_id) || null}
+          onClose={() => setNewTermModal(null)}
+          onDone={() => { setNewTermModal(null); loadActivities(); }}
         />
       )}
 
@@ -1341,6 +1385,136 @@ export default function School() {
           </div>
         </BottomSheet>
       )}
+    </div>
+  );
+}
+
+/**
+ * Start-of-term rollover. Takes a child's FINISHED activities and moves the
+ * ticked ones into a new term window in one action - same days, times and
+ * pickup people, new dates. The window prefills from the child's school's
+ * next term (first term_start after today plus its term_end) when the school
+ * holds future dates; everything stays editable because the guess can be
+ * wrong (a club term rarely matches the school term exactly).
+ */
+function NewTermModal({ kid, activities, school, onClose, onDone }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const termDates = school?.term_dates || [];
+  const nextStart = termDates
+    .filter((d) => d.event_type === 'term_start' && d.date > today)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+  const nextEnd = nextStart
+    ? termDates
+        .filter((d) => d.event_type === 'term_end' && d.date > nextStart.date)
+        .sort((a, b) => a.date.localeCompare(b.date))[0] || null
+    : null;
+  const seasonOf = (ymd) => {
+    const m = Number(ymd.slice(5, 7));
+    return m >= 8 ? 'Autumn' : m <= 4 ? 'Spring' : 'Summer';
+  };
+  const defaultLabel = nextStart
+    ? `${seasonOf(nextStart.date)} Term${nextStart.academic_year ? ` ${nextStart.academic_year}` : ''}`
+    : '';
+
+  const [startDate, setStartDate] = useState(nextStart?.date || '');
+  const [endDate, setEndDate] = useState(nextEnd?.date || '');
+  const [label, setLabel] = useState(defaultLabel);
+  const [ticked, setTicked] = useState(() => new Set(activities.map((a) => a.id)));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const NT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const toggleTick = (id) => setTicked((t) => {
+    const next = new Set(t);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const valid = startDate && endDate && startDate < endDate && ticked.size > 0;
+
+  async function apply() {
+    if (!valid || saving) return;
+    setSaving(true);
+    setErr('');
+    try {
+      for (const a of activities) {
+        if (!ticked.has(a.id)) continue;
+        await api.patch(`/schools/activities/${a.id}`, {
+          start_date: startDate,
+          end_date: endDate,
+          term_label: label.trim() || null,
+        });
+      }
+      onDone();
+    } catch (e) {
+      setErr(e.response?.data?.error || 'Could not update the activities.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-6" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-semibold text-charcoal mb-1">Start new term — {kid.name}</h3>
+        <p className="text-sm text-warm-grey mb-4">
+          Tick the clubs carrying on. Same days, times and pickups — just new dates.
+        </p>
+
+        <label className="block text-xs font-semibold text-charcoal mb-1">Term name</label>
+        <input
+          type="text"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          placeholder="e.g. Autumn Term 2026-2027"
+          className="w-full h-11 px-3 rounded-[10px] border-[1.5px] border-light-grey bg-cream text-sm mb-3 focus:outline-none focus:border-plum"
+        />
+        <div className="flex gap-3 mb-4">
+          <div className="flex-1">
+            <label className="block text-xs font-semibold text-charcoal mb-1">First week</label>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              className="w-full h-11 px-3 rounded-[10px] border-[1.5px] border-light-grey bg-cream text-sm focus:outline-none focus:border-plum" />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs font-semibold text-charcoal mb-1">Last week</label>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+              className="w-full h-11 px-3 rounded-[10px] border-[1.5px] border-light-grey bg-cream text-sm focus:outline-none focus:border-plum" />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-light-grey divide-y divide-light-grey mb-4">
+          {activities.map((a) => (
+            <label key={a.id} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={ticked.has(a.id)}
+                onChange={() => toggleTick(a.id)}
+                className="h-4 w-4 accent-[var(--color-plum,#6B3FA0)]"
+              />
+              <span className="flex-1 text-sm text-charcoal truncate">{a.activity}</span>
+              <span className="text-xs text-warm-grey shrink-0">
+                {NT_DAYS[a.day_of_week] || ''}{a.time_start ? ` ${String(a.time_start).slice(0, 5)}` : ''}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {err && <p className="text-sm text-coral mb-3">{err}</p>}
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 h-12 rounded-xl border-[1.5px] border-light-grey text-sm font-semibold text-charcoal">
+            Cancel
+          </button>
+          <button
+            onClick={apply}
+            disabled={!valid || saving}
+            className="flex-1 h-12 rounded-xl bg-plum text-white text-sm font-semibold disabled:opacity-40"
+          >
+            {saving ? 'Moving…' : `Move ${ticked.size} ${ticked.size === 1 ? 'club' : 'clubs'}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
