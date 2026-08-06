@@ -9,6 +9,7 @@ import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Segmented from '../components/ui/Segmented';
 import { useCanWrite } from '../context/SubscriptionContext';
+import useSwipeNavigate from '../hooks/useSwipeNavigate';
 import { useChildMode } from '../context/ChildModeContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
@@ -860,6 +861,11 @@ export default function Calendar() {
     setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDate(new Date(now));
   }
+
+  // Swipe left/right anywhere on the view = next/previous day, week or
+  // month - the arrows stay for desktop, but on a phone the page turns
+  // like the native calendar.
+  const swipe = useSwipeNavigate({ onPrev: navigatePrev, onNext: navigateNext });
 
   // ── Navigation label ──────────────────────────────────────
 
@@ -2188,7 +2194,7 @@ export default function Calendar() {
 
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && (
-        <>
+        <div {...swipe.bindings}>
           {/* Desktop month grid */}
           <div className="hidden md:block">
             <div className="border border-[rgba(26,22,32,0.07)] rounded-2xl overflow-hidden bg-white">
@@ -2408,12 +2414,13 @@ export default function Calendar() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* ── Week View ───────────────────────────────────────── */}
       {viewMode === 'week' && (
         <div
+          {...swipe.bindings}
           // Mobile vs desktop chrome stacks differ - mobile has the sticky
           // header + bottom nav (~320px combined), desktop just the page
           // padding + H1 (~240px). Tailwind responsive class swaps the
@@ -2554,6 +2561,7 @@ export default function Calendar() {
       {/* ── Day View ────────────────────────────────────────── */}
       {viewMode === 'day' && selectedDate && (
         <div
+          {...swipe.bindings}
           // See note on the week-view card above for the offset rationale.
           className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_190px)]"
         >
