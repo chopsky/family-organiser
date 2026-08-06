@@ -150,6 +150,7 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '
   const codes = qrs && qrs.length ? qrs : [{ src: qr }]
   const wrapRef = useRef(null)
   const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
+  const [shiftX, setShiftX] = useState(0)
   const recompute = () => {
     const node = wrapRef.current
     if (!node) return
@@ -159,9 +160,23 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '
     // above the trigger unless there's genuinely no room up there.
     if (preferUp) setPlacement(rect.top < 210 ? 'bottom' : 'top')
     else setPlacement(window.innerHeight - rect.bottom < 210 ? 'top' : 'bottom')
+    // Horizontal clamp: the popover centres on the trigger, but the hero
+    // button sits near the page margin and the two-code variant is ~384px
+    // wide, so centring pushed it past the viewport edge. Shift it back
+    // inside with 12px breathing room.
+    const pop = node.querySelector('.lv-qrpop')
+    if (pop) {
+      const center = rect.left + rect.width / 2
+      const half = pop.offsetWidth / 2
+      const margin = 12
+      let shift = 0
+      if (center - half < margin) shift = margin - (center - half)
+      else if (center + half > window.innerWidth - margin) shift = (window.innerWidth - margin) - (center + half)
+      setShiftX(Math.round(shift))
+    }
   }
   return (
-    <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} onMouseEnter={recompute} onFocus={recompute}>
+    <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} style={{ '--qr-shift': `${shiftX}px` }} onMouseEnter={recompute} onFocus={recompute}>
       <a href={href} className={className} aria-label={ariaLabel}>{children}</a>
       <span className="lv-qrpop" role="tooltip" aria-hidden="true">
         {codes.map((c, i) => (
