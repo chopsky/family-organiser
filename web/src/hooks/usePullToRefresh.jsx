@@ -50,6 +50,7 @@ export function usePullToRefresh(onRefresh) {
   const [refreshing, setRefreshing] = useState(false);
   const startYRef = useRef(null);
   const startXRef = useRef(null);    // for horizontal-vs-vertical direction lock
+  const axisRef = useRef(null);      // 'h' | 'v' - decided ONCE per touch, then binding
   const armedRef = useRef(false);    // we've crossed the trigger threshold
   const refreshingRef = useRef(false); // mirror of refreshing for handlers
 
@@ -63,6 +64,7 @@ export function usePullToRefresh(onRefresh) {
     }
     startYRef.current = e.touches?.[0]?.clientY ?? null;
     startXRef.current = e.touches?.[0]?.clientX ?? null;
+    axisRef.current = null;
     armedRef.current = false;
   }, [native]);
 
@@ -73,11 +75,18 @@ export function usePullToRefresh(onRefresh) {
     const x = e.touches?.[0]?.clientX ?? 0;
     const delta = y - startYRef.current;
     const dx = x - (startXRef.current ?? x);
-    // Direction lock: if the gesture is more horizontal than vertical, the
-    // user is side-scrolling (e.g. the weather hourly strip), not pulling
-    // to refresh. Abandon PTR for the rest of this touch so the horizontal
-    // scroller wins cleanly and we don't yank the page down.
-    if (Math.abs(dx) > Math.abs(delta)) {
+    // Direction lock, decided ONCE per touch and then binding. The old
+    // version re-compared |dx| vs |dy| on every move, so a horizontal
+    // calendar swipe that starts a few pixels diagonal rendered the pull
+    // indicator until dx overtook dy - the page "pulled down" while the
+    // page turned (real report 2026-08-06). Now: wait until the finger has
+    // clearly moved (10px), classify the gesture once, and a horizontal
+    // gesture can never re-enter the PTR path for the rest of the touch.
+    if (axisRef.current == null) {
+      if (Math.max(Math.abs(dx), Math.abs(delta)) < 10) return; // too early to tell
+      axisRef.current = Math.abs(dx) > Math.abs(delta) ? 'h' : 'v';
+    }
+    if (axisRef.current === 'h') {
       setPull(0);
       startYRef.current = null;
       armedRef.current = false;
@@ -123,6 +132,7 @@ export function usePullToRefresh(onRefresh) {
     }
     startYRef.current = null;
     startXRef.current = null;
+    axisRef.current = null;
     armedRef.current = false;
   }, [native, onRefresh]);
 
