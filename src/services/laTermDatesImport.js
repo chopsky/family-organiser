@@ -145,8 +145,16 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
     // genuinely-partial case worth surfacing; current-only is normal (next
     // year often isn't published until spring) and stays 'ok'.
     const haveCurrent = dates.some((d) => d.academic_year === ays.currentAY);
-    const status = haveCurrent ? 'ok' : 'partial';
-    const note = haveCurrent ? null : `Only ${ays.nextAY} dates were found - ${ays.currentAY} was not available.`;
+    const haveNext = dates.some((d) => d.academic_year === ays.nextAY);
+    // Late-season (May-Aug): councils prune the outgoing year and publish only
+    // the next one - that's healthy, not "partial". The AY label only rolls
+    // over in September (academicYearsForCountry), so without this every
+    // August the directory filled with false "needs attention" partials.
+    const month = new Date().getUTCMonth(); // 0-based; 4..7 = May..Aug
+    const lateSeason = month >= 4 && month <= 7;
+    const acceptable = haveCurrent || (lateSeason && haveNext);
+    const status = acceptable ? 'ok' : 'partial';
+    const note = acceptable ? null : `Only ${ays.nextAY} dates were found - ${ays.currentAY} was not available.`;
     await laDb.updateAuthorityStatus(la.id, {
       status,
       error: note,

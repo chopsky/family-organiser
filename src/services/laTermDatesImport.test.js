@@ -98,7 +98,8 @@ describe('importAuthority', () => {
     expect(laDb.replaceEntriesForLA).not.toHaveBeenCalled();
   });
 
-  test('only next-year dates → partial with an explanatory note', async () => {
+  test('only next-year dates → partial with an explanatory note (winter)', async () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate','setTimeout'] }).setSystemTime(new Date('2026-02-10T12:00:00Z'));
     findOfficialTermDatesUrl.mockResolvedValue('https://barnet.gov.uk/term-dates');
     fetchTermDatesPageText.mockResolvedValue('lots of page text');
     extractTermDatesPreview.mockResolvedValue({
@@ -111,6 +112,18 @@ describe('importAuthority', () => {
     expect(res.status).toBe('partial');
     expect(lastStatus().status).toBe('partial');
     expect(lastStatus().error).toMatch(/2025-2026 was not available/);
+    jest.useRealTimers();
+  });
+
+  test('late-season (Aug): next-year-only is OK, not partial', async () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate','setTimeout'] }).setSystemTime(new Date('2026-08-03T12:00:00Z'));
+    findOfficialTermDatesUrl.mockResolvedValue('https://barnet.gov.uk/term-dates');
+    fetchTermDatesPageText.mockResolvedValue('lots of page text');
+    extractTermDatesPreview.mockResolvedValue({ ok: true, body: { dates: [{ event_type: 'term_start', date: '2026-09-02', academic_year: '2026-2027', label: 'Autumn term' }] } });
+    const res = await importAuthority(LA, AYS);
+    expect(res.status).toBe('ok');
+    expect(lastStatus().error).toBeNull();
+    jest.useRealTimers();
   });
 
   test('unexpected error → failed, resolves (never throws)', async () => {
