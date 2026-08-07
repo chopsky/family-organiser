@@ -214,6 +214,72 @@ async function sendWhatsAppFollowupEmail(to, name) {
 }
 
 /**
+ * T+24h "finish your setup" nudge for verified users who never created a
+ * household - they abandoned the wizard before the household step, so they
+ * have an account pointing at nothing. One-shot per user, gated by
+ * users.setup_nudge_sent_at (scheduler.setup-nudges).
+ *
+ * The CTA points at /signup: the onboarding flow IS /signup now and resumes
+ * automatically at the first unfinished step (entryIndex), so a tap from
+ * the email lands them exactly where they left off.
+ */
+async function sendSetupNudgeEmail(to, name) {
+  const firstName = (name || 'there').trim().split(/\s+/)[0] || 'there';
+  const url = `${BASE_URL}/signup`;
+  const html = emailTemplate('Your account is ready — your family isn’t on it yet', `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">Hi ${firstName},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">
+      You created your Housemait account yesterday — the only thing missing is your family.
+    </p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 16px;">
+      Two minutes of setup gets you a shared calendar, shopping lists and meal plans the whole household can actually see — and a calm morning brief at 07:00 with what's on.
+    </p>
+    <div style="text-align:center;">${button('Finish setting up', url)}</div>
+    <p style="color:${BRAND.inkLight};font-size:12px;margin:16px 0 0;">
+      You'll pick up exactly where you left off — everything you've already entered is saved.
+    </p>
+  `);
+  await sendEmail(to, 'Your Housemait account is ready — 2 minutes to set up your family', html);
+}
+
+/**
+ * T+24h "confirm your email" nudge for users who registered but never
+ * verified. One-shot per user, gated by users.verify_nudge_sent_at
+ * (scheduler.setup-nudges).
+ *
+ * Reuses the exact link + code mechanism of sendVerificationEmail: the
+ * caller mints a FRESH token/code via db.createEmailVerificationToken
+ * (identical to POST /api/auth/resend-verification - the original token
+ * expired 24h after signup, so a stale link would bounce). The /verify URL
+ * is a Universal Link, hence trackLinks:'None' below - Postmark's tracking
+ * rewrite would break iOS/Android app deep-linking.
+ */
+async function sendVerifyNudgeEmail(to, name, token, code = null) {
+  const firstName = (name || 'there').trim().split(/\s+/)[0] || 'there';
+  const url = `${BASE_URL}/verify?token=${token}`;
+  const codeBlock = code ? `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin-top:26px;">Reading this on a different device to the one you signed up on? Enter this code there instead:</p>
+    <div style="text-align:center;margin:14px 0;">
+      <span style="display:inline-block;padding:14px 26px;border-radius:12px;background:#F3EDFC;color:${BRAND.ink};font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;font-weight:700;letter-spacing:.22em;">${code}</span>
+    </div>` : '';
+  const html = emailTemplate('Confirm your email to get started', `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">Hi ${firstName},</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 12px;">
+      You signed up for Housemait yesterday, but your email was never confirmed — so your family organiser is sitting there waiting.
+    </p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0 0 16px;">
+      One tap and you're in. Here's a fresh link:
+    </p>
+    <div style="text-align:center;">${button('Confirm my email', url)}</div>
+    ${codeBlock}
+    <p style="color:${BRAND.inkLight};font-size:13px;">${code ? 'This link and code both expire' : 'This link expires'} in 24 hours.</p>
+  `);
+  // trackLinks:'None' keeps the raw housemait.com/verify link so iOS Universal
+  // Links / Android App Links open the app instead of the browser.
+  await sendEmail(to, 'Confirm your email to get started with Housemait', html, { trackLinks: 'None' });
+}
+
+/**
  * Confirmation reply for an inbound (forwarded) email after the AI has
  * processed it. Summarises what got done + offers a one-tap UNDO link
  * so users can revert mistakes without contacting support. The link is
@@ -694,6 +760,8 @@ async function sendAnnouncementEmail({ to, subject, html }) {
 module.exports = {
   sendVerificationEmail,
   sendWhatsAppFollowupEmail,
+  sendSetupNudgeEmail,
+  sendVerifyNudgeEmail,
   sendInviteEmail,
   sendInboundEmailConfirmation,
   sendInboundEmailNoResults,

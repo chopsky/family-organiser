@@ -14,6 +14,7 @@ const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
 const { runDbHealthCheck } = require('./db-health-monitor');
 const { runCaptureOpenerCheck } = require('./capture-openers');
+const { runSetupNudgeCheck } = require('./setup-nudges');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
@@ -853,6 +854,15 @@ function startScheduler() {
   // the email" under 15 min.
   cron.schedule('*/15 * * * *', () => runWhatsAppFollowupCheck());
   console.log('✓ WhatsApp re-engagement check scheduled (every 15 min)');
+
+  // ── "Finish your setup" email nudges: every 15 minutes ─────────────────────
+  // T+24h siblings of the WhatsApp follow-up for the two cohorts it can't
+  // reach: verified users with no household (setup nudge → /signup resumes
+  // the wizard) and never-verified users (fresh verification link). One-shot
+  // per user (stamped on users table); pre-migration the finders return []
+  // so this no-ops until migration-setup-nudge-emails.sql is run.
+  cron.schedule('*/15 * * * *', () => runSetupNudgeCheck());
+  console.log('✓ Setup/verify nudge check scheduled (every 15 min)');
 
   // ── Capture openers: every 15 min ──────────────────────────────────────────
   // Day 1-3 activation questions for newly linked WhatsApp users, sent in

@@ -338,6 +338,9 @@ async function updateUser(userId, fields, db = supabase) {
  *     who signed up a month ago and never came back is not going to
  *     activate from an out-of-the-blue email)
  *   - disabled_at IS NULL    (skip disabled accounts)
+ *   - household_id IS NOT NULL (a householdless user hasn't finished the
+ *     setup wizard - they get the "finish your setup" nudge instead;
+ *     pitching WhatsApp before they have a household is premature)
  *
  * Returns: array of { id, name, email }.
  */
@@ -351,6 +354,7 @@ async function findUsersAwaitingWhatsAppFollowup(db = supabase) {
     .eq('whatsapp_linked', false)
     .is('whatsapp_followup_sent_at', null)
     .is('disabled_at', null)
+    .not('household_id', 'is', null)
     .lt('created_at', cutoff24h)
     .gt('created_at', cutoff7d)
     .not('email', 'is', null);
@@ -437,6 +441,101 @@ async function markWhatsAppFollowupSent(userId, db = supabase) {
     .update({ whatsapp_followup_sent_at: new Date().toISOString() })
     .eq('id', userId);
   if (error) console.error('[markWhatsAppFollowupSent] update failed:', error.message);
+}
+
+/**
+ * Find users eligible for the T+24h "finish your setup" email: they signed
+ * up and verified, but never created (or joined) a household - the setup
+ * wizard was abandoned before the household step. Same 24h-7d warmth window
+ * and one-shot stamp semantics as findUsersAwaitingWhatsAppFollowup above.
+ *
+ * "No household" = users.household_id IS NULL - the exact state
+ * POST /api/auth/create-household checks (req.householdId) and flips via
+ * claimHouseholdForUser, and the state that makes /signup resume the wizard.
+ *
+ * Self-heals pre-migration: if setup_nudge_sent_at isn't there yet the
+ * query fails with a missing-column error and we return [] so the cron
+ * no-ops instead of spamming.
+ *
+ * Returns: array of { id, name, email }.
+ */
+async function findUsersAwaitingSetupNudge(db = supabase) {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const cutoff7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, email')
+    .eq('email_verified', true)
+    .is('household_id', null)
+    .is('setup_nudge_sent_at', null)
+    .is('disabled_at', null)
+    .lt('created_at', cutoff24h)
+    .gt('created_at', cutoff7d)
+    .not('email', 'is', null);
+  if (error) {
+    if (isMissingColumnError(error)) {
+      console.warn('[findUsersAwaitingSetupNudge] setup_nudge_sent_at missing — run migration-setup-nudge-emails.sql');
+    } else {
+      console.error('[findUsersAwaitingSetupNudge] query failed:', error.message);
+    }
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Find users eligible for the T+24h "confirm your email" nudge: they
+ * registered but never clicked the verification link, so they're locked out
+ * of everything downstream. Same 24h-7d window / one-shot stamp / missing-
+ * column self-heal as findUsersAwaitingSetupNudge.
+ *
+ * Returns: array of { id, name, email }.
+ */
+async function findUsersAwaitingVerifyNudge(db = supabase) {
+  const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const cutoff7d  = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, email')
+    .eq('email_verified', false)
+    .is('verify_nudge_sent_at', null)
+    .is('disabled_at', null)
+    .lt('created_at', cutoff24h)
+    .gt('created_at', cutoff7d)
+    .not('email', 'is', null);
+  if (error) {
+    if (isMissingColumnError(error)) {
+      console.warn('[findUsersAwaitingVerifyNudge] verify_nudge_sent_at missing — run migration-setup-nudge-emails.sql');
+    } else {
+      console.error('[findUsersAwaitingVerifyNudge] query failed:', error.message);
+    }
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Stamp users.setup_nudge_sent_at after the "finish your setup" email is
+ * sent. Idempotent - the cron only picks up NULL stamps.
+ */
+async function markSetupNudgeSent(userId, db = supabase) {
+  const { error } = await db
+    .from('users')
+    .update({ setup_nudge_sent_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) console.error('[markSetupNudgeSent] update failed:', error.message);
+}
+
+/**
+ * Stamp users.verify_nudge_sent_at after the "confirm your email" nudge is
+ * sent. Idempotent - the cron only picks up NULL stamps.
+ */
+async function markVerifyNudgeSent(userId, db = supabase) {
+  const { error } = await db
+    .from('users')
+    .update({ verify_nudge_sent_at: new Date().toISOString() })
+    .eq('id', userId);
+  if (error) console.error('[markVerifyNudgeSent] update failed:', error.message);
 }
 
 // ─── Token helpers (verification, reset) ─────────────────────────────────────
@@ -10388,6 +10487,10 @@ module.exports = {
   // WhatsApp re-engagement (T+24h email for signups who never linked)
   findUsersAwaitingWhatsAppFollowup,
   markWhatsAppFollowupSent,
+  findUsersAwaitingSetupNudge,
+  findUsersAwaitingVerifyNudge,
+  markSetupNudgeSent,
+  markVerifyNudgeSent,
   findCaptureOpenerCandidates,
   getCaptureOpenerKeys,
   recordCaptureOpener,
