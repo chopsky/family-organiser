@@ -22,7 +22,6 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const laDb = require('../db/laTermDates');
-const schoolDirDb = require('../db/schoolDirectory');
 
 const CANONICAL_BASE = 'https://housemait.com/school-term-dates';
 const INDEX_HTML = path.join(__dirname, '..', '..', 'public', 'la-term-dates', 'index.html');
@@ -149,11 +148,12 @@ router.get('/', async (req, res, next) => {
 router.get('/sitemap.xml', async (req, res) => {
   try {
     const authorities = await laDb.listAllAuthorities();
-    const schools = await schoolDirDb.listDirectorySchools({ pageSize: 100 }).catch(() => ({ rows: [] }));
+    // Councils only. School records are deliberately NOT public: parents seed
+    // them from calendars some schools keep gated (a real security concern
+    // for e.g. Jewish schools) - they live in-app only.
     const urls = [
       `${CANONICAL_BASE}/`,
       ...authorities.filter((a) => ['ok', 'partial'].includes(a.import_status)).map((a) => `${CANONICAL_BASE}/${a.slug}`),
-      ...schools.rows.filter((s) => s.status === 'ok').map((s) => `${CANONICAL_BASE}/schools/${s.slug}`),
     ];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}\n</urlset>`;
     res.set('Cache-Control', CACHE_HEADER).type('application/xml').send(xml);
@@ -168,31 +168,16 @@ router.get('/sitemap.xml', async (req, res) => {
 // Express 5 dropped inline route regexes, hence the in-handler check.
 const SLUG_RE = /^[a-z0-9-]+$/;
 
-// ── Per-school page (before /:slug so "schools" isn't eaten by it) ─────────
-router.get('/schools/:slug', async (req, res, next) => {
-  try {
-    if (!SLUG_RE.test(req.params.slug)) return next();
-    const school = await schoolDirDb.getDirectorySchoolBySlug(req.params.slug);
-    if (!school || school.status !== 'ok') return next();
-    const entries = await schoolDirDb.getDirectorySchoolDates(school.id);
-    const years = groupByYear(entries);
-    const yearsLabel = years.map((y) => y.year).join(' and ');
-    const families = (school.adopted_count || 0) + 1;
-    const title = `${school.name} Term Dates${yearsLabel ? ` ${yearsLabel}` : ''} | Housemait`;
-    const description = `Term dates and holidays for ${school.name}${school.postcode ? ` (${school.postcode})` : ''}${yearsLabel ? ` for ${yearsLabel}` : ''} — imported from the school's own published calendar and checked automatically. Used by ${families} Housemait famil${families === 1 ? 'y' : 'ies'}.`;
-    res.set('Cache-Control', CACHE_HEADER).type('html').send(detailPage({
-      title,
-      description,
-      canonicalPath: `/schools/${school.slug}`,
-      h1: `${school.name} term dates`,
-      sub: `${school.postcode ? `${school.postcode} · ` : ''}Imported from the school's published calendar · used by ${families} famil${families === 1 ? 'y' : 'ies'} on Housemait`,
-      years,
-      jsonLd: breadcrumbLd(`${school.name} term dates`, `/schools/${school.slug}`),
-    }));
-  } catch (err) {
-    console.error('[term-dates-ssr] school page failed:', err.message);
-    next();
-  }
+// ── School pages: WITHDRAWN from the public site ───────────────────────────
+// Parent-seeded school records stay in-app only: some schools deliberately
+// gate their calendars (a real security concern, e.g. Jewish schools), and a
+// public page would republish what the school chose not to. 410 + noindex
+// tells Google to drop the previously-indexed URLs fast.
+router.get('/schools/:slug', (req, res) => {
+  res.set('X-Robots-Tag', 'noindex')
+    .status(410)
+    .type('html')
+    .send('<!DOCTYPE html><html lang="en-GB"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>Page removed</title></head><body style="font-family:sans-serif;padding:40px"><p>School term-date pages are no longer public. Parents can access their school\'s dates inside the <a href="https://housemait.com">Housemait</a> app.</p><p><a href="/school-term-dates/">Browse council term dates →</a></p></body></html>');
 });
 
 // ── Per-council page ───────────────────────────────────────────────────────
