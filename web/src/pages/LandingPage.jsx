@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import '../landing.css'
 import { useLocale } from '../hooks/useLocale'
@@ -139,53 +140,75 @@ const FileIcon = () => (
 
 /**
  * QR-on-hover download link — the behaviour carried over from the previous
- * site. Wrapper is the hover/focus zone; the popover shows the App Store QR
- * and flips above the trigger when there isn't ~200px free below (recomputed
- * on every pointer/keyboard entry, since scroll changes the answer). Touch
- * devices never see the popover (CSS hover gate) — a tap just navigates.
+ * site. Wrapper is the hover/focus zone; the popover shows the store QR(s),
+ * rendered through a PORTAL onto document.body with fixed positioning.
+ * Portal because the hero and CTA panel are overflow: hidden — an in-place
+ * absolute popover was clipped at the section edge whenever the trigger sat
+ * near it (real report 2026-08-06: half-visible codes below the hero
+ * button), and near the edge NEITHER direction has room inside the section.
+ * Fixed-on-body only ever needs to fit the viewport.
+ *
+ * Touch devices never see the popover (hover matchMedia gate) — a tap just
+ * navigates. preferUp keeps the old bias: open above when it fits.
  */
+const QR_IMG = 168 // must match .lv-qrpop img in landing.css
+const QR_PAD = 16  // must match .lv-qrpop padding/gap
 function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '/assets/app-store-qr.svg', qrs }) {
   // One code by default; pass `qrs` (array of {src, label}) to show several
   // side by side — the web hero shows both the App Store and Play codes.
   const codes = qrs && qrs.length ? qrs : [{ src: qr }]
   const wrapRef = useRef(null)
-  const [placement, setPlacement] = useState(preferUp ? 'top' : 'bottom')
-  const [shiftX, setShiftX] = useState(0)
-  const recompute = () => {
+  const closeTimer = useRef(null)
+  const [pos, setPos] = useState(null) // {x, y} viewport px while open
+
+  const open = () => {
+    clearTimeout(closeTimer.current)
+    if (!window.matchMedia?.('(hover: hover)').matches) return
     const node = wrapRef.current
     if (!node) return
     const rect = node.getBoundingClientRect()
-    // preferUp: used inside overflow-hidden sections (hero, CTA panel)
-    // where a downward popover gets clipped at the section edge — open
-    // above the trigger unless there's genuinely no room up there.
-    if (preferUp) setPlacement(rect.top < 210 ? 'bottom' : 'top')
-    else setPlacement(window.innerHeight - rect.bottom < 210 ? 'top' : 'bottom')
-    // Horizontal clamp: the popover centres on the trigger, but the hero
-    // button sits near the page margin and the two-code variant is ~384px
-    // wide, so centring pushed it past the viewport edge. Shift it back
-    // inside with 12px breathing room.
-    const pop = node.querySelector('.lv-qrpop')
-    if (pop) {
-      const center = rect.left + rect.width / 2
-      const half = pop.offsetWidth / 2
-      const margin = 12
-      let shift = 0
-      if (center - half < margin) shift = margin - (center - half)
-      else if (center + half > window.innerWidth - margin) shift = (window.innerWidth - margin) - (center + half)
-      setShiftX(Math.round(shift))
-    }
+    // Popover size is deterministic from the CSS constants above.
+    const hasLabels = codes.some((c) => c.label)
+    const w = codes.length * QR_IMG + (codes.length - 1) * QR_PAD + QR_PAD * 2
+    const h = QR_IMG + QR_PAD * 2 + (hasLabels ? 26 : 0)
+    const margin = 12, gapY = 12
+    const x = Math.min(Math.max(rect.left + rect.width / 2 - w / 2, margin), window.innerWidth - margin - w)
+    const fitsAbove = rect.top - gapY - h >= margin
+    const fitsBelow = rect.bottom + gapY + h <= window.innerHeight - margin
+    const up = preferUp ? fitsAbove || !fitsBelow : !fitsBelow && fitsAbove
+    const y = up ? Math.max(margin, rect.top - gapY - h) : rect.bottom + gapY
+    setPos({ x: Math.round(x), y: Math.round(y) })
   }
+  const scheduleClose = () => {
+    clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setPos(null), 160)
+  }
+  const cancelClose = () => clearTimeout(closeTimer.current)
+
+  // A fixed popover doesn't follow the page — close rather than drift.
+  useEffect(() => {
+    if (!pos) return undefined
+    const onScroll = () => setPos(null)
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    return () => window.removeEventListener('scroll', onScroll, { capture: true })
+  }, [pos])
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
+
   return (
-    <span ref={wrapRef} className="lv-qrwrap" data-placement={placement} style={{ '--qr-shift': `${shiftX}px` }} onMouseEnter={recompute} onFocus={recompute}>
+    <span ref={wrapRef} className="lv-qrwrap" onMouseEnter={open} onMouseLeave={scheduleClose} onFocus={open} onBlur={scheduleClose}>
       <a href={href} className={className} aria-label={ariaLabel}>{children}</a>
-      <span className="lv-qrpop" role="tooltip" aria-hidden="true">
-        {codes.map((c, i) => (
-          <span key={c.src || i} className="lv-qrcode">
-            <img src={c.src} alt="" width="150" height="150" loading="lazy" />
-            {c.label && <span className="lv-qrlabel">{c.label}</span>}
-          </span>
-        ))}
-      </span>
+      {pos && createPortal(
+        <span className="lv-qrpop" role="tooltip" style={{ left: pos.x, top: pos.y }}
+          onMouseEnter={cancelClose} onMouseLeave={scheduleClose}>
+          {codes.map((c, i) => (
+            <span key={c.src || i} className="lv-qrcode">
+              <img src={c.src} alt="" width="150" height="150" loading="lazy" />
+              {c.label && <span className="lv-qrlabel">{c.label}</span>}
+            </span>
+          ))}
+        </span>,
+        document.body,
+      )}
     </span>
   )
 }

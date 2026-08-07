@@ -311,30 +311,27 @@
 .lv-footer .links a { font-size: 13.5px; font-weight: 600; color: var(--lv-ink-2); text-decoration: none; }
 .lv-footer .links a:hover { color: var(--lv-purple); }
 
-/* ── QR-on-hover download popover (ported behaviour from the previous
-      site: wrapper is the hover/focus zone; popover flips above when
-      there's no room below; touch devices just navigate). ── */
+/* ── QR-on-hover download popover. Rendered through a React portal onto
+      document.body with position: fixed — the hero/CTA sections are
+      overflow: hidden, and an in-place popover was clipped at the section
+      edge whenever the trigger sat near it. NOTE: because it lives outside
+      .lv, this block must not rely on .lv-scoped vars or the .lv resets
+      (hence the literal colours and explicit fonts). Its existence IS the
+      open state (QrLink mounts/unmounts it), so no hover reveal here —
+      just an entrance animation. Sizes are mirrored by QR_IMG/QR_PAD in
+      LandingPage.jsx for the placement maths. ── */
 .lv-qrwrap { position: relative; display: inline-flex; }
 .lv-qrpop {
-  position: absolute; top: calc(100% + 12px); left: 50%; transform: translate(calc(-50% + var(--qr-shift, 0px)), -6px);
+  position: fixed; z-index: 120; box-sizing: border-box;
   background: #fff; border-radius: 18px; padding: 16px;
-  display: flex; gap: 16px;
-  /* Shrink-to-fit for an abs-pos box is capped at the containing block (the
-     ~200px button wrap), which crushed the two-QR variant into 40px-wide
-     codes. max-content sizes it to the codes instead. */
-  width: max-content;
+  display: flex; gap: 16px; width: max-content;
   box-shadow: 0 22px 50px -18px rgba(23, 17, 38, 0.45), 0 6px 14px rgba(23, 17, 38, 0.12);
-  opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease; z-index: 30;
+  animation: lvQrIn 0.18s ease both;
 }
-.lv-qrpop::before { content: ''; position: absolute; top: -14px; left: 0; right: 0; height: 14px; }
-.lv-qrwrap[data-placement="top"] .lv-qrpop { top: auto; bottom: calc(100% + 12px); transform: translate(calc(-50% + var(--qr-shift, 0px)), 6px); }
-.lv-qrwrap[data-placement="top"] .lv-qrpop::before { top: auto; bottom: -14px; }
+@keyframes lvQrIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .lv-qrcode { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .lv-qrpop img { width: 168px; height: 168px; display: block; border-radius: 6px; }
-.lv-qrlabel { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: var(--lv-ink); }
-@media (hover: hover) {
-  .lv-qrwrap:hover .lv-qrpop, .lv-qrwrap:focus-within .lv-qrpop { opacity: 1; transform: translate(calc(-50% + var(--qr-shift, 0px)), 0); pointer-events: auto; }
-}
+.lv-qrlabel { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: #241E33; font-family: 'Inter', system-ui, sans-serif; }
 
 /* ── Narrow (<1080) ── */
 @media (max-width: 1079px) {
