@@ -73,11 +73,33 @@ router.get('/failures', async (req, res) => {
   }
 });
 
-// NOTE: the former public /schools endpoints were withdrawn - parent-seeded
-// school records are in-app only (see routes/schools.js directory-dates /
-// adopt-directory-dates). Some schools gate their calendars deliberately.
-router.get(['/schools', '/schools/:slug'], (req, res) => {
-  res.set('X-Robots-Tag', 'noindex').status(410).json({ error: 'School records are no longer public. Access your school\'s dates in the Housemait app.' });
+// The former public /schools endpoints are withdrawn - parent-seeded school
+// records are in-app only (some schools gate their calendars deliberately).
+// The OPERATOR can still inspect the roster with the import key:
+//   GET /api/la-term-dates/schools?key=<LA_IMPORT_KEY>          full rows
+//   GET /api/la-term-dates/schools/<slug>?key=<LA_IMPORT_KEY>   record + dates
+// Anyone without the key gets 410 + noindex.
+router.get(['/schools', '/schools/:slug'], async (req, res) => {
+  const expected = process.env.LA_IMPORT_KEY;
+  const provided = req.get('x-import-key') || req.query.key;
+  if (!expected || provided !== expected) {
+    return res.set('X-Robots-Tag', 'noindex').status(410).json({ error: 'School records are no longer public. Access your school\'s dates in the Housemait app.' });
+  }
+  try {
+    const schoolDirDb = require('../db/schoolDirectory');
+    res.set('X-Robots-Tag', 'noindex');
+    if (req.params.slug) {
+      const school = await schoolDirDb.getDirectorySchoolBySlug(req.params.slug);
+      if (!school) return res.status(404).json({ error: 'Unknown school.' });
+      const dates = await schoolDirDb.getDirectorySchoolDates(school.id);
+      return res.json({ school, dates });
+    }
+    const { search, status, page, pageSize } = req.query;
+    return res.json(await schoolDirDb.listDirectorySchools({ search, status, page, pageSize }));
+  } catch (err) {
+    console.error('[la-term-dates] operator schools view failed:', err.message);
+    return res.status(500).json({ error: 'Could not load schools.' });
+  }
 });
 
 // ── Import trigger (operator-only) ──────────────────────────────────────────
