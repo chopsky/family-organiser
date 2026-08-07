@@ -27,8 +27,18 @@ const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.housem
 const QUIET = 2;
 const DARK = '#2D2A33'; // charcoal, matching QrCode.jsx — functional contrast, not themed
 
-function svgFor(value) {
-  const cells = encodeQR(value, 'raw', { ecc: 'medium', border: 0 });
+// Both codes are pinned to the SAME QR version (grid size): the Play URL is
+// longer than the App Store one, so left to auto-size the two codes come out
+// at different module densities and read as mismatched sizes side by side
+// (real report 2026-08-06, twice). Encode each once to find its natural
+// version, then re-encode both at the larger of the two.
+function naturalVersion(value) {
+  const n = encodeQR(value, 'raw', { ecc: 'medium', border: 0 }).length;
+  return (n - 17) / 4;
+}
+
+function svgFor(value, version) {
+  const cells = encodeQR(value, 'raw', { ecc: 'medium', border: 0, version });
   const n = cells.length;
   let d = '';
   for (let y = 0; y < n; y++) {
@@ -45,10 +55,11 @@ function svgFor(value) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="${-QUIET} ${-QUIET} ${span} ${span}" shape-rendering="crispEdges"><path fill="#fff" d="M${-QUIET} ${-QUIET}h${span}v${span}H${-QUIET}z"/><path fill="${DARK}" d="${d}"/></svg>\n`;
 }
 
+const version = Math.max(naturalVersion(APP_STORE_URL), naturalVersion(PLAY_STORE_URL));
 for (const [file, url] of [
   ['app-store-qr.svg', APP_STORE_URL],
   ['play-store-qr.svg', PLAY_STORE_URL],
 ]) {
-  writeFileSync(join(ASSETS, file), svgFor(url));
-  console.log(`wrote ${file} (${url})`);
+  writeFileSync(join(ASSETS, file), svgFor(url, version));
+  console.log(`wrote ${file} (${url}) at version ${version}`);
 }
