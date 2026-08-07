@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import '../landing.css'
@@ -114,7 +114,7 @@ const ICONS = [
 ]
 
 const STORY_CHAPTERS = [
-  { h: ['One calendar,', 'the whole family'], p: 'School runs, clubs, birthdays and appointments, colour-coded by person and synced to every phone in the house.' },
+  { h: ['One calendar,', 'the whole family'], p: 'School runs, clubs, birthdays and appointments, colour-coded by person - and it syncs with the calendars you already use.' },
   { h: ['Chores kids', 'actually do'], p: 'Routines and quests with stars to earn and treats to spend. Beds get made, teeth get brushed, and nobody nags.' },
   { h: ['A week of dinners', 'in minutes'], p: 'Plan the week from your family recipe box, and every ingredient lands on the shopping list by itself.' },
   { h: ['Lists that keep', 'everyone in sync'], p: 'To-dos and shopping, shared in real time. Add it the moment you think of it, sorted before you forget.' },
@@ -125,6 +125,45 @@ const SCREENS = ['/landing/app-calendar.jpg', '/landing/app-tasks.jpg', '/landin
 const SCREEN_ALTS = ['Housemait shared family calendar', 'Housemait chores, routines and rewards', 'Housemait weekly meal planner and recipe box', 'Housemait shared to-do and shopping lists']
 const COMPANIONS = ['/landing/app-calendar-month.jpg', '/landing/app-rewards.jpg', '/landing/app-meals.jpg', '/landing/app-shopping.jpg']
 const COMPANION_ALTS = ['Housemait calendar month view', 'Housemait rewards and star shop', 'Housemait recipe box', 'Housemait categorised shopping list']
+
+// Calendar-sync tile row under the Calendar feature panel: [src, icon px, label].
+const CAL_SYNC = [
+  ['/landing/cal-google.png', 23, 'Google Calendar'],
+  ['/landing/cal-apple.webp', 25, 'Apple Calendar'],
+  ['/landing/cal-outlook.png', 23, 'Outlook'],
+]
+
+/* ── Popup overlay cards (design_handoff UPDATE-features-popups.md) ────
+   Two cards per feature step float over the phone frame, animating on the
+   same scroll clock as the steps. Positions are % of the frame so they
+   scale with it. Sides alternate per step so consecutive steps mirror. */
+const PopEmoji = ({ e }) => <span style={{ fontSize: 19, lineHeight: 1 }}>{e}</span>
+const PopCheck = () => (
+  <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#6D38AD', display: 'grid', placeItems: 'center', flex: 'none' }}>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+  </span>
+)
+const PopSparkles = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="#6D38AD" style={{ flex: 'none' }}><path d="M12 2l1.9 5.7L19.6 9.6l-5.7 1.9L12 17.2l-1.9-5.7L4.4 9.6l5.7-1.9zM19 14l0.95 2.85L22.8 17.8l-2.85 0.95L19 21.6l-0.95-2.85L15.2 17.8l2.85-0.95z" /></svg>
+)
+const PopAvatar = () => (
+  <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#6D38AD', color: '#FFFFFF', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 700, flex: 'none' }}>J</span>
+)
+const PopWa = () => <img src="/landing/icons/whatsapp.svg" alt="" style={{ width: 18, height: 18, display: 'block', flex: 'none' }} />
+
+// Per step: [top "a" card, bottom "b" card]. lead/trail wrap the text.
+const POPUPS = [
+  [{ lead: <PopEmoji e="⚽" />, text: 'Football - Tue 5pm' },
+    { lead: <PopEmoji e="🎂" />, text: 'Grandma’s birthday - Sun' }],
+  [{ lead: <PopEmoji e="👕" />, text: 'Wash laundry', trail: <PopCheck /> },
+    { lead: <PopEmoji e="⭐" />, text: 'You earned 5 stars!' }],
+  [{ lead: <PopSparkles />, text: 'Easy dinner tonight?' },
+    { text: 'Pesto pasta - 15 mins ✓' }],
+  [{ lead: <PopEmoji e="🍓" />, text: 'Strawberries', trail: <PopCheck /> },
+    { lead: <PopAvatar />, text: 'James added bin bags' }],
+  [{ lead: <PopWa />, text: 'Ella’s dentist Thu 3pm' },
+    { lead: <PopCheck />, text: 'Added to calendar' }],
+]
 
 /* ── Small shared pieces ──────────────────────────────────────────── */
 
@@ -425,6 +464,20 @@ export default function LandingPage() {
           const base = narrow ? 'translateX(-50%)' : 'translateY(-50%)'
           card.style.transform = `${base} translateY(${(((1 - enter) * 26) - (exit * 26)).toFixed(1)}px)`
         }
+
+        // Popup overlay cards: rise 20px, scale 0.88→1 and fade in shortly
+        // after the screen appears (b staggered ~1/7 step later), then fade
+        // with the screen. Step 4's cards have no exit — they stay as the
+        // story unpins. (ex = 1 − exit; exit is already 0 for step 4.)
+        const PA = E[`pop${i}a`]
+        const PB = E[`pop${i}b`]
+        if (PA || PB) {
+          const ex = 1 - exit
+          const pa = ease(inv(t, 0.1, 0.34))
+          const pb = ease(inv(t, 0.24, 0.48))
+          if (PA) { PA.style.opacity = (pa * ex).toFixed(3); PA.style.transform = `translateY(${((1 - pa) * 20).toFixed(1)}px) scale(${(0.88 + 0.12 * pa).toFixed(3)})` }
+          if (PB) { PB.style.opacity = (pb * ex).toFixed(3); PB.style.transform = `translateY(${((1 - pb) * 20).toFixed(1)}px) scale(${(0.88 + 0.12 * pb).toFixed(3)})` }
+        }
       }
 
       // Companion phone (desktop, chapters 1–4): tilted mock behind the
@@ -607,6 +660,22 @@ export default function LandingPage() {
                 ))}
                 <img ref={setEl('chat')} className="lv-s-layer" src="/landing/app-whatsapp.jpg" alt="WhatsApp conversation with the Housemait assistant" style={{ zIndex: 6 }} loading="lazy" />
               </div>
+              {/* Popup overlay cards — two per step, absolutely positioned over
+                  the frame (z-12, above the frame image), driven by the loop. */}
+              {POPUPS.map(([a, b], i) => {
+                const aSide = i % 2 === 0 ? 'right' : 'left'
+                const bSide = aSide === 'right' ? 'left' : 'right'
+                return (
+                  <Fragment key={i}>
+                    <div className="lv-pop" ref={setEl(`pop${i}a`)} style={{ top: '13%', [aSide]: '-16%' }}>
+                      <div className="lv-pop-card">{a.lead}<span className="lv-pop-text">{a.text}</span>{a.trail}</div>
+                    </div>
+                    <div className="lv-pop" ref={setEl(`pop${i}b`)} style={{ bottom: '7%', [bSide]: '-14%' }}>
+                      <div className="lv-pop-card">{b.lead}<span className="lv-pop-text">{b.text}</span>{b.trail}</div>
+                    </div>
+                  </Fragment>
+                )
+              })}
             </div>
           </div>
 
@@ -624,6 +693,16 @@ export default function LandingPage() {
             <div key={ch.p} className={`lv-story-card ${i % 2 === 0 ? 'side-l' : 'side-r'}`} ref={setEl(`c${i}`)}>
               <h3>{ch.h[0]}<br />{ch.h[1]}</h3>
               <p>{ch.p}</p>
+              {i === 0 && (
+                <div className="lv-sync">
+                  <span className="lv-sync-label">Syncs with</span>
+                  <span style={{ display: 'inline-flex' }}>
+                    {CAL_SYNC.map(([src, size, label]) => (
+                      <span key={src} className="lv-sync-tile"><img src={src} alt={label} title={label} style={{ width: size, height: size, objectFit: 'contain', display: 'block' }} /></span>
+                    ))}
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>

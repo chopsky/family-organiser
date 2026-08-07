@@ -161,6 +161,18 @@
 .lv-story-card h3 { font-size: clamp(28px, 2.8vw, 40px); line-height: 1.12; margin: 0 0 12px; }
 .lv-story-card p { color: var(--lv-ink-2); font-size: 16px; line-height: 1.6; margin: 0; }
 
+/* Calendar-sync tile row (Calendar feature panel; inherits panel align) */
+.lv-sync { margin-top: 20px; display: inline-flex; align-items: center; gap: 12px; }
+.lv-sync-label { font-size: 13.5px; font-weight: 600; color: #8A8399; }
+.lv-sync-tile { width: 40px; height: 40px; border-radius: 13px; background: #FFFFFF; border: 1px solid rgba(36, 30, 51, 0.08); display: grid; place-items: center; margin-left: 5px; }
+
+/* Popup overlay cards over the phone frame — the animated wrapper carries
+   opacity/transform (set per-frame in the scroll loop); the inner card is
+   the static white chrome. */
+.lv-pop { position: absolute; z-index: 12; opacity: 0; pointer-events: none; will-change: transform, opacity; }
+.lv-pop-card { display: flex; align-items: center; gap: 10px; background: #FFFFFF; border: 1px solid rgba(36, 30, 51, 0.08); border-radius: 16px; padding: 11px 14px; box-shadow: 0 18px 40px rgba(36, 30, 51, 0.18); white-space: nowrap; }
+.lv-pop-text { font-size: 14px; font-weight: 600; color: #241E33; }
+
 /* ── Flat story (?flat=1, screenshot-only): each chapter reproduced
       with the LIVE stage geometry — centred main phone, companion
       tilted behind on the side opposite the text, text at the live
