@@ -114,7 +114,7 @@ const ICONS = [
 ]
 
 const STORY_CHAPTERS = [
-  { h: ['One calendar,', 'the whole family'], p: 'School runs, clubs, birthdays and appointments, colour-coded by person - and it syncs with the calendars you already use.' },
+  { h: ['One calendar,', 'the whole family'], p: 'School runs, clubs, birthdays and appointments, colour-coded by person.' },
   { h: ['Chores kids', 'actually do'], p: 'Routines and quests with stars to earn and treats to spend. Beds get made, teeth get brushed, and nobody nags.' },
   { h: ['A week of dinners', 'in minutes'], p: 'Plan the week from your family recipe box, and every ingredient lands on the shopping list by itself.' },
   { h: ['Lists that keep', 'everyone in sync'], p: 'To-dos and shopping, shared in real time. Add it the moment you think of it, sorted before you forget.' },
