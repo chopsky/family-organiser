@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../../lib/api';
+import { avatarSrc } from '../../lib/avatarSet';
 import { IconArrowLeft } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
 import SubscriptionBadge from '../../components/SubscriptionBadge';
@@ -315,8 +316,9 @@ export default function AdminHouseholdDetail() {
                 to={`/admin/users/${m.id}`}
                 className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-4 flex items-center gap-3 hover:shadow-[var(--shadow-md)] transition-shadow"
               >
-                {m.avatar_url ? (
-                  <img src={m.avatar_url} alt={m.name} className="w-10 h-10 rounded-full object-cover" />
+                {m.avatar_url || m.avatar_id ? (
+                  // Same precedence as the in-app Avatar: photo → illustration → initial.
+                  <img src={m.avatar_url || avatarSrc(m.avatar_id)} alt={m.name} className="w-10 h-10 rounded-full object-cover bg-white" />
                 ) : (
                   <div className={`w-10 h-10 rounded-full ${ac} text-white flex items-center justify-center font-bold text-sm`}>
                     {m.name?.[0]?.toUpperCase()}

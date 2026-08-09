@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../../lib/api';
+import { avatarSrc } from '../../lib/avatarSet';
 import { useAuth } from '../../context/AuthContext';
 import { IconArrowLeft, IconShield, IconBan, IconCheckCircle, IconTrash, IconCpu, IconMessageCircle, IconRefresh } from '../../components/Icons';
 import Spinner from '../../components/Spinner';
@@ -173,8 +174,9 @@ export default function AdminUserDetail() {
       {/* Profile Card */}
       <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-6">
         <div className="flex items-start gap-4">
-          {user.avatar_url ? (
-            <img src={user.avatar_url} alt={user.name} className="w-16 h-16 rounded-full object-cover" />
+          {user.avatar_url || user.avatar_id ? (
+            // Same precedence as the in-app Avatar: photo → illustration → initial.
+            <img src={user.avatar_url || avatarSrc(user.avatar_id)} alt={user.name} className="w-16 h-16 rounded-full object-cover bg-white" />
           ) : (
             <div className={`w-16 h-16 rounded-full ${ac} text-white flex items-center justify-center text-xl font-bold`}>
               {user.name?.[0]?.toUpperCase()}

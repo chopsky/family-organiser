@@ -5447,7 +5447,7 @@ async function getAllUsersAdmin({ search, page = 1, limit = 50, sort = 'created_
 
   let query = db
     .from('users')
-    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
+    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, avatar_id, email_verified, whatsapp_linked, disabled_at, created_at', { count: 'exact' });
 
   if (search) {
     const s = sanitizeOrFilterValue(search);
@@ -5528,7 +5528,7 @@ async function getAllUsersAdminByDerivedSort({ search, page, limit, sortDir, sta
   // 5. Fetch the actual rows for just this page
   const { data: rows, error: rowErr } = await db
     .from('users')
-    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, email_verified, whatsapp_linked, disabled_at, created_at')
+    .select('id, name, email, role, household_id, is_platform_admin, member_type, color_theme, avatar_url, avatar_id, email_verified, whatsapp_linked, disabled_at, created_at')
     .in('id', pageIds);
   if (rowErr) throw rowErr;
 
@@ -5795,7 +5795,7 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
   const [{ data: members }, storage, schools] = await Promise.all([
     db
       .from('users')
-      .select('id, name, email, role, member_type, color_theme, avatar_url, is_platform_admin, disabled_at, created_at, school_id')
+      .select('id, name, email, role, member_type, color_theme, avatar_url, avatar_id, is_platform_admin, disabled_at, created_at, school_id')
       .eq('household_id', householdId)
       .order('created_at'),
     getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
