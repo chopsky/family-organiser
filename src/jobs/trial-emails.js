@@ -25,18 +25,22 @@ const db = require('../db/queries');
 const email = require('../services/email');
 
 // Tuples describing each lifecycle email the cron can send.
-//   dayCount  - integer trial day (1-indexed). Used to find households
-//               whose trial_started_at falls within the matching
-//               24-hour window.
-//   emailType - dedupe key in sent_emails
+//   daysLeft  - days until trial_ends_at. Selection is keyed on the
+//               REAL end date, not days since signup: the old
+//               signup-age windows told extended-trial households
+//               their trial was ending months early (The Schneiders,
+//               2026-08-08 — "5 days left" with 334 days to go).
+//               For the standard 30-day trial these map to the old
+//               day 20 / 25 / 28 sends exactly.
+//   emailType - dedupe key in sent_emails (names kept from the old
+//               day-count scheme so historical dedupe rows still hold)
 //   sender    - email.js function to invoke
-//   respectOptOut - nudge emails (20/25/28) skip when
-//                   trial_emails_enabled=false; transactional (30)
-//                   always sends.
+//   respectOptOut - nudge emails skip when trial_emails_enabled=false;
+//                   transactional (trial_expired) always sends.
 const NUDGE_SCHEDULE = [
-  { dayCount: 20, emailType: 'trial_day_20', sender: email.sendTrialDay20Email, respectOptOut: true  },
-  { dayCount: 25, emailType: 'trial_day_25', sender: email.sendTrialDay25Email, respectOptOut: true  },
-  { dayCount: 28, emailType: 'trial_day_28', sender: email.sendTrialDay28Email, respectOptOut: true  },
+  { daysLeft: 10, emailType: 'trial_day_20', sender: email.sendTrialDay20Email, respectOptOut: true  },
+  { daysLeft: 5,  emailType: 'trial_day_25', sender: email.sendTrialDay25Email, respectOptOut: true  },
+  { daysLeft: 2,  emailType: 'trial_day_28', sender: email.sendTrialDay28Email, respectOptOut: true  },
 ];
 
 /**
@@ -62,9 +66,9 @@ async function runTrialEmailCheck() {
 
 /**
  * Operator alert: email the admin (ADMIN_ALERT_EMAIL / SUPPORT_EMAIL) for
- * each household whose trial expires roughly tomorrow. Day 29 of a 30-day
- * trial = expiry lands 24-48h after this 09:00 run, which is the last
- * comfortable window to reach out before the paywall drops.
+ * each household whose trial expires roughly tomorrow (trial_ends_at
+ * 24-48h after this 09:00 run) — the last comfortable window to reach
+ * out before the paywall drops.
  *
  * Reuses the sent_emails (household_id, email_type) dedupe so a re-run
  * (deploy, manual trigger) can't double-alert on the same household.
@@ -72,7 +76,7 @@ async function runTrialEmailCheck() {
  * ("Trial expires tomorrow: Bennett Family") beat a digest for actioning.
  */
 async function processAdminExpiryAlerts() {
-  const households = await db.findHouseholdsAtTrialDay(29);
+  const households = await db.findHouseholdsWithTrialEndingInDays(1);
   if (households.length === 0) {
     console.log('[trial-emails] No households at day 29 - no admin expiry alerts');
     return;
@@ -99,13 +103,13 @@ async function processAdminExpiryAlerts() {
   }
 }
 
-async function processNudgeDay({ dayCount, emailType, sender, respectOptOut }) {
-  const households = await db.findHouseholdsAtTrialDay(dayCount);
+async function processNudgeDay({ daysLeft, emailType, sender, respectOptOut }) {
+  const households = await db.findHouseholdsWithTrialEndingInDays(daysLeft);
   if (households.length === 0) {
-    console.log(`[trial-emails] No households at day ${dayCount}`);
+    console.log(`[trial-emails] No households with ${daysLeft} days of trial left`);
     return;
   }
-  console.log(`[trial-emails] ${households.length} household(s) at day ${dayCount} - emailType=${emailType}`);
+  console.log(`[trial-emails] ${households.length} household(s) with ${daysLeft} days left - emailType=${emailType}`);
   for (const household of households) {
     try {
       if (respectOptOut && !household.trial_emails_enabled) {
@@ -114,12 +118,12 @@ async function processNudgeDay({ dayCount, emailType, sender, respectOptOut }) {
         // they re-enable mid-trial (the timestamp is within the
         // one-day window, not the email send itself). Simpler: skip
         // entirely, log, move on.
-        console.log(`[trial-emails] household ${household.id} opted out - skipping day ${dayCount}`);
+        console.log(`[trial-emails] household ${household.id} opted out - skipping ${emailType}`);
         continue;
       }
       await dispatchEmail({ household, emailType, sender });
     } catch (err) {
-      console.error(`[trial-emails] day ${dayCount} failed for household ${household.id}:`, err.message);
+      console.error(`[trial-emails] ${emailType} failed for household ${household.id}:`, err.message);
       // Continue with the next household rather than aborting the batch.
     }
   }

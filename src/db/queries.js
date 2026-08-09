@@ -9260,15 +9260,22 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
 }
 
 /**
- * Find all households whose trial is at the given integer day-count.
- * "Day N of a 30-day trial" means NOW() is in the 24-hour window
- * starting at `trial_started_at + (N-1) days`. Boundaries are half-open
- * so [day 20, day 21) covers exactly one calendar day's worth of
- * households - matches once-per-day cron semantics.
+ * Find all households whose trial ENDS in the given number of days:
+ * trial_ends_at falls in the half-open window
+ * [now + daysLeft days, now + daysLeft+1 days) — exactly one calendar
+ * day's worth per once-daily cron run, and "X days left" copy is true
+ * by construction (floor of time remaining = daysLeft).
+ *
+ * Selection is deliberately keyed on trial_ends_at, NOT days since
+ * trial_started_at. The old signup-age version fired the "5 days left"
+ * email at day 25 regardless of the real end date, so households with
+ * founder-extended trials got told their trial was ending 11 months
+ * early (real report 2026-08-08, The Schneiders). Extended and paused
+ * trials now get their nudges near their ACTUAL end.
  *
  * Filters:
- *   • subscription_status = 'trialing' (day 20/25/28 only fire while
- *     the trial is still running; if the user subscribed mid-trial
+ *   • subscription_status = 'trialing' (nudges only fire while the
+ *     trial is still running; if the user subscribed mid-trial
  *     they're 'active' and we skip them)
  *   • is_internal = false (internal accounts never get nudges)
  *   • subscription_provider != 'apple' (Apple subscribers get Apple's
@@ -9277,16 +9284,11 @@ async function markEmailSentIfNew(householdId, emailType, db = supabase) {
  *     creates conflicting messages. By design, an Apple subscriber
  *     would never be 'trialing' anyway, but the filter is defensive
  *     against any future state where the two could co-exist).
- *
- * Returns household rows joined with the primary contact email (the
- * household's creator / admin user).
  */
-async function findHouseholdsAtTrialDay(dayNumber, db = supabase) {
-  // 1-indexed day: day 1 = first 24h of trial. For day N, the window is
-  // trial_started_at + (N-1 days, N days).
+async function findHouseholdsWithTrialEndingInDays(daysLeft, db = supabase) {
   const now = new Date();
-  const windowStart = new Date(now.getTime() - dayNumber * 86_400_000).toISOString();
-  const windowEnd   = new Date(now.getTime() - (dayNumber - 1) * 86_400_000).toISOString();
+  const windowStart = new Date(now.getTime() + daysLeft * 86_400_000).toISOString();
+  const windowEnd   = new Date(now.getTime() + (daysLeft + 1) * 86_400_000).toISOString();
 
   const { data, error } = await db
     .from('households')
@@ -9294,8 +9296,8 @@ async function findHouseholdsAtTrialDay(dayNumber, db = supabase) {
     .eq('subscription_status', 'trialing')
     .eq('is_internal', false)
     .neq('subscription_provider', 'apple')
-    .gte('trial_started_at', windowStart)
-    .lt('trial_started_at', windowEnd);
+    .gte('trial_ends_at', windowStart)
+    .lt('trial_ends_at', windowEnd);
   if (error) throw error;
   return data || [];
 }
@@ -9327,7 +9329,7 @@ async function findHouseholdsWithExpiredTrial(db = supabase) {
     // Apple subscribers get Apple's expiry / billing-issue emails directly;
     // our day-30 email would point them at housemait.com/subscribe with web
     // pricing and a different cancel flow. Defensive against impossible
-    // states like provider='apple' + status='trialing' (see findHouseholdsAtTrialDay).
+    // states like provider='apple' + status='trialing' (see findHouseholdsWithTrialEndingInDays).
     .neq('subscription_provider', 'apple')
     .gte('trial_ends_at', windowStart)
     .lt('trial_ends_at', windowEnd);
@@ -10109,7 +10111,7 @@ module.exports = {
   findHouseholdByRevenuecatAppUserId,
   // Trial lifecycle emails
   markEmailSentIfNew,
-  findHouseholdsAtTrialDay,
+  findHouseholdsWithTrialEndingInDays,
   findHouseholdsWithExpiredTrial,
   getHouseholdPrimaryContact,
   getHouseholdUsageCounts,

@@ -3,7 +3,8 @@
  *
  * What's covered:
  *   • Day 20 / 25 / 28 find the right households via
- *     db.findHouseholdsAtTrialDay and dispatch the corresponding email.
+ *     db.findHouseholdsWithTrialEndingInDays (keyed on trial_ends_at,
+ *     NOT signup age) and dispatch the corresponding email.
  *   • Day 30 (trial_expired) runs on the expired-households query
  *     rather than the at-day query, and ignores trial_emails_enabled.
  *   • trial_emails_enabled=false skips day 20/25/28 but NOT day 30.
@@ -31,7 +32,7 @@ const TRIALING = (overrides = {}) => ({
 });
 
 function setupDefaults() {
-  db.findHouseholdsAtTrialDay.mockResolvedValue([]);
+  db.findHouseholdsWithTrialEndingInDays.mockResolvedValue([]);
   db.findHouseholdsWithExpiredTrial.mockResolvedValue([]);
   db.markEmailSentIfNew.mockResolvedValue(true);
   db.getHouseholdPrimaryContact.mockResolvedValue({
@@ -55,8 +56,8 @@ afterEach(() => jest.restoreAllMocks());
 
 describe('runTrialEmailCheck - per-day dispatch', () => {
   test('day 20 households get the day-20 email', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) => {
-      return day === 20 ? [TRIALING()] : [];
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) => {
+      return daysLeft === 10 ? [TRIALING()] : [];
     });
 
     await runTrialEmailCheck();
@@ -75,9 +76,9 @@ describe('runTrialEmailCheck - per-day dispatch', () => {
   });
 
   test('day 25 and day 28 route to the right senders', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) => {
-      if (day === 25) return [TRIALING({ id: 'hh-25' })];
-      if (day === 28) return [TRIALING({ id: 'hh-28' })];
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) => {
+      if (daysLeft === 5) return [TRIALING({ id: 'hh-25' })];
+      if (daysLeft === 2) return [TRIALING({ id: 'hh-28' })];
       return [];
     });
 
@@ -104,8 +105,8 @@ describe('runTrialEmailCheck - per-day dispatch', () => {
 
 describe('runTrialEmailCheck - trial_emails_enabled opt-out', () => {
   test('day 20 respects trial_emails_enabled=false (skips send)', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
-      day === 20 ? [TRIALING({ trial_emails_enabled: false })] : []
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) =>
+      daysLeft === 10 ? [TRIALING({ trial_emails_enabled: false })] : []
     );
 
     await runTrialEmailCheck();
@@ -129,8 +130,8 @@ describe('runTrialEmailCheck - trial_emails_enabled opt-out', () => {
 
 describe('runTrialEmailCheck - idempotency', () => {
   test('if markEmailSentIfNew returns false, no send fires', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
-      day === 25 ? [TRIALING()] : []
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) =>
+      daysLeft === 5 ? [TRIALING()] : []
     );
     db.markEmailSentIfNew.mockResolvedValue(false); // already sent
 
@@ -140,8 +141,8 @@ describe('runTrialEmailCheck - idempotency', () => {
   });
 
   test('dedup is keyed per (household, email_type)', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) => {
-      if (day === 20) return [TRIALING({ id: 'hh-a' }), TRIALING({ id: 'hh-b' })];
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) => {
+      if (daysLeft === 10) return [TRIALING({ id: 'hh-a' }), TRIALING({ id: 'hh-b' })];
       return [];
     });
     // First call succeeds, second fails (simulate dedup catching the
@@ -159,8 +160,8 @@ describe('runTrialEmailCheck - idempotency', () => {
 
 describe('runTrialEmailCheck - missing recipient', () => {
   test('household with no contactable admin is skipped without throwing', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
-      day === 20 ? [TRIALING()] : []
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) =>
+      daysLeft === 10 ? [TRIALING()] : []
     );
     db.getHouseholdPrimaryContact.mockResolvedValue(null);
 
@@ -169,8 +170,8 @@ describe('runTrialEmailCheck - missing recipient', () => {
   });
 
   test('a failing send for one household does not block others', async () => {
-    db.findHouseholdsAtTrialDay.mockImplementation(async (day) =>
-      day === 20 ? [TRIALING({ id: 'hh-fail' }), TRIALING({ id: 'hh-ok' })] : []
+    db.findHouseholdsWithTrialEndingInDays.mockImplementation(async (daysLeft) =>
+      daysLeft === 10 ? [TRIALING({ id: 'hh-fail' }), TRIALING({ id: 'hh-ok' })] : []
     );
     email.sendTrialDay20Email
       .mockRejectedValueOnce(new Error('Postmark 500'))
@@ -180,5 +181,17 @@ describe('runTrialEmailCheck - missing recipient', () => {
 
     expect(email.sendTrialDay20Email).toHaveBeenCalledTimes(2);
     expect(email.sendTrialDay20Email.mock.calls[1][0].householdId).toBe('hh-ok');
+  });
+});
+
+describe('selection is keyed on trial_ends_at, not signup age', () => {
+  // Regression: The Schneiders (2026-08-08) — trial extended to 2027 but
+  // the day-25 "5 days left" email fired anyway, because selection used
+  // days-since-signup. The cron must ask for households by days-until-END:
+  // 10/5/2 for the nudges and 1 for the admin expiry alert.
+  test('cron queries daysLeft 10, 5, 2 and 1 — nothing else', async () => {
+    await runTrialEmailCheck();
+    const asked = db.findHouseholdsWithTrialEndingInDays.mock.calls.map((c) => c[0]).sort((a, b) => a - b);
+    expect(asked).toEqual([1, 2, 5, 10]);
   });
 });
