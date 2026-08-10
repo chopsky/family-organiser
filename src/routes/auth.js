@@ -2,7 +2,7 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../db/queries');
-const { signToken, requireAuth } = require('../middleware/auth');
+const { signToken, signSiriToken, requireAuth } = require('../middleware/auth');
 const { requireTurnstile } = require('../middleware/turnstile');
 const email = require('../services/email');
 const publicHolidays = require('../services/publicHolidays');
@@ -1181,6 +1181,24 @@ router.post('/refresh', async (req, res) => {
     console.error('POST /api/auth/refresh error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// ─── POST /api/auth/siri-token ─────────────────────────────────────────────
+// Issues the long-lived scope:'siri' token for the iOS App Intent ("Hey
+// Siri, add to Housemait") — see signSiriToken in middleware/auth.js for
+// the containment story. Minting requires a NORMAL access token: this
+// route is not allowlisted for the siri scope, so a Siri token cannot
+// renew itself.
+router.post('/siri-token', requireAuth, (req, res) => {
+  return res.json({
+    token: signSiriToken({
+      userId: req.user.id,
+      householdId: req.householdId,
+      name: req.user.name,
+      role: req.user.role,
+      isPlatformAdmin: req.user.isPlatformAdmin || false,
+    }),
+  });
 });
 
 // ─── POST /api/auth/logout ─────────────────────────────────────────────────

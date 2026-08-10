@@ -11,5 +11,6 @@ class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(EventKitReaderPlugin())
         bridge?.registerPluginInstance(AdAttributionPlugin())
+        bridge?.registerPluginInstance(SiriBridgePlugin())
     }
 }

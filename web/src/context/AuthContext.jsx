@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import api from '../lib/api';
 import { logIn as revenuecatLogIn, logOut as revenuecatLogOut } from '../lib/revenuecat';
 import { clearAllCache } from '../lib/offlineCache';
+import { clearSiriToken } from '../lib/siriShortcuts';
 
 const AuthContext = createContext(null);
 
@@ -67,6 +68,9 @@ export function AuthProvider({ children }) {
     // Drop the offline read cache so the next user on this device
     // doesn't see the previous user's data flash on first render.
     clearAllCache();
+    // Revoke Siri's mirrored token so "Hey Siri, add to Housemait" stops
+    // working the moment the account does (no-op off iOS).
+    clearSiriToken();
     setToken(null);
     setUser(null);
     setHousehold(null);

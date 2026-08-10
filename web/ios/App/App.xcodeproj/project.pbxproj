@@ -18,6 +18,8 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		7E1A2B3C4D5E6F7A8B9C0D02 /* EventKitReaderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D01 /* EventKitReaderPlugin.swift */; };
 		7E1A2B3C4D5E6F7A8B9C0D11 /* AdAttributionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */; };
+		7E1A2B3C4D5E6F7A8B9C0D23 /* ShoppingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */; };
+		7E1A2B3C4D5E6F7A8B9C0D21 /* SiriBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */; };
 		7E1A2B3C4D5E6F7A8B9C0D04 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D03 /* ViewController.swift */; };
 		EK0000000000000000000005 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EK0000000000000000000006 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
@@ -37,6 +39,8 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		7E1A2B3C4D5E6F7A8B9C0D01 /* EventKitReaderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventKitReaderPlugin.swift; sourceTree = "<group>"; };
 		7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdAttributionPlugin.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingIntents.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriBridgePlugin.swift; sourceTree = "<group>"; };
 		7E1A2B3C4D5E6F7A8B9C0D03 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		EK0000000000000000000006 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -80,6 +84,8 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				7E1A2B3C4D5E6F7A8B9C0D01 /* EventKitReaderPlugin.swift */,
 				7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */,
+				7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */,
+				7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */,
 				7E1A2B3C4D5E6F7A8B9C0D03 /* ViewController.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -179,6 +185,8 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				7E1A2B3C4D5E6F7A8B9C0D02 /* EventKitReaderPlugin.swift in Sources */,
 				7E1A2B3C4D5E6F7A8B9C0D11 /* AdAttributionPlugin.swift in Sources */,
+				7E1A2B3C4D5E6F7A8B9C0D23 /* ShoppingIntents.swift in Sources */,
+				7E1A2B3C4D5E6F7A8B9C0D21 /* SiriBridgePlugin.swift in Sources */,
 				7E1A2B3C4D5E6F7A8B9C0D04 /* ViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

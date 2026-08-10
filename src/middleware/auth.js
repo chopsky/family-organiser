@@ -14,6 +14,29 @@ function signToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
+// Long-lived token for the iOS Siri App Intent ("Hey Siri, add to
+// Housemait"). Intents run outside the WebView with no access to the 1h
+// access token, and the rotating refresh token is single-use (consuming it
+// from Swift would log the app out), so Siri gets its own credential.
+// Containment: scope:'siri' is rejected by requireAuth everywhere except
+// routes that opt in via allowSiriScope, so a leaked token can add
+// shopping items and nothing else. 180d ≈ "re-minted long before it
+// expires" (the app re-mints weekly on launch).
+const SIRI_TOKEN_EXPIRES_IN = '180d';
+
+function signSiriToken(payload) {
+  return jwt.sign({ ...payload, scope: 'siri' }, JWT_SECRET, { expiresIn: SIRI_TOKEN_EXPIRES_IN });
+}
+
+/**
+ * Marks the request as accepting scope:'siri' tokens. Mount BEFORE
+ * requireAuth on the specific routes the Siri intent is allowed to call.
+ */
+function allowSiriScope(req, res, next) {
+  req.siriScopeAllowed = true;
+  return next();
+}
+
 /**
  * Express middleware: validates Bearer JWT and attaches req.user + req.householdId.
  */
@@ -29,6 +52,11 @@ function requireAuth(req, res, next) {
     // Pin the algorithm: tokens are always signed HS256 (symmetric secret), so
     // refusing any other alg closes the algorithm-confusion / alg:none class.
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    // Scope containment: Siri tokens are long-lived, so they only work on
+    // routes that explicitly opted in (see allowSiriScope above).
+    if (payload.scope === 'siri' && req.siriScopeAllowed !== true) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
     req.user = { id: payload.userId, name: payload.name, role: payload.role, isPlatformAdmin: payload.isPlatformAdmin || false };
     req.householdId = payload.householdId;
     return next();
@@ -78,4 +106,4 @@ function requirePlatformAdmin(req, res, next) {
   return next();
 }
 
-module.exports = { signToken, requireAuth, requireAdmin, requireHousehold, requirePlatformAdmin };
+module.exports = { signToken, signSiriToken, allowSiriScope, requireAuth, requireAdmin, requireHousehold, requirePlatformAdmin };

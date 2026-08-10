@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const db = require('../db/queries');
-const { requireAuth, requireHousehold } = require('../middleware/auth');
+const { requireAuth, requireHousehold, allowSiriScope } = require('../middleware/auth');
 const { AISLE_CATEGORIES, detectAisle } = require('../utils/aisle-detect');
 const cache = require('../services/cache');
 const push = require('../services/push');
@@ -59,7 +59,11 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * Body: { items: [{ item, category?, quantity? }] }
  *    or: { item, category?, quantity? }   (single item shorthand)
  */
-router.post('/', requireAuth, requireHousehold, async (req, res) => {
+// allowSiriScope: the iOS Siri intent ("Hey Siri, add to Housemait") adds
+// items with a long-lived scope:'siri' token that requireAuth rejects on
+// every route except the ones that opt in — this is the only opted-in
+// mutation. See middleware/auth.js.
+router.post('/', allowSiriScope, requireAuth, requireHousehold, async (req, res) => {
   let itemsInput = req.body.items;
   if (!itemsInput && req.body.item) {
     // single-item shorthand
