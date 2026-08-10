@@ -81,6 +81,73 @@ struct AddToShoppingListIntent: AppIntent {
     }
 }
 
+/**
+ * "Hey Siri, add a to-do in Housemait" - creates a TO-DO on the Lists
+ * page (the /api/tasks capture list), deliberately NOT a chore on the
+ * Tasks board: chores need an assignee/day/stars, exactly the ambiguity
+ * voice handles badly. To-dos are unambiguous capture - worst case is a
+ * duplicate.
+ *
+ * The to-do is dated TODAY (device-local) so it surfaces in the Today
+ * bucket - an undated to-do sinks to Someday, and a spoken capture is
+ * almost always "today-ish". Same scoped-token auth story as the
+ * shopping intent above.
+ */
+@available(iOS 16.0, *)
+struct AddToDoIntent: AppIntent {
+    static var title: LocalizedStringResource = "Add a To-do"
+    static var description = IntentDescription("Add a to-do to your Housemait list.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "To-do", requestValueDialog: "What's the to-do?")
+    var todo: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Add the to-do \(\.$todo)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let token = UserDefaults.standard.string(forKey: "housemait.siri.apiToken"), !token.isEmpty else {
+            return .result(dialog: "Open Housemait and sign in first, then try again.")
+        }
+        let title = todo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else {
+            return .result(dialog: "I didn't catch what the to-do was.")
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = .current
+
+        var request = URLRequest(url: URL(string: "https://api.housemait.com/api/tasks")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "title": title,
+            "due_date": formatter.string(from: Date()),
+        ])
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            switch status {
+            case 200...299:
+                return .result(dialog: "Added \"\(title)\" to your to-dos.")
+            case 401:
+                return .result(dialog: "Open Housemait and sign in again, then try once more.")
+            case 402:
+                return .result(dialog: "Your Housemait subscription needs attention - open the app to sort it out.")
+            default:
+                return .result(dialog: "I couldn't add that just now. Try again in a moment.")
+            }
+        } catch {
+            return .result(dialog: "I couldn't reach Housemait. Check your connection and try again.")
+        }
+    }
+}
+
 @available(iOS 16.0, *)
 struct HousemaitShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -94,6 +161,16 @@ struct HousemaitShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Add to shopping list",
             systemImageName: "cart.badge.plus"
+        )
+        AppShortcut(
+            intent: AddToDoIntent(),
+            phrases: [
+                "Add a to-do in \(.applicationName)",
+                "Add a to-do to \(.applicationName)",
+                "New to-do in \(.applicationName)",
+            ],
+            shortTitle: "Add a to-do",
+            systemImageName: "checklist"
         )
     }
 }

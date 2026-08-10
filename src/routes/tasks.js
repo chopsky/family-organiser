@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
-const { requireAuth, requireHousehold } = require('../middleware/auth');
+const { requireAuth, requireHousehold, allowSiriScope } = require('../middleware/auth');
 const cache = require('../services/cache');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
@@ -90,7 +90,11 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
  * (or omitted) means "everyone". Names not in the household are dropped
  * silently by addTasks.
  */
-router.post('/', requireAuth, requireHousehold, async (req, res) => {
+// allowSiriScope: the iOS Siri intent ("Hey Siri, add a to-do in
+// Housemait") creates to-dos with a long-lived scope:'siri' token that
+// requireAuth rejects on every route except the opted-in adds (this and
+// POST /api/shopping). See middleware/auth.js.
+router.post('/', allowSiriScope, requireAuth, requireHousehold, async (req, res) => {
   let tasksInput = req.body.tasks;
   if (!tasksInput && req.body.title) {
     tasksInput = [req.body];
