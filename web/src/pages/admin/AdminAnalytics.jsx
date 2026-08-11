@@ -86,6 +86,9 @@ export default function AdminAnalytics() {
           live calendar, the dashboard/brief/reminders all have content. */}
       <CalendarConnection stats={calendarConnection} />
 
+      {/* Per-household activation buckets + weekly retention curve */}
+      <ActivationRetention />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* Feature Usage */}
         <div>
@@ -265,6 +268,109 @@ export default function AdminAnalytics() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* Activation & retention - lifetime per-household buckets + weekly curve.
+   Self-fetching: the computation paginates several tables server-side (6h
+   cache), so it loads lazily instead of riding the main /analytics call. */
+const BUCKET_META = {
+  active: { label: 'Active', chip: 'bg-sage-light text-sage' },
+  fading: { label: 'Fading', chip: 'bg-amber-100 text-amber-700' },
+  quiet: { label: 'Quiet', chip: 'bg-cream text-warm-grey' },
+  petered_out: { label: 'Petered out', chip: 'bg-coral-light text-coral' },
+  never_started: { label: 'Never started', chip: 'bg-light-grey text-warm-grey' },
+  expired: { label: 'Expired', chip: 'bg-light-grey text-warm-grey' },
+};
+
+function ActivationRetention() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  // No synchronous setState in the effect: initial state already reads
+  // loading=true/failed=false, and the refresh handler (a click, not an
+  // effect) resets them itself.
+  const fetchData = (refresh) =>
+    api.get('/admin/activation', refresh ? { params: { refresh: 1 } } : undefined)
+      .then(({ data }) => { setData(data); setFailed(false); })
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  useEffect(() => { fetchData(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const load = (refresh) => { setLoading(true); setFailed(false); fetchData(refresh); };
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display text-lg font-medium text-charcoal">Activation &amp; retention (lifetime)</h2>
+        <button
+          onClick={() => load(true)}
+          className="text-xs font-semibold text-plum hover:underline disabled:opacity-50"
+          disabled={loading}
+        >
+          {loading ? 'Computing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {failed && <p className="text-sm text-warm-grey bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">Couldn't load activation data.</p>}
+      {!failed && !data && <div className="flex justify-center py-10"><Spinner /></div>}
+
+      {data && (
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+          {/* Bucket chips */}
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(BUCKET_META).map(([key, meta]) => (
+              <span key={key} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${meta.chip}`}>
+                {meta.label}
+                <span className="font-bold">{data.buckets?.[key] ?? 0}</span>
+              </span>
+            ))}
+            <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium text-warm-grey">
+              of {data.totalHouseholds} genuine households
+            </span>
+          </div>
+
+          {/* Weekly retention curve */}
+          <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider mt-5 mb-2">Any deliberate activity in week N since signup</p>
+          <div className="flex items-end gap-2 h-24">
+            {(data.weekly || []).map((w) => (
+              <div key={w.week} className="flex flex-col items-center flex-1 min-w-0">
+                <span className="text-[10px] text-warm-grey mb-1">{w.pct}%</span>
+                <div className="w-full bg-plum-light rounded-t" style={{ height: `${Math.max(w.pct, 2)}%` }} />
+                <span className="text-[10px] text-warm-grey mt-1">w{w.week}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Watchlist */}
+          {(data.watchlist || []).length > 0 && (
+            <>
+              <p className="text-xs font-semibold text-warm-grey uppercase tracking-wider mt-5 mb-2">Watchlist — real usage that stopped or collapsed</p>
+              <table className="w-full text-sm">
+                <tbody>
+                  {data.watchlist.map((h) => (
+                    <tr key={h.id} className="border-b border-light-grey last:border-0">
+                      <td className="py-2 pr-3 font-medium text-charcoal">{h.name}</td>
+                      <td className="py-2 pr-3">
+                        <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${BUCKET_META[h.bucket]?.chip || ''}`}>
+                          {BUCKET_META[h.bucket]?.label || h.bucket}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3 text-warm-grey text-xs">first 14d: {h.first14} · last 14d: {h.last14}</td>
+                      <td className="py-2 text-right text-warm-grey text-xs">
+                        {h.lastActiveDays === null ? 'never active' : `active ${h.lastActiveDays}d ago`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          <p className="text-[11px] text-warm-grey mt-3">Computed {new Date(data.computedAt).toLocaleString('en-GB')} · counts deliberate writes only (messages, lists, chores, to-dos, meals, manual events) · cached 6h</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -490,6 +490,23 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/activation ──────────────────────────────────────────────
+//
+// Activation & retention card: per-household deliberate-activity buckets +
+// weekly retention curve. Separate from /analytics because it's heavier
+// (full pagination over the write tables) - the card fetches it lazily and
+// the service caches results for 6h. ?refresh=1 recomputes.
+router.get('/activation', async (req, res) => {
+  try {
+    const data = await require('../services/activation-retention')
+      .computeActivation({ refresh: req.query.refresh === '1' });
+    return res.json(data);
+  } catch (err) {
+    console.error('GET /api/admin/activation error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/inbound-emails ──────────────────────────────────────────
 //
 // Recent forwarded-email processing log. Powers the AdminInboundEmails
