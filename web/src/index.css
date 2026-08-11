@@ -156,6 +156,16 @@
     -webkit-touch-callout: default;
   }
 
+  /* Admin is a data tool - emails, IDs and stats must all be copyable,
+     but the body-level user-select:none above left table cells and spans
+     unselectable (real report 2026-08-10). Re-enable for the whole admin
+     subtree; the native-feel guard only matters in the customer app. */
+  .admin-selectable, .admin-selectable * {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
   /* Bottom-sheet safe padding. Drops onto any element whose bottom
      edge sits flush with the viewport bottom (bottom-anchored
      modals, banners). Keeps content clear of the iPhone home

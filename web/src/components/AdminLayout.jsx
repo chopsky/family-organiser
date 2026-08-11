@@ -47,7 +47,7 @@ export default function AdminLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-cream flex flex-col md:flex-row">
+    <div className="min-h-screen bg-cream flex flex-col md:flex-row admin-selectable">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-60 bg-white border-r border-light-grey flex-col fixed inset-y-0 left-0 z-30">
         {/* Header */}
