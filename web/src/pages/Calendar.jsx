@@ -1178,6 +1178,14 @@ export default function Calendar() {
       setSyncedEvent(ev);
       return;
     }
+    // School term dates are fabricated entries derived from the School
+    // page's imports - there is no calendar_events row behind them, so the
+    // editor's PATCH had nothing to hit and 500ed (real report 2026-08-11).
+    // Read-only detail sheet, managed on the School page.
+    if (ev._school) {
+      setSyncedEvent(ev);
+      return;
+    }
     setEditingEvent(ev);
     setEventAttachments([]);
     if (ev.id) loadAttachments(ev.id);
@@ -3562,6 +3570,14 @@ export default function Calendar() {
                   <p className="text-xs font-medium text-plum">🔄 {sourceLine}</p>
                   <p className="text-[11px] text-plum/70 mt-0.5">
                     Read-only here - edit or delete it in that calendar and Housemait updates automatically.
+                  </p>
+                </div>
+              )}
+              {syncedEvent._school && (
+                <div className="mt-4 bg-plum-light rounded-xl px-3 py-2.5">
+                  <p className="text-xs font-medium text-plum">📚 School term dates</p>
+                  <p className="text-[11px] text-plum/70 mt-0.5">
+                    Read-only here - term dates (and each school&apos;s colour) are managed on the School page.
                   </p>
                 </div>
               )}

@@ -24,6 +24,13 @@ import useHasChildren from '../hooks/useHasChildren';
 const SOFT = '#F3EEE5';
 const CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
 
+// Per-school accent swatches - a subset of the member palette so a school
+// CAN match a member's colour ("St Helen's in my pink"), without inventing
+// a second colour system. Multi-school households need distinguishable
+// term dates on the calendar (real report 2026-08-11: three schools all on
+// the default blue).
+const SCHOOL_COLOURS = ['#6B3FA0', '#E8724A', '#7DAE82', '#E8A040', '#4A9FCC', '#C74E95', '#6558C7', '#3AADA0'];
+
 // Small pickup-car glyph for the Activities rows.
 function PickupCar({ className = 'h-3.5 w-3.5' }) {
   return (
@@ -68,6 +75,21 @@ export default function School() {
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [householdSchools, setHouseholdSchools] = useState([]);
   const [childActivities, setChildActivities] = useState({}); // { childId: [activities] }
+  const [colourPickerFor, setColourPickerFor] = useState(null); // school id with the swatch row open
+
+  // Optimistic: paint the card immediately, revert if the PATCH fails. The
+  // calendar picks the new colour up on its next term-dates fetch.
+  async function handleSetSchoolColour(schoolId, colour) {
+    setColourPickerFor(null);
+    const prev = householdSchools;
+    setHouseholdSchools((hs) => hs.map((s) => (s.id === schoolId ? { ...s, colour } : s)));
+    try {
+      await api.patch(`/schools/${schoolId}`, { colour });
+    } catch {
+      setHouseholdSchools(prev);
+      setError('Could not save the colour. Try again in a moment.');
+    }
+  }
 
   // Standalone activity editor (driven by the Activities card). The form
   // itself is the shared <ActivityModal> (also used by the Calendar's
@@ -718,9 +740,17 @@ export default function School() {
               return (
                 <div key={school.id} className="bg-white rounded-[18px] border border-light-grey p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
                   <div className="flex items-start gap-3.5">
-                    <div className="w-[46px] h-[46px] rounded-[13px] shrink-0 flex items-center justify-center" style={{ background: colour + '1F', color: colour }}>
+                    <button
+                      type="button"
+                      disabled={!isAdmin}
+                      onClick={() => setColourPickerFor(colourPickerFor === school.id ? null : school.id)}
+                      title={isAdmin ? 'Change this school’s colour' : undefined}
+                      aria-label={isAdmin ? `Change ${school.school_name}'s colour` : undefined}
+                      className="w-[46px] h-[46px] rounded-[13px] shrink-0 flex items-center justify-center border-0"
+                      style={{ background: colour + '1F', color: colour, cursor: isAdmin ? 'pointer' : 'default' }}
+                    >
                       <IconGraduation className="h-6 w-6" />
-                    </div>
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="text-base font-semibold text-charcoal truncate">{school.school_name}</div>
                       <div className="text-xs text-warm-grey mt-0.5 truncate">
@@ -731,6 +761,22 @@ export default function School() {
                       <button onClick={() => handleRemoveHouseholdSchool(school.id)} className="text-xs font-semibold text-warm-grey hover:text-coral shrink-0">Remove</button>
                     )}
                   </div>
+
+                  {colourPickerFor === school.id && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-warm-grey mr-1">Colour</span>
+                      {SCHOOL_COLOURS.map((hex) => (
+                        <button
+                          key={hex}
+                          type="button"
+                          onClick={() => handleSetSchoolColour(school.id, hex)}
+                          aria-label={`Use this colour for ${school.school_name}`}
+                          className="w-8 h-8 rounded-full transition-transform hover:scale-110"
+                          style={{ background: hex, border: colour === hex ? '2.5px solid #2D2A33' : '2.5px solid transparent' }}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap gap-2">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-semibold text-charcoal whitespace-nowrap" style={{ background: SOFT }}>

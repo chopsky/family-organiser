@@ -906,7 +906,16 @@ router.post('/events', async (req, res) => {
  * PATCH /api/calendar/events/:id
  * Body: any subset of event fields
  */
+// Fabricated calendar entries (school term dates `td-…`, weekly-activity
+// occurrences) have no calendar_events row. Older clients could still send
+// their ids to the event mutation routes, where the uuid cast surfaced as a
+// 500 (real report 2026-08-11). Reject them cleanly instead.
+const EVENT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.patch('/events/:id', async (req, res) => {
+  if (!EVENT_UUID_RE.test(req.params.id)) {
+    return res.status(404).json({ error: 'This entry is managed elsewhere - school term dates live on the School page.' });
+  }
   const { color, recurrence, reminders, assigned_to_names, ...rest } = req.body;
 
   if (color && !VALID_COLORS.includes(color)) {
@@ -991,6 +1000,9 @@ router.patch('/events/:id', async (req, res) => {
  * DELETE /api/calendar/events/:id
  */
 router.delete('/events/:id', async (req, res) => {
+  if (!EVENT_UUID_RE.test(req.params.id)) {
+    return res.status(404).json({ error: 'This entry is managed elsewhere - school term dates live on the School page.' });
+  }
   try {
     // Synced copies are read-only: a "delete" would resurrect on the next
     // sync/refresh of the source calendar. Removing the whole calendar is

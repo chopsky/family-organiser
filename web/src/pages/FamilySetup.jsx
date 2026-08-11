@@ -1997,12 +1997,16 @@ export default function FamilySetup() {
                 </div>
               </div>
 
-              {/* School — only a term-calendar disambiguator, shown when the
-                  household has 2+ schools. Lets you pick which school's term
-                  calendar applies to this member. With 0/1 schools it's
-                  inferred from the household, so no picker is shown. Schools
-                  are added/managed on the School page. */}
-              {showSchools && householdSchools.length >= 2 && (
+              {/* School — only a term-calendar disambiguator, shown for
+                  CHILDREN when the household has 2+ schools. Lets you pick
+                  which school's term calendar applies to this child. With
+                  0/1 schools it's inferred from the household, so no picker
+                  is shown. Adults never see it: linking an adult to a school
+                  does nothing (no adult surface consumes it) and the first
+                  multi-school household read it as "assign my school to me"
+                  and expected effects that don't exist (real report
+                  2026-08-11). Schools are added/managed on the School page. */}
+              {showSchools && editingMember?.member_type === 'dependent' && householdSchools.length >= 2 && (
                 <div>
                   <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
                   <div className="relative">

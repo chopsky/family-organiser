@@ -1454,26 +1454,40 @@ describe('POST /api/calendar/device-sync', () => {
 describe('synced calendar events are read-only', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  // Real uuid shapes: the event mutation routes reject non-uuid ids up
+  // front (fabricated entries like school term dates `td-…` have no
+  // calendar_events row - they used to 500 on the uuid cast).
+  const E1 = '11111111-1111-4111-8111-111111111111';
+  const E2 = '22222222-2222-4222-8222-222222222222';
+
   test('PATCH on a synced event is refused with 409', async () => {
-    db.getCalendarEventById.mockResolvedValue({ id: 'e1', external_feed_id: 'F1', start_time: 'x', end_time: 'y' });
-    const res = await request(app).patch('/api/calendar/events/e1').set(AUTH).send({ title: 'New title' });
+    db.getCalendarEventById.mockResolvedValue({ id: E1, external_feed_id: 'F1', start_time: 'x', end_time: 'y' });
+    const res = await request(app).patch(`/api/calendar/events/${E1}`).set(AUTH).send({ title: 'New title' });
     expect(res.status).toBe(409);
     expect(db.updateCalendarEvent).not.toHaveBeenCalled();
   });
 
   test('DELETE on a synced event is refused with 409', async () => {
-    db.getCalendarEventById.mockResolvedValue({ id: 'e1', external_feed_id: 'F1' });
-    const res = await request(app).delete('/api/calendar/events/e1').set(AUTH);
+    db.getCalendarEventById.mockResolvedValue({ id: E1, external_feed_id: 'F1' });
+    const res = await request(app).delete(`/api/calendar/events/${E1}`).set(AUTH);
     expect(res.status).toBe(409);
     expect(db.deleteCalendarEvent).not.toHaveBeenCalled();
   });
 
   test('native events still update normally', async () => {
-    db.getCalendarEventById.mockResolvedValue({ id: 'e2', external_feed_id: null, start_time: '2026-06-15T09:00:00Z', end_time: '2026-06-15T10:00:00Z' });
-    db.updateCalendarEvent.mockResolvedValue({ id: 'e2', title: 'Renamed', start_time: '2026-06-15T09:00:00Z' });
-    const res = await request(app).patch('/api/calendar/events/e2').set(AUTH).send({ title: 'Renamed' });
+    db.getCalendarEventById.mockResolvedValue({ id: E2, external_feed_id: null, start_time: '2026-06-15T09:00:00Z', end_time: '2026-06-15T10:00:00Z' });
+    db.updateCalendarEvent.mockResolvedValue({ id: E2, title: 'Renamed', start_time: '2026-06-15T09:00:00Z' });
+    const res = await request(app).patch(`/api/calendar/events/${E2}`).set(AUTH).send({ title: 'Renamed' });
     expect(res.status).toBe(200);
     expect(db.updateCalendarEvent).toHaveBeenCalled();
+  });
+
+  test('fabricated ids (school term dates td-…) get a clean 404, not a 500', async () => {
+    const res = await request(app).patch('/api/calendar/events/td-abc123').set(AUTH).send({ title: 'x' });
+    expect(res.status).toBe(404);
+    expect(db.getCalendarEventById).not.toHaveBeenCalled();
+    const del = await request(app).delete('/api/calendar/events/td-abc123').set(AUTH);
+    expect(del.status).toBe(404);
   });
 
   test('restore refuses synced/missing rows with 404 (query matches only user-deleted events)', async () => {
