@@ -125,6 +125,16 @@ function CollapsibleRow({ icon, label, sub, defaultOpen = false, className = '',
 // border and soft double shadow; an uppercase section label above it;
 // rows of title/sub + a right-side control, split by hairline dividers.
 const SET_CARD_SHADOW = '0 1px 0 rgba(26,22,32,0.02), 0 4px 14px rgba(26,22,32,0.03)';
+
+// Morning-brief send times offered in Settings. Half-hour steps across the
+// realistic school-run window; the scheduler falls back to 07:00 for
+// anything else, and the API rejects non-HH:MM outright.
+const BRIEF_TIMES = ['05:00', '05:30', '06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00'];
+const formatBriefTime = (t) => {
+  const [h, m] = t.split(':').map(Number);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
 const SET_CARD_CLASS = 'bg-white rounded-[18px] border border-[rgba(26,22,32,0.07)]';
 
 function SectionLabel({ children }) {
@@ -679,6 +689,23 @@ export default function Settings() {
   const [notifPrefs, setNotifPrefs] = useState(null);
   const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(true);
   const [savingNotifPref, setSavingNotifPref] = useState(null); // which key is saving
+  const [savingBriefTime, setSavingBriefTime] = useState(false);
+
+  // Household-level: one brief time for the family (the column lives on
+  // households and the scheduler gates per household). Optimistic via
+  // updateHousehold so the select doesn't snap back while saving.
+  async function saveBriefTime(t) {
+    setSavingBriefTime(true);
+    const prev = household?.reminder_time || null;
+    updateHousehold({ reminder_time: t });
+    try {
+      await api.patch('/household', { reminder_time: t });
+    } catch {
+      updateHousehold({ reminder_time: prev });
+    } finally {
+      setSavingBriefTime(false);
+    }
+  }
 
   // Location permission state - drives the Location section. One of
   // 'granted' | 'denied' | 'prompt' | 'unavailable' | null (still loading).
@@ -2246,6 +2273,25 @@ export default function Settings() {
                   }`}
                 />
               </button>
+            </div>
+
+            {/* Brief time - household-level (one send time for the family).
+                05:00-10:00 half-hour steps; scheduler default is 07:00. */}
+            <div className="flex items-center justify-between pb-5 border-b border-cream-border">
+              <div className="min-w-0 flex-1 pr-3">
+                <p className="text-sm font-medium text-bark">Briefing time</p>
+                <p className="text-xs text-cocoa">When the morning briefing arrives, for the whole household.</p>
+              </div>
+              <select
+                value={(BRIEF_TIMES.includes(household?.reminder_time) && household.reminder_time) || '07:00'}
+                onChange={(e) => saveBriefTime(e.target.value)}
+                disabled={savingBriefTime}
+                aria-label="Morning briefing time"
+                className="shrink-0 ml-3 appearance-none border border-cream-border rounded-lg pl-3 pr-8 py-2 bg-white text-sm text-bark focus:outline-none focus:ring-2 focus:ring-accent"
+                style={{ backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236B6774\' stroke-width=\'2\'><path d=\'m6 9 6 6 6-6\'/></svg>")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+              >
+                {BRIEF_TIMES.map((t) => <option key={t} value={t}>{formatBriefTime(t)}</option>)}
+              </select>
             </div>
 
             {/* Evening heads-up - the same brief about TOMORROW, at 8pm. For

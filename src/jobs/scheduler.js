@@ -48,10 +48,20 @@ function currentHHMMInTZ(timezone) {
   }
 }
 
-// The morning brief goes out at a single fixed local time for everyone. Members
-// opt out per-person via the Settings toggle (enforced inside sendDailyReminders),
-// not by picking a time - so there's no per-member/household reminder_time here.
+// The DEFAULT morning-brief local time. Households can move it in Settings
+// (households.reminder_time) - the column and PATCH existed for months with
+// nothing reading them while the help claimed the time was changeable
+// (real report 2026-08-11). Members still opt in/out per-person via the
+// Settings toggle, enforced inside sendDailyReminders.
 const DAILY_BRIEF_TIME = '07:00';
+
+// Resolve a household's brief time, falling back to the default on
+// anything that isn't strict HH:MM - the gate must never be broken by a
+// malformed value that slipped into the column.
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function resolveBriefTime(reminderTime) {
+  return HHMM_RE.test(reminderTime || '') ? reminderTime : DAILY_BRIEF_TIME;
+}
 
 // The send GATE is a window, not a single minute. This job runs every minute
 // and walks all households SEQUENTIALLY; the per-member day-lock guarantees
@@ -69,8 +79,8 @@ const DAILY_BRIEF_WINDOW_MIN = 30;
 // enough to still act on them (defrost something, find the PE kit).
 const EVENING_BRIEF_TIME = '20:00';
 
-function withinDailyBriefWindow(timezone) {
-  return hhmmWithinWindow(currentHHMMInTZ(timezone), DAILY_BRIEF_TIME, DAILY_BRIEF_WINDOW_MIN);
+function withinDailyBriefWindow(timezone, reminderTime) {
+  return hhmmWithinWindow(currentHHMMInTZ(timezone), resolveBriefTime(reminderTime), DAILY_BRIEF_WINDOW_MIN);
 }
 
 function withinEveningBriefWindow(timezone) {
@@ -89,7 +99,7 @@ async function runDailyReminderCheck() {
     const households = await db.getAllHouseholds();
     for (const household of households) {
       const tz = household.timezone || 'Europe/London';
-      if (!withinDailyBriefWindow(tz)) continue;
+      if (!withinDailyBriefWindow(tz, household.reminder_time)) continue;
       const members = await db.getHouseholdMembers(household.id);
       const todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: tz })).toISOString().split('T')[0];
 
@@ -929,4 +939,4 @@ function startScheduler() {
   };
 }
 
-module.exports = { startScheduler, runDailyReminderCheck, runEveningBriefCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, refreshAllGoogleFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession };
+module.exports = { startScheduler, runDailyReminderCheck, runEveningBriefCheck, runOverdueNudgeCheck, runWeeklyDigest, syncAllIcalFeeds, refreshAllExternalFeeds, refreshAllGoogleFeeds, currentHHMMInTZ, processEventReminders, isSchoolInSession, resolveBriefTime };

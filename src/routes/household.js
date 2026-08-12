@@ -140,7 +140,14 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   const updates = {};
 
   if (name !== undefined) updates.name = name.trim();
-  if (reminder_time !== undefined) updates.reminder_time = reminder_time;
+  if (reminder_time !== undefined) {
+    // The scheduler gates the morning brief on this - strict HH:MM only,
+    // so a malformed value can never silently kill a household's brief.
+    if (reminder_time !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(reminder_time)) {
+      return res.status(400).json({ error: 'reminder_time must be HH:MM (24-hour)' });
+    }
+    updates.reminder_time = reminder_time;
+  }
   if (timezone !== undefined) updates.timezone = timezone;
   if (allergies !== undefined) updates.allergies = allergies;
   // trial_emails_enabled - admin-only (matches the rest of this endpoint).
