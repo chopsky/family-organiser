@@ -57,10 +57,12 @@ const DAILY_BRIEF_TIME = '07:00';
 
 // Resolve a household's brief time, falling back to the default on
 // anything that isn't strict HH:MM - the gate must never be broken by a
-// malformed value that slipped into the column.
+// malformed value that slipped into the column. The column is a Postgres
+// TIME, which reads back as 'HH:MM:SS' - normalise before validating.
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 function resolveBriefTime(reminderTime) {
-  return HHMM_RE.test(reminderTime || '') ? reminderTime : DAILY_BRIEF_TIME;
+  const hhmm = String(reminderTime || '').slice(0, 5);
+  return HHMM_RE.test(hhmm) ? hhmm : DAILY_BRIEF_TIME;
 }
 
 // The send GATE is a window, not a single minute. This job runs every minute

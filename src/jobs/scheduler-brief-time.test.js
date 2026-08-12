@@ -18,6 +18,12 @@ describe('resolveBriefTime', () => {
     expect(resolveBriefTime('10:00')).toBe('10:00');
   });
 
+  test('normalises the Postgres TIME read-back format (HH:MM:SS)', () => {
+    // The column is TIME - a stored '06:00' reads back as '06:00:00'.
+    expect(resolveBriefTime('06:00:00')).toBe('06:00');
+    expect(resolveBriefTime('07:30:00')).toBe('07:30');
+  });
+
   test('falls back to 07:00 for null/empty/malformed values', () => {
     expect(resolveBriefTime(null)).toBe('07:00');
     expect(resolveBriefTime(undefined)).toBe('07:00');

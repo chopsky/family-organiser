@@ -2283,7 +2283,8 @@ export default function Settings() {
                 <p className="text-xs text-cocoa">When the morning briefing arrives, for the whole household.</p>
               </div>
               <select
-                value={(BRIEF_TIMES.includes(household?.reminder_time) && household.reminder_time) || '07:00'}
+                // Postgres TIME reads back as HH:MM:SS - normalise to HH:MM
+                value={(() => { const t = String(household?.reminder_time || '').slice(0, 5); return BRIEF_TIMES.includes(t) ? t : '07:00'; })()}
                 onChange={(e) => saveBriefTime(e.target.value)}
                 disabled={savingBriefTime}
                 aria-label="Morning briefing time"
