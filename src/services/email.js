@@ -616,14 +616,21 @@ function buildListUnsubscribeHeaders(householdId) {
  * into db/queries.js.
  */
 function usageToTemplateModel(usage) {
-  // Emit each count only when it's worth bragging about: Mustachio treats
-  // a missing key as falsy, so the templates' per-row {{#field}}
-  // conditionals hide the empty rows. We used to pass raw zeros and the
-  // day-20/28 emails told never-started households "0 shopping list
-  // items · 0 meals planned" while asking them to pay - the exact
-  // own-goal we spotted in a competitor's win-back the same day
-  // (2026-08-14). has_usage gates the whole stats block; when false the
-  // templates show a "there's still time to try it" line instead.
+  // Emit each count only when it's worth bragging about: we used to pass
+  // raw zeros and the day-20/28 emails told never-started households
+  // "0 shopping list items · 0 meals planned" while asking them to pay -
+  // the exact own-goal we spotted in a competitor's win-back the same
+  // day (2026-08-14).
+  //
+  // The counts are nested under a `usage` object because of how
+  // Postmark's Mustachio scopes sections: inside {{#section}} there is
+  // NO parent-context fallback, so a flat model with a boolean gate
+  // ({{#has_usage}} wrapping {{#items_added}} rows) renders the wrapper
+  // but none of the rows. With an object, {{#usage}} scopes into it and
+  // the row sections resolve; rows print the number with {{.}}. Missing
+  // keys are falsy (rows hidden), and {{^usage}} shows the "there's
+  // still time to try it" fallback. NB Mustachio treats 0 as TRUTHY for
+  // sections, so omitting zero keys here is the only thing hiding them.
   const counts = {
     items_added:          usage?.shopping_item_count  ?? 0,
     meals_planned:        usage?.meal_plan_count      ?? 0,
@@ -633,12 +640,14 @@ function usageToTemplateModel(usage) {
     // only worth showing once the family is actually in.
     family_members_count: (usage?.member_count ?? 0) > 1 ? usage.member_count : 0,
   };
-  const model = {};
+  const nested = {};
   for (const [key, value] of Object.entries(counts)) {
-    if (value > 0) model[key] = value;
+    if (value > 0) nested[key] = value;
   }
-  model.has_usage = Object.keys(model).length > 0;
-  return model;
+  const hasUsage = Object.keys(nested).length > 0;
+  // has_usage kept alongside the object so a template referencing either
+  // shape stays coherent while template + backend deploys are in flight.
+  return hasUsage ? { has_usage: true, usage: nested } : { has_usage: false };
 }
 
 // ── Day 1 - Welcome ────────────────────────────────────────────────
