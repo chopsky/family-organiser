@@ -616,13 +616,29 @@ function buildListUnsubscribeHeaders(householdId) {
  * into db/queries.js.
  */
 function usageToTemplateModel(usage) {
-  return {
+  // Emit each count only when it's worth bragging about: Mustachio treats
+  // a missing key as falsy, so the templates' per-row {{#field}}
+  // conditionals hide the empty rows. We used to pass raw zeros and the
+  // day-20/28 emails told never-started households "0 shopping list
+  // items · 0 meals planned" while asking them to pay - the exact
+  // own-goal we spotted in a competitor's win-back the same day
+  // (2026-08-14). has_usage gates the whole stats block; when false the
+  // templates show a "there's still time to try it" line instead.
+  const counts = {
     items_added:          usage?.shopping_item_count  ?? 0,
     meals_planned:        usage?.meal_plan_count      ?? 0,
     tasks_completed:      usage?.task_count           ?? 0,
     events_added:         usage?.calendar_event_count ?? 0,
-    family_members_count: usage?.member_count         ?? 0,
+    // A count of 1 family member is just the person who signed up -
+    // only worth showing once the family is actually in.
+    family_members_count: (usage?.member_count ?? 0) > 1 ? usage.member_count : 0,
   };
+  const model = {};
+  for (const [key, value] of Object.entries(counts)) {
+    if (value > 0) model[key] = value;
+  }
+  model.has_usage = Object.keys(model).length > 0;
+  return model;
 }
 
 // ── Day 1 - Welcome ────────────────────────────────────────────────
@@ -758,6 +774,7 @@ async function sendAnnouncementEmail({ to, subject, html }) {
 }
 
 module.exports = {
+  usageToTemplateModel, // exported for tests
   sendVerificationEmail,
   sendWhatsAppFollowupEmail,
   sendSetupNudgeEmail,
