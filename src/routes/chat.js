@@ -107,6 +107,66 @@ function localToUTC(date, time, timezone) {
   }
 }
 
+// Wall-clock components of a stored UTC instant, as seen in a timezone.
+// en-CA date format is YYYY-MM-DD; hourCycle h23 keeps midnight as "00".
+function ymdInTz(d, tz) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+function hhmmInTz(d, tz) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+}
+
+/**
+ * Translate an update_event action's new_* fields into a calendar_events
+ * column patch. Only fields the model actually set land in the patch;
+ * date and time sides rebuild independently from the existing values so
+ * "move it to Tuesday" keeps the time and "make it 12pm" keeps the day.
+ * When only a new start is given the event keeps its LENGTH (the bot's
+ * keep-the-old-end behaviour could invert start/end - "move the 10-11
+ * meeting to 12" must not end at 11).
+ */
+function buildChatEventPatch(act, existing, tz, members) {
+  const patch = {};
+  if (act.new_title) patch.title = act.new_title;
+  if (act.new_location !== undefined && act.new_location !== null) patch.location = act.new_location;
+  if (Array.isArray(act.assigned_to_names)) {
+    const { ids, names } = db.resolveAssignees(act.assigned_to_names, members);
+    patch.assigned_to_ids = ids;
+    patch.assigned_to_names = names;
+  }
+
+  const hasNewDate = !!act.new_date;
+  const hasNewStart = !!act.new_start_time;
+  const hasNewEnd = !!act.new_end_time;
+  if (!hasNewDate && !hasNewStart && !hasNewEnd) return patch;
+
+  if (existing.all_day && !hasNewStart && !hasNewEnd) {
+    // Pure date move of an all-day event keeps the naive convention.
+    patch.start_time = `${act.new_date}T00:00:00Z`;
+    patch.end_time = `${act.new_date}T23:59:59Z`;
+    return patch;
+  }
+
+  const startD = new Date(existing.start_time);
+  const endD = existing.end_time ? new Date(existing.end_time) : null;
+  const dateStr = act.new_date
+    || (existing.all_day ? String(existing.start_time).slice(0, 10) : ymdInTz(startD, tz));
+  const startHHMM = act.new_start_time
+    || (existing.all_day || isNaN(startD.getTime()) ? '09:00' : hhmmInTz(startD, tz));
+  patch.start_time = localToUTC(dateStr, startHHMM, tz);
+  if (hasNewEnd) {
+    patch.end_time = localToUTC(dateStr, act.new_end_time, tz);
+  } else {
+    const durMs = !existing.all_day && endD && !isNaN(endD.getTime()) && endD > startD
+      ? endD.getTime() - startD.getTime()
+      : 60 * 60 * 1000;
+    patch.end_time = new Date(Date.parse(patch.start_time) + durMs).toISOString().replace('.000Z', 'Z');
+  }
+  // Giving a timed slot to an all-day event makes it a timed event.
+  if (existing.all_day && (hasNewStart || hasNewEnd)) patch.all_day = false;
+  return patch;
+}
+
 /**
  * Build the system prompt with family context injected.
  */
@@ -681,6 +741,53 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             });
           } else {
             cleanContent += `\n\n⚠️ I found ${candidates.length} events matching "${act.title}" - tell me which date to remove, or say "remove all of them".`;
+          }
+
+        } else if (act.action === 'update_event' && act.title) {
+          // Chat can CHANGE events too. Without this action the model
+          // improvised delete_event for "change the time to 12pm" (real
+          // 2026-08-12 transcript) - the user watched their event vanish
+          // instead of move. Same fuzzy targeting as delete_event; synced
+          // copies stay read-only.
+          const matches = await db.findEventsByFuzzyTitle(req.householdId, act.title, {
+            dateHint: act.date || null,
+            limit: 25,
+          });
+          const editable = matches.filter((e) => !e.external_feed_id);
+
+          if (editable.length === 0) {
+            cleanContent += matches.length > 0
+              ? `\n\n⚠️ "${act.title}" syncs from another calendar, so I can't change it here - edit it in the source calendar and it'll update in Housemait automatically.`
+              : `\n\n⚠️ I couldn't find "${act.title}" on the calendar, so nothing was changed.`;
+          } else if (editable.length > 1) {
+            cleanContent += `\n\n⚠️ I found ${editable.length} events matching "${act.title}" - tell me which date you mean and I'll change that one.`;
+          } else {
+            const hit = editable[0];
+            const patch = buildChatEventPatch(act, hit, userTz, members);
+            if (Object.keys(patch).length === 0) {
+              cleanContent += `\n\n⚠️ I couldn't work out what to change about "${hit.title}" - tell me the new time, date, or details.`;
+            } else {
+              const updatedEvent = await db.updateCalendarEvent(hit.id, req.householdId, patch);
+              // Assignee rows live in event_assignees (replacement
+              // semantics) - keep them in step with the columns, same as
+              // the create path.
+              if (Array.isArray(patch.assigned_to_names)) {
+                await db.saveEventAssignees(hit.id, req.householdId, patch.assigned_to_names, members);
+              }
+              executedActions.push({
+                type: 'event_updated',
+                event: {
+                  id: hit.id,
+                  title: patch.title || hit.title,
+                  start_time: updatedEvent?.start_time ?? patch.start_time ?? hit.start_time,
+                  end_time: updatedEvent?.end_time ?? patch.end_time ?? hit.end_time,
+                  all_day: patch.all_day ?? hit.all_day ?? false,
+                  location: patch.location ?? hit.location ?? null,
+                  recurrence: hit.recurrence || null,
+                  assigned_to_names: patch.assigned_to_names || hit.assigned_to_names || [],
+                },
+              });
+            }
           }
 
         } else if (['skip_activity', 'override_activity', 'update_activity', 'delete_activity'].includes(act.action)) {

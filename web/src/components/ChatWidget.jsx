@@ -238,7 +238,7 @@ function TaskCreatedCard({ task, members }) {
   );
 }
 
-function EventCreatedCard({ event, members }) {
+function EventCreatedCard({ event, members, heading = 'Event added' }) {
   if (!event) return null;
   const when = formatHumanDateTime(event.start_time, event.all_day);
   const recurrence = event.recurrence
@@ -257,7 +257,7 @@ function EventCreatedCard({ event, members }) {
           <rect x="3" y="4" width="18" height="18" rx="2" />
           <path d="M16 2v4M8 2v4M3 10h18" />
         </svg>
-        Event added
+        {heading}
       </div>
       <div className="flex items-start gap-2.5">
         <div className="flex-1 min-w-0">
@@ -281,6 +281,7 @@ function ActionCards({ actions, members }) {
       {actions.map((a, i) => {
         if (a.type === 'task_created') return <TaskCreatedCard key={i} task={a.task} members={members} />;
         if (a.type === 'event_created') return <EventCreatedCard key={i} event={a.event} members={members} />;
+        if (a.type === 'event_updated') return <EventCreatedCard key={i} event={a.event} members={members} heading="Event updated" />;
         return null;
       })}
     </>
