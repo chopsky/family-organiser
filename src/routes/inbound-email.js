@@ -4,6 +4,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
 const { scanReceipt, matchReceiptToList, extractFromEmail } = require('../services/ai');
 const { extractEmailContent, extractAttachmentText } = require('../services/email-parser');
+const { localToUTC } = require('../utils/local-time');
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation, sendInboundEmailNoResults } = require('../services/email');
 
@@ -289,14 +290,20 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
               ? members.find(m => m.id === assigneeIds[0])
               : null;
 
-            // AI extracts local times - store without Z suffix so the app
-            // interprets them in the user's timezone (same as manually created events)
+            // AI extracts local wall-clock times; start_time is a
+            // timestamptz column, so a naive string would be read as UTC -
+            // during BST that stored every emailed appointment an hour late
+            // (Maxine's 6:45pm blood test showing as 7:45pm, 2026-08-13).
+            // Convert through the household timezone like chat/bot creates do.
+            // All-day events keep the naive-midnight convention the rest of
+            // the app uses (the all_day flag makes the UI date-only).
+            const tz = household.timezone || 'Europe/London';
             const startTime = ev.all_day
               ? `${ev.date}T00:00:00`
-              : `${ev.date}T${ev.start_time || '09:00'}:00`;
+              : localToUTC(ev.date, ev.start_time || '09:00', tz);
             const endTime = ev.all_day
               ? `${ev.date}T23:59:59`
-              : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00`;
+              : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', tz);
 
             const created = await db.createCalendarEvent(householdId, {
               title: ev.title,
