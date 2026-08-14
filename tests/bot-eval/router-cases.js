@@ -44,4 +44,9 @@ module.exports = [
   { message: 'we pay £9.99 a month for Netflix', expect: null },
   { message: 'thanks!', expect: null },
   { message: "Lynn is allergic to nuts", expect: null },
+  // 2026-08-14: "Dean in London from 1 to 6 Sept" fast-pathed to
+  // query_calendar (topic "Dean") - a verbless jotting is a CREATE, and the
+  // router answering it as a read meant the classifier never saw it.
+  { message: 'Dean in London from 1 to 6 Sept', expect: null },
+  { message: 'dentist Tuesday 3pm', expect: null },
 ];

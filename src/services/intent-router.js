@@ -50,6 +50,7 @@ const ROUTER_SYSTEM = `You route messages for a family-organiser bot. Decide if 
 
 Return "other" whenever you are not certain, and ALWAYS when the message:
 - adds, removes, completes, changes, cancels, books or reminds ("add milk and show the list" → other)
+- is a bare STATEMENT or noun phrase naming a person/thing with a date, time or date range and no question ("Dean in London from 1 to 6 Sept", "dentist Tuesday 3pm", "Logan swimming Friday"). That is the user jotting down a NEW event to save, not asking to view. A read is phrased as a question ("what's on...", "when is...", "do I have..."); a dated statement is a new-event jotting → other.
 - asks a question that needs knowledge or advice rather than stored data
 - mixes a read with anything else
 - is conversational, a greeting, or a follow-up to an earlier request

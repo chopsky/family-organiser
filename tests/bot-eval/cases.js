@@ -668,6 +668,25 @@ module.exports = [
     },
   },
 
+  // ── 2026-08-14: "Dean in London from 1 to 6 Sept" - a verbless jotting
+  // (no "add", no question) must classify as a multi-day CREATE. The router
+  // used to swallow it as query_calendar; once it falls through, the full
+  // classifier must not treat it as a question either.
+  {
+    name: 'verbless jotting: "Dean in London from 1 to 6 Sept" creates a multi-day event',
+    message: 'Dean in London from 1 to 6 Sept',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent !== 'create_event') return `intent ${r.intent}`;
+      const ev = r.calendar_event || (Array.isArray(r.calendar_events) ? r.calendar_events[0] : null);
+      if (!ev) return 'no calendar_event';
+      if (!/09-01$/.test(ev.date || '')) return `date ${ev.date}`;
+      if (!/09-06$/.test(ev.end_date || '')) return `end_date ${ev.end_date} (range lost)`;
+      if (!/dean/i.test(ev.title || '')) return `title ${ev.title}`;
+      return null;
+    },
+  },
+
   // ── 2026-08-01: "apply for UK citizenship on 18 March 2027, remind 2 days
   // before" - the first pass claimed "added" with an EMPTY task list (77
   // output tokens); the honesty backstop caught it and the verbatim retry
