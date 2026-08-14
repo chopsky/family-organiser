@@ -19,6 +19,7 @@ import { confirmDestructive } from '../lib/action-sheet';
 import ActivityModal from '../components/ActivityModal';
 import { looksLikeGathering } from '../lib/partyDetect';
 import { isKidMember } from '../lib/kidsTheme';
+import { openInMaps } from '../lib/maps';
 
 // ── Colour map ──────────────────────────────────────────────
 // Each member's color_theme maps to Tailwind utility classes.
@@ -3213,6 +3214,15 @@ export default function Calendar() {
                         style={mInput}
                         placeholder="Add location"
                       />
+                      {formLocation.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => openInMaps(formLocation)}
+                          className="mt-1.5 text-xs font-semibold text-plum underline decoration-plum/30 underline-offset-2"
+                        >
+                          Open in Maps ↗
+                        </button>
+                      )}
                     </MField>
                     <MField label="Attachments">
                       <div className="min-w-0">
@@ -3561,7 +3571,15 @@ export default function Calendar() {
                 {new Date(syncedEvent.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                 {syncedEvent.all_day ? ' · All day' : ` · ${formatTime(syncedEvent.start_time)} – ${formatTime(syncedEvent.end_time)}`}
               </p>
-              {syncedEvent.location && <p className="text-sm text-warm-grey mt-1">📍 {syncedEvent.location}</p>}
+              {syncedEvent.location && (
+                <button
+                  type="button"
+                  onClick={() => openInMaps(syncedEvent.location)}
+                  className="text-sm text-plum mt-1 underline decoration-plum/30 underline-offset-2 text-left"
+                >
+                  📍 {syncedEvent.location}
+                </button>
+              )}
               {/* Provenance footer only applies to genuinely synced events. In
                   Child Mode this same sheet shows native events read-only, where
                   the "edit it in that calendar" copy would be misleading. */}
