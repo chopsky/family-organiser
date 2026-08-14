@@ -1274,12 +1274,20 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
       });
 
       // Persist anything actionable + build a short summary for the chat.
+      // executedActions must reach the response: the app only refreshes
+      // open pages (and renders confirmation cards) when `actions` is
+      // non-empty - without it a PDF upload created events the calendar
+      // didn't show until a manual reload, which read as a failed save
+      // (real 2026-08-14 incident: the assistant then "re-added" them,
+      // making duplicates).
       const summaryLines = [];
+      const executedActions = [];
       if (Array.isArray(result.tasks) && result.tasks.length > 0) {
         const toAdd = result.tasks.filter(t => t.action !== 'complete');
         if (toAdd.length > 0) {
           await db.addTasks(req.householdId, toAdd, req.user.id, members);
           summaryLines.push(`📋 Added ${toAdd.length} task${toAdd.length === 1 ? '' : 's'}: ${toAdd.map(t => t.title).join(', ')}`);
+          executedActions.push({ type: 'tasks_added', count: toAdd.length });
         }
       }
       // A PDF (school letter) often carries several events — classify v2 puts
@@ -1315,6 +1323,19 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
             await db.saveEventAssignees(createdPdfEvent.id, req.householdId, assigneeNames, members);
           }
           summaryLines.push(`📅 Added event: ${ev.title}${ev.date ? ` on ${ev.date}` : ''}`);
+          executedActions.push({
+            type: 'event_created',
+            event: {
+              id: createdPdfEvent?.id || null,
+              title: ev.title,
+              start_time: startTime,
+              end_time: endTime,
+              all_day: !!ev.all_day,
+              location: ev.location || null,
+              recurrence: ev.recurrence || null,
+              assigned_to_names: assigneeNames,
+            },
+          });
         } catch (err) {
           console.error('[chat/image] PDF event create failed:', err.message);
         }
@@ -1328,7 +1349,11 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
       await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
       await db.saveChatMessage(req.householdId, req.user.id, 'assistant', msg, conversationId);
       await db.touchConversation(conversationId);
-      return res.json({ message: msg, conversation_id: conversationId });
+      return res.json({
+        message: msg,
+        conversation_id: conversationId,
+        actions: executedActions.length > 0 ? executedActions : undefined,
+      });
     }
 
     // ── Image branch (existing flow) ───────────────────────────────────────
@@ -1425,6 +1450,21 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
             await db.saveEventAssignees(createdEvRow.id, req.householdId, assigneeNames, members);
           }
           created.push(ev.recurrence ? `${ev.title} (repeats ${ev.recurrence})` : ev.title);
+          // Same rich card payload as the text create_event path, so
+          // image-scanned events get EVENT ADDED cards too.
+          executedActions.push({
+            type: 'event_created',
+            event: {
+              id: createdEvRow?.id || null,
+              title: ev.title,
+              start_time: startTime,
+              end_time: endTime,
+              all_day: !!ev.all_day,
+              location: ev.location || null,
+              recurrence: ev.recurrence || null,
+              assigned_to_names: assigneeNames,
+            },
+          });
         } catch (err) {
           console.error(`Failed to create event "${ev.title}" from image:`, err.message);
         }
@@ -1434,7 +1474,6 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         let msg = `📅 **${created.length} event${created.length > 1 ? 's' : ''} added to calendar:**\n`;
         created.forEach(t => { msg += `• ${t}\n`; });
         if (scan.summary) msg += `\n${scan.summary}`;
-        executedActions.push({ type: 'create_events', count: created.length });
         cache.invalidate(`digest:${req.householdId}`);
 
         await db.saveChatMessage(req.householdId, req.user.id, 'user', '📷 [Sent an image with event details]', conversationId);
