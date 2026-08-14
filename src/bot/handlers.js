@@ -2011,7 +2011,22 @@ function topicMatchesTitle(topic, title) {
   return hits(tTopic, tTitle) || hits(tTitle, tTopic);
 }
 
-async function handleCalendarQuery(result, household, user, userTz, actions, originalText = '') {
+/**
+ * Was the message phrased as a question? Used to tell a genuine lookup
+ * ("when is Dean in London?") from a jotting the router misread as one
+ * ("Dean in London from 1 to 6 Sept"). Deliberately generous: any
+ * question mark, leading interrogative/auxiliary, or an embedded
+ * "what's/when's" counts as a question.
+ */
+function isQuestionForm(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (!t) return false;
+  if (t.includes('?')) return true;
+  return /^(what|when|where|who|whose|which|how|why|is|are|am|do|does|did|have|has|had|can|could|will|would|should|any|anything)\b/.test(t)
+    || /\b(what's|whats|when's|whens|where's|wheres|who's|whos)\b/.test(t);
+}
+
+async function handleCalendarQuery(result, household, user, userTz, actions, originalText = '', opts = {}) {
   const { formatEventWhen } = require('../utils/event-when');
   const { expandActivityOccurrences } = require('../services/activity-occurrences');
   const isYmd = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -2129,6 +2144,17 @@ async function handleCalendarQuery(result, household, user, userTz, actions, ori
           { question_about: topic, matches: lines }, null),
         actions,
       };
+    }
+    // Router-misroute safety net: the fast-path grabbed a message, the
+    // named thing matched NOTHING, and the message wasn't even phrased as
+    // a question. That combination is near-proof the routing was wrong
+    // ("Dean in London from 1 to 6 Sept" is a jotting, not a lookup) -
+    // return null so the caller falls through to the full classify
+    // pipeline, which will create the event or ask properly. Only the
+    // router path sets this flag; the full pipeline's own calendar
+    // queries keep the honest no-match answer below.
+    if (opts.fallthroughOnTopicMiss && !isQuestionForm(originalText)) {
+      return null;
     }
     const horizon = topicWideSearch ? ' in the next 12 months' : ' for that period';
     return {
@@ -2868,10 +2894,16 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         return { response: await handleList(user, household), actions };
       }
       if (routed.route === 'query_calendar') {
-        return await handleCalendarQuery(
+        const answer = await handleCalendarQuery(
           { query_start: routed.query_start, query_end: routed.query_end, query_topic: routed.query_topic },
-          household, user, userTz, actions, text
+          household, user, userTz, actions, text,
+          { fallthroughOnTopicMiss: true }
         );
+        // null = the named topic matched nothing AND the message wasn't a
+        // question - almost certainly a misrouted jotting. Fall through to
+        // the full pipeline instead of answering with a listing.
+        if (answer) return answer;
+        console.log('[handlers] READ fast-path: topic miss on statement-form message, rerouting to full pipeline:', text.slice(0, 50));
       }
       if (routed.route === 'subscription_list') {
         return await handleSubscriptionList(household, actions);
@@ -4733,6 +4765,7 @@ module.exports = {
   rememberDuplicateTodo,
   popDuplicateTodo,
   handleCalendarQuery,
+  isQuestionForm,
   handleVoiceNote,
   handlePhoto,
   handleDocument,
