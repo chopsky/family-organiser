@@ -736,4 +736,50 @@ module.exports = [
       return null;
     },
   },
+
+  // ── 2026-08-13 capability-gap round: meals OFF the plan, bulk targeting,
+  // and recurrence clearing - the three "known remaining gaps".
+  {
+    name: 'meal_plan_remove: taking a meal off the plan routes to the remove intent with a name target',
+    message: 'Take spag bol off the meal plan, we are getting a takeaway instead',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [] },
+    check: (r) => {
+      if (r.intent !== 'meal_plan_remove') return `intent ${r.intent}`;
+      const targets = r.meal_plan_targets || [];
+      if (targets.length < 1) return 'no meal_plan_targets';
+      if (!targets.some((t) => /bologn|spag/i.test(t.meal_name || ''))) return `targets ${JSON.stringify(targets)}`;
+      return null;
+    },
+  },
+  {
+    name: 'bulk delete: "delete all the fixtures" sets target.all_matching',
+    message: 'Delete all the football fixtures from the calendar',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn'],
+      tasks: [],
+      calendarEvents: [
+        { id: 'e1', title: 'Football fixture: U9 v Rovers', start_time: futureISO(2), all_day: false },
+        { id: 'e2', title: 'Football fixture: U9 v Town', start_time: futureISO(9), all_day: false },
+        { id: 'e3', title: 'Dentist', start_time: futureISO(4), all_day: false },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'delete_event') return `intent ${r.intent}`;
+      if (r.target?.all_matching !== true) return `all_matching ${r.target?.all_matching}`;
+      if (!/fixture|football/i.test(r.target?.title || '')) return `title ${r.target?.title}`;
+      return null;
+    },
+  },
+  {
+    name: 'recurrence clearing: "stop it repeating" emits updates.recurrence none, not a delete',
+    message: "Stop Jack's swimming lesson repeating every week, it's a one-off now",
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Jack'], tasks: [] },
+    check: (r) => {
+      if (r.intent === 'delete_event') return 'misrouted to delete_event - stopping a repeat is an update';
+      if (r.intent !== 'update_event') return `intent ${r.intent}`;
+      if (r.updates?.recurrence !== 'none') return `updates.recurrence ${r.updates?.recurrence}`;
+      return null;
+    },
+  },
 ];

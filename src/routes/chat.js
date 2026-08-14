@@ -1144,6 +1144,32 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           if (planned.length > 0) {
             executedActions.push({ type: 'add_meal_plan', meals: planned });
           }
+
+        } else if (act.action === 'remove_meal_plan' && Array.isArray(act.meals) && act.meals.length > 0) {
+          // Take meals off the plan ("take spag bol off Tuesday", "clear
+          // Friday's meals"). Each target matches on whatever is given:
+          // name fuzzily, date and category exactly. At least one of
+          // name/date per target.
+          const removedMeals = [];
+          for (const t of act.meals.slice(0, 10)) {
+            const date = typeof t?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : null;
+            const name = typeof t?.meal_name === 'string' ? t.meal_name.trim() : '';
+            if (!date && !name) continue;
+            const entries = await db.findMealPlanEntries(req.householdId, {
+              date, mealName: name || null,
+              category: ['breakfast', 'lunch', 'snack', 'dinner'].includes(String(t.category || '').toLowerCase())
+                ? String(t.category).toLowerCase() : null,
+            });
+            for (const e of entries) {
+              await db.deleteMealPlanEntry(e.id, req.householdId);
+              removedMeals.push({ date: e.date, name: e.meal_name, category: e.category });
+            }
+          }
+          if (removedMeals.length === 0) {
+            cleanContent += `\n\n⚠️ I couldn't find that on the meal plan, so nothing was removed.`;
+          } else {
+            executedActions.push({ type: 'meal_plan_removed', count: removedMeals.length, meals: removedMeals });
+          }
         }
       } catch (actionErr) {
         console.error(`Action ${act.action} failed (non-fatal):`, actionErr.message);

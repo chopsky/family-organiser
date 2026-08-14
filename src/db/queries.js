@@ -4882,6 +4882,30 @@ async function createMealPlanEntry(householdId, data, userId, db = supabase) {
   return meal;
 }
 
+// Find meal plan entries for the AI channels' remove/change flow. Any
+// combination of filters; mealName matches fuzzily. Defaults to a window
+// of the past week through the next four so "take spag bol off" hits the
+// planned copy, not months of history.
+async function findMealPlanEntries(householdId, { date, category, mealName, from, to } = {}, db = supabase) {
+  let query = db
+    .from('meal_plan')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('date');
+  if (date) {
+    query = query.eq('date', date);
+  } else {
+    const fromDate = from || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const toDate = to || new Date(Date.now() + 28 * 86400000).toISOString().slice(0, 10);
+    query = query.gte('date', fromDate).lte('date', toDate);
+  }
+  if (category) query = query.eq('category', category);
+  if (mealName?.trim()) query = query.ilike('meal_name', `%${mealName.trim().replace(/[%_]/g, '')}%`);
+  const { data, error } = await query.limit(50);
+  if (error) throw error;
+  return data || [];
+}
+
 async function updateMealPlanEntry(mealId, householdId, updates, db = supabase) {
   const { data, error } = await db
     .from('meal_plan')
@@ -10403,6 +10427,7 @@ module.exports = {
   createMealPlanEntry,
   updateMealPlanEntry,
   deleteMealPlanEntry,
+  findMealPlanEntries,
   getRecipes,
   getRecipeById,
   getLatestRecipe,

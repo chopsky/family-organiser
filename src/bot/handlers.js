@@ -970,6 +970,39 @@ async function runUndo(user, household) {
   if (mut && (!add || mut.timestamp > add.timestamp)) {
     recentMutations.delete(user.id);
     try {
+      if (mut.op === 'bulk') {
+        // Combined undo for a bulk modify - revert every item, tolerating
+        // partial failure (a row someone else already touched shouldn't
+        // strand the rest).
+        let restored = 0;
+        for (const item of mut.items || []) {
+          try {
+            if (item.op === 'delete') {
+              if (item.kind === 'event') {
+                await db.updateCalendarEvent(item.id, household.id, { deleted_at: null });
+              } else {
+                await db.restoreDeletedRow(item.kind === 'task' ? 'tasks' : 'shopping_items', household.id, item.preImage);
+              }
+            } else if (item.kind === 'event') {
+              await db.updateCalendarEvent(item.id, household.id, item.preImage);
+            } else if (item.kind === 'task') {
+              await db.updateTask(item.id, household.id, item.preImage);
+            } else {
+              await db.updateShoppingItem(item.id, household.id, item.preImage);
+            }
+            restored++;
+          } catch (err) {
+            console.error('[handlers] bulk undo item failed:', err.message);
+          }
+        }
+        const total = (mut.items || []).length;
+        return {
+          response: restored === total
+            ? `↩️ Undone - put all ${total} back how they were.`
+            : `↩️ Put ${restored} of ${total} back - the rest may have changed since; check the app.`,
+          actions,
+        };
+      }
       if (mut.op === 'delete') {
         if (mut.kind === 'event') {
           // Event deletes are soft - clear the tombstone.
@@ -1232,9 +1265,15 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     };
   }
 
-  // 3. Multiple matches - disambiguate. Stash the candidates + intent so the
-  // user's number reply can be resolved without going back through the LLM.
+  // 3. Multiple matches. all_matching = the user asked for every one
+  // ("delete all the fixtures", "move them all") - apply the change to
+  // the whole set with one combined undo. Otherwise disambiguate: stash
+  // the candidates + intent so the user's number reply can be resolved
+  // without going back through the LLM.
   if (candidates.length > 1) {
+    if (target.all_matching) {
+      return await executeBulkModify({ intent: result.intent, kind, candidates, updates, user, household, actions });
+    }
     const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c)}`);
     const more = candidates.length > 5 ? `\n  … and ${candidates.length - 5} more` : '';
     const verb = isDelete ? (kind === 'shopping' ? 'remove' : 'cancel') : 'change';
@@ -1246,7 +1285,7 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
       householdId: household.id,
     });
     return {
-      response: `I found a few matches - which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number or a more specific detail.`,
+      response: `I found a few matches - which one do you want to ${verb}?\n\n${lines.join('\n')}${more}\n\nReply with the number, "all of them", or a more specific detail.`,
       actions,
     };
   }
@@ -1481,6 +1520,84 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
   }
 }
 
+/**
+ * Bulk modify: the same update/delete applied to EVERY fuzzy match
+ * ("delete all the fixtures", "move all the packing tasks to Saturday").
+ * Patches build against each item's own values so a bulk time change
+ * keeps each event's day; one combined undo entry restores the lot.
+ */
+async function executeBulkModify({ intent, kind, candidates, updates, user, household, actions }) {
+  const isDelete = intent.startsWith('delete_');
+  const items = [];
+  const doneLabels = [];
+  let skippedSynced = 0;
+
+  for (const hit of candidates.slice(0, 25)) {
+    const label = kind === 'shopping' ? hit.item : hit.title;
+    try {
+      if (kind === 'event' && hit.external_feed_id) { skippedSynced++; continue; }
+      if (isDelete) {
+        if (kind === 'event') {
+          await db.softDeleteCalendarEvent(hit.id, household.id);
+          items.push({ kind, op: 'delete', id: hit.id, label });
+        } else if (kind === 'task') {
+          await db.deleteTask(hit.id, household.id);
+          items.push({ kind, op: 'delete', id: hit.id, preImage: hit, label });
+        } else {
+          await db.deleteShoppingItem(hit.id, household.id);
+          items.push({ kind, op: 'delete', id: hit.id, preImage: hit, label });
+        }
+        forgetReferent(user.id, kind, hit.id);
+        doneLabels.push(label);
+      } else {
+        const patch = kind === 'event' ? buildEventUpdates(updates, hit, household, user)
+          : kind === 'task' ? buildTaskUpdates(updates, hit, household)
+            : buildShoppingUpdates(updates);
+        for (const k of Object.keys(patch)) {
+          const isTime = k === 'start_time' || k === 'end_time';
+          const equal = isTime
+            ? Date.parse(patch[k]) === Date.parse(hit[k])
+            : String(patch[k] ?? '') === String(hit[k] ?? '');
+          if (equal) delete patch[k];
+        }
+        if (Object.keys(patch).length === 0) continue;
+        if (kind === 'event') await db.updateCalendarEvent(hit.id, household.id, patch);
+        else if (kind === 'task') await db.updateTask(hit.id, household.id, patch);
+        else await db.updateShoppingItem(hit.id, household.id, patch);
+        items.push({ kind, op: 'update', id: hit.id, preImage: pickPreImage(hit, patch), label });
+        doneLabels.push(label);
+      }
+    } catch (err) {
+      console.error('[handlers] bulk modify item failed:', err.message);
+    }
+  }
+
+  if (items.length === 0) {
+    if (skippedSynced > 0) {
+      return { response: '📅 Those sync from an external calendar, so I can\'t change them here - edit them in the source calendar and they\'ll update automatically.', actions };
+    }
+    return {
+      response: isDelete
+        ? "⚠️ I couldn't remove any of those just now - please try again in a minute."
+        : 'What would you like to change about them? (time, date, assignee…)',
+      actions,
+    };
+  }
+
+  rememberMutation(user.id, { kind, op: 'bulk', items, label: `${items.length} ${kind === 'shopping' ? 'shopping items' : `${kind}s`}` });
+  const noun = kind === 'shopping' ? 'shopping items' : `${kind}s`;
+  const verb = isDelete ? (kind === 'shopping' ? 'Removed' : 'Cancelled') : 'Updated';
+  const emoji = kind === 'event' ? '📅' : kind === 'task' ? '📋' : '🛒';
+  const sample = doneLabels.slice(0, 5).map((l) => `• ${l}`).join('\n');
+  const more = doneLabels.length > 5 ? `\n… and ${doneLabels.length - 5} more` : '';
+  const skipNote = skippedSynced > 0 ? `\n(${skippedSynced} synced from another calendar were left alone.)` : '';
+  broadcast.toHousehold(user.id, household.members, `${emoji} ${user.name} ${verb.toLowerCase()} ${items.length} ${noun}`);
+  return {
+    response: `${isDelete ? '🗑️' : '✏️'} ${verb} ${items.length} ${noun}:\n${sample}${more}${skipNote}\n\nReply *undo* to put them all back.`,
+    actions,
+  };
+}
+
 /** Extract a YYYY-MM-DD hint from target.context if one's obvious. */
 /**
  * Parse a free-text date hint from the classifier's target.context field
@@ -1587,8 +1704,11 @@ function buildEventUpdates(updates, existing, household, user) {
   if (updates.all_day !== undefined && updates.all_day !== null) patch.all_day = !!updates.all_day;
   // The classify schema has always allowed updates.recurrence but this
   // builder dropped it - "make the birthdays repeat yearly" earned an
-  // apology instead of an edit (real 2026-08-10 transcript).
-  if (updates.recurrence !== undefined && updates.recurrence !== null) patch.recurrence = updates.recurrence;
+  // apology instead of an edit (real 2026-08-10 transcript). 'none'
+  // clears the repeat ("stop it repeating") - the schema can't emit null.
+  if (updates.recurrence !== undefined && updates.recurrence !== null) {
+    patch.recurrence = updates.recurrence === 'none' ? null : updates.recurrence;
+  }
 
   // Reassign via names → parallel id + name arrays. The classifier emits
   // the full list of names the user mentioned; we resolve each against
@@ -1662,7 +1782,7 @@ function buildTaskUpdates(updates, existing, household) {
   if (updates.title) patch.title = updates.title;
   if (updates.due_date !== undefined && updates.due_date !== null) patch.due_date = updates.due_date;
   if (updates.priority) patch.priority = updates.priority;
-  if (updates.recurrence !== undefined) patch.recurrence = updates.recurrence;
+  if (updates.recurrence !== undefined) patch.recurrence = updates.recurrence === 'none' ? null : updates.recurrence;
   if (updates.notification !== undefined && updates.notification !== null) patch.notification = updates.notification;
 
   if (Array.isArray(updates.assigned_to_names)) {
@@ -3088,6 +3208,23 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (valid.length === 0) {
       return { response: "Which meal should go on which day? Tell me like 'spag bol on Tuesday' and I'll pop it on the meal plan. 🍽", actions };
     }
+    // Swap semantics: "change Tuesday's dinner to tacos" arrives as
+    // meal_plan_add for tacos + the outgoing meal in meal_plan_targets.
+    // Remove those first so the slot doesn't end up double-booked.
+    const swapTargets = (Array.isArray(result.meal_plan_targets) ? result.meal_plan_targets : [])
+      .filter((t) => t && (t.meal_name?.trim() || (typeof t.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.date))));
+    for (const t of swapTargets.slice(0, 10)) {
+      try {
+        const outgoing = await db.findMealPlanEntries(household.id, {
+          date: /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') ? t.date : null,
+          category: t.category || null,
+          mealName: t.meal_name || null,
+        });
+        for (const e of outgoing) await db.deleteMealPlanEntry(e.id, household.id);
+      } catch (err) {
+        console.error('[handlers] meal_plan_add swap removal failed:', err.message);
+      }
+    }
     const recipes = await db.getRecipes(household.id).catch(() => []);
     const findRecipe = (name) => {
       const n = name.trim().toLowerCase();
@@ -3122,6 +3259,39 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       ? `\n⚠️ ${valid.length - planned.length} of them couldn't be saved - try those again.`
       : '';
     return { response: `🍽 On the meal plan:\n${lines}${failNote}`, actions };
+  }
+
+  if (result.intent === 'meal_plan_remove') {
+    // Take meals OFF the plan ("take spag bol off Tuesday", "clear
+    // Friday's dinner"). Targets match on whatever the user gave - name
+    // fuzzily, date and category exactly.
+    const targets = (Array.isArray(result.meal_plan_targets) ? result.meal_plan_targets : [])
+      .filter((t) => t && (t.meal_name?.trim() || (typeof t.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.date))));
+    if (targets.length === 0) {
+      return { response: "Which meal should come off the plan? Tell me like 'take spag bol off Tuesday'. 🍽", actions };
+    }
+    const removed = [];
+    for (const t of targets.slice(0, 10)) {
+      try {
+        const entries = await db.findMealPlanEntries(household.id, {
+          date: /^\d{4}-\d{2}-\d{2}$/.test(t.date || '') ? t.date : null,
+          category: t.category || null,
+          mealName: t.meal_name || null,
+        });
+        for (const e of entries) {
+          await db.deleteMealPlanEntry(e.id, household.id);
+          removed.push(e);
+        }
+      } catch (err) {
+        console.error('[handlers] meal_plan_remove failed:', err.message);
+      }
+    }
+    if (removed.length === 0) {
+      return { response: "I couldn't find that on the meal plan - it may already be off, or saved under a different name. Ask me \"what's on the meal plan?\" to check.", actions };
+    }
+    const mealDayLabel = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+    const removedLines = removed.slice(0, 8).map((e) => `• ${mealDayLabel(e.date)}${e.category !== 'dinner' ? ` (${e.category})` : ''}: *${e.meal_name}*`).join('\n');
+    return { response: `🍽 Off the meal plan:\n${removedLines}${removed.length > 8 ? `\n… and ${removed.length - 8} more` : ''}`, actions };
   }
 
   // Handle calendar event creation (primary path - intent explicitly create_event)
@@ -4588,4 +4758,10 @@ module.exports = {
   rememberInviteOffer,
   buildInviteLinkReply,
   buildInviteRosterReply,
+  // Modify machinery (exported for tests)
+  buildEventUpdates,
+  buildTaskUpdates,
+  executeBulkModify,
+  runUndo,
+  rememberMutation,
 };

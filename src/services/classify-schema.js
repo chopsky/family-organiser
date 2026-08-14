@@ -69,7 +69,7 @@ const INTENTS = [
   'subscription_list', 'create_event', 'update_event', 'delete_event',
   'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item',
   'recipe', 'recipe_followup', 'weather', 'school_activity', 'school_event',
-  'school_add', 'meal_plan_add', 'web_search', 'chat',
+  'school_add', 'meal_plan_add', 'meal_plan_remove', 'web_search', 'chat',
 ];
 const SHOPPING_CATEGORIES = [
   'Dairy & Eggs', 'Produce', 'Meat & Seafood', 'Pantry & Grains', 'Bakery',
@@ -131,6 +131,9 @@ const CLASSIFY_SCHEMA = obj({
     target_id: opt(int),
     context: opt(str),
     assigned_to_name: opt(str),
+    // Bulk: apply the update/delete to EVERY fuzzy match ("delete all the
+    // fixtures", "move all the packing tasks to Saturday").
+    all_matching: opt(bool),
   })),
   updates: opt(obj({
     title: opt(str),
@@ -145,7 +148,9 @@ const CLASSIFY_SCHEMA = obj({
     description: opt(str),
     due_date: opt(str),
     priority: opt(en(PRIORITIES)),
-    recurrence: opt(en(RECURRENCES)),
+    // 'none' clears the repeat on update ("stop it repeating") - the
+    // builders map it to a NULL recurrence column.
+    recurrence: opt(en([...RECURRENCES, 'none'])),
     reminders: opt(reminders),
     notification: opt(en(NOTIFICATIONS)),
     quantity: opt(str),
@@ -192,6 +197,14 @@ const CLASSIFY_SCHEMA = obj({
   meal_plan_entries: opt(arr(obj({
     date: str,
     meal_name: str,
+    category: opt(en(['breakfast', 'lunch', 'snack', 'dinner'])),
+  }))),
+  // meal_plan_remove targets: every field optional because "take spag bol
+  // off the plan" has no date and "clear Tuesday's dinner" has no name -
+  // the handler matches on whatever is given (at least one required).
+  meal_plan_targets: opt(arr(obj({
+    meal_name: opt(str),
+    date: opt(str),
     category: opt(en(['breakfast', 'lunch', 'snack', 'dinner'])),
   }))),
   web_search_query: opt(str),
