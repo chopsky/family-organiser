@@ -5699,6 +5699,64 @@ async function resolveActivityFilter(activity, db = supabase) {
   return { householdIds: idleIds, isEmpty: idleIds.length === 0 };
 }
 
+// ─── Households admin sorting ───────────────────────────────────────────────
+//
+// Two families of sortable column, because they need different machinery:
+//
+//   SQL      - real columns on `households`. Postgres orders them, so we can
+//              keep .range() pagination and only ever fetch one page.
+//   DERIVED  - values computed after the query (counts from other tables, or
+//              the plan badge's own precedence rules). Postgres can't ORDER BY
+//              these, so we fetch every matching row, enrich, sort in JS, then
+//              slice the page. Costlier, hence the split rather than treating
+//              everything as derived.
+//
+// Whitelisting also keeps `sort` out of the query string entirely - an
+// unrecognised value falls back to created_at rather than reaching PostgREST.
+const HOUSEHOLD_SQL_SORTS = new Set(['name', 'created_at', 'join_code', 'timezone']);
+const HOUSEHOLD_DERIVED_SORTS = new Set([
+  'last_active_at', 'member_count', 'schools_count', 'documents_bytes', 'plan',
+]);
+
+// Plan is categorical, so "ascending" needs a defined meaning. We order by
+// commercial lifecycle rather than alphabetically - ascending walks from
+// paying customers down to accounts that can't convert, which is the order an
+// operator scanning the list actually cares about. Mirrors SubscriptionBadge:
+// is_internal wins over subscription_status.
+const PLAN_RANK = { active: 0, trialing: 1, expired: 2, cancelled: 3, internal: 4 };
+
+function planRank(h) {
+  if (h.is_internal) return PLAN_RANK.internal;
+  const rank = PLAN_RANK[h.subscription_status];
+  return rank === undefined ? 99 : rank; // unknown/null status sorts last
+}
+
+/** Comparator for a derived column. Timestamps put nulls last in BOTH
+ *  directions (a household that has never been active isn't "earliest"),
+ *  whereas 0 members / 0 files / 0 schools are genuine values and sort
+ *  numerically. */
+function compareDerived(sortKey, ascending) {
+  const dir = ascending ? 1 : -1;
+
+  if (sortKey === 'last_active_at') {
+    return (a, b) => {
+      const ta = a.last_active_at;
+      const tb = b.last_active_at;
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return dir * ta.localeCompare(tb);
+    };
+  }
+
+  if (sortKey === 'plan') {
+    return (a, b) => dir * (planRank(a) - planRank(b));
+  }
+
+  // Numeric counts: member_count, schools_count, documents_bytes
+  return (a, b) => dir * ((a[sortKey] || 0) - (b[sortKey] || 0));
+}
+
 async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'created_at', sortDir = 'desc', plan, activity } = {}, db = supabase) {
   // Resolve the activity filter into explicit household IDs first - if it
   // matches nothing we can short-circuit without hitting households at all.
@@ -5728,17 +5786,17 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     query = query.in('id', activityFilter.householdIds);
   }
 
-  // last_active_at is a derived value (MAX across members) so the DB can't
-  // sort by it. For that path we fetch ALL matching rows, enrich, then sort
-  // + paginate in JS. For everything else we use the normal SQL order + range.
-  const sortByActive = sort === 'last_active_at';
+  // Derived columns can't be ordered by Postgres, so those fetch every
+  // matching row and sort after enrichment (see the whitelists above).
+  const isDerivedSort = HOUSEHOLD_DERIVED_SORTS.has(sort);
 
-  // Whitelist sort columns to prevent injection
-  const sortColumn = sort === 'name' ? 'name' : 'created_at';
+  // Whitelist sort columns to prevent injection; anything unrecognised
+  // (including a derived key, which is handled separately) falls back.
+  const sortColumn = HOUSEHOLD_SQL_SORTS.has(sort) ? sort : 'created_at';
   const ascending = sortDir === 'asc';
 
   let data, error, count;
-  if (sortByActive) {
+  if (isDerivedSort) {
     const res = await query;
     data = res.data; error = res.error; count = res.count;
   } else {
@@ -5817,19 +5875,10 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     }
   }
 
-  // For sort=last_active_at we deferred ordering + pagination until after
-  // enrichment (since the field is derived). Apply both now.
-  // Nulls always go last so households with no activity sit at the bottom
-  // regardless of direction.
-  if (sortByActive) {
-    data.sort((a, b) => {
-      const ta = a.last_active_at;
-      const tb = b.last_active_at;
-      if (!ta && !tb) return 0;
-      if (!ta) return 1;
-      if (!tb) return -1;
-      return ascending ? ta.localeCompare(tb) : tb.localeCompare(ta);
-    });
+  // Derived sorts deferred ordering + pagination until after enrichment,
+  // because the values being sorted on only exist at this point. Apply both now.
+  if (isDerivedSort) {
+    data.sort(compareDerived(sort, ascending));
     const from = (page - 1) * limit;
     data = data.slice(from, from + limit);
   }

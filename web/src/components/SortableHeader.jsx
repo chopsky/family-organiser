@@ -2,8 +2,21 @@
  * Clickable table header that toggles sort. Active column shows an arrow
  * indicating direction. Pass `column` (the API sort key), the current
  * `sort`/`sortDir` state, and an `onSort(column, direction)` handler.
+ *
+ * `defaultDir` overrides the first-click direction when the convention below
+ * gets it wrong for a particular column.
  */
-export default function SortableHeader({ column, label, sort, sortDir, onSort, className = '' }) {
+
+// Which way a column should sort on its FIRST click. Driven by the key's
+// suffix rather than a hand-maintained list of column names, so new sortable
+// columns get sensible behaviour without touching this file:
+//   *_at                  timestamps  -> newest first
+//   *_count / *_bytes     magnitudes  -> largest first
+// Everything else (names, codes, timezones, categorical badges) reads more
+// naturally A→Z / lowest-rank-first, so it defaults to ascending.
+const DESC_FIRST = /(_at|_count|_bytes)$/;
+
+export default function SortableHeader({ column, label, sort, sortDir, onSort, className = '', defaultDir }) {
   const isActive = sort === column;
   const arrow = isActive ? (sortDir === 'asc' ? '↑' : '↓') : '';
 
@@ -11,11 +24,7 @@ export default function SortableHeader({ column, label, sort, sortDir, onSort, c
     if (isActive) {
       onSort(column, sortDir === 'asc' ? 'desc' : 'asc');
     } else {
-      // First click on a new column defaults to descending for timestamp
-      // columns (most-recent first feels natural for activity / dates),
-      // ascending for text columns (names look natural A→Z first).
-      const isTimestampCol = column === 'created_at' || column === 'last_active_at' || column === 'last_whatsapp_at';
-      onSort(column, isTimestampCol ? 'desc' : 'asc');
+      onSort(column, defaultDir || (DESC_FIRST.test(column) ? 'desc' : 'asc'));
     }
   }
 

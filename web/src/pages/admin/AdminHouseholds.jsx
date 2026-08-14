@@ -206,13 +206,13 @@ export default function AdminHouseholds() {
               <thead>
                 <tr className="border-b border-light-grey text-left">
                   <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider">Members</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden sm:table-cell">Plan</th>
+                  <SortableHeader column="member_count" label="Members" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                  <SortableHeader column="plan" label="Plan" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell" />
                   <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden md:table-cell">School</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Storage</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Join Code</th>
-                  <th className="px-4 py-3 font-semibold text-warm-grey text-xs uppercase tracking-wider hidden lg:table-cell">Timezone</th>
+                  <SortableHeader column="schools_count" label="School" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
+                  <SortableHeader column="documents_bytes" label="Storage" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
+                  <SortableHeader column="join_code" label="Join Code" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
+                  <SortableHeader column="timezone" label="Timezone" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                   <SortableHeader column="created_at" label="Created" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 </tr>
               </thead>
