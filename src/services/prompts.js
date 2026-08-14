@@ -26,6 +26,17 @@ APP NAVIGATION (the real screens - never invent others):
 - Settings sections: Connected services (Connect WhatsApp, Connect Calendars, Send Emails to AI), Notifications (morning briefing on/off AND a "Briefing time" picker, evening heads-up, per-device push), Location, Active sessions, and Account (data export, subscription, delete).
 - NEVER give directions to a screen, toggle, or setting that is not listed above. If you are not certain where something lives in the app, say you're not certain instead of guessing a path - wrong directions are worse than none.`;
 
+// The single source of truth for "whose clock is this?". Every prompt that
+// extracts a start_time interpolates it, because the fix keeps getting written
+// in one prompt and forgotten in the others: the email path carried this rule
+// for months while the image path did not, and in Aug 2026 a photographed party
+// invite reading "4:45pm" came back from the model as "15:45" (already
+// UTC-converted off the venue's UK address). localToUTC then subtracted the BST
+// hour a second time and the family had the party in their calendar an hour
+// early. Static text only - it is interpolated into CLASSIFICATION_SYSTEM,
+// which must stay byte-identical across calls for prompt caching.
+const LOCAL_TIME_RULE = `- **Times are LOCAL wall-clock, exactly as printed.** Return start_time/end_time as the time actually written ("6.45pm" -> "18:45"). NEVER convert to UTC or any other timezone - the system applies the household's timezone itself, so a "helpful" conversion lands the family at the wrong hour. Do NOT infer a timezone from an address, venue or postcode. Ignore any timezone abbreviations in the source unless the event is clearly in another country.`;
+
 const CLASSIFICATION_SYSTEM = `You are a helpful family assistant AI. You help with shopping lists, tasks, remembering household info, and general family questions.
 
 You will be given a raw message from a family member. Parse it and return structured data.
@@ -184,6 +195,7 @@ CALENDAR EVENT RULES:
 - description: any extra details, or null
 - For events with no specific time, set all_day to true
 - Default end_time to 1 hour after start_time if not specified
+${LOCAL_TIME_RULE}
 
 SHOPPING ITEM RULES:
 - Infer aisle_category from context: Dairy & Eggs | Produce | Meat & Seafood | Pantry & Grains | Bakery | Frozen Foods | Beverages | Household & Cleaning | Personal Care | Other
@@ -681,7 +693,7 @@ To CHANGE an existing calendar event (you CAN update them - time, date, title, l
 \`\`\`
 - title (plus the optional date) identify WHICH event; the new_* fields carry ONLY what changes - leave everything you're not changing null. Omit new_recurrence entirely unless the user asked about repeating; set it null explicitly to STOP an event repeating.
 - Set all_matching true for bulk changes ("make all the birthdays repeat yearly", "move all the fixtures to 2pm") - the same change applies to every matching event, each keeping its own date.
-- Times are the family's local wall-clock in 24h HH:MM ("6.45pm" → "18:45") - never convert timezones.
+${LOCAL_TIME_RULE}
 - If the user gives one time ("move it to 12pm"), set new_start_time only; the event keeps its length. Set new_end_time only when they state an end.
 - assigned_to_names, when set, REPLACES the full attendee list - include everyone who should remain on the event.
 - Events synced from an external calendar are read-only; the reply will explain that automatically.
@@ -919,6 +931,7 @@ For "event" type images, extract ALL events/dates you can find. For each event e
 - date: YYYY-MM-DD (resolve relative dates using today's date)
 - start_time: HH:MM in 24h format, or null if not specified
 - end_time: HH:MM in 24h format, or null if not specified
+${LOCAL_TIME_RULE}
 - all_day: true if no specific time, false otherwise
 - location: venue/address if mentioned, or null
 - description: any extra details (dress code, what to bring, booking ref, flight number etc.), or null
@@ -994,7 +1007,7 @@ OTHER RULES:
 - For receipts: normalise product names to plain English (e.g. "LURPAK SLTD 250G" → "butter"). IGNORE delivery charges, fees, tips, discounts, loyalty-points lines, and substituted-item notices.
 - For events: resolve dates to YYYY-MM-DD. If the source gives an EXPLICIT calendar date that includes a year (e.g. "Date: 01/06/2026"), use that date EXACTLY - even if it is in the past. NEVER shift an explicitly-stated date to today or to a future occurrence; the user pasted/forwarded a document and expects the date it actually states. Only when NO year is given should you assume the next occurrence (this year if the day+month is still ahead, otherwise next year). Interpret ambiguous numeric dates using the household country convention - DD/MM for UK ("GB") and South Africa ("ZA"), MM/DD for US. When the country is unknown, prefer DD/MM (the app's primary market is the UK).
 - For event times: if the source gives NO time of day (e.g. a fixture sheet that lists only a date), set all_day: true and leave start_time and end_time null. NEVER invent a plausible-looking time - a parent who trusts a fabricated "10:00" turns up at the wrong time. Only set start_time/end_time when the source actually states a time.
-- **Times are LOCAL wall-clock, exactly as printed.** Return start_time/end_time as the time written in the email ("6.45pm" → "18:45"). NEVER convert to UTC or any other timezone - the system applies the household's timezone itself, so a "helpful" conversion lands the family at the wrong hour. Ignore any timezone abbreviations in the source unless the event is clearly in another country.
+${LOCAL_TIME_RULE}
 - **NEVER use the email's own sent/received timestamp as the event's date or time.** The forwarding header's date ("Sent: Tuesday 11 August 16:01") is when the email was written, not when the appointment happens. If the body states no event date, that's all_day: true on the stated date or no event at all - not the header date.
 - For member assignment: match names mentioned in the email to household members. If "Mason" or "Year 4" is mentioned and Mason is a household member, assign to Mason.
 - If the email contains multiple events (e.g. a school newsletter with several dates), extract ALL of them.
@@ -1047,6 +1060,7 @@ Respond only with valid JSON matching this schema:
 }`;
 
 module.exports = {
+  LOCAL_TIME_RULE,
   CLASSIFICATION_SYSTEM,
   CLASSIFICATION_CONTEXT,
   RECEIPT_EXTRACTION_SYSTEM,
