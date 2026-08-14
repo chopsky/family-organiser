@@ -507,6 +507,23 @@ router.get('/activation', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/ai-misses ───────────────────────────────────────────────
+//
+// "AI said no" radar: assistant replies across app chat + WhatsApp where the
+// model told a customer it couldn't do something. Surfaces capability gaps
+// (missing actions, falsely denied features) as they happen instead of
+// waiting for a support email. ?days=N (1-90, default 30).
+router.get('/ai-misses', async (req, res) => {
+  try {
+    const days = Math.min(90, Math.max(1, parseInt(req.query.days, 10) || 30));
+    const data = await db.getAiCapabilityMisses({ days });
+    return res.json(data);
+  } catch (err) {
+    console.error('GET /api/admin/ai-misses error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ─── GET /api/admin/inbound-emails ──────────────────────────────────────────
 //
 // Recent forwarded-email processing log. Powers the AdminInboundEmails

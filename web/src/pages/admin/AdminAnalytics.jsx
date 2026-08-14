@@ -88,6 +88,7 @@ export default function AdminAnalytics() {
 
       {/* Per-household activation buckets + weekly retention curve */}
       <ActivationRetention />
+      <AiMisses />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
         {/* Feature Usage */}
@@ -283,6 +284,89 @@ const BUCKET_META = {
   never_started: { label: 'Never started', chip: 'bg-light-grey text-warm-grey' },
   expired: { label: 'Expired', chip: 'bg-light-grey text-warm-grey' },
 };
+
+// "AI said no" radar: assistant replies (app chat + WhatsApp) where the model
+// told a customer it couldn't do something. Each row is a potential capability
+// gap - a missing action, or the model falsely denying a feature that exists.
+function AiMisses() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [days, setDays] = useState(30);
+  const [expanded, setExpanded] = useState(null);
+
+  const fetchData = (d) =>
+    api.get('/admin/ai-misses', { params: { days: d } })
+      .then(({ data }) => { setData(data); setFailed(false); })
+      .catch(() => setFailed(true))
+      .finally(() => setLoading(false));
+  useEffect(() => { fetchData(days); }, [days]);
+
+  const byHousehold = {};
+  for (const m of data?.misses || []) {
+    (byHousehold[m.householdId] ||= { name: m.householdName, rows: [] }).rows.push(m);
+  }
+  const groups = Object.entries(byHousehold).sort((a, b) => b[1].rows.length - a[1].rows.length);
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display text-lg font-medium text-charcoal">AI said no</h2>
+        <div className="flex items-center gap-2">
+          {[7, 30, 60].map((d) => (
+            <button
+              key={d}
+              onClick={() => { setLoading(true); setDays(d); }}
+              className={`text-xs font-semibold rounded-lg px-2 py-1 ${days === d ? 'bg-plum-light text-plum' : 'text-warm-grey hover:text-plum'}`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {failed && <p className="text-sm text-warm-grey bg-white rounded-2xl p-5 shadow-[var(--shadow-sm)]">Couldn't load AI misses.</p>}
+      {!failed && loading && !data && <div className="flex justify-center py-10"><Spinner /></div>}
+
+      {data && !failed && (
+        <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+          <p className="text-xs text-warm-grey mb-3">
+            {data.misses.length} assistant replies said "I can't" across {groups.length} households.
+            Each one is a capability gap or the model wrongly denying a feature that exists.
+          </p>
+          {groups.length === 0 && <p className="text-sm text-warm-grey">Nothing in this window. Lovely.</p>}
+          {groups.map(([hid, g]) => (
+            <div key={hid} className="border-b border-light-grey last:border-0 py-2">
+              <button
+                onClick={() => setExpanded(expanded === hid ? null : hid)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <span className="text-sm font-medium text-charcoal">{g.name}</span>
+                <span className="text-xs text-warm-grey">{g.rows.length} {g.rows.length === 1 ? 'reply' : 'replies'} {expanded === hid ? '▾' : '▸'}</span>
+              </button>
+              {expanded === hid && (
+                <div className="mt-2 space-y-2">
+                  {g.rows.map((m, i) => (
+                    <div key={i} className="text-xs bg-cream rounded-lg p-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`rounded px-1.5 py-0.5 font-semibold ${m.channel === 'whatsapp' ? 'bg-sage-light text-sage' : 'bg-plum-light text-plum'}`}>
+                          {m.channel === 'whatsapp' ? 'WhatsApp' : 'App chat'}
+                        </span>
+                        <span className="text-warm-grey">{new Date(m.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        {m.intent && <span className="text-warm-grey">intent: {m.intent}</span>}
+                      </div>
+                      <p className="text-charcoal admin-selectable">{m.snippet}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ActivationRetention() {
   const [data, setData] = useState(null);

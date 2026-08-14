@@ -6265,6 +6265,59 @@ async function getBotUserVisibleFailures({ days = 7 } = {}, db = supabase) {
   };
 }
 
+// "AI said no": assistant replies (app chat + WhatsApp) where the model told
+// a real customer it couldn't do something. This is the capability-gap radar -
+// it's how the missing chat task-deletion and the Maxine update_event gap were
+// found (2026-08-13). Patterns are fixed strings (no user input interpolated
+// into .or(), per the PostgREST-filter rule), and internal households are
+// excluded so founder testing doesn't drown the signal.
+const AI_MISS_PATTERNS = [
+  "%I can't%", '%I cannot%', "%don't have a way%", '%not able to%',
+  '%not something I can%', '%not supported%', "%don't have visibility%",
+  "%isn't something I can%",
+];
+async function getAiCapabilityMisses({ days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data: households, error: hhErr } = await db
+    .from('households').select('id, name').eq('is_internal', false);
+  if (hhErr) throw hhErr;
+  const nameById = new Map((households || []).map((h) => [h.id, h.name]));
+  const ids = [...nameById.keys()];
+  if (ids.length === 0) return { since, misses: [] };
+
+  const orExpr = (col) => AI_MISS_PATTERNS.map((p) => `${col}.ilike.${p}`).join(',');
+  const [chatRes, waRes] = await Promise.all([
+    db.from('chat_messages')
+      .select('household_id, created_at, content')
+      .eq('role', 'assistant').in('household_id', ids).gte('created_at', since)
+      .or(orExpr('content'))
+      .order('created_at', { ascending: false }).limit(200),
+    db.from('whatsapp_message_log')
+      .select('household_id, created_at, intent, response')
+      .in('household_id', ids).gte('created_at', since)
+      .not('response', 'is', null)
+      .or(orExpr('response'))
+      .order('created_at', { ascending: false }).limit(200),
+  ]);
+  if (chatRes.error) throw chatRes.error;
+  if (waRes.error) throw waRes.error;
+
+  const misses = [
+    ...(chatRes.data || []).map((m) => ({
+      channel: 'app_chat', intent: null,
+      householdId: m.household_id, householdName: nameById.get(m.household_id) || 'Unknown',
+      at: m.created_at, snippet: (m.content || '').replace(/\s+/g, ' ').slice(0, 280),
+    })),
+    ...(waRes.data || []).map((m) => ({
+      channel: 'whatsapp', intent: m.intent || null,
+      householdId: m.household_id, householdName: nameById.get(m.household_id) || 'Unknown',
+      at: m.created_at, snippet: (m.response || '').replace(/\s+/g, ' ').slice(0, 280),
+    })),
+  ].sort((a, b) => (a.at < b.at ? 1 : -1));
+
+  return { since, misses };
+}
+
 /**
  * Recent AI/app errors across ALL users and features, for the admin dashboard.
  * The per-user profile page already lists a user's failed calls, but errors
@@ -10366,6 +10419,7 @@ module.exports = {
   // Platform admin Phase 2
   getAiUsageStats,
   getBotUserVisibleFailures,
+  getAiCapabilityMisses,
   getRecentAiErrors,
   getAiUsageTimeline,
   logWhatsAppMessage,
