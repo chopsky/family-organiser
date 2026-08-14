@@ -1122,10 +1122,13 @@ function formatShoppingList(items) {
   return lines.join('\n').trim();
 }
 
-function formatTaskList(tasks, heading = 'Tasks') {
+function formatTaskList(tasks, heading = 'Tasks', timezone = null) {
   if (!tasks.length) return `✅ No ${heading.toLowerCase()}!`;
 
-  const today = new Date().toISOString().split('T')[0];
+  // Overdue is judged against the household's calendar date, not the
+  // server's UTC date - a SAST evening shouldn't mark tomorrow's tasks
+  // overdue two hours early.
+  const today = timezone ? ymdInTimezone(new Date(), timezone) : new Date().toISOString().split('T')[0];
   const lines = [`*${heading}*`];
 
   for (const t of tasks) {
@@ -4329,7 +4332,7 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
   // through so an explicit instruction ("add these dates to the calendar")
   // overrides the blind guess - which used to misread booking confirmations
   // as receipts.
-  const ctx = { householdId: household.id, userId: user.id, caption };
+  const ctx = { householdId: household.id, userId: user.id, caption, timezone: household.timezone };
   const scan = await scanImage(imageBuffer, mimeType, memberNames, ctx);
 
   // ── Receipt handling ──
@@ -4462,7 +4465,7 @@ async function handleTasks(user, household, showAll = false) {
     ? await db.getAllIncompleteTasks(household.id)
     : await db.getTasks(household.id);
   const heading = showAll ? 'All Pending Tasks' : 'Tasks Due Today & Overdue';
-  return formatTaskList(tasks, heading);
+  return formatTaskList(tasks, heading, household.timezone);
 }
 
 /**
@@ -4471,7 +4474,7 @@ async function handleTasks(user, household, showAll = false) {
 async function handleMyTasks(user, household) {
   const tasks = await db.getTasks(household.id, { assignedToId: user.id });
   const heading = `${user.name}'s Tasks`;
-  return formatTaskList(tasks, heading);
+  return formatTaskList(tasks, heading, household.timezone);
 }
 
 /**

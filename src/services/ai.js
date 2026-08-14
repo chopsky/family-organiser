@@ -17,6 +17,18 @@ const {
 /**
  * Parse a text message into structured shopping items and tasks.
  */
+// The household's calendar date - server UTC drifts a day on either side
+// of midnight for far-from-UTC families (NZ mornings, US evenings).
+function todayInTimezone(timezone) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date());
+  } catch {
+    return new Date().toISOString().split('T')[0];
+  }
+}
+
 async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [], choresToday = [] } = {}) {
   // "Today" needs to be computed in the user's timezone, not UTC, or
   // we drift on either side of midnight (a 23:30 BST message gets
@@ -351,14 +363,17 @@ async function matchReceiptToList(receiptItems, shoppingList, { householdId, use
 /**
  * Scan an image to determine if it's a receipt or contains calendar events.
  */
-async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId, caption = '' } = {}) {
+async function scanImage(imageData, mediaType = 'image/jpeg', memberNames = [], { householdId, userId, caption = '', timezone } = {}) {
   // Buffer = raw bytes; string may be a data URI from a client - strip its prefix.
   const norm = Buffer.isBuffer(imageData)
     ? { data: imageData.toString('base64'), mediaType }
     : normaliseImageData(imageData, mediaType);
   const base64 = norm.data;
 
-  const today = new Date().toISOString().split('T')[0];
+  // Household-local date, not server UTC: a US-evening photo of a party
+  // invite ("next Saturday") anchored to UTC's tomorrow lands events a
+  // day off. Same class as the classify() anchor above.
+  const today = todayInTimezone(timezone);
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const systemPrompt = IMAGE_SCAN_SYSTEM
     .replace(/{{DATE}}/g, today)
@@ -599,7 +614,7 @@ function buildEmailExtractionContext(ctx = {}) {
  * and empty arrays - same as before this argument existed.
  */
 async function extractFromEmail(emailText, subject, memberNames = [], context = {}, { householdId, userId } = {}) {
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayInTimezone(context.timezone);
   const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'none specified';
   const contextStr = buildEmailExtractionContext(context);
 

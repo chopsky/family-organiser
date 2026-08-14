@@ -181,6 +181,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       ]);
       const aiContext = {
         country: household.country,
+        timezone: household.timezone,
         shoppingList: shoppingList.map((i) => ({ id: i.id, item: i.item })),
         recentPurchases,
         recurringTaskTitles,

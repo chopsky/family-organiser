@@ -174,7 +174,11 @@ function buildChatEventPatch(act, existing, tz, members) {
  * Build the system prompt with family context injected.
  */
 async function buildSystemPrompt(householdId, householdName, userId, currentMessage = '', deviceCoords = null) {
-  const today = new Date().toISOString().split('T')[0];
+  // Fetch window anchored a day EARLY: server-UTC "today" can be the
+  // household's yesterday (NZ mornings) or tomorrow (US evenings), and the
+  // prompt's date below is computed in the household timezone - the window
+  // must contain it either way.
+  const today = new Date(Date.now() - 86400000).toISOString().split('T')[0];
   const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
 
   const [members, notes, shopping, tasks, events, household, schools, recipes, rawPreferences, activities, mealPlan] = await Promise.all([
@@ -354,7 +358,7 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   // only this FAMILY DATA block varies per household/message.
   let context = CHAT_ASSISTANT_CONTEXT
     .replace(/{{HOUSEHOLD_NAME}}/g, householdName || 'your')
-    .replace(/{{DATE}}/g, today)
+    .replace(/{{DATE}}/g, ymdInTz(new Date(), userTz))
     .replace(/{{SENDER}}/g, currentUser?.name || 'the user')
     .replace(/{{TIMEZONE}}/g, userTz)
     .replace(/{{LOCATION}}/g, locationStr)

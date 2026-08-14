@@ -200,6 +200,7 @@ async function extractAndApply(text, subject, user, household) {
     // date on the U11 cricket test paste.
     extraction = await extractFromEmail(text, subject || null, memberNames, {
       country: household.country || null,
+      timezone: household.timezone || null,
     }, {
       householdId: household.id,
       userId: user.id,
