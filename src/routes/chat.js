@@ -129,6 +129,9 @@ function buildChatEventPatch(act, existing, tz, members) {
   const patch = {};
   if (act.new_title) patch.title = act.new_title;
   if (act.new_location !== undefined && act.new_location !== null) patch.location = act.new_location;
+  // Recurrence edits ("make the birthdays yearly") - explicit null clears
+  // the repeat ("stop it repeating"), absent leaves it alone.
+  if (act.new_recurrence !== undefined) patch.recurrence = act.new_recurrence;
   if (Array.isArray(act.assigned_to_names)) {
     const { ids, names } = db.resolveAssignees(act.assigned_to_names, members);
     patch.assigned_to_ids = ids;
@@ -759,34 +762,44 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             cleanContent += matches.length > 0
               ? `\n\n⚠️ "${act.title}" syncs from another calendar, so I can't change it here - edit it in the source calendar and it'll update in Housemait automatically.`
               : `\n\n⚠️ I couldn't find "${act.title}" on the calendar, so nothing was changed.`;
-          } else if (editable.length > 1) {
-            cleanContent += `\n\n⚠️ I found ${editable.length} events matching "${act.title}" - tell me which date you mean and I'll change that one.`;
+          } else if (editable.length > 1 && !act.all_matching) {
+            cleanContent += `\n\n⚠️ I found ${editable.length} events matching "${act.title}" - tell me which date you mean, or say "all of them".`;
           } else {
-            const hit = editable[0];
-            const patch = buildChatEventPatch(act, hit, userTz, members);
-            if (Object.keys(patch).length === 0) {
-              cleanContent += `\n\n⚠️ I couldn't work out what to change about "${hit.title}" - tell me the new time, date, or details.`;
+            // all_matching applies the same change to every match ("make
+            // all the birthdays yearly", "move all the fixtures to 2pm") -
+            // each event's patch is built against ITS OWN existing values
+            // so a time change keeps each event's day.
+            const eventTargets = act.all_matching ? editable : [editable[0]];
+            const firstPatch = buildChatEventPatch(act, eventTargets[0], userTz, members);
+            if (Object.keys(firstPatch).length === 0) {
+              cleanContent += `\n\n⚠️ I couldn't work out what to change about "${eventTargets[0].title}" - tell me the new time, date, or details.`;
             } else {
-              const updatedEvent = await db.updateCalendarEvent(hit.id, req.householdId, patch);
-              // Assignee rows live in event_assignees (replacement
-              // semantics) - keep them in step with the columns, same as
-              // the create path.
-              if (Array.isArray(patch.assigned_to_names)) {
-                await db.saveEventAssignees(hit.id, req.householdId, patch.assigned_to_names, members);
-              }
-              executedActions.push({
-                type: 'event_updated',
-                event: {
+              const updatedEvents = [];
+              for (const hit of eventTargets) {
+                const patch = buildChatEventPatch(act, hit, userTz, members);
+                const updatedEvent = await db.updateCalendarEvent(hit.id, req.householdId, patch);
+                // Assignee rows live in event_assignees (replacement
+                // semantics) - keep them in step with the columns, same as
+                // the create path.
+                if (Array.isArray(patch.assigned_to_names)) {
+                  await db.saveEventAssignees(hit.id, req.householdId, patch.assigned_to_names, members);
+                }
+                updatedEvents.push({
                   id: hit.id,
                   title: patch.title || hit.title,
                   start_time: updatedEvent?.start_time ?? patch.start_time ?? hit.start_time,
                   end_time: updatedEvent?.end_time ?? patch.end_time ?? hit.end_time,
                   all_day: patch.all_day ?? hit.all_day ?? false,
                   location: patch.location ?? hit.location ?? null,
-                  recurrence: hit.recurrence || null,
+                  recurrence: patch.recurrence !== undefined ? patch.recurrence : (hit.recurrence || null),
                   assigned_to_names: patch.assigned_to_names || hit.assigned_to_names || [],
-                },
-              });
+                });
+              }
+              if (updatedEvents.length === 1) {
+                executedActions.push({ type: 'event_updated', event: updatedEvents[0] });
+              } else {
+                executedActions.push({ type: 'events_updated', count: updatedEvents.length, titles: updatedEvents.map((e) => e.title) });
+              }
             }
           }
 
@@ -889,6 +902,37 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           await db.addShoppingItemsWithDedupe(req.householdId, enriched, req.user.id, { overrideHint });
           executedActions.push({ type: 'add_shopping', count: act.items.length });
 
+        } else if (['complete_shopping_item', 'delete_shopping_item'].includes(act.action) && act.item) {
+          // Shopping list management from chat - three households asked to
+          // clear or tick off items and were told adding was all chat could
+          // do (2026-07/08 transcripts). Fuzzy match like the bot does;
+          // all_matching handles "remove all the juice".
+          const itemMatches = await db.findShoppingItemsByFuzzyName(req.householdId, act.item, { limit: 25 });
+          const itemVerb = act.action === 'complete_shopping_item' ? 'tick off' : 'remove';
+          if (itemMatches.length === 0) {
+            cleanContent += `\n\n⚠️ I couldn't find "${act.item}" on the shopping list, so nothing was changed.`;
+          } else if (itemMatches.length > 1 && !act.all_matching) {
+            const lines = itemMatches.slice(0, 5).map((i) => `• ${i.item}${i.quantity ? ` (x${i.quantity})` : ''}`);
+            cleanContent += `\n\n⚠️ I found ${itemMatches.length} items matching "${act.item}" - tell me which to ${itemVerb}, or say "all of them":\n${lines.join('\n')}`;
+          } else {
+            const targets = act.all_matching ? itemMatches : [itemMatches[0]];
+            if (act.action === 'complete_shopping_item') {
+              for (const i of targets) await db.completeShoppingItemById(i.id);
+              executedActions.push({ type: 'shopping_completed', count: targets.length, items: targets.map((i) => i.item) });
+            } else {
+              for (const i of targets) await db.deleteShoppingItem(i.id, req.householdId);
+              executedActions.push({ type: 'shopping_deleted', count: targets.length, items: targets.map((i) => i.item) });
+            }
+          }
+
+        } else if (act.action === 'clear_shopping') {
+          // mode 'completed' (default) clears ticked-off items; 'all' wipes
+          // the list. The model is prompted to use 'all' only when the user
+          // unambiguously asks for the whole list to go.
+          const mode = act.mode === 'all' ? 'all' : 'completed';
+          const { removed } = await db.clearShoppingItems(req.householdId, { mode });
+          executedActions.push({ type: 'shopping_cleared', mode, count: removed });
+
         } else if (act.action === 'fetch_weather') {
           // Location precedence for weather:
           //   1. An explicit place in the message ("weather in Brighton").
@@ -979,6 +1023,66 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
               assigned_to_names: savedRow?.assigned_to_names || [],
             },
           });
+
+        } else if (['complete_task', 'update_task', 'delete_task'].includes(act.action) && act.title) {
+          // Task management from chat. Before these actions existed the
+          // model could only apologise - a real household asked FIVE times
+          // to remove 13 stuck to-dos (2026-08-06 transcript) and got "I
+          // genuinely don't have a delete action for tasks" every time.
+          // all_matching covers the bulk case ("delete all of them",
+          // "move them all to Saturday").
+          const taskMatches = await db.findTasksByFuzzyTitle(req.householdId, act.title, {
+            assignedToName: act.assigned_to_name || null,
+            limit: 25,
+          });
+          const verb = act.action === 'complete_task' ? 'tick off' : act.action === 'delete_task' ? 'remove' : 'change';
+          if (taskMatches.length === 0) {
+            cleanContent += `\n\n⚠️ I couldn't find a task matching "${act.title}", so nothing was changed.`;
+          } else if (taskMatches.length > 1 && !act.all_matching) {
+            const lines = taskMatches.slice(0, 5).map((t) => `• ${t.title}${t.due_date ? ` (due ${t.due_date})` : ''}`);
+            cleanContent += `\n\n⚠️ I found ${taskMatches.length} tasks matching "${act.title}" - tell me which one to ${verb}, or say "all of them":\n${lines.join('\n')}`;
+          } else {
+            const targets = act.all_matching ? taskMatches : [taskMatches[0]];
+            if (act.action === 'complete_task') {
+              for (const t of targets) await db.completeTask(t.id);
+              executedActions.push({ type: 'tasks_completed', count: targets.length, titles: targets.map((t) => t.title) });
+            } else if (act.action === 'delete_task') {
+              for (const t of targets) await db.deleteTask(t.id, req.householdId);
+              executedActions.push({ type: 'tasks_deleted', count: targets.length, titles: targets.map((t) => t.title) });
+            } else {
+              // update_task: new_* fields carry only what changes. due_time
+              // is a wall-clock TIME column (no timezone conversion - same
+              // as the create path).
+              const patch = {};
+              if (act.new_title) patch.title = act.new_title;
+              if (act.new_due_date !== undefined && act.new_due_date !== null) patch.due_date = act.new_due_date;
+              if (act.new_due_time !== undefined && act.new_due_time !== null) patch.due_time = act.new_due_time;
+              if (act.new_recurrence !== undefined) patch.recurrence = act.new_recurrence;
+              if (Array.isArray(act.assigned_to_names)) {
+                const { ids, names } = db.resolveAssignees(act.assigned_to_names, members);
+                patch.assigned_to_ids = ids;
+                patch.assigned_to_names = names;
+              }
+              if (Object.keys(patch).length === 0) {
+                cleanContent += `\n\n⚠️ I couldn't work out what to change about "${targets[0].title}" - tell me the new date, time, or details.`;
+              } else {
+                const updatedTasks = [];
+                for (const t of targets) updatedTasks.push(await db.updateTask(t.id, req.householdId, patch));
+                executedActions.push({
+                  type: 'tasks_updated',
+                  count: targets.length,
+                  tasks: updatedTasks.map((t, i) => ({
+                    id: t?.id || targets[i].id,
+                    title: t?.title || targets[i].title,
+                    due_date: t?.due_date ?? null,
+                    due_time: t?.due_time ?? null,
+                    recurrence: t?.recurrence ?? null,
+                    assigned_to_names: t?.assigned_to_names || [],
+                  })),
+                });
+              }
+            }
+          }
 
         } else if (act.action === 'create_recipe') {
           // Generate and save recipe to Recipe Box

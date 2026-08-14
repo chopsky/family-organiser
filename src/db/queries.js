@@ -2313,6 +2313,20 @@ async function completeShoppingItemById(id, db = supabase) {
   return data;
 }
 
+// Bulk-clear the household's shopping list from chat ("clear the list",
+// "clear off what we've bought"). mode 'completed' removes only ticked-off
+// items; 'all' wipes open items too. Returns how many rows went.
+async function clearShoppingItems(householdId, { mode = 'completed' } = {}, db = supabase) {
+  let query = db
+    .from('shopping_items')
+    .delete()
+    .eq('household_id', householdId);
+  if (mode !== 'all') query = query.eq('completed', true);
+  const { data, error } = await query.select('id');
+  if (error) throw error;
+  return { removed: (data || []).length };
+}
+
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 // Resolve a list of member names to a parallel { ids, names } pair using
@@ -10420,6 +10434,7 @@ module.exports = {
   getAiUsageStats,
   getBotUserVisibleFailures,
   getAiCapabilityMisses,
+  clearShoppingItems,
   getRecentAiErrors,
   getAiUsageTimeline,
   logWhatsAppMessage,

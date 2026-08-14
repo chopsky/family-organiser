@@ -1585,6 +1585,10 @@ function buildEventUpdates(updates, existing, household, user) {
   if (updates.location !== undefined && updates.location !== null) patch.location = updates.location;
   if (updates.description !== undefined && updates.description !== null) patch.description = updates.description;
   if (updates.all_day !== undefined && updates.all_day !== null) patch.all_day = !!updates.all_day;
+  // The classify schema has always allowed updates.recurrence but this
+  // builder dropped it - "make the birthdays repeat yearly" earned an
+  // apology instead of an edit (real 2026-08-10 transcript).
+  if (updates.recurrence !== undefined && updates.recurrence !== null) patch.recurrence = updates.recurrence;
 
   // Reassign via names → parallel id + name arrays. The classifier emits
   // the full list of names the user mentioned; we resolve each against
