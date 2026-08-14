@@ -171,7 +171,17 @@ async function insertHolidaysForHousehold(householdId, countryCode, year, create
  * caller should skip holiday seeding for that household.
  */
 function resolveCountryCode(household) {
-  if (household?.country && household.country !== 'OTHER') return household.country;
+  if (household?.country === 'OTHER') {
+    // OTHER is the system saying "I don't know where this family lives".
+    // Never answer that with the timezone - it reflects wherever the
+    // phone was standing at signup, and guessing seeded 64 Spanish bank
+    // holidays onto a UK family's calendar (2026-08-10). No holidays is
+    // a shrug; the wrong country's is a support email.
+    return null;
+  }
+  if (household?.country) return household.country;
+  // Legacy rows from before the country column existed carry null -
+  // timezone is the only signal they ever had, so keep using it for them.
   return countryFromTimezone(household?.timezone);
 }
 
@@ -179,14 +189,15 @@ function resolveCountryCode(household) {
  * Called when a household is created. Inserts current + next year holidays.
  */
 async function seedHolidaysForNewHousehold(householdId, timezone, createdByUserId, country) {
-  // Prefer explicit country (passed from createHousehold caller), fall back
-  // to timezone. Same priority as resolveCountryCode but inlined because
-  // we don't have a household record to pass yet at seed time.
-  const countryCode =
-    (country && country !== 'OTHER' ? country : null) ||
-    countryFromTimezone(timezone);
+  // Seed strictly from the KNOWN country. OTHER (or absent) means the
+  // signup cascade couldn't tell where this family lives - never fall
+  // back to timezone here, it's a location signal not a home signal
+  // (the Maxine mis-country: Europe/Madrid seeded Spanish holidays for
+  // a UK household, 2026-08-10). They get holidays the moment they set
+  // their country in Settings (replace re-seed) instead.
+  const countryCode = country && country !== 'OTHER' ? country : null;
   if (!countryCode) {
-    console.log(`No country mapping for timezone "${timezone}" / country "${country}" - skipping holiday seed`);
+    console.log(`Country "${country}" (tz "${timezone}") - skipping holiday seed rather than guessing`);
     return;
   }
 
@@ -218,6 +229,26 @@ async function refreshHolidaysForAllHouseholds() {
   }
 }
 
+/**
+ * REPLACE re-seed for a country change: wipe the seeder-owned
+ * public_holiday events, then insert the new country's set (current +
+ * next year). Runs when a household corrects its country in Settings -
+ * the by-hand fix from the Maxine mis-country becomes one tap. OTHER
+ * wipes and seeds nothing (never guess).
+ */
+async function replaceHolidaysForHousehold(householdId, country, createdByUserId) {
+  const { removed } = await db.deletePublicHolidayEvents(householdId);
+  if (!country || country === 'OTHER') {
+    console.log(`Replaced holidays for ${householdId}: removed ${removed}, seeded 0 (country ${country})`);
+    return { removed, inserted: 0 };
+  }
+  const year = new Date().getFullYear();
+  const a = await insertHolidaysForHousehold(householdId, country, year, createdByUserId);
+  const b = await insertHolidaysForHousehold(householdId, country, year + 1, createdByUserId);
+  console.log(`Replaced holidays for ${householdId}: removed ${removed}, seeded ${a + b} (${country})`);
+  return { removed, inserted: a + b };
+}
+
 module.exports = {
   countryFromTimezone,
   resolveCountryCode,
@@ -225,4 +256,5 @@ module.exports = {
   insertHolidaysForHousehold,
   seedHolidaysForNewHousehold,
   refreshHolidaysForAllHouseholds,
+  replaceHolidaysForHousehold,
 };

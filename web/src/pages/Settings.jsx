@@ -20,6 +20,7 @@ import {
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin, IconStar,
 } from '../components/Icons';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
+import { SUPPORTED_COUNTRIES, COUNTRY_LABELS } from '../lib/country';
 import { readLocaleCookie } from '../hooks/useLocale';
 import { openWriteReview } from '../lib/appReview';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -481,6 +482,50 @@ export default function Settings() {
   const { enabled: childMode, enable: enableChildMode, disable: disableChildMode, pinIsSet } = useChildMode();
   const hasChildren = useHasChildren();
   const navigate = useNavigate();
+
+  // ── Country & time zone (Location section) ─────────────────────
+  // Self-serve correction for mis-detected signups. Draft state so the
+  // save button appears only when something actually changed; the server
+  // swaps the seeded public holidays when country changes.
+  const [localeDraft, setLocaleDraft] = useState({
+    country: household?.country || 'GB',
+    timezone: household?.timezone || 'Europe/London',
+  });
+  const [localeSaving, setLocaleSaving] = useState(false);
+  const [localeMsg, setLocaleMsg] = useState('');
+  const localeDirty = localeDraft.country !== (household?.country || 'GB')
+    || localeDraft.timezone !== (household?.timezone || 'Europe/London');
+  // A pragmatic zone list: every supported country's zones, plus whatever
+  // the household currently has so an exotic value never disappears from
+  // its own dropdown.
+  const timezoneOptions = [...new Set([
+    'Europe/London', 'Europe/Dublin',
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Toronto', 'America/Vancouver',
+    'Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', 'Australia/Perth',
+    'Pacific/Auckland', 'Africa/Johannesburg',
+    household?.timezone,
+    localeDraft.timezone,
+  ].filter(Boolean))];
+  async function saveLocale() {
+    setLocaleSaving(true); setLocaleMsg('');
+    try {
+      const { data } = await api.patch('/settings', { country: localeDraft.country, timezone: localeDraft.timezone });
+      updateHousehold({ country: localeDraft.country, timezone: localeDraft.timezone });
+      if (data?.holidaysReplaced) {
+        const { removed, inserted } = data.holidaysReplaced;
+        setLocaleMsg(inserted > 0
+          ? `Saved - swapped ${removed} public holidays for ${inserted} ${COUNTRY_LABELS[localeDraft.country]} ones.`
+          : `Saved - removed ${removed} public holidays.`);
+      } else {
+        setLocaleMsg('Saved.');
+      }
+    } catch (err) {
+      setLocaleMsg(err.response?.data?.error || 'Could not save - please try again.');
+    } finally {
+      setLocaleSaving(false);
+    }
+  }
 
   // ── Child Mode PIN management ──────────────────────────────────
   const [pinFormOpen, setPinFormOpen] = useState(false);
@@ -2468,6 +2513,58 @@ export default function Settings() {
               {requestingLocation ? 'Requesting…' : 'Use my location'}
             </button>
           )}
+        </div>
+
+        {/* Country & time zone - the self-serve fix for a mis-detected
+            signup (travelling signups used to become the holiday-country's
+            household with no way back but support). Changing country swaps
+            the seeded bank holidays wholesale on the server. */}
+        <div className="mt-6 border-t border-cream-border pt-5">
+          <p className="text-sm font-medium text-bark">Country &amp; time zone</p>
+          <p className="mt-1 text-sm text-cocoa">
+            These set your bank holidays, school features, and when the daily
+            brief arrives. If you signed up while travelling, correct them
+            here - your calendar's public holidays are swapped automatically.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="settings-country" className="block text-xs font-semibold text-cocoa mb-1">Country</label>
+              <select
+                id="settings-country"
+                value={localeDraft.country}
+                onChange={(e) => setLocaleDraft((d) => ({ ...d, country: e.target.value }))}
+                className="w-full h-11 rounded-xl border border-cream-border bg-white px-3 text-sm text-bark"
+              >
+                {SUPPORTED_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="settings-timezone" className="block text-xs font-semibold text-cocoa mb-1">Time zone</label>
+              <select
+                id="settings-timezone"
+                value={localeDraft.timezone}
+                onChange={(e) => setLocaleDraft((d) => ({ ...d, timezone: e.target.value }))}
+                className="w-full h-11 rounded-xl border border-cream-border bg-white px-3 text-sm text-bark"
+              >
+                {timezoneOptions.map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {localeDirty && (
+            <button
+              type="button"
+              onClick={saveLocale}
+              disabled={localeSaving}
+              className="mt-3 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {localeSaving ? 'Saving…' : 'Save country & time zone'}
+            </button>
+          )}
+          {localeMsg && <p className="mt-2 text-sm text-cocoa">{localeMsg}</p>}
         </div>
       </SectionWrapper>
 

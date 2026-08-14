@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
-import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../lib/country';
+import { detectCountryFromTimezone, detectCountryFromLocaleCookie, detectCountryFromLocaleRegion } from '../lib/country';
 import { readLocaleCookie } from '../hooks/useLocale';
 import { getStorefrontCountry } from '../lib/revenuecat';
 import ErrorBanner from '../components/ErrorBanner';
@@ -61,8 +61,12 @@ export default function SetupHousehold() {
       // experience. Cookie wins over timezone because the marketing
       // site IS the source of truth for what region a web visitor
       // signed up for.
+      // Device language region sits between storefront and cookie: it
+      // travels with the person (en-GB on holiday in Spain), where the
+      // timezone travels with the trip.
       const country =
         (await getStorefrontCountry())
+        || detectCountryFromLocaleRegion()
         || detectCountryFromLocaleCookie(readLocaleCookie())
         || detectCountryFromTimezone(timezone);
       const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country });

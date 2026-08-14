@@ -77,6 +77,41 @@ export function detectCountryFromLocaleCookie(localeCode) {
 }
 
 /**
+ * Country code from the device's language settings (en-GB → GB). Sits
+ * SECOND in the signup cascade, ahead of the locale cookie and timezone,
+ * because language settings travel with the person, not the trip: a UK
+ * phone reports en-GB on a sun lounger in Marbella, while its timezone
+ * says Europe/Madrid. That exact combination mis-countried a real UK
+ * household as OTHER and seeded Spanish bank holidays (2026-08-10).
+ *
+ * Only returns a country we actually support; any other region (es-ES,
+ * fr-FR…) returns null so the deliberate marketing-page cookie (/za
+ * visit) and the timezone fallback still get their say.
+ */
+const LOCALE_REGION_MAP = { GB: 'GB', UK: 'GB', IE: 'IE', US: 'US', CA: 'CA', AU: 'AU', NZ: 'NZ', ZA: 'ZA' };
+
+export function detectCountryFromLocaleRegion(languages) {
+  const list = Array.isArray(languages) && languages.length
+    ? languages
+    : (typeof navigator !== 'undefined'
+      ? (navigator.languages?.length ? navigator.languages : [navigator.language])
+      : []);
+  for (const tag of list || []) {
+    if (!tag || typeof tag !== 'string') continue;
+    let region = null;
+    try {
+      region = new Intl.Locale(tag).region || null;
+    } catch {
+      continue; // malformed language tag
+    }
+    if (!region) continue;
+    const mapped = LOCALE_REGION_MAP[region.toUpperCase()];
+    if (mapped) return mapped;
+  }
+  return null;
+}
+
+/**
  * Best-effort country code from the browser's timezone. Used as a
  * fallback when no locale cookie is set (visitor signing up directly
  * via /signup without touching a marketing page first, or visiting

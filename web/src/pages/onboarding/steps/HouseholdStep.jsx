@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../../../lib/api';
-import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../../../lib/country';
+import {
+  detectCountryFromTimezone, detectCountryFromLocaleCookie, detectCountryFromLocaleRegion,
+  SUPPORTED_COUNTRIES, COUNTRY_LABELS,
+} from '../../../lib/country';
 import { readLocaleCookie } from '../../../hooks/useLocale';
 import { getStorefrontCountry } from '../../../lib/revenuecat';
 import { Title, Em, Kicker, Lead, PrimaryButton, Segmented } from './_ui';
 import { inputStyle, labelStyle } from './_styles';
+
+// Flag emoji from an ISO code (regional indicator pairs); OTHER gets a globe.
+function flagFor(code) {
+  if (!code || code === 'OTHER') return '🌍';
+  return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 0x1F1A5 + c.charCodeAt(0)));
+}
 
 // Step 5. Name a new household or join an existing one by code. Mirrors
 // SetupHousehold.jsx (same endpoints + country cascade), but keeps the user in
@@ -14,8 +23,41 @@ export default function HouseholdStep({ auth, form, update, next, setError }) {
   const [name, setName] = useState(form.hhName || '');
   const [joinCode, setJoinCode] = useState(form.joinCode || '');
   const [loading, setLoading] = useState(false);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
+  // Detected country + whether the signals disagreed (signing up away from
+  // home). Detection runs on mount so the confirmation line can render
+  // BEFORE the user submits; a travelling signup sees "Setting you up for
+  // the UK · change" instead of silently becoming a Spanish household
+  // (the Maxine mis-country, 2026-08-10).
+  const [country, setCountry] = useState(form.hhCountry || null);
+  const [mismatch, setMismatch] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Cascade by how well each signal survives travel: Apple ID
+      // storefront (home), device language region (home), marketing-page
+      // cookie (deliberate), timezone (wherever the phone is standing).
+      const detected =
+        (await getStorefrontCountry())
+        || detectCountryFromLocaleRegion()
+        || detectCountryFromLocaleCookie(readLocaleCookie())
+        || detectCountryFromTimezone(timezone);
+      if (cancelled) return;
+      setCountry((prev) => prev || detected);
+      setMismatch(detected !== detectCountryFromTimezone(timezone));
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function switchMode(m) { if (m !== mode) { setMode(m); update({ hhMode: m }); setError(''); } }
+
+  function pickCountry(code) {
+    setCountry(code);
+    update({ hhCountry: code });
+    setShowPicker(false);
+  }
 
   async function createHousehold(e) {
     e.preventDefault();
@@ -23,14 +65,8 @@ export default function HouseholdStep({ auth, form, update, next, setError }) {
     if (!name.trim()) { setError('Please give your household a name.'); return; }
     setLoading(true);
     try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
-      // Same authoritative cascade as SetupHousehold: storefront > locale cookie
-      // > timezone (see that file for the full rationale).
-      const country =
-        (await getStorefrontCountry())
-        || detectCountryFromLocaleCookie(readLocaleCookie())
-        || detectCountryFromTimezone(timezone);
-      const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country });
+      const chosen = country || detectCountryFromTimezone(timezone);
+      const { data } = await api.post('/auth/create-household', { name: name.trim(), timezone, country: chosen });
       update({ hhName: name.trim() });
       auth.login(data);
       next();
@@ -76,6 +112,46 @@ export default function HouseholdStep({ auth, form, update, next, setError }) {
         <form onSubmit={createHousehold} style={{ textAlign: 'left' }}>
           <label htmlFor="ob-hh-name" style={labelStyle}>Household name</label>
           <input id="ob-hh-name" type="text" value={name} onChange={(e) => { setName(e.target.value); update({ hhName: e.target.value }); }} placeholder="e.g. The Carters" autoFocus style={inputStyle} />
+
+          {/* Country confirmation: always shown once detected (one glance when
+              we're right, one tap when we're wrong), with the full picker on
+              "change". Especially load-bearing when mismatch is true - the
+              user is signing up away from home. */}
+          {country && (
+            <div style={{ marginTop: 12, fontSize: 13, color: 'var(--color-warm-grey)', lineHeight: 1.5 }}>
+              {showPicker ? (
+                <div>
+                  <label htmlFor="ob-hh-country" style={{ ...labelStyle, marginBottom: 6 }}>Country</label>
+                  <select
+                    id="ob-hh-country"
+                    value={country}
+                    onChange={(e) => pickCountry(e.target.value)}
+                    style={{ ...inputStyle, height: 44 }}
+                  >
+                    {SUPPORTED_COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span>
+                  Setting you up for {country === 'OTHER' ? 'your country' : COUNTRY_LABELS[country]} {flagFor(country)}
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(true)}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--color-plum, #6B3FA0)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    change
+                  </button>
+                  {mismatch && country !== 'OTHER' && (
+                    <span> — looks like you're travelling, so we've used your home country.</span>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+
           <PrimaryButton type="submit" disabled={loading || !name.trim()} style={{ marginTop: 18 }}>
             {loading ? 'Creating…' : 'Create household'}
           </PrimaryButton>

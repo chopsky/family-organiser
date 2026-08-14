@@ -2313,6 +2313,21 @@ async function completeShoppingItemById(id, db = supabase) {
   return data;
 }
 
+// Hard-delete the seeder-owned public-holiday events for a household -
+// the wipe half of the replace re-seed that runs when a household's
+// country changes. Scoped to category 'public_holiday' so user events
+// are untouchable from this path.
+async function deletePublicHolidayEvents(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('calendar_events')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('category', 'public_holiday')
+    .select('id');
+  if (error) throw error;
+  return { removed: (data || []).length };
+}
+
 // Bulk-clear the household's shopping list from chat ("clear the list",
 // "clear off what we've bought"). mode 'completed' removes only ticked-off
 // items; 'all' wipes open items too. Returns how many rows went.
@@ -10460,6 +10475,7 @@ module.exports = {
   getBotUserVisibleFailures,
   getAiCapabilityMisses,
   clearShoppingItems,
+  deletePublicHolidayEvents,
   getRecentAiErrors,
   getAiUsageTimeline,
   logWhatsAppMessage,

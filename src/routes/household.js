@@ -173,8 +173,27 @@ router.patch('/settings', requireAuth, requireHousehold, requireAdmin, async (re
   }
 
   try {
+    // A country CHANGE swaps the seeded public holidays wholesale - the
+    // old add-only seed endpoint left the wrong country's bank holidays
+    // behind, which had to be repaired by hand (the Maxine mis-country,
+    // 2026-08-10). Compare before writing so a no-op save doesn't churn
+    // the calendar.
+    const before = updates.country !== undefined
+      ? await db.getHouseholdById(req.householdId)
+      : null;
     const updated = await db.updateHouseholdSettings(req.householdId, updates);
-    return res.json({ household: publicHousehold(updated) });
+    let holidaysReplaced = null;
+    if (before && updates.country !== before.country) {
+      try {
+        const { replaceHolidaysForHousehold } = require('../services/publicHolidays');
+        holidaysReplaced = await replaceHolidaysForHousehold(req.householdId, updates.country, req.user.id);
+      } catch (seedErr) {
+        // The settings change itself succeeded - don't fail the save over
+        // a Nager API blip; the December refresh (or a re-save) heals it.
+        console.error('PATCH /api/settings holiday re-seed failed:', seedErr.message);
+      }
+    }
+    return res.json({ household: publicHousehold(updated), holidaysReplaced });
   } catch (err) {
     console.error('PATCH /api/settings error:', err);
     return res.status(500).json({ error: 'Internal server error' });

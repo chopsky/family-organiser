@@ -93,6 +93,12 @@ export function iapKeyPresent() {
 }
 
 let _configured = false;
+// The in-flight configure() promise. getStorefrontCountry() awaits this
+// (briefly) instead of racing it: configure() is fired-and-forgotten from
+// main.jsx, and a fast signup reached the household step before the SDK
+// was ready - Purchases.getStorefront() threw, was swallowed, and a real
+// UK Apple ID produced country null (the Maxine mis-country, 2026-08-10).
+let _configurePromise = null;
 
 /**
  * Initialise the RevenueCat SDK. Idempotent - safe to call multiple
@@ -125,7 +131,8 @@ export async function configure() {
 
   try {
     console.log('[revenuecat] calling Purchases.configure...');
-    await Purchases.configure({ apiKey });
+    _configurePromise = Purchases.configure({ apiKey });
+    await _configurePromise;
     _configured = true;
     console.log('[revenuecat] configured ✓');
   } catch (err) {
@@ -151,6 +158,16 @@ export async function configure() {
 export async function getStorefrontCountry() {
   if (!isIapPlatform()) return null;
   try {
+    // Wait for the boot-time configure() to finish (capped so signup can
+    // never hang on it) - calling getStorefront on an unconfigured SDK
+    // throws, which used to read as "no storefront" for real Apple IDs.
+    if (_configurePromise && !_configured) {
+      await Promise.race([
+        _configurePromise.catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+    }
+    if (!_configured) return null;
     const { countryCode } = await Purchases.getStorefront();
     if (typeof countryCode !== 'string' || countryCode.length !== 2) return null;
     return countryCode.toUpperCase();

@@ -21,7 +21,7 @@ import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { detectCountryFromTimezone, detectCountryFromLocaleCookie } from '../../lib/country';
+import { detectCountryFromTimezone, detectCountryFromLocaleCookie, detectCountryFromLocaleRegion } from '../../lib/country';
 import { readLocaleCookie } from '../../hooks/useLocale';
 import { getStorefrontCountry } from '../../lib/revenuecat';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
@@ -94,6 +94,7 @@ export default function useV4Auth(d) {
       try {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London';
         const country = (await getStorefrontCountry())
+          || detectCountryFromLocaleRegion()
           || detectCountryFromLocaleCookie(readLocaleCookie())
           || detectCountryFromTimezone(timezone);
         const res = await api.post('/auth/create-household', { name: wanted, timezone, country });
