@@ -1309,12 +1309,15 @@ router.post('/:schoolId/import-pdf/preview', requireAuth, requireHousehold, requ
     return res.status(400).json({ error: 'No file uploaded.' });
   }
   // Cheap MIME sanity check. Multer's fileFilter would be the canonical
-  // spot but inline here keeps the route self-contained — there's only
-  // one type we accept.
+  // spot but inline here keeps the route self-contained. The web picker
+  // offers ".pdf,image/jpeg,image/png" - the server must honour the same
+  // list (it used to reject the images the UI invited, real support
+  // complaint 2026-08-14: a parent photographed the term-dates letter).
   const mime = req.file.mimetype || '';
   const looksLikePdf = mime === 'application/pdf' || req.file.originalname?.toLowerCase().endsWith('.pdf');
-  if (!looksLikePdf) {
-    return res.status(400).json({ error: 'Please upload a PDF file (got ' + (mime || 'unknown type') + ').' });
+  const looksLikeImage = /^image\/(jpeg|png|heic|heif|webp)$/i.test(mime);
+  if (!looksLikePdf && !looksLikeImage) {
+    return res.status(400).json({ error: 'Please upload a PDF or a photo (JPEG/PNG) of the term dates (got ' + (mime || 'unknown type') + ').' });
   }
 
   try {
@@ -1324,13 +1327,24 @@ router.post('/:schoolId/import-pdf/preview', requireAuth, requireHousehold, requ
 
     let pageText;
     try {
-      const pdfData = await pdfParse(req.file.buffer);
-      pageText = (pdfData.text || '').trim().substring(0, 16000);
+      if (looksLikeImage) {
+        // Photo of the letter: vision transcription instead of pdf-parse.
+        const { transcribeScannedDocument } = require('../services/document-extract');
+        pageText = (await transcribeScannedDocument(req.file.buffer, mime)).substring(0, 16000);
+      } else {
+        const pdfData = await pdfParse(req.file.buffer);
+        pageText = (pdfData.text || '').trim().substring(0, 16000);
+        if (!pageText.replace(/\s/g, '')) {
+          // Scanned PDF with no text layer - same vision fallback.
+          const { transcribeScannedDocument } = require('../services/document-extract');
+          pageText = (await transcribeScannedDocument(req.file.buffer, 'application/pdf')).substring(0, 16000);
+        }
+      }
     } catch (pdfErr) {
-      return res.status(400).json({ error: `Could not read the PDF: ${pdfErr.message}` });
+      return res.status(400).json({ error: `Could not read the ${looksLikeImage ? 'image' : 'PDF'}: ${pdfErr.message}` });
     }
     if (pageText.length < 50) {
-      return res.status(400).json({ error: 'The PDF appears to contain no extractable text. It may be a scanned image — add term dates manually instead.' });
+      return res.status(400).json({ error: `The ${looksLikeImage ? 'photo' : 'PDF'} didn't contain readable term dates — try a clearer ${looksLikeImage ? 'photo' : 'copy'}, or add term dates manually instead.` });
     }
 
     console.log('[import-pdf] Extracted', pageText.length, 'chars from upload', req.file.originalname);

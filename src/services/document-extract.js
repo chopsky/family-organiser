@@ -33,6 +33,32 @@ function isPlainText(mime) { return /^text\//i.test(mime || ''); }
  * @param {string} mediaType - the MIME type (Twilio MediaContentType0)
  * @returns {Promise<{text: string, kind: 'pdf'|'docx'|'text'}>}
  */
+// Vision cap: Claude accepts large requests, but a base64 blow-up on a
+// huge scan is wasted money - anything bigger than this gets the honest
+// "couldn't read it" instead.
+const MAX_VISION_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Read a scanned document (image-only PDF, or a photo of a letter) with
+ * the vision model and return its text verbatim. This is what turns
+ * "I couldn't read that PDF, send a screenshot instead" (real complaint,
+ * 2026-08-14) into it just working: pdf-parse only reads text LAYERS,
+ * and most school letters arrive as scans that have none.
+ */
+async function transcribeScannedDocument(buffer, mediaType) {
+  const { callClaude } = require('./ai-client');
+  const isImage = /^image\//i.test(mediaType || '');
+  const block = isImage
+    ? { type: 'image', source: { type: 'base64', media_type: mediaType, data: buffer.toString('base64') } }
+    : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buffer.toString('base64') } };
+  const { text } = await callClaude({
+    system: 'You transcribe documents. Output every piece of text in the attached document verbatim as plain text, preserving line breaks and reading order. No commentary, no summarising, no markdown - transcription only. If a word is illegible, write [?].',
+    messages: [{ role: 'user', content: [block, { type: 'text', text: 'Transcribe this document.' }] }],
+    maxTokens: 8192,
+  });
+  return (text || '').trim();
+}
+
 async function extractTextFromDocument(buffer, mediaType) {
   if (!buffer || buffer.length === 0) {
     throw new Error('The document came through empty. Please try sending it again.');
@@ -63,9 +89,19 @@ async function extractTextFromDocument(buffer, mediaType) {
   // Emptiness check strips ALL whitespace, but we return the original
   // (whitespace-preserving) text so line/section structure survives for
   // the extractor - a fixture sheet's layout carries meaning.
-  const clean = (text || '').trim();
+  let clean = (text || '').trim();
+  if (!clean.replace(/\s/g, '') && kind === 'pdf' && buffer.length <= MAX_VISION_BYTES) {
+    // No text layer = a scanned PDF. Read it with vision before giving
+    // up - bouncing parents to "send a screenshot instead" was a real
+    // support complaint (2026-08-14).
+    try {
+      clean = await transcribeScannedDocument(buffer, 'application/pdf');
+    } catch (visionErr) {
+      console.warn('[document-extract] vision transcription failed:', visionErr.message);
+    }
+  }
   if (!clean.replace(/\s/g, '')) {
-    throw new Error("I opened the document but couldn't find any readable text in it (it may be a scanned image). Try sending it as a photo instead, or paste the text.");
+    throw new Error("I opened the document but couldn't find any readable text in it. Try sending it as a photo instead, or paste the text.");
   }
   // Guard against pathological inputs - the extraction feeds an LLM
   // prompt, so cap the size. 20k chars is comfortably more than any
@@ -83,4 +119,4 @@ function isSupportedDocument(mediaType) {
     || /application\/(msword|vnd\.openxmlformats)/i.test(mediaType || '');
 }
 
-module.exports = { extractTextFromDocument, isSupportedDocument };
+module.exports = { extractTextFromDocument, isSupportedDocument, transcribeScannedDocument };

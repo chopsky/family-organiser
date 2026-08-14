@@ -1,6 +1,5 @@
 const { Router } = require('express');
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { CHAT_ASSISTANT_SYSTEM, CHAT_ASSISTANT_CONTEXT } = require('../services/prompts');
@@ -1245,24 +1244,22 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
     // events / tasks / shopping items. The classifier returns the same
     // shape the text-chat endpoint above already knows how to act on.
     if (req.file.mimetype === 'application/pdf') {
+      // Shared document extractor: text-layer PDFs parse directly, and
+      // SCANNED PDFs fall back to vision transcription instead of the old
+      // "send a screenshot instead" dead end (real support complaint,
+      // 2026-08-14 - a photographed school letter saved as PDF).
       let pdfText = '';
       try {
-        const parsed = await pdfParse(req.file.buffer);
-        pdfText = (parsed.text || '').trim();
+        const { extractTextFromDocument } = require('../services/document-extract');
+        const extracted = await extractTextFromDocument(req.file.buffer, 'application/pdf');
+        pdfText = extracted.text;
       } catch (err) {
-        console.error('[chat/image] pdfParse failed:', err.message);
-        const errorMsg = "📄 I couldn't read that PDF. The file might be scanned or password-protected — try saving it as a normal PDF (File → Save As → PDF) and re-attaching.";
+        console.error('[chat/image] PDF extraction failed:', err.message);
+        const errorMsg = `📄 ${err.message || "I couldn't read that PDF - try sending it as a photo instead."}`;
         await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
         await db.saveChatMessage(req.householdId, req.user.id, 'assistant', errorMsg, conversationId);
         await db.touchConversation(conversationId);
         return res.json({ message: errorMsg, conversation_id: conversationId });
-      }
-      if (!pdfText) {
-        const emptyMsg = "📄 That PDF didn't have any readable text. If it's a scanned document, try opening it on your phone and using the camera to scan it as a photo instead — I can read images directly.";
-        await db.saveChatMessage(req.householdId, req.user.id, 'user', '📄 [Sent a PDF]', conversationId);
-        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', emptyMsg, conversationId);
-        await db.touchConversation(conversationId);
-        return res.json({ message: emptyMsg, conversation_id: conversationId });
       }
 
       const currentUser = members.find(m => m.id === req.user.id);
