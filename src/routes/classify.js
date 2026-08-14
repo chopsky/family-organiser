@@ -178,14 +178,21 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         // complete task + add event in the same turn).
         if (result.calendar_event) {
           const ev = result.calendar_event;
+          // The classifier emits local wall-clock times - convert through
+          // the household timezone. The old bare-Z suffix stamped the
+          // wall-clock as UTC, shifting every timed quick-add an hour
+          // during BST (same family of bug as the email-forward and
+          // pasted-schedule paths, fixed 2026-08-14).
+          const { localToUTC } = require('../utils/local-time');
+          const evTz = householdRow?.timezone || 'Europe/London';
           const eventData = {
             title: ev.title,
             start_time: ev.all_day
               ? `${ev.date}T00:00:00Z`
-              : `${ev.date}T${ev.start_time || '00:00'}:00Z`,
+              : localToUTC(ev.date, ev.start_time || '00:00', evTz),
             end_time: ev.all_day
               ? `${ev.date}T23:59:59Z`
-              : ev.end_time ? `${ev.date}T${ev.end_time}:00Z` : null,
+              : ev.end_time ? localToUTC(ev.date, ev.end_time, evTz) : null,
             all_day: ev.all_day || false,
             description: ev.description || null,
             location: ev.location || null,

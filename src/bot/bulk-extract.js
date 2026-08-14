@@ -97,10 +97,17 @@ async function applyExtraction(extraction, user, household) {
         const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
         const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
         const firstAssignee = assigneeIds.length > 0 ? members.find(m => m.id === assigneeIds[0]) : null;
-        // AI emits local times - store without Z so the app reads them in
-        // the household timezone (same as manually-created events).
-        const startTime = ev.all_day ? `${ev.date}T00:00:00` : `${ev.date}T${ev.start_time || '09:00'}:00`;
-        const endTime = ev.all_day ? `${ev.date}T23:59:59` : `${ev.date}T${ev.end_time || ev.start_time || '10:00'}:00`;
+        // AI emits local wall-clock times; start_time is a timestamptz
+        // column, so a naive string is read as UTC - during BST that put
+        // every pasted-schedule appointment an hour late (Maxine's dog
+        // groomer, 2026-08-14; identical bug to the email-forward path
+        // fixed in 567c146). Convert through the household timezone like
+        // the chat/bot create paths do. All-day keeps the naive
+        // date-only convention.
+        const { localToUTC } = require('../utils/local-time');
+        const tz = household.timezone || 'Europe/London';
+        const startTime = ev.all_day ? `${ev.date}T00:00:00` : localToUTC(ev.date, ev.start_time || '09:00', tz);
+        const endTime = ev.all_day ? `${ev.date}T23:59:59` : localToUTC(ev.date, ev.end_time || ev.start_time || '10:00', tz);
         const created = await db.createCalendarEvent(household.id, {
           title: ev.title,
           start_time: startTime,
