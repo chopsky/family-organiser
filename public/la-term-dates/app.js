@@ -172,6 +172,28 @@
       return frag;
     }
 
+    // POST /import with {slug} runs one authority synchronously and returns
+    // the outcome. This was always wired to the button below but never
+    // defined - the admin re-import click threw a ReferenceError.
+    async function reimport(slug, btn) {
+      btn.disabled = true; btn.textContent = 'Re-importing…';
+      try {
+        const r = await fetch(`${API}/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-import-key': ADMIN_KEY },
+          body: JSON.stringify({ slug }),
+        });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+        delete detailCache[slug];
+        btn.textContent = '✓ Re-imported';
+        loadStats(); load();
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '↻ Re-import this authority';
+        alert(`Re-import failed: ${e.message}`);
+      }
+    }
+
     async function toggleCard(li, head, body) {
       const open = li.getAttribute('aria-expanded') === 'true';
       if (open) {
@@ -240,16 +262,92 @@
       $('pager').hidden = false;
     }
 
-    // ── Events ─────────────────────────────────────────────────────────────
-    $('search').addEventListener('input', (e) => {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => { state.search = e.target.value.trim(); state.page = 1; load(); }, 300);
-    });
-    $('region').addEventListener('change', (e) => { state.region = e.target.value; state.page = 1; load(); });
-    $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
-    $('next').addEventListener('click', () => { state.page++; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    // ── Public directory view ──────────────────────────────────────────────
+    // Without ?key= this page is the SEO-facing directory. The server has
+    // already rendered every imported council as a plain <a> link (crawlers
+    // and no-JS visitors get exactly that), so this layer only adds
+    // client-side filtering - it must never replace the links with the
+    // import dashboard, which is what used to strand visitors here with no
+    // route through to the council pages.
+    async function publicView() {
+      const list = $('list');
+      let items = Array.from(list.querySelectorAll('li.card'));
 
-    if (ADMIN_KEY) setOnly($('adminFlag'), el('span', { class: 'admin-flag', text: 'admin mode' }));
-    loadStats();
-    load();
+      // Opened as a bare static file, or the server-side injection failed:
+      // rebuild the same plain links from the public API (paged, capped 100).
+      if (!items.length) {
+        try {
+          for (let page = 1; page <= 3; page++) {
+            const d = await fetch(`${API}/authorities?page=${page}&pageSize=100`).then((r) => r.json());
+            for (const a of d.rows || []) {
+              if (!['ok', 'partial'].includes(a.import_status)) continue;
+              const li = el('li', { class: 'card', 'data-name': a.name.toLowerCase(), 'data-region': a.region || '' },
+                el('a', { class: 'card-head', style: 'text-decoration:none', href: `/school-term-dates/${encodeURIComponent(a.slug)}` },
+                  el('span', { class: 'card-title' },
+                    el('span', { class: 'name', text: a.name }),
+                    el('span', { class: 'sub', text: `${a.region ? `${a.region} · ` : ''}term dates, half terms & INSET days` }),
+                  ),
+                  el('span', { class: 'chev', 'aria-hidden': 'true', text: '›' }),
+                ));
+              list.append(li);
+            }
+            if (!d.rows || d.rows.length < 100) break;
+          }
+          items = Array.from(list.querySelectorAll('li.card'));
+        } catch (e) { /* leave whatever is there */ }
+      }
+
+      const box = $('stats');
+      clear(box);
+      box.append(chip('', 'Councils covered', items.length, null));
+      fetch(`${API}/stats`).then((r) => r.json())
+        .then((s) => { if (s && s.dateCount) box.append(chip('ok', 'Dates tracked', s.dateCount.toLocaleString('en-GB'), null)); })
+        .catch(() => {});
+
+      // Cached copies of the server HTML from before the data-* attributes
+      // shipped: fall back to the visible name; hide the region filter.
+      const nameOf = (li) => (li.dataset.name || (li.querySelector('.name') || {}).textContent || '').toLowerCase();
+      if (!items.some((li) => li.dataset.region)) $('region').hidden = true;
+
+      const noMatchWhy = el('span');
+      const noMatch = el('li', { class: 'empty', hidden: true },
+        el('div', { class: 'big', text: 'No councils found' }), noMatchWhy);
+      list.append(noMatch);
+
+      function apply() {
+        const q = ($('search').value || '').trim().toLowerCase();
+        const region = $('region').value;
+        let shown = 0;
+        for (const li of items) {
+          const hit = (!q || nameOf(li).includes(q)) && (!region || li.dataset.region === region);
+          li.hidden = !hit;
+          if (hit) shown++;
+        }
+        noMatch.hidden = shown > 0;
+        noMatchWhy.textContent = q ? `Nothing matches "${q}".` : 'Try clearing the region filter.';
+        $('metaLine').textContent = q || region
+          ? `Showing ${shown} of ${items.length} councils`
+          : `${items.length} councils, A to Z — click one for its term dates`;
+      }
+      $('search').addEventListener('input', apply);
+      $('region').addEventListener('change', apply);
+      apply();
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────
+    if (!ADMIN_KEY) {
+      publicView();
+    } else {
+      // Operator import dashboard - exactly the old behaviour, key-holders only.
+      setOnly($('adminFlag'), el('span', { class: 'admin-flag', text: 'admin mode' }));
+      $('search').addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { state.search = e.target.value.trim(); state.page = 1; load(); }, 300);
+      });
+      $('region').addEventListener('change', (e) => { state.region = e.target.value; state.page = 1; load(); });
+      $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+      $('next').addEventListener('click', () => { state.page++; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      loadStats();
+      load();
+    }
   

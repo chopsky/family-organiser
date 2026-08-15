@@ -130,7 +130,7 @@ router.get('/', async (req, res, next) => {
     const authorities = await laDb.listAllAuthorities();
     const items = authorities
       .filter((a) => ['ok', 'partial'].includes(a.import_status))
-      .map((a) => `<li class="card"><a class="card-head" style="text-decoration:none" href="/school-term-dates/${esc(a.slug)}"><span class="card-title"><span class="name">${esc(a.name)}</span><span class="sub">School term dates ${esc(a.name)}</span></span></a></li>`)
+      .map((a) => `<li class="card" data-name="${esc(a.name.toLowerCase())}" data-region="${esc(a.region || '')}"><a class="card-head" style="text-decoration:none" href="/school-term-dates/${esc(a.slug)}"><span class="card-title"><span class="name">${esc(a.name)}</span><span class="sub">${esc(a.region ? `${a.region} · ` : '')}term dates, half terms &amp; INSET days</span></span><span class="chev" aria-hidden="true">›</span></a></li>`)
       .join('');
     // Server-inject the crawlable list; app.js replaces it on load.
     const injected = html.replace(

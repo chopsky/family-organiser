@@ -204,8 +204,8 @@ async function listAllAuthorities({ onlyPending = false, onlyStale = false, slug
   // newer than the base table, so we degrade gracefully if it isn't migrated.
   const build = (withAttempts) => {
     const cols = withAttempts
-      ? 'id, name, slug, import_status, source_url, import_attempts'
-      : 'id, name, slug, import_status, source_url';
+      ? 'id, name, slug, region, import_status, source_url, import_attempts'
+      : 'id, name, slug, region, import_status, source_url';
     let query = supabase.from('la_directory').select(cols).order('name', { ascending: true });
     if (slugs && slugs.length) query = query.in('slug', slugs);
     if (onlyPending) query = query.eq('import_status', 'pending');
