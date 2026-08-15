@@ -13,6 +13,7 @@ const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
 const { runDbHealthCheck } = require('./db-health-monitor');
+const { runTrialExpirySweep } = require('./trial-expiry-sweep');
 const { runCaptureOpenerCheck } = require('./capture-openers');
 const { runSetupNudgeCheck } = require('./setup-nudges');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
@@ -725,6 +726,12 @@ function startScheduler() {
   // stopped working. See src/jobs/db-health-monitor.js for the alert policy.
   cron.schedule('*/2 * * * *', () => runDbHealthCheck());
   console.log('✓ DB health monitor started (probes every 2 minutes)');
+
+  // Daily bookkeeping: flip overdue trials to 'expired' so admin counts and
+  // cohort queries stay truthful. Access control is NOT waiting on this -
+  // the subscriptionStatus middleware 402s overdue trials at request time.
+  cron.schedule('45 3 * * *', () => runTrialExpirySweep());
+  console.log('✓ Trial expiry sweep scheduled (daily 03:45)');
 
   // ── Daily reminders: check every minute ─────────────────────────────────────
   cron.schedule('* * * * *', () => runDailyReminderCheck());
