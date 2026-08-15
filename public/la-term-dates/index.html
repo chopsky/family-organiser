@@ -167,6 +167,13 @@
     .prose h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: var(--plum); margin: 30px 0 10px; letter-spacing: -0.01em; }
     .prose h3 { font-size: 16px; font-weight: 600; color: var(--charcoal); margin: 20px 0 4px; }
     .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 10px; }
+    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--light-grey); }
+    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
+    .site-footer .tag { font-size: 13.5px; color: var(--warm-grey); max-width: 62ch; margin: 0 0 10px; }
+    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    .site-footer nav a { color: var(--plum); text-decoration: none; font-weight: 600; }
+    .site-footer nav a:hover { text-decoration: underline; }
+    .site-footer .copy { font-size: 12px; color: var(--warm-grey); margin: 0; }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     @media (max-width: 520px) { td.date-col { width: auto; display: block; } table.dates td { padding: 5px 0; } }
   </style>
@@ -228,6 +235,22 @@
       <h3>Which parts of the UK does this directory cover?</h3>
       <p>The 176 local education authorities across England and Wales - the bodies that publish term dates this way. Scotland and Northern Ireland set school holidays through separate systems, so their dates are not listed here yet.</p>
     </section>
+
+    <footer class="site-footer">
+      <a href="https://housemait.com" aria-label="Housemait - family organiser app">
+        <img src="/school-term-dates/housemait-logo.svg" alt="Housemait" width="160" height="26" loading="lazy" />
+      </a>
+      <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with
+        school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
+      <nav>
+        <a href="https://housemait.com">Family organiser app</a>
+        <a href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+        <a href="https://housemait.com/support">Support</a>
+        <a href="https://housemait.com/privacy">Privacy</a>
+        <a href="https://housemait.com/terms">Terms</a>
+      </nav>
+      <p class="copy">© 2026 Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
+    </footer>
   </div>
 
   <script src="app.js"></script>

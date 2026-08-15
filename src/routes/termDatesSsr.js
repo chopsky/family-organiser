@@ -274,6 +274,14 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
     .prose { margin-top: 34px; }
     .prose h3 { font-size: 16px; font-weight: 600; margin: 20px 0 4px; }
     .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 8px; }
+    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
+    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
+    .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
+    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    .site-footer nav a { color: #6B3FA0; text-decoration: none; font-weight: 600; }
+    .site-footer nav a:hover { text-decoration: underline; }
+    .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
+
     @media (max-width: 520px) { td.d { width: auto; } }
   </style>
 </head>
@@ -290,6 +298,21 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
       <p class="sub" style="margin:6px 0 0">Housemait puts term dates, school events and after-school activities on a shared family calendar — with reminders that pause in the holidays.</p>
       <a class="btn" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
+    <footer class="site-footer">
+      <a href="https://housemait.com" aria-label="Housemait - family organiser app">
+        <img src="/school-term-dates/housemait-logo.svg" alt="Housemait" width="160" height="26" loading="lazy" />
+      </a>
+      <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with
+        school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
+      <nav>
+        <a href="https://housemait.com">Family organiser app</a>
+        <a href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+        <a href="https://housemait.com/support">Support</a>
+        <a href="https://housemait.com/privacy">Privacy</a>
+        <a href="https://housemait.com/terms">Terms</a>
+      </nav>
+      <p class="copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
+    </footer>
   </div>
 </body>
 </html>`;

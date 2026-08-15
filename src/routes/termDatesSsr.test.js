@@ -138,6 +138,15 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.text).not.toContain('October half term');            // fact missing -> question dropped
   });
 
+
+  it('links back to housemait.com from every council page (footer)', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.text).toContain('class="site-footer"');
+    expect(res.text).toContain('href="https://housemait.com"');
+    expect(res.text).toContain('housemait-logo.svg');
+    expect(res.text).toContain('© ');
+  });
+
   it('never-imported councils fall through rather than render empty pages', async () => {
     laDb.getAuthorityBySlug.mockResolvedValue({ id: 'x', name: 'Nevershire', slug: 'nevershire', import_status: 'pending' });
     const res = await request(app()).get('/school-term-dates/nevershire');
