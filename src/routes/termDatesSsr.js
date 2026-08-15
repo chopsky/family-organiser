@@ -225,6 +225,70 @@ function buildCouncilContent(authority, years) {
   return { contentHtml, faqLd };
 }
 
+// ── .ics download: the council's dates as an importable calendar snapshot ──
+// Deliberately a STATIC file, not a live webcal feed: the page's upsell line
+// is "changes added later won't reach this download - Housemait keeps them
+// updated", and that stays honest only if the file really is a snapshot.
+
+const icsEscape = (t) => String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+// RFC 5545 folds lines at 75 octets; our lines are short but council labels
+// aren't under our control, so fold defensively.
+function icsFold(line) {
+  const bytes = Buffer.from(line, 'utf8');
+  if (bytes.length <= 74) return line;
+  const parts = [];
+  let start = 0;
+  while (start < bytes.length) {
+    let end = Math.min(start + 74, bytes.length);
+    while (end > start && end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--; // don't split UTF-8
+    parts.push(bytes.slice(start, end).toString('utf8'));
+    start = end;
+  }
+  return parts.join('\r\n ');
+}
+
+const icsDate = (iso) => iso.replace(/-/g, '');
+function icsDayAfter(iso) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+function buildIcs(authority, entries) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const pageUrl = `${CANONICAL_BASE}/${authority.slug}`;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Housemait//School Term Dates//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsEscape(`${authority.name} school term dates`)}`,
+    'X-WR-TIMEZONE:Europe/London',
+  ];
+  for (const e of entries) {
+    if (!e.date) continue;
+    const label = e.label || TYPE_LABEL[e.event_type] || e.event_type;
+    lines.push(
+      'BEGIN:VEVENT',
+      // Stable per (council, type, date): re-downloading upgrades events
+      // in place instead of duplicating them.
+      `UID:${authority.slug}-${e.event_type}-${e.date}@housemait.com`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${icsDate(e.date)}`,
+      `DTEND;VALUE=DATE:${icsDayAfter(e.end_date || e.date)}`,
+      `SUMMARY:${icsEscape(`${label} — ${authority.name} schools`)}`,
+      `DESCRIPTION:${icsEscape(`${authority.name} council's published calendar, via ${pageUrl}. This download is a snapshot - dates added or changed later won't appear in it.`)}`,
+      `URL:${pageUrl}`,
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT',
+    );
+  }
+  lines.push('END:VCALENDAR');
+  return lines.map(icsFold).join('\r\n') + '\r\n';
+}
+
 /** Shared shell for the per-entity pages - same brand vocabulary as the app. */
 function detailPage({ title, description, canonicalPath, h1, sub, years, extraHtml = '', contentHtml = '', jsonLd, faqLd = null, slugForCta = '' }) {
   const yearBlocks = years.map(({ year, dates }) => `
@@ -274,6 +338,12 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
     .prose { margin-top: 34px; }
     .prose h3 { font-size: 16px; font-weight: 600; margin: 20px 0 4px; }
     .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 8px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
+    .actions a.pill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border: 1.5px solid #E8E5EC; border-radius: 21px; background: #fff; color: #6B3FA0; font-weight: 600; font-size: 13.5px; text-decoration: none; transition: border-color .2s ease-out; }
+    .actions a.pill:hover { border-color: #6B3FA0; }
+    .actions svg { flex-shrink: 0; }
+    .ics-note { font-size: 12.5px; color: #6B6774; margin: 0 0 24px; max-width: 62ch; }
+    .ics-note a { color: #6B3FA0; font-weight: 600; }
     .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
     .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
     .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
@@ -290,6 +360,17 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
     <nav class="crumb"><a href="/school-term-dates/">← All UK school term dates</a></nav>
     <h1>${esc(h1)}</h1>
     <p class="sub">${esc(sub)}</p>
+    ${slugForCta ? `
+    <div class="actions">
+      <a class="pill" href="/school-term-dates/${esc(slugForCta)}/term-dates.ics" download>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+        Add to your calendar</a>
+      <a class="pill" href="https://wa.me/?text=${encodeURIComponent(`${h1} - ${CANONICAL_BASE}/${slugForCta}`)}" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.5.1-.2.2-.6.8-.7.9-.1.1-.3.2-.5.1a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.4-1.7c-.1-.2 0-.4.1-.5l.4-.4c.1-.2.2-.3.2-.5s0-.3 0-.5c-.1-.1-.5-1.3-.7-1.8-.2-.4-.4-.4-.5-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1.1 2.7a11 11 0 0 0 4.2 3.7c.6.3 1 .4 1.4.5.6.2 1.1.2 1.5.1.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2 0-.1-.2-.2-.4-.3Z"/></svg>
+        Share on WhatsApp</a>
+    </div>
+    <p class="ics-note">The download is a snapshot — INSET days and changes added later won't reach your
+      calendar. <a href="https://housemait.com/signup?src=termdates-ics">Housemait keeps them updated automatically</a>.</p>` : ''}
     ${yearBlocks || '<p class="sub">No term dates published yet.</p>'}
     ${extraHtml}
     ${contentHtml}
@@ -387,6 +468,24 @@ router.get('/schools/:slug', (req, res) => {
 });
 
 // ── Per-council page ───────────────────────────────────────────────────────
+router.get('/:slug/term-dates.ics', async (req, res, next) => {
+  try {
+    if (!SLUG_RE.test(req.params.slug)) return next();
+    const authority = await laDb.getAuthorityBySlug(req.params.slug);
+    if (!authority || !['ok', 'partial'].includes(authority.import_status)) return next();
+    const entries = await laDb.getEntriesForLA(authority.id);
+    if (!entries.length) return next();
+    res
+      .set('Cache-Control', CACHE_HEADER)
+      .set('Content-Disposition', `attachment; filename="${authority.slug}-term-dates.ics"`)
+      .type('text/calendar; charset=utf-8')
+      .send(buildIcs(authority, entries));
+  } catch (err) {
+    console.error('[term-dates-ssr] ics failed:', err.message);
+    next();
+  }
+});
+
 router.get('/:slug', async (req, res, next) => {
   try {
     if (!SLUG_RE.test(req.params.slug)) return next();

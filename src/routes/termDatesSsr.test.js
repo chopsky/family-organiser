@@ -153,3 +153,62 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('GET /school-term-dates/:slug/term-dates.ics', () => {
+  beforeEach(() => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-10-26', end_date: '2026-10-30', label: 'Half term; with, chars' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-12-21', end_date: '2026-12-31', label: 'Christmas holiday' },
+    ]);
+  });
+
+  it('serves a valid all-day calendar with exclusive DTEND', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire/term-dates.ics');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/calendar');
+    expect(res.headers['content-disposition']).toContain('hertfordshire-term-dates.ics');
+    expect(res.text).toMatch(/^BEGIN:VCALENDAR\r\n/);
+    expect(res.text.trim().endsWith('END:VCALENDAR')).toBe(true);
+    // single day: DTEND is the next day (exclusive per RFC 5545)
+    expect(res.text).toContain('DTSTART;VALUE=DATE:20260901');
+    expect(res.text).toContain('DTEND;VALUE=DATE:20260902');
+    // range ending 30 Oct -> DTEND 31 Oct; range ending 31 Dec -> DTEND 1 Jan (rollover)
+    expect(res.text).toContain('DTEND;VALUE=DATE:20261031');
+    expect(res.text).toContain('DTEND;VALUE=DATE:20270101');
+  });
+
+  it('escapes council text and keeps UIDs stable for re-downloads', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire/term-dates.ics');
+    expect(res.text).toContain('Half term\\; with\\, chars');
+    expect(res.text).toContain('UID:hertfordshire-term_start-2026-09-01@housemait.com');
+  });
+
+  it('404s for never-imported councils and bad slugs', async () => {
+    laDb.getAuthorityBySlug.mockResolvedValue({ id: 'x', name: 'Nevershire', slug: 'nevershire', import_status: 'pending' });
+    expect((await request(app()).get('/school-term-dates/nevershire/term-dates.ics')).status).toBe(404);
+    expect((await request(app()).get('/school-term-dates/UPPER!/term-dates.ics')).status).toBe(404);
+  });
+});
+
+describe('council page action buttons', () => {
+  beforeEach(() => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+    ]);
+  });
+
+  it('offers the .ics download, the WhatsApp share, and the tagged upsell', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.text).toContain('href="/school-term-dates/hertfordshire/term-dates.ics"');
+    expect(res.text).toContain('https://wa.me/?text=');
+    expect(res.text).toContain(encodeURIComponent('https://housemait.com/school-term-dates/hertfordshire'));
+    expect(res.text).toContain('https://housemait.com/signup?src=termdates-ics');
+  });
+});
