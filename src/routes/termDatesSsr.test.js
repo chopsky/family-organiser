@@ -83,6 +83,11 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     });
     laDb.getEntriesForLA.mockResolvedValue([
       { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-10-26', end_date: '2026-10-30', label: 'Half term holiday' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-12-21', end_date: '2027-01-01', label: 'Christmas holiday' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2027-02-15', end_date: '2027-02-19', label: 'Half term holiday' },
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2027-03-26', end_date: '2027-04-09', label: 'Easter holiday' },
+      { academic_year: '2026-2027', event_type: 'term_end', date: '2027-07-23', end_date: null, label: 'End of term' },
     ]);
   });
 
@@ -97,6 +102,40 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.text).toContain('og:image');
     expect(res.text).toContain('https://housemait.com/school-term-dates/og-share.png');
     expect(res.text).toContain('summary_large_image');
+  });
+
+
+  it('renders unique data-driven prose, not just tables', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    // The intro derives from the council's own dates and school count
+    expect(res.text).toContain('About Hertfordshire school term dates');
+    expect(res.text).toContain('pupils return on Tue 1 Sep 2026');
+    // FAQ answers are the actual dates, month-classified
+    expect(res.text).toContain('When is October half term in Hertfordshire in 2026?');
+    expect(res.text).toContain('Mon 26 Oct 2026 – Fri 30 Oct 2026');
+    expect(res.text).toContain('When do Hertfordshire schools break up for summer in 2027?');
+  });
+
+  it('emits FAQPage structured data matching the visible questions', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    const m = res.text.match(/<script type="application\/ld\+json">({"@context":"https:\/\/schema.org","@type":"FAQPage".*?})<\/script>/);
+    expect(m).toBeTruthy();
+    const ld = JSON.parse(m[1]);
+    expect(ld.mainEntity.length).toBeGreaterThanOrEqual(6);
+    const names = ld.mainEntity.map((q) => q.name);
+    expect(names).toContain('When do Hertfordshire schools go back in September 2026?');
+    // every structured question appears as visible page copy too
+    for (const q of names) expect(res.text).toContain(q.replace(/&/g, '&amp;'));
+  });
+
+  it('degrades to fewer questions when a council has sparse data', async () => {
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+    ]);
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('go back in September 2026');       // fact exists -> question stays
+    expect(res.text).not.toContain('October half term');            // fact missing -> question dropped
   });
 
   it('never-imported councils fall through rather than render empty pages', async () => {

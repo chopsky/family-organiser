@@ -15,6 +15,7 @@
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Are these school term dates official?", "acceptedAnswer": {"@type": "Answer", "text": "Yes - every page is built from the relevant council's own published term-date calendar, with a link to the source at the bottom. We re-check each council monthly. Your school's own published dates are always the final word, since individual schools can add INSET days or vary the odd date."}}, {"@type": "Question", "name": "Why do neighbouring councils have different term dates?", "acceptedAnswer": {"@type": "Answer", "text": "Each local authority consults on and sets its own calendar, so two councils a few miles apart can place half term or the Easter break a week apart. It usually comes down to how they fit 190 teaching days around bank holidays and local traditions - and it is why families near a council boundary should always check the right council, not the nearest one."}}, {"@type": "Question", "name": "Do academies, free schools and private schools follow these dates?", "acceptedAnswer": {"@type": "Answer", "text": "Not automatically. Council term dates formally apply to community and voluntary-controlled schools. Academies, free schools and foundation schools set their own calendars - though most stay close to the council's to keep life simple for families - and independent schools run noticeably different, usually longer, holidays. Always confirm with the school itself."}}, {"@type": "Question", "name": "What is an INSET day?", "acceptedAnswer": {"@type": "Answer", "text": "An in-service training day: the school is open for staff but closed to pupils. Every state school in England and Wales takes five a year, chosen by the school rather than the council - which is why they rarely appear in council calendars and catch so many families out. Schools confirm them in newsletters, usually a term at a time."}}, {"@type": "Question", "name": "Which parts of the UK does this directory cover?", "acceptedAnswer": {"@type": "Answer", "text": "The 176 local education authorities across England and Wales - the bodies that publish term dates this way. Scotland and Northern Ireland set school holidays through separate systems, so their dates are not listed here yet."}}]}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK School Term & Holiday Dates","description":"Term dates for every UK local education authority and parent-verified independent schools, refreshed monthly.","url":"https://housemait.com/school-term-dates/","creator":{"@type":"Organization","name":"Housemait","url":"https://housemait.com"}}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -162,6 +163,10 @@
     .empty .big { font-family: 'Recoleta', serif; font-size: 26px; color: var(--charcoal); margin-bottom: 6px; }
     .admin-flag { display: inline-block; background: var(--plum-light); color: var(--plum); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 8px; margin-left: 8px; }
 
+    .prose { margin-top: 44px; max-width: 68ch; }
+    .prose h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: var(--plum); margin: 30px 0 10px; letter-spacing: -0.01em; }
+    .prose h3 { font-size: 16px; font-weight: 600; color: var(--charcoal); margin: 20px 0 4px; }
+    .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 10px; }
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
     @media (max-width: 520px) { td.date-col { width: auto; display: block; } table.dates td { padding: 5px 0; } }
   </style>
@@ -195,6 +200,34 @@
       <span class="where" id="where"></span>
       <button id="next" type="button">Next →</button>
     </div>
+
+    <section class="prose">
+      <h2>How school term dates work in the UK</h2>
+      <p>Term dates are set locally, not nationally. Each local education authority publishes a calendar for the
+        community and voluntary-controlled schools in its area, shaped around 190 teaching days, bank holidays and
+        local consultation - which is why the school year starts on a Tuesday in one county and a Thursday in the
+        next. Academies and free schools technically set their own dates, though most stay within a day or two of
+        their council's pattern.</p>
+      <p>Councils usually publish a year or more ahead: most confirm the following September's dates by the previous
+        autumn, and Welsh authorities coordinate more closely with each other than English ones do. Every page in
+        this directory is rebuilt from the council's own published calendar and re-checked monthly, with a link to
+        the original source at the bottom.</p>
+      <p>The dates families actually get caught out by are usually not in the council calendar at all: INSET days
+        are picked school by school, and the odd school shifts a term boundary. That is why the calendar on the
+        school newsletter - and the one on your fridge - matters as much as the official list.</p>
+
+      <h2>Common questions</h2>
+      <h3>Are these school term dates official?</h3>
+      <p>Yes - every page is built from the relevant council's own published term-date calendar, with a link to the source at the bottom. We re-check each council monthly. Your school's own published dates are always the final word, since individual schools can add INSET days or vary the odd date.</p>
+      <h3>Why do neighbouring councils have different term dates?</h3>
+      <p>Each local authority consults on and sets its own calendar, so two councils a few miles apart can place half term or the Easter break a week apart. It usually comes down to how they fit 190 teaching days around bank holidays and local traditions - and it is why families near a council boundary should always check the right council, not the nearest one.</p>
+      <h3>Do academies, free schools and private schools follow these dates?</h3>
+      <p>Not automatically. Council term dates formally apply to community and voluntary-controlled schools. Academies, free schools and foundation schools set their own calendars - though most stay close to the council's to keep life simple for families - and independent schools run noticeably different, usually longer, holidays. Always confirm with the school itself.</p>
+      <h3>What is an INSET day?</h3>
+      <p>An in-service training day: the school is open for staff but closed to pupils. Every state school in England and Wales takes five a year, chosen by the school rather than the council - which is why they rarely appear in council calendars and catch so many families out. Schools confirm them in newsletters, usually a term at a time.</p>
+      <h3>Which parts of the UK does this directory cover?</h3>
+      <p>The 176 local education authorities across England and Wales - the bodies that publish term dates this way. Scotland and Northern Ireland set school holidays through separate systems, so their dates are not listed here yet.</p>
+    </section>
   </div>
 
   <script src="app.js"></script>
