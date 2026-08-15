@@ -25,6 +25,7 @@ async function runTrialExpirySweep() {
       .from('households')
       .select('id, trial_ends_at')
       .eq('subscription_status', 'trialing')
+      .eq('is_internal', false)   // middleware never applies status logic to internal rows; neither do we
       .is('trial_paused_at', null)
       .lt('trial_ends_at', new Date().toISOString());
     if (error) throw error;

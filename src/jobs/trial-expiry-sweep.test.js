@@ -35,6 +35,7 @@ describe('runTrialExpirySweep', () => {
     const out = await runTrialExpirySweep();
     expect(out).toEqual({ flipped: 0, failed: 0 });
     expect(sel.eq).toHaveBeenCalledWith('subscription_status', 'trialing');
+    expect(sel.eq).toHaveBeenCalledWith('is_internal', false);
     expect(sel.is).toHaveBeenCalledWith('trial_paused_at', null);
     expect(sel.lt).toHaveBeenCalledWith('trial_ends_at', expect.any(String));
   });
