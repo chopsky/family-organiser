@@ -74,3 +74,34 @@ describe('GET /school-term-dates/ (SSR index)', () => {
     expect(res.status).toBe(404); // fell through, didn't crash
   });
 });
+
+describe('GET /school-term-dates/:slug (council page)', () => {
+  beforeEach(() => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire',
+      region: 'England', import_status: 'ok', source_url: 'https://www.hertfordshire.gov.uk/term-dates',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+    ]);
+  });
+
+  it('CTA carries the acquisition tag and the council through to signup', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('href="https://housemait.com/signup?src=termdates&amp;la=hertfordshire"');
+  });
+
+  it('serves a share image so WhatsApp/Facebook previews render a card', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.text).toContain('og:image');
+    expect(res.text).toContain('https://housemait.com/school-term-dates/og-share.png');
+    expect(res.text).toContain('summary_large_image');
+  });
+
+  it('never-imported councils fall through rather than render empty pages', async () => {
+    laDb.getAuthorityBySlug.mockResolvedValue({ id: 'x', name: 'Nevershire', slug: 'nevershire', import_status: 'pending' });
+    const res = await request(app()).get('/school-term-dates/nevershire');
+    expect(res.status).toBe(404);
+  });
+});

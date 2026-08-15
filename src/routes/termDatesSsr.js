@@ -53,7 +53,7 @@ function groupByYear(entries) {
 }
 
 /** Shared shell for the per-entity pages - same brand vocabulary as the app. */
-function detailPage({ title, description, canonicalPath, h1, sub, years, extraHtml = '', jsonLd }) {
+function detailPage({ title, description, canonicalPath, h1, sub, years, extraHtml = '', jsonLd, slugForCta = '' }) {
   const yearBlocks = years.map(({ year, dates }) => `
     <section>
       <h2>${esc(year)}</h2>
@@ -74,6 +74,11 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
   <meta property="og:description" content="${esc(description)}" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="${CANONICAL_BASE}${canonicalPath}" />
+  <meta property="og:image" content="https://housemait.com/school-term-dates/og-share.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   <style>
     @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
@@ -105,7 +110,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
     <div class="cta">
       <strong>Get these dates on your family calendar.</strong>
       <p class="sub" style="margin:6px 0 0">Housemait puts term dates, school events and after-school activities on a shared family calendar — with reminders that pause in the holidays.</p>
-      <a class="btn" href="https://housemait.com/gb">Try Housemait free</a>
+      <a class="btn" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
   </div>
 </body>
@@ -198,6 +203,7 @@ router.get('/:slug', async (req, res, next) => {
       title,
       description,
       canonicalPath: `/${authority.slug}`,
+      slugForCta: authority.slug,
       h1: `${authority.name} school term dates`,
       sub: `Council-published term and holiday dates for schools in ${authority.name}${authority.region ? ` (${authority.region})` : ''}. Academies and independents may differ — check with your school.`,
       years,

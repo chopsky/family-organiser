@@ -30,6 +30,7 @@ import AuthHeader from '../../components/AuthHeader';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
 import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
+import { resolveTermDatesLa, readTermDatesLa, laDisplayName } from '../../lib/termDatesLa';
 import WelcomeNotifications from './steps/WelcomeNotifications';
 import AccountStep from './steps/AccountStep';
 import HouseholdStep from './steps/HouseholdStep';
@@ -115,6 +116,7 @@ export default function OnboardingFlow() {
     accName: '',
     promoCode: resolveSignupPromo(searchParams),
     signupSource: resolveSignupSource(searchParams),
+    termDatesLa: resolveTermDatesLa(searchParams),
     hhMode: 'new', hhName: '', joinCode: '',
     invited: [],
     calProvider: null, calUrl: '',
@@ -184,7 +186,9 @@ export default function OnboardingFlow() {
       console.error('[onboarding] mark-onboarded failed:', err?.response?.data?.error || err.message);
     } finally {
       clearStoredStep();
-      navigate('/dashboard');
+      // Came from a council term-dates page: land where they can finish that
+      // job (School screen reads + clears the same stored tag).
+      navigate(readTermDatesLa() ? '/school' : '/dashboard');
     }
   };
 
@@ -286,7 +290,7 @@ function renderStep(key, ctx) {
     case 'get-app':
       return <GetAppStep next={ctx.next} />;
     case 'finish':
-      return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} userId={ctx.auth.user?.id} invited={ctx.form.invited} finishing={ctx.finishing} onFinish={ctx.finish} />;
+      return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} userId={ctx.auth.user?.id} invited={ctx.form.invited} termDatesLaName={laDisplayName(ctx.form.termDatesLa)} finishing={ctx.finishing} onFinish={ctx.finish} />;
     default:
       return null;
   }

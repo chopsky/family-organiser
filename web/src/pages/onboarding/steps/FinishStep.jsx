@@ -7,7 +7,7 @@ const initialOf = (s) => (s || '?').trim().charAt(0).toUpperCase() || '?';
 
 // Step 9. Personalised wrap-up: the first name, the household, the people just
 // added. The button marks onboarding complete and lands on the dashboard.
-export default function FinishStep({ firstName, householdName, userId, invited = [], finishing, onFinish }) {
+export default function FinishStep({ firstName, householdName, userId, invited = [], termDatesLaName = '', finishing, onFinish }) {
   // The avatar stack must reflect the REAL household (you + everyone added),
   // not the in-memory invited list - that list is lost across the email-verify
   // round trip / a reload / a different device, which left only "you" showing
@@ -42,9 +42,11 @@ export default function FinishStep({ firstName, householdName, userId, invited =
       <Title>You're ready, <Em>{firstName}.</Em></Title>
 
       <p style={{ fontSize: 15, color: 'var(--color-cocoa)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 380 }}>
-        {householdName
-          ? <><strong style={{ color: 'var(--color-charcoal)' }}>{householdName}</strong> is live. Add your first task, list item or event, and everyone you invited sees it the moment they sign in.</>
-          : <>Your household is live. Add your first task, list item or event, and everyone you invited sees it the moment they sign in.</>}
+        {termDatesLaName
+          ? <>{householdName ? <strong style={{ color: 'var(--color-charcoal)' }}>{householdName}</strong> : 'Your household'} is live. Next: add your school and the {termDatesLaName} term dates you were reading drop straight onto the family calendar.</>
+          : householdName
+            ? <><strong style={{ color: 'var(--color-charcoal)' }}>{householdName}</strong> is live. Add your first task, list item or event, and everyone you invited sees it the moment they sign in.</>
+            : <>Your household is live. Add your first task, list item or event, and everyone you invited sees it the moment they sign in.</>}
       </p>
 
       <div style={{ display: 'flex', justifyContent: 'center', margin: '22px 0 4px' }}>
@@ -57,7 +59,7 @@ export default function FinishStep({ firstName, householdName, userId, invited =
       </div>
 
       <PrimaryButton onClick={onFinish} disabled={finishing} style={{ marginTop: 26 }}>
-        {finishing ? 'Taking you in…' : 'Go to dashboard →'}
+        {finishing ? 'Taking you in…' : termDatesLaName ? 'Add your school dates →' : 'Go to dashboard →'}
       </PrimaryButton>
     </div>
   );

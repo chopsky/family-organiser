@@ -18,6 +18,7 @@ import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { ACTIVITY_ICONS, iconFor } from '../lib/activityIcons';
 import useHasChildren from '../hooks/useHasChildren';
+import { readTermDatesLa, clearTermDatesLa, laDisplayName } from '../lib/termDatesLa';
 
 // Soft warm sand for inset chips / day pills (shared literal across the
 // redesigned pages - no exact theme token for this neutral).
@@ -70,6 +71,10 @@ export default function School() {
 
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  // Council handoff from the public term-dates pages (/signup?la=...):
+  // greet the job they arrived with, and stop once it's done or dismissed.
+  const [laHandoff, setLaHandoff] = useState(() => readTermDatesLa() || '');
+  const dismissLaHandoff = () => { clearTermDatesLa(); setLaHandoff(''); };
 
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
@@ -563,6 +568,7 @@ export default function School() {
       const fresh = await api.get('/schools').then(r => r.data.schools || []);
       setHouseholdSchools(fresh);
       setAddSchoolOpen(false);
+      if (laHandoff) dismissLaHandoff();   // council handoff fulfilled
       const newSchool = fresh.find(s => s.id === createdId) || reuseSchool;
       if (newSchool?.id) openUpdateTermDates(newSchool);
     } catch (err) {
@@ -649,12 +655,24 @@ export default function School() {
   }
 
   // ── Teaser: no dependent children yet ──────────────────────────────
+  const laBanner = laHandoff ? (
+    <div className="flex items-start gap-3 bg-plum-light text-plum rounded-xl px-4 py-3">
+      <IconCalendar className="h-4 w-4 shrink-0 mt-0.5" />
+      <p className="text-sm min-w-0 flex-1">
+        You were reading <span className="font-semibold">{laDisplayName(laHandoff)}</span> term
+        dates — add your school below and they&apos;ll drop straight onto the family calendar.
+      </p>
+      <button onClick={dismissLaHandoff} aria-label="Dismiss" className="shrink-0 font-semibold hover:opacity-70">×</button>
+    </div>
+  ) : null;
+
   // Sell the feature instead of showing empty scaffolding; the CTA takes
   // the user to Family to add their children first.
   if (!hasChildren) {
     return (
       <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
         <PageHeader title="School" />
+        {laBanner}
         <div className="bg-white rounded-[18px] border border-light-grey p-6 md:p-8" style={{ boxShadow: CARD_SHADOW }}>
           <div className="w-[52px] h-[52px] rounded-[15px] flex items-center justify-center mb-4 bg-plum-light text-plum">
             <IconGraduation className="h-7 w-7" />
@@ -699,6 +717,7 @@ export default function School() {
         )}
       />
 
+      {laBanner}
       <ErrorBanner message={error} onDismiss={() => setError('')} />
       {success && (
         <p className="text-sm text-sage bg-sage-light rounded-xl px-3 py-2">{success}</p>
