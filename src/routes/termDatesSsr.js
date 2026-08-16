@@ -485,8 +485,8 @@ function buildNearbyHtml(authority, allLive) {
   if (pick.length < 6) takeCyclic(others);
   if (!pick.length) return '';
   return `
-    <nav class="nearby" aria-label="Nearby councils">
-      <h2>Term dates for nearby councils</h2>
+    <nav class="nearby" aria-label="More council term dates">
+      <h2>More UK council term dates</h2>
       <div class="nearby-grid">
         ${pick.map((a) => `<a href="/school-term-dates/${esc(a.slug)}">${esc(a.name)}</a>`).join('\n        ')}
       </div>

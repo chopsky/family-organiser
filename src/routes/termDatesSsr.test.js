@@ -97,7 +97,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.text).toContain('href="https://housemait.com/signup?src=termdates&amp;la=hertfordshire"');
   });
 
-  it('cross-links nearby councils (cyclic same-region mesh), skipping dead pages and itself', async () => {
+  it('cross-links other councils (cyclic mesh), skipping dead pages and itself', async () => {
     laDb.listAllAuthorities.mockResolvedValue([
       { name: 'Barnet', slug: 'barnet', region: 'England', import_status: 'ok' },
       { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok' },
@@ -107,7 +107,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     ]);
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('Term dates for nearby councils');
+    expect(res.text).toContain('More UK council term dates');
     // Cyclic window starts after Hertfordshire alphabetically: Kent, Surrey, wraps to Barnet.
     expect(res.text).toContain('href="/school-term-dates/kent"');
     expect(res.text).toContain('href="/school-term-dates/surrey"');
@@ -120,7 +120,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     laDb.listAllAuthorities.mockRejectedValue(new Error('db down'));
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.status).toBe(200);
-    expect(res.text).not.toContain('Term dates for nearby councils');
+    expect(res.text).not.toContain('More UK council term dates');
   });
 
   it('serves a share image so WhatsApp/Facebook previews render a card', async () => {
