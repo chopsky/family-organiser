@@ -97,6 +97,32 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.text).toContain('href="https://housemait.com/signup?src=termdates&amp;la=hertfordshire"');
   });
 
+  it('cross-links nearby councils (cyclic same-region mesh), skipping dead pages and itself', async () => {
+    laDb.listAllAuthorities.mockResolvedValue([
+      { name: 'Barnet', slug: 'barnet', region: 'England', import_status: 'ok' },
+      { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok' },
+      { name: 'Kent', slug: 'kent', region: 'England', import_status: 'ok' },
+      { name: 'Luton', slug: 'luton', region: 'England', import_status: 'failed' }, // dead → never linked
+      { name: 'Surrey', slug: 'surrey', region: 'England', import_status: 'partial' },
+    ]);
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Term dates for nearby councils');
+    // Cyclic window starts after Hertfordshire alphabetically: Kent, Surrey, wraps to Barnet.
+    expect(res.text).toContain('href="/school-term-dates/kent"');
+    expect(res.text).toContain('href="/school-term-dates/surrey"');
+    expect(res.text).toContain('href="/school-term-dates/barnet"');
+    expect(res.text).not.toContain('href="/school-term-dates/luton"'); // failed import
+    expect(res.text).not.toContain('href="/school-term-dates/hertfordshire"'); // not itself
+  });
+
+  it('renders the page without a nearby block when the sibling fetch fails', async () => {
+    laDb.listAllAuthorities.mockRejectedValue(new Error('db down'));
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('Term dates for nearby councils');
+  });
+
   it('serves a share image so WhatsApp/Facebook previews render a card', async () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.text).toContain('og:image');

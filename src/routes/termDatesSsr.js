@@ -458,6 +458,43 @@ function buildIcs(authority, entries) {
 }
 
 /**
+ * "Nearby councils" cross-links: a cyclic window of six same-region
+ * siblings (alphabetical, wrapping past Z), topped up from the full A–Z
+ * list when a region is small. The cyclic window is the point: every
+ * council page RECEIVES ~6 in-links as well as giving 6, instead of a
+ * whole region piling its links onto the alphabetical head. Before this,
+ * each of the ~176 council pages had exactly one internal in-link (the
+ * index list), which is why Search Console parked 173 of them in
+ * "Discovered – currently not indexed" — a mesh gives Google a crawl
+ * path into every page from any entry point.
+ */
+function buildNearbyHtml(authority, allLive) {
+  const others = allLive.filter((a) => a.slug !== authority.slug);
+  if (!others.length) return '';
+  const pick = [];
+  const takeCyclic = (list) => {
+    if (!list.length) return;
+    let start = list.findIndex((a) => a.name.localeCompare(authority.name) > 0);
+    if (start === -1) start = 0;
+    for (let k = 0; k < list.length && pick.length < 6; k++) {
+      const cand = list[(start + k) % list.length];
+      if (!pick.some((p) => p.slug === cand.slug)) pick.push(cand);
+    }
+  };
+  takeCyclic(others.filter((a) => a.region && a.region === authority.region));
+  if (pick.length < 6) takeCyclic(others);
+  if (!pick.length) return '';
+  return `
+    <nav class="nearby" aria-label="Nearby councils">
+      <h2>Term dates for nearby councils</h2>
+      <div class="nearby-grid">
+        ${pick.map((a) => `<a href="/school-term-dates/${esc(a.slug)}">${esc(a.name)}</a>`).join('\n        ')}
+      </div>
+      <p class="nearby-all"><a href="/school-term-dates/">Browse all UK councils →</a></p>
+    </nav>`;
+}
+
+/**
  * Google Analytics — same GA4 property as housemait.com (page paths keep the
  * microsite separable in reports). Consent Mode v2 with every signal denied
  * and NO consent banner here, so GA only ever sends cookieless, anonymised
@@ -524,7 +561,7 @@ const FOOTER_HTML = `
     </footer>`;
 
 /** The redesigned per-council page (design handoff: Council Term Dates). */
-function detailPage({ title, description, canonicalPath, h1, sub, years, contentHtml = '', jsonLd, faqLd = null, slugForCta = '', authority = null }) {
+function detailPage({ title, description, canonicalPath, h1, sub, years, contentHtml = '', nearbyHtml = '', jsonLd, faqLd = null, slugForCta = '', authority = null }) {
   const yearBlocks = years.map(buildYearCard).join('');
   const countdownHtml = authority ? buildCountdown(authority, years) : '';
   const srcDomain = authority && authority.source_url
@@ -582,6 +619,13 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6B3FA0; }
     .nc-unit { font-size: 12px; font-weight: 600; color: #6B3FA0; margin-top: 5px; }
 
+    .nearby { margin-top: 34px; }
+    .nearby h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 24px; color: #2D2A33; margin: 0 0 12px; }
+    .nearby-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .nearby-grid a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid #E8E5EC; font-size: 13.5px; font-weight: 600; color: #6B3FA0; text-decoration: none; }
+    .nearby-grid a:hover { border-color: #6B3FA0; }
+    .nearby-all { margin: 12px 0 0; font-size: 13.5px; }
+    .nearby-all a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 8px; }
     .btn-ics { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; background: #6B3FA0; color: #FFFFFF; font-weight: 600; font-size: 14px; text-decoration: none; }
     .btn-ics:hover { background: #5A3488; color: #FFFFFF; }
@@ -649,7 +693,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
       </div>
       <a class="btn-white" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
-    ${contentHtml}${FOOTER_HTML}
+    ${contentHtml}${nearbyHtml}${FOOTER_HTML}
   </div>
 </body>
 </html>`;
@@ -775,6 +819,16 @@ router.get('/:slug', async (req, res, next) => {
     const entries = withoutFinishedYears(await laDb.getEntriesForLA(authority.id));
     const years = groupByYear(entries);
     const content = buildCouncilContent(authority, years);
+    // Live siblings for the cross-link mesh (same ok/partial filter as the
+    // index + sitemap, so we never link to a 404). Fail-open: the page must
+    // render even if the sibling fetch breaks — the mesh is a garnish.
+    let allLive = [];
+    try {
+      allLive = (await laDb.listAllAuthorities() || [])
+        .filter((a) => ['ok', 'partial'].includes(a.import_status));
+    } catch (err) {
+      console.error('[term-dates-ssr] nearby fetch failed:', err.message);
+    }
     const yearsLabel = years.map((y) => y.year).join(' and ');
     const title = `${authority.name} School Term Dates${yearsLabel ? ` ${yearsLabel}` : ''} & Holidays | Housemait`;
     const description = `Official ${authority.name} school term dates${yearsLabel ? ` for ${yearsLabel}` : ''} — term starts and ends, half terms and holidays, sourced from the council's own published calendar and refreshed monthly.`;
@@ -788,6 +842,7 @@ router.get('/:slug', async (req, res, next) => {
       sub: `Council-published term and holiday dates for schools in ${authority.name}${authority.region ? ` (${authority.region})` : ''}. Academies and independents may differ — check with your school.`,
       years,
       contentHtml: content.contentHtml,
+      nearbyHtml: buildNearbyHtml(authority, allLive),
       jsonLd: breadcrumbLd(`${authority.name} school term dates`, `/${authority.slug}`),
       faqLd: content.faqLd,
     }));
