@@ -28,6 +28,7 @@ beforeEach(() => {
   academicYearsForCountry.mockReturnValue(AYS);
   laDb.updateAuthorityStatus.mockResolvedValue();
   laDb.replaceEntriesForLA.mockResolvedValue(0);
+  laDb.getEntriesForLA.mockResolvedValue([]); // no pre-existing entries unless a test sets them
   validateTermDates.mockImplementation((rows) => rows); // passthrough
   extractTermDatesViaSearch.mockResolvedValue([]); // no fallback dates unless a test sets them
 });
@@ -64,7 +65,9 @@ describe('importAuthority', () => {
     expect(res.status).toBe('ok');
     expect(res.method).toBe('direct');
     expect(extractTermDatesViaSearch).not.toHaveBeenCalled(); // direct succeeded, no fallback
-    expect(laDb.replaceEntriesForLA).toHaveBeenCalledWith('la-1', ['2025-2026', '2026-2027'], expect.any(Array));
+    // Per-year replacement: only years the fresh import actually found are
+    // touched (2026-2027 had no fresh data, so it must not be wiped).
+    expect(laDb.replaceEntriesForLA).toHaveBeenCalledWith('la-1', ['2025-2026'], expect.any(Array));
     expect(lastStatus()).toMatchObject({ status: 'ok', import_method: 'direct', date_count: 2 });
     expect(lastStatus().last_imported_at).toBeDefined();
   });
@@ -81,7 +84,7 @@ describe('importAuthority', () => {
     expect(res.status).toBe('ok');
     expect(res.method).toBe('search');
     expect(validateTermDates).toHaveBeenCalled();
-    expect(laDb.replaceEntriesForLA).toHaveBeenCalledWith('la-1', ['2025-2026', '2026-2027'], expect.any(Array));
+    expect(laDb.replaceEntriesForLA).toHaveBeenCalledWith('la-1', ['2025-2026'], expect.any(Array));
     expect(lastStatus()).toMatchObject({ status: 'ok', import_method: 'search', source_url: 'https://barnet.gov.uk/term-dates' });
   });
 
@@ -133,6 +136,28 @@ describe('importAuthority', () => {
 
     expect(res.status).toBe('failed');
     expect(res.error).toMatch(/socket hang up/);
+  });
+
+  // The Barnet clobber (2026-08-16): the Aug stale-refresh's search fallback
+  // returned only 6 rows for 2026-2027 and the wholesale replace wiped the
+  // 23-row set imported in June. A drastically thinner fresh year (< half the
+  // existing count) must KEEP the existing entries.
+  test('shrink guard: a much thinner fresh year does not clobber a richer stored one', async () => {
+    laDb.getEntriesForLA.mockResolvedValueOnce(
+      Array.from({ length: 23 }, (_, i) => ({ academic_year: '2026-2027', event_type: 'inset_day', date: `2026-10-${String(i + 1).padStart(2, '0')}` })),
+    );
+    findOfficialTermDatesUrl.mockResolvedValue('https://barnet.gov.uk/term-dates');
+    fetchTermDatesPageText.mockResolvedValue('page text');
+    extractTermDatesPreview.mockResolvedValue({ ok: true, body: { dates: [
+      { event_type: 'term_start', date: '2026-09-02', academic_year: '2026-2027', label: 'Autumn term' },
+      { event_type: 'term_end', date: '2026-12-18', academic_year: '2026-2027', label: 'Autumn ends' },
+      { event_type: 'half_term_start', date: '2026-10-26', end_date: '2026-10-30', academic_year: '2026-2027', label: 'Half term' },
+    ] } });
+
+    const res = await importAuthority(LA, AYS);
+
+    expect(laDb.replaceEntriesForLA).not.toHaveBeenCalled(); // 3 < 23/2 → keep
+    expect(res.dateCount).toBe(23); // the stored set survives
   });
 
   // The Bexley trap (2026-08-03): a STORED year-stamped source_url kept

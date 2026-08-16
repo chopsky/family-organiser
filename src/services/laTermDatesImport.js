@@ -139,7 +139,30 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
       label: d.label || null,
       source_url: url || null,
     }));
-    await laDb.replaceEntriesForLA(la.id, [ays.currentAY, ays.nextAY], entries);
+    // Per-year replacement with a shrink guard. Two clobber modes this
+    // prevents (both real): (1) a re-import that found NOTHING for a year we
+    // hold must not delete that year - so only years present in the fresh set
+    // are replaced; (2) a drastically THINNER result must not overwrite a
+    // richer one - Barnet's Aug-2026 search re-import came back with 6 rows
+    // for 2026-2027 and wiped the 23-row set imported in June.
+    let existingEntries = [];
+    try { existingEntries = (await laDb.getEntriesForLA(la.id)) || []; } catch { existingEntries = []; }
+    const freshYears = [...new Set(entries.map((e) => e.academic_year))];
+    const yearsToReplace = freshYears.filter((y) => {
+      const had = existingEntries.filter((e) => e.academic_year === y).length;
+      const got = entries.filter((e) => e.academic_year === y).length;
+      if (had > 4 && got < had / 2) {
+        console.warn(`[la-import] ${la.name}: keeping existing ${y} (${had} entries) - fresh import only found ${got}`);
+        return false;
+      }
+      return true;
+    });
+    const inserted = entries.filter((e) => yearsToReplace.includes(e.academic_year));
+    if (yearsToReplace.length) {
+      await laDb.replaceEntriesForLA(la.id, yearsToReplace, inserted);
+    }
+    // What the row now holds: untouched years we kept + the fresh insert.
+    const storedEntries = existingEntries.filter((e) => !yearsToReplace.includes(e.academic_year)).concat(inserted);
 
     // 'ok' once we have THIS year's dates. Only next-year (no current) is the
     // genuinely-partial case worth surfacing; current-only is normal (next
@@ -160,12 +183,12 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
       error: note,
       source_url: url || null,
       import_method: method,
-      date_count: entries.length,
+      date_count: storedEntries.length,
       last_imported_at: new Date().toISOString(),
       last_attempted_at: attemptedAt,
       import_attempts: attempts,
     });
-    return { status, source_url: url, dateCount: entries.length, method };
+    return { status, source_url: url, dateCount: storedEntries.length, method };
   } catch (err) {
     const error = err.message || 'Unexpected import error.';
     await laDb.updateAuthorityStatus(la.id, { status: 'failed', error, last_attempted_at: attemptedAt, import_attempts: attempts }).catch(() => {});

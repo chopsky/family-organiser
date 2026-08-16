@@ -52,6 +52,25 @@ function groupByYear(entries) {
   return Object.keys(by).sort().map((year) => ({ year, dates: by[year] }));
 }
 
+/**
+ * Drop entries belonging to academic years that have ENTIRELY finished -
+ * once a year's last date is behind us (e.g. 2025-26 after 20 Jul 2026),
+ * nobody is looking for it and leading the page with it reads as stale.
+ * A year survives while any of its dates is today or later.
+ */
+function withoutFinishedYears(entries) {
+  const today = new Date().toISOString().slice(0, 10);
+  const lastByYear = {};
+  for (const e of entries) {
+    const last = e.end_date || e.date;
+    if (!lastByYear[e.academic_year] || last > lastByYear[e.academic_year]) lastByYear[e.academic_year] = last;
+  }
+  const live = entries.filter((e) => lastByYear[e.academic_year] >= today);
+  // Never filter down to nothing: a council whose data is all historic should
+  // still show what it has rather than an empty page.
+  return live.length ? live : entries;
+}
+
 // ── Design-system helpers (ported from the handoff prototype's script) ──────
 
 const DAY_MS = 86400000;
@@ -682,7 +701,7 @@ router.get('/:slug/term-dates.ics', async (req, res, next) => {
     if (!SLUG_RE.test(req.params.slug)) return next();
     const authority = await laDb.getAuthorityBySlug(req.params.slug);
     if (!authority || !['ok', 'partial'].includes(authority.import_status)) return next();
-    const entries = await laDb.getEntriesForLA(authority.id);
+    const entries = withoutFinishedYears(await laDb.getEntriesForLA(authority.id));
     if (!entries.length) return next();
     res
       .set('Cache-Control', CACHE_HEADER)
@@ -700,7 +719,7 @@ router.get('/:slug', async (req, res, next) => {
     if (!SLUG_RE.test(req.params.slug)) return next();
     const authority = await laDb.getAuthorityBySlug(req.params.slug);
     if (!authority || !['ok', 'partial'].includes(authority.import_status)) return next();
-    const entries = await laDb.getEntriesForLA(authority.id);
+    const entries = withoutFinishedYears(await laDb.getEntriesForLA(authority.id));
     const years = groupByYear(entries);
     const content = buildCouncilContent(authority, years);
     const yearsLabel = years.map((y) => y.year).join(' and ');
