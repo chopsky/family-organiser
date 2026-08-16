@@ -23,7 +23,8 @@ import { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { isIos, APP_STORE_CONFIGURED } from '../../lib/app-store';
+import { isIos, APP_STORE_CONFIGURED, PLAY_STORE_CONFIGURED } from '../../lib/app-store';
+import { isAndroid } from '../../lib/platform';
 import api from '../../lib/api';
 import ErrorBanner from '../../components/ErrorBanner';
 import AuthHeader from '../../components/AuthHeader';
@@ -41,17 +42,22 @@ import GetAppStep from './steps/GetAppStep';
 import FinishStep from './steps/FinishStep';
 
 // The "Get the app" nudge belongs ONLY to someone finishing onboarding in a
-// mobile BROWSER on an iPhone: not inside the native app (already there), not on
-// Android/desktop (no app), and not before a live App Store listing exists.
-// When false, next()/back() skip straight over the get-app step.
-//
-// TEMPORARILY OFF: the live App Store build is stale (the developer account is
-// migrating individual -> organisation, which blocks updates), so we must NOT
-// push fresh web signups to download the outdated app. Flip APP_STORE_BUILD_CURRENT
-// back to true once the new version is approved and live, and the step returns
-// for iPhone-web users as before.
-const APP_STORE_BUILD_CURRENT = false;
-const SHOW_GET_APP = APP_STORE_BUILD_CURRENT && !Capacitor.isNativePlatform() && isIos() && APP_STORE_CONFIGURED;
+// mobile BROWSER: not inside the native app (already there), not on desktop
+// (the landing page's QR badges cover that). Gated per store so a stale
+// listing can be pulled from the flow without touching the other platform:
+//  - APP_STORE_BUILD_CURRENT: was OFF while the individual->organisation
+//    account migration froze updates; re-enabled 2026-08-16 after verifying
+//    via the iTunes lookup API that 1.11.0 went live on 2026-08-06.
+//  - PLAY_BUILD_CURRENT: the Google Play listing launched 2026-08-05 with
+//    the current build. NB Android has no in-app purchase flow yet (Play
+//    Billing pending) - subscribing still happens on the web.
+// When neither gate passes, next()/back() skip straight over the step.
+const APP_STORE_BUILD_CURRENT = true;
+const PLAY_BUILD_CURRENT = true;
+const inBrowser = () => !Capacitor.isNativePlatform();
+const SHOW_GET_APP =
+  (APP_STORE_BUILD_CURRENT && inBrowser() && isIos() && APP_STORE_CONFIGURED) ||
+  (PLAY_BUILD_CURRENT && inBrowser() && isAndroid() && PLAY_STORE_CONFIGURED);
 
 // Step keys in order + the progress-bar fill per step. The account card is the
 // pre-auth entry screen; 'get-app' sits just before 'finish' and is skipped for
@@ -288,7 +294,7 @@ function renderStep(key, ctx) {
     case 'calendar':
       return <CalendarStep form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'get-app':
-      return <GetAppStep next={ctx.next} />;
+      return <GetAppStep next={ctx.next} platform={isAndroid() ? 'android' : 'ios'} />;
     case 'finish':
       return <FinishStep firstName={ctx.firstName} householdName={ctx.form.hhName || ctx.auth.household?.name} userId={ctx.auth.user?.id} invited={ctx.form.invited} termDatesLaName={laDisplayName(ctx.form.termDatesLa)} finishing={ctx.finishing} onFinish={ctx.finish} />;
     default:
