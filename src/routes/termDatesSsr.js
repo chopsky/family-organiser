@@ -52,6 +52,154 @@ function groupByYear(entries) {
   return Object.keys(by).sort().map((year) => ({ year, dates: by[year] }));
 }
 
+// ── Design-system helpers (ported from the handoff prototype's script) ──────
+
+const DAY_MS = 86400000;
+const isoMs = (s) => { const [y, m, d] = (s || '').split('-').map(Number); return Date.UTC(y, m - 1, d); };
+
+/** Range format with same-month compression: "Mon 26 – Fri 30 Oct 2026". */
+function frShort(d, e) {
+  if (!e || e === d) return fmtDate(d);
+  const a = d.split('-').map(Number), b = e.split('-').map(Number);
+  if (a[0] === b[0] && a[1] === b[1]) {
+    const sd = new Date(Date.UTC(a[0], a[1] - 1, a[2]));
+    return `${DOW[sd.getUTCDay()]} ${a[2]} – ${fmtDate(e)}`;
+  }
+  return `${fmtDate(d)} – ${fmtDate(e)}`;
+}
+const monthLabelOf = (s) => { const [y, m] = (s || '').split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
+
+/**
+ * Map a stored entry to the design's event kind (start/end/half/break/bank/
+ * inset). The importer types every holiday range as half_term_start, so the
+ * half-term vs holiday split falls back to label keywords, then span (a half
+ * term is ≤6 weekdays; Christmas/Easter/summer are longer).
+ */
+function kindOf(e) {
+  if (e.event_type === 'term_start') return 'start';
+  if (e.event_type === 'term_end') return 'end';
+  if (e.event_type === 'inset_day') return 'inset';
+  const multi = e.end_date && e.end_date !== e.date;
+  if (e.event_type === 'bank_holiday') return multi ? 'break' : 'bank';
+  const lbl = (e.label || '').toLowerCase();
+  if (/half\s*-?\s*term/.test(lbl)) return 'half';
+  if (/christmas|xmas|easter|summer|winter|spring break/.test(lbl)) return 'break';
+  if (!multi) return 'half';
+  return weekdaysIn(e.date, e.end_date) <= 6 ? 'half' : 'break';
+}
+
+// Pill text + tint/text colours per kind (design TAG map; INSET reuses the
+// coral holiday pair - the prototype has no INSET example, but INSET means
+// school closed to pupils, which is the coral family).
+const TAG = {
+  start: ['Term starts', '#F3EDFC', '#6B3FA0'],
+  end: ['Term ends', '#F3EDFC', '#6B3FA0'],
+  half: ['Half term', '#FBF1DE', '#936314'],
+  break: ['Holiday', '#FDF0EB', '#B8431F'],
+  bank: ['Bank holiday', '#FDF0EB', '#B8431F'],
+  inset: ['INSET day', '#FDF0EB', '#B8431F'],
+};
+const STRIP_COL = { term: '#E7DDF3', half: '#E0A458', break: '#E8724A', bank: '#E8724A', inset: '#E8724A' };
+
+/** One academic-year card: heading + legend, proportional strip, event rows. */
+function buildYearCard({ year, dates }) {
+  const rows = dates.map((e) => {
+    const k = kindOf(e);
+    const multi = e.end_date && e.end_date !== e.date;
+    return `<div class="row"><span class="when">${esc(frShort(e.date, e.end_date))}</span><span class="lbl">${esc(e.label || TYPE_LABEL[e.event_type] || e.event_type)}<span class="pill" style="background:${TAG[k][1]};color:${TAG[k][2]}">${TAG[k][0]}</span></span><span class="wdays">${multi ? `${weekdaysIn(e.date, e.end_date)} weekdays` : ''}</span></div>`;
+  }).join('');
+
+  // Year-at-a-glance strip: term time in lilac, breaks proportional to their
+  // calendar days. Needs both a term_start and a term_end to anchor the span
+  // (123 councils carry autumn-only next years - those get rows, no strip).
+  const starts = dates.filter((e) => e.event_type === 'term_start');
+  const ends = dates.filter((e) => e.event_type === 'term_end');
+  let stripHtml = '';
+  if (starts.length && ends.length) {
+    const s0 = isoMs(starts[0].date);
+    const s1 = isoMs(ends[ends.length - 1].date);
+    const total = (s1 - s0) / DAY_MS;
+    if (total > 30) {
+      const brs = dates
+        .filter((e) => !['term_start', 'term_end', 'half_term_end'].includes(e.event_type))
+        .map((e) => ({ s: isoMs(e.date), e: isoMs(e.end_date || e.date), k: kindOf(e), label: e.label || TYPE_LABEL[e.event_type], d: e.date, de: e.end_date }))
+        .filter((b) => b.s <= s1 && b.e >= s0)
+        .sort((a, b) => a.s - b.s);
+      const segs = [];
+      let cur = s0;
+      for (const b of brs) {
+        const bs = Math.max(b.s, cur);
+        const be = Math.min(b.e, s1);
+        if (be < bs) continue; // swallowed by a previous range
+        if (bs > cur) segs.push({ days: (bs - cur) / DAY_MS, k: 'term', title: 'Term time' });
+        segs.push({ days: (be - bs) / DAY_MS + 1, k: b.k, title: `${b.label} · ${frShort(b.d, b.de)}` });
+        cur = be + DAY_MS;
+      }
+      if (s1 > cur) segs.push({ days: (s1 - cur) / DAY_MS, k: 'term', title: 'Term time' });
+      stripHtml = `
+      <div class="strip">${segs.map((g) => `<div style="width:${(g.days / total * 100).toFixed(3)}%;min-width:${g.k === 'term' ? '0' : '3px'};background:${STRIP_COL[g.k] || STRIP_COL.term}" title="${esc(g.title)}"></div>`).join('')}</div>
+      <div class="months"><span>${esc(monthLabelOf(starts[0].date))}</span><span>${esc(monthLabelOf(ends[ends.length - 1].date))}</span></div>`;
+    }
+  }
+
+  return `
+    <section class="yearcard">
+      <div class="yearhead">
+        <h2>${esc(year)}</h2>
+        <div class="legend">
+          <span><span class="sq" style="background:#E7DDF3"></span>Term time</span>
+          <span><span class="sq" style="background:#E0A458"></span>Half term</span>
+          <span><span class="sq" style="background:#E8724A"></span>Holiday</span>
+        </div>
+      </div>${stripHtml}
+      <div class="rows">${rows}</div>
+    </section>`;
+}
+
+/**
+ * "Next up" countdown card: first event whose end is today or later, with a
+ * "Now" state while inside a holiday. Friendly phrasing per the design:
+ * term starts read "Back to school", term ends "School breaks up".
+ */
+function buildCountdown(authority, years) {
+  const flat = [];
+  years.forEach(({ dates }) => dates.forEach((e) => flat.push(e)));
+  flat.sort((a, b) => isoMs(a.date) - isoMs(b.date));
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  let ev = null, thenEv = null;
+  for (let i = 0; i < flat.length; i++) {
+    if (isoMs(flat[i].end_date || flat[i].date) >= today) { ev = flat[i]; thenEv = flat[i + 1] || null; break; }
+  }
+  if (!ev) return '';
+  const k = kindOf(ev);
+  const friendly = k === 'start' ? 'Back to school' : k === 'end' ? 'School breaks up' : (ev.label || TYPE_LABEL[ev.event_type]);
+  let big, unit, sub;
+  if (isoMs(ev.date) <= today) {
+    big = 'Now'; unit = '';
+    sub = `On now · ends ${fmtDate(ev.end_date || ev.date)}`;
+  } else {
+    const n = Math.round((isoMs(ev.date) - today) / DAY_MS);
+    big = String(n);
+    unit = n === 1 ? 'day away' : 'days away';
+    sub = n === 1 ? `${fmtDate(ev.date)} · tomorrow` : fmtDate(ev.date);
+  }
+  const thenLine = thenEv ? `Then: ${thenEv.label || TYPE_LABEL[thenEv.event_type]} · ${frShort(thenEv.date, thenEv.end_date)}` : '';
+  return `
+    <div class="nextcard">
+      <div class="nc-left">
+        <div class="nc-eyebrow">Next up in ${esc(authority.name)}</div>
+        <div class="nc-title">${esc(friendly)}</div>
+        <div class="nc-sub">${esc(sub)}</div>
+        ${thenLine ? `<div class="nc-then">${esc(thenLine)}</div>` : ''}
+      </div>
+      <div class="nc-stat">
+        <div class="nc-big">${esc(big)}</div>
+        ${unit ? `<div class="nc-unit">${esc(unit)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
 // ── SEO content: unique per-council copy computed from the council's own dates ──
 // The date tables alone read as "thin content"; this section gives every page
 // real prose. Nothing here is boilerplate-with-a-name-swapped: the answers are
@@ -289,15 +437,37 @@ function buildIcs(authority, entries) {
   return lines.map(icsFold).join('\r\n') + '\r\n';
 }
 
-/** Shared shell for the per-entity pages - same brand vocabulary as the app. */
-function detailPage({ title, description, canonicalPath, h1, sub, years, extraHtml = '', contentHtml = '', jsonLd, faqLd = null, slugForCta = '' }) {
-  const yearBlocks = years.map(({ year, dates }) => `
-    <section>
-      <h2>${esc(year)}</h2>
-      <table><tbody>
-        ${dates.map((d) => `<tr><td class="d">${esc(fmtRange(d.date, d.end_date))}</td><td>${esc(d.label || TYPE_LABEL[d.event_type] || d.event_type)}</td></tr>`).join('')}
-      </tbody></table>
-    </section>`).join('');
+/** Shared header row + footer used by index (static) and council pages. */
+const HEADER_HTML = `
+    <div class="topbar">
+      <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
+      <a class="btn-try" href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+    </div>`;
+
+const FOOTER_HTML = `
+    <footer class="site-footer">
+      <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
+      <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
+      <nav>
+        <a href="https://housemait.com">Family organiser app</a>
+        <a href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+        <a href="https://housemait.com/support">Support</a>
+        <a href="https://housemait.com/privacy">Privacy</a>
+        <a href="https://housemait.com/terms">Terms</a>
+      </nav>
+      <p class="copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
+    </footer>`;
+
+/** The redesigned per-council page (design handoff: Council Term Dates). */
+function detailPage({ title, description, canonicalPath, h1, sub, years, contentHtml = '', jsonLd, faqLd = null, slugForCta = '', authority = null }) {
+  const yearBlocks = years.map(buildYearCard).join('');
+  const countdownHtml = authority ? buildCountdown(authority, years) : '';
+  const srcDomain = authority && authority.source_url
+    ? authority.source_url.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+    : '';
+  const sourceHtml = srcDomain
+    ? `<p class="srcline">Source: <a href="${esc(authority.source_url)}" target="_blank" rel="nofollow noopener noreferrer">${esc(srcDomain)}</a> · re-checked monthly</p>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en-GB">
@@ -319,81 +489,102 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, extraHt
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
   <style>
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #FBF8F3; color: #2D2A33; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
-    .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+    html, body { margin: 0; padding: 0; background: #FBF8F3; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
     a { color: #6B3FA0; }
-    .crumb { font-size: 13px; margin-bottom: 18px; }
-    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; color: #6B3FA0; margin: 0 0 6px; }
-    .sub { color: #6B6774; font-size: 15px; margin: 0 0 26px; }
-    h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 24px; color: #6B3FA0; margin: 28px 0 8px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; }
-    td { padding: 9px 14px; border-bottom: 1px solid #E8E5EC; font-size: 14.5px; }
-    tr:last-child td { border-bottom: none; }
-    td.d { white-space: nowrap; font-weight: 600; width: 190px; }
-    .cta { margin-top: 36px; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 16px; padding: 20px; }
-    .cta a.btn { display: inline-block; margin-top: 10px; background: #6B3FA0; color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 11px 20px; border-radius: 12px; }
-    .src { font-size: 12.5px; color: #6B6774; margin-top: 16px; word-break: break-all; }
-    .prose { margin-top: 34px; }
-    .prose h3 { font-size: 16px; font-weight: 600; margin: 20px 0 4px; }
-    .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 8px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
-    .actions a.pill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border: 1.5px solid #E8E5EC; border-radius: 21px; background: #fff; color: #6B3FA0; font-weight: 600; font-size: 13.5px; text-decoration: none; transition: border-color .2s ease-out; }
-    .actions a.pill:hover { border-color: #6B3FA0; }
-    .actions svg { flex-shrink: 0; }
-    .ics-note { font-size: 12.5px; color: #6B6774; margin: 0 0 24px; max-width: 62ch; }
-    .ics-note a { color: #6B3FA0; font-weight: 600; }
+    a:hover { color: #54317E; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 26px 20px 72px; }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 30px; }
+    .topbar img { height: 26px; width: auto; display: block; }
+    .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
+    .btn-try:hover { background: #5A3488; color: #FFFFFF; }
+
+    .crumb { font-size: 13.5px; font-weight: 600; text-decoration: none; }
+    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(32px, 5.5vw, 46px); line-height: 1.08; letter-spacing: -0.02em; color: #6B3FA0; margin: 12px 0 8px; }
+    .sub { color: #6B6774; font-size: 15.5px; margin: 0; max-width: 62ch; }
+
+    .nextcard { display: flex; align-items: center; gap: 22px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 18px; padding: 20px 24px; box-shadow: 0 4px 16px rgba(107,63,160,0.08); margin: 24px 0 4px; flex-wrap: wrap; }
+    .nc-left { flex: 1; min-width: 230px; }
+    .nc-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #E8724A; }
+    .nc-title { font-family: 'Recoleta', Georgia, serif; font-size: 29px; color: #2D2A33; line-height: 1.15; margin-top: 4px; }
+    .nc-sub { font-size: 14px; color: #6B6774; margin-top: 4px; }
+    .nc-then { font-size: 13px; color: #6B6774; margin-top: 10px; }
+    .nc-stat { text-align: center; background: #F3EDFC; border-radius: 14px; padding: 14px 22px; min-width: 92px; }
+    .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6B3FA0; }
+    .nc-unit { font-size: 12px; font-weight: 600; color: #6B3FA0; margin-top: 5px; }
+
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 8px; }
+    .btn-ics { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; background: #6B3FA0; color: #FFFFFF; font-weight: 600; font-size: 14px; text-decoration: none; }
+    .btn-ics:hover { background: #5A3488; color: #FFFFFF; }
+    .btn-wa { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; border: 1.5px solid #6B3FA0; background: #FFFFFF; color: #6B3FA0; font-weight: 600; font-size: 14px; text-decoration: none; }
+    .btn-wa:hover { background: #F3EDFC; color: #6B3FA0; }
+    .ics-note { font-size: 12.5px; color: #6B6774; max-width: 64ch; margin: 0 0 6px; }
+
+    .yearcard { background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 18px; padding: 22px 24px 14px; margin-top: 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
+    .yearhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 18px; }
+    .yearhead h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 0; letter-spacing: -0.01em; }
+    .legend { display: flex; gap: 14px; font-size: 11.5px; color: #6B6774; align-items: center; flex-wrap: wrap; }
+    .legend > span { display: inline-flex; align-items: center; gap: 5px; }
+    .legend .sq { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .strip { display: flex; height: 30px; border-radius: 9px; overflow: hidden; margin: 14px 0 5px; border: 1px solid #E8E5EC; }
+    .months { display: flex; justify-content: space-between; font-size: 11px; color: #9B96A4; margin-bottom: 4px; }
+    .rows { margin-top: 10px; }
+    .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 9px 0; border-bottom: 1px solid #F0EDF3; }
+    .row:last-child { border-bottom: none; }
+    .row .when { width: 205px; flex-shrink: 0; font-weight: 600; font-size: 14px; }
+    .row .lbl { flex: 1; min-width: 200px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .row .pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+    .row .wdays { font-size: 12.5px; color: #6B6774; }
+
+    .srcline { font-size: 12.5px; color: #6B6774; margin: 14px 0 0; }
+
+    .ctaband { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; background: #6B3FA0; border-radius: 20px; padding: 28px 30px; margin-top: 36px; }
+    .ctaband > div { flex: 1; min-width: 260px; }
+    .ctaband h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #FFFFFF; margin: 0 0 6px; letter-spacing: -0.01em; }
+    .ctaband p { font-size: 14.5px; color: rgba(255,255,255,0.85); margin: 0; max-width: 56ch; }
+    .ctaband .btn-white { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 12px; background: #FFFFFF; color: #6B3FA0; font-weight: 600; font-size: 14.5px; text-decoration: none; white-space: nowrap; }
+    .ctaband .btn-white:hover { background: #F3EDFC; color: #6B3FA0; }
+
+    .prose { margin-top: 40px; max-width: 68ch; }
+    .prose h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 0 0 10px; letter-spacing: -0.01em; }
+    .prose h2:not(:first-child) { margin-top: 30px; }
+    .prose h3 { font-size: 16px; font-weight: 600; color: #2D2A33; margin: 20px 0 4px; }
+    .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 10px; }
+
     .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
     .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
     .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
     .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-    .site-footer nav a { color: #6B3FA0; text-decoration: none; font-weight: 600; }
-    .site-footer nav a:hover { text-decoration: underline; }
+    .site-footer nav a { font-weight: 600; text-decoration: none; }
     .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
-
-    @media (max-width: 520px) { td.d { width: auto; } }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <nav class="crumb"><a href="/school-term-dates/">← All UK school term dates</a></nav>
+  <div class="wrap">${HEADER_HTML}
+    <a class="crumb" href="/school-term-dates/">← All UK school term dates</a>
     <h1>${esc(h1)}</h1>
     <p class="sub">${esc(sub)}</p>
+    ${countdownHtml}
     ${slugForCta ? `
     <div class="actions">
-      <a class="pill" href="/school-term-dates/${esc(slugForCta)}/term-dates.ics" download>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
-        Add to your calendar</a>
-      <a class="pill" href="https://wa.me/?text=${encodeURIComponent(`${h1} - ${CANONICAL_BASE}/${slugForCta}`)}" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.5.1-.2.2-.6.8-.7.9-.1.1-.3.2-.5.1a6.7 6.7 0 0 1-2-1.2 7.4 7.4 0 0 1-1.4-1.7c-.1-.2 0-.4.1-.5l.4-.4c.1-.2.2-.3.2-.5s0-.3 0-.5c-.1-.1-.5-1.3-.7-1.8-.2-.4-.4-.4-.5-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1.1 2.7a11 11 0 0 0 4.2 3.7c.6.3 1 .4 1.4.5.6.2 1.1.2 1.5.1.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2 0-.1-.2-.2-.4-.3Z"/></svg>
-        Share on WhatsApp</a>
+      <a class="btn-ics" href="/school-term-dates/${esc(slugForCta)}/term-dates.ics" download>Add to your calendar</a>
+      <a class="btn-wa" href="https://wa.me/?text=${encodeURIComponent(`${h1} - ${CANONICAL_BASE}/${slugForCta}`)}" target="_blank" rel="noopener">Share on WhatsApp</a>
     </div>
-    <p class="ics-note">The download is a snapshot — INSET days and changes added later won't reach your
-      calendar. <a href="https://housemait.com/signup?src=termdates-ics">Housemait keeps them updated automatically</a>.</p>` : ''}
-    ${yearBlocks || '<p class="sub">No term dates published yet.</p>'}
-    ${extraHtml}
-    ${contentHtml}
-    <div class="cta">
-      <strong>Get these dates on your family calendar.</strong>
-      <p class="sub" style="margin:6px 0 0">Housemait puts term dates, school events and after-school activities on a shared family calendar — with reminders that pause in the holidays.</p>
-      <a class="btn" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
+    <p class="ics-note">The download is a snapshot — INSET days and changes added later won't reach your calendar. <a href="https://housemait.com/signup?src=termdates-ics">Housemait keeps them updated automatically</a>.</p>` : ''}
+    ${yearBlocks || '<p class="sub" style="margin-top:24px">No term dates published yet.</p>'}
+    ${sourceHtml}
+    <div class="ctaband">
+      <div>
+        <h2>Get these dates on your family calendar</h2>
+        <p>Housemait puts term dates, INSET days, school events and after-school activities on a shared family calendar — with reminders that pause in the holidays.</p>
+      </div>
+      <a class="btn-white" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
-    <footer class="site-footer">
-      <a href="https://housemait.com" aria-label="Housemait - family organiser app">
-        <img src="/school-term-dates/housemait-logo.svg" alt="Housemait" width="160" height="26" loading="lazy" />
-      </a>
-      <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with
-        school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
-      <nav>
-        <a href="https://housemait.com">Family organiser app</a>
-        <a href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
-        <a href="https://housemait.com/support">Support</a>
-        <a href="https://housemait.com/privacy">Privacy</a>
-        <a href="https://housemait.com/terms">Terms</a>
-      </nav>
-      <p class="copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
-    </footer>
+    ${contentHtml}${FOOTER_HTML}
   </div>
 </body>
 </html>`;
@@ -414,16 +605,34 @@ function breadcrumbLd(name, pathSuffix) {
 router.get('/', async (req, res, next) => {
   try {
     const html = fs.readFileSync(INDEX_HTML, 'utf-8');
-    const authorities = await laDb.listAllAuthorities();
-    const items = authorities
-      .filter((a) => ['ok', 'partial'].includes(a.import_status))
-      .map((a) => `<li class="card" data-name="${esc(a.name.toLowerCase())}" data-region="${esc(a.region || '')}"><a class="card-head" style="text-decoration:none" href="/school-term-dates/${esc(a.slug)}"><span class="card-title"><span class="name">${esc(a.name)}</span><span class="sub">${esc(a.region ? `${a.region} · ` : '')}term dates, half terms &amp; INSET days</span></span><span class="chev" aria-hidden="true">›</span></a></li>`)
+    const authorities = (await laDb.listAllAuthorities())
+      .filter((a) => ['ok', 'partial'].includes(a.import_status));
+
+    // Group by first letter for the letter-headed grid + jump nav.
+    const byLetter = new Map();
+    for (const a of authorities) {
+      const L = a.name[0].toUpperCase();
+      if (!byLetter.has(L)) byLetter.set(L, []);
+      byLetter.get(L).push(a);
+    }
+    const letters = [...byLetter.keys()];
+    const lettersHtml = letters
+      .map((L) => `<a href="#letter-${L}">${L}</a>`)
       .join('');
-    // Server-inject the crawlable list; app.js replaces it on load.
-    const injected = html.replace(
-      '<ul class="list" id="list" aria-live="polite"></ul>',
-      `<ul class="list" id="list" aria-live="polite">${items}</ul>`,
-    );
+    const gridHtml = letters.map((L) => `
+      <section class="letterSec" data-letter="${L}">
+        <div class="letterHead" id="letter-${L}"><h2>${L}</h2><div class="rule"></div></div>
+        <div class="cgrid">
+          ${byLetter.get(L).map((a) => `<a class="ccard" data-name="${esc(a.name.toLowerCase())}" data-region="${esc(a.region || 'England')}" href="/school-term-dates/${esc(a.slug)}"><span class="cname">${esc(a.name)}</span><span class="csub">${esc(a.region || 'England')} · term dates &amp; holidays</span></a>`).join('\n          ')}
+        </div>
+      </section>`).join('');
+    const countText = `${authorities.length} councils, A to Z — click one for its term dates`;
+
+    // Server-inject the crawlable content; app.js only shows/hides it.
+    const injected = html
+      .replace('<!--SSR:COUNT-->', esc(countText))
+      .replace('<!--SSR:LETTERS-->', lettersHtml)
+      .replace('<!--SSR:GRID-->', gridHtml);
     res.set('Cache-Control', CACHE_HEADER).type('html').send(injected);
   } catch (err) {
     console.error('[term-dates-ssr] index failed:', err.message);
@@ -497,18 +706,15 @@ router.get('/:slug', async (req, res, next) => {
     const yearsLabel = years.map((y) => y.year).join(' and ');
     const title = `${authority.name} School Term Dates${yearsLabel ? ` ${yearsLabel}` : ''} & Holidays | Housemait`;
     const description = `Official ${authority.name} school term dates${yearsLabel ? ` for ${yearsLabel}` : ''} — term starts and ends, half terms and holidays, sourced from the council's own published calendar and refreshed monthly.`;
-    const srcHtml = authority.source_url
-      ? `<p class="src">Source: <a href="${esc(authority.source_url)}" rel="nofollow noopener" target="_blank">${esc(authority.source_url)}</a></p>`
-      : '';
     res.set('Cache-Control', CACHE_HEADER).type('html').send(detailPage({
       title,
       description,
       canonicalPath: `/${authority.slug}`,
       slugForCta: authority.slug,
+      authority,
       h1: `${authority.name} school term dates`,
       sub: `Council-published term and holiday dates for schools in ${authority.name}${authority.region ? ` (${authority.region})` : ''}. Academies and independents may differ — check with your school.`,
       years,
-      extraHtml: srcHtml,
       contentHtml: content.contentHtml,
       jsonLd: breadcrumbLd(`${authority.name} school term dates`, `/${authority.slug}`),
       faqLd: content.faqLd,
