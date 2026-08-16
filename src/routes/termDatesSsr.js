@@ -18,6 +18,7 @@
  * absorbs crawl traffic.
  */
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const router = express.Router();
@@ -456,6 +457,51 @@ function buildIcs(authority, entries) {
   return lines.map(icsFold).join('\r\n') + '\r\n';
 }
 
+/**
+ * Google Analytics — same GA4 property as housemait.com (page paths keep the
+ * microsite separable in reports). Consent Mode v2 with every signal denied
+ * and NO consent banner here, so GA only ever sends cookieless, anonymised
+ * pings (traffic shape, no _ga cookies, no client ID) — the compliant
+ * static-site counterpart of the main app's banner-gated setup in
+ * web/index.html. The inline body is a separate constant so its CSP hash
+ * below is always computed from exactly what ships.
+ */
+const GA_INLINE_JS = `
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', {
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'denied'
+    });
+    gtag('js', new Date());
+    gtag('config', 'G-RY1QCM5JBG', { anonymize_ip: true });
+  `;
+const GA_SNIPPET = `
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RY1QCM5JBG"></script>
+  <script>${GA_INLINE_JS}</script>`;
+const GA_INLINE_HASH = crypto.createHash('sha256').update(GA_INLINE_JS).digest('base64');
+
+// The app-wide helmet CSP is script-src 'self', which would silently kill
+// both the gtag loader and the inline snippet — so these routes replace it
+// with the same policy plus exactly what GA needs: the loader origin, the
+// hash of our one inline script, and the ping/pixel endpoints.
+const CSP_HEADER = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "font-src 'self' https: data:",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+  "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com",
+  "object-src 'none'",
+  `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}'`,
+  "script-src-attr 'none'",
+  "style-src 'self' https: 'unsafe-inline'",
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+  'upgrade-insecure-requests',
+].join(';');
+
 /** Shared header row + footer used by index (static) and council pages. */
 const HEADER_HTML = `
     <div class="topbar">
@@ -580,7 +626,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
     .site-footer nav a { font-weight: 600; text-decoration: none; }
     .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
-  </style>
+  </style>${GA_SNIPPET}
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}
@@ -620,6 +666,12 @@ function breadcrumbLd(name, pathSuffix) {
   };
 }
 
+// GA-aware CSP for every term-dates response (harmless on .ics/xml).
+router.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP_HEADER);
+  next();
+});
+
 // ── Index: app shell with the council list server-injected ─────────────────
 router.get('/', async (req, res, next) => {
   try {
@@ -651,7 +703,8 @@ router.get('/', async (req, res, next) => {
     const injected = html
       .replace('<!--SSR:COUNT-->', esc(countText))
       .replace('<!--SSR:LETTERS-->', lettersHtml)
-      .replace('<!--SSR:GRID-->', gridHtml);
+      .replace('<!--SSR:GRID-->', gridHtml)
+      .replace('</head>', `${GA_SNIPPET}\n</head>`);
     res.set('Cache-Control', CACHE_HEADER).type('html').send(injected);
   } catch (err) {
     console.error('[term-dates-ssr] index failed:', err.message);
