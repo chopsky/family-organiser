@@ -902,6 +902,12 @@ export default function LandingPage() {
           <span className="copy">© 2026 Housemait</span>
         </div>
         <div className="links">
+          {/* Plain <a>: /school-term-dates/ is a Vercel proxy to the SSR
+              microsite, not an SPA route. UK-only feature, but shown on the
+              default apex too - that's the page crawlers index first. */}
+          {(locale.code === 'gb' || locale.code === 'default') && (
+            <a href="/school-term-dates/">School term dates</a>
+          )}
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>
           <Link to="/support">Contact</Link>
