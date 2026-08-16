@@ -61,6 +61,24 @@ async function getAuthorityBySlug(slug) {
   return data;
 }
 
+/**
+ * Every dated row in the directory, for whole-dataset sweeps (the freshness
+ * audit). Paginated with .range() - an unpaginated select silently caps at
+ * 1000 rows and the table holds ~5k.
+ */
+async function listAllEntries() {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('la_term_date_entries')
+      .select('la_id, academic_year, date, end_date')
+      .range(from, from + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+
 async function getEntriesForLA(laId) {
   const { data, error } = await supabase
     .from('la_term_date_entries')
@@ -261,6 +279,7 @@ module.exports = {
   listAuthorities,
   getAuthorityBySlug,
   getEntriesForLA,
+  listAllEntries,
   getDirectoryTermDatesByName,
   getStats,
   replaceEntriesForLA,

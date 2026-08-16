@@ -848,6 +848,38 @@ function startScheduler() {
   });
   console.log('✓ Term-dates backfill sweep scheduled (Mondays 04:30 UTC)');
 
+  // ── LA term-dates freshness audit: Mondays 05:00 UTC ───────────────────────
+  // Import health (status 'ok', recent last_imported_at) says an import RAN,
+  // not that the data it left is usable - Barnet sat at 'ok' while its page
+  // led with a finished academic year (2026-08-16: 37 councils like it).
+  // This reads the stored dates themselves and alerts on councils whose
+  // newest data is over, missing the in-season year, or truncated before
+  // summer. Pure DB reads (no AI spend), so no env gate; it flags via admin
+  // alert and never auto-imports - remediation stays a deliberate, attended
+  // run (scripts/run-la-import.js or per-slug re-import).
+  cron.schedule('0 5 * * 1', async () => {
+    try {
+      const weekKey = new Date().toISOString().slice(0, 10);
+      if (!(await db.acquireSchedulerLock('term-dates-freshness', weekKey))) return;
+      const { auditTermDatesFreshness } = require('../services/laTermDatesFreshness');
+      const { total, flagged } = await auditTermDatesFreshness();
+      console.log(`[term-freshness] audited=${total} flagged=${flagged.length}`);
+      if (flagged.length > 0) {
+        const { sendAdminAlert } = require('../services/email');
+        const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        await sendAdminAlert(
+          `Term-dates freshness: ${flagged.length} council(s) stale`,
+          flagged.map((f) =>
+            `<a href="https://housemait.com/school-term-dates/${esc(f.slug)}"><strong>${esc(f.name)}</strong></a>: ${esc(f.problem)} — ${esc(f.detail)}`,
+          ).join('<br/>'),
+        );
+      }
+    } catch (err) {
+      console.error('[term-freshness] weekly audit failed:', err.message);
+    }
+  });
+  console.log('✓ LA term-dates freshness audit scheduled (Mondays 05:00 UTC)');
+
   // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
   // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
   // for 3+ days - opening the app is itself the fix (foreground sync).
