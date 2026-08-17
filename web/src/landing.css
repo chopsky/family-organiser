@@ -222,6 +222,20 @@
 .lv-kidpop { position: absolute; z-index: 2; pointer-events: none; }
 .lv-kidpop .lv-pop-card { padding: 9px 12px; }
 .lv-kidpop .lv-pop-text { font-size: 13.5px; }
+.lv-kidpop-check { display: inline-flex; }
+/* Hover-capable devices play the sequence: hovering the card checks
+   "Brush teeth" (badge pops in), then the stars popup reveals. The badge
+   slot is always reserved so the card never reflows. Touch devices skip
+   the interaction and show the finished state. */
+@media (hover: hover) {
+  .lv-kidpop-check { opacity: 0; transform: scale(0.3); transition: opacity 0.22s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .lv-card:hover .lv-kidpop-check { opacity: 1; transform: scale(1); transition-delay: 0.15s; }
+  .lv-kidpop-b { opacity: 0; transform: translateY(10px) scale(0.92); transition: opacity 0.3s ease, transform 0.3s ease; }
+  .lv-card:hover .lv-kidpop-b { opacity: 1; transform: translateY(0) scale(1); transition-delay: 0.55s; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lv-kidpop-check, .lv-kidpop-b, .lv-card:hover .lv-kidpop-check, .lv-card:hover .lv-kidpop-b { transition: none; }
+}
 .lv-receipt-well { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 13px; }
 .lv-receipt {
   width: min(250px, 100%); background: var(--lv-paper); border: 1px solid rgba(36, 30, 51, 0.10); border-radius: 8px;

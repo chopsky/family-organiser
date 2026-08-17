@@ -734,11 +734,13 @@ export default function LandingPage() {
                 <img src="/landing/app-kid-quests.jpg" alt="Housemait Child Mode, today&rsquo;s quests" loading="lazy" />
               </div>
               {/* Static popups over the kid phone — same chrome as the story's */}
+              {/* Hover play: the check pops in, then the stars popup reveals.
+                  Touch devices (no hover) see the finished state statically. */}
               <div className="lv-kidpop" style={{ top: 22, left: 'calc(50% - 158px)' }}>
-                <div className="lv-pop-card"><PopEmoji e="🦷" /><span className="lv-pop-text">Brush teeth</span><PopCheck /></div>
+                <div className="lv-pop-card"><PopEmoji e="🦷" /><span className="lv-pop-text">Brush teeth</span><span className="lv-kidpop-check"><PopCheck /></span></div>
               </div>
-              <div className="lv-kidpop" style={{ bottom: 14, right: 'calc(50% - 152px)' }}>
-                <div className="lv-pop-card"><PopEmoji e="🔥" /><span className="lv-pop-text">3-day streak!</span></div>
+              <div className="lv-kidpop lv-kidpop-b" style={{ bottom: 14, right: 'calc(50% - 152px)' }}>
+                <div className="lv-pop-card"><PopEmoji e="⭐" /><span className="lv-pop-text">2 stars earned</span></div>
               </div>
             </div>
           </div>
