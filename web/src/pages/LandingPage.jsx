@@ -727,7 +727,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lv-card crop" data-lv-reveal="1">
-            <h3>Kids build healthy habits</h3>
+            <h3>Build healthy habits</h3>
             <p>Child Mode lets kids see their day, tick off their tasks, earn stars and spend them on rewards.</p>
             <div className="lv-kidphone-well">
               <div className="lv-kidphone">
