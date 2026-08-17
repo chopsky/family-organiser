@@ -202,7 +202,7 @@
 .lv-cards { margin-top: 64px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 20px; }
 .lv-card { background: #fff; border: 1px solid var(--lv-border); border-radius: 30px; padding: 36px 36px 32px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .lv-card.crop { padding-bottom: 0; }
-.lv-card h3 { font-size: 26px; }
+.lv-card h3 { font-size: 28px; }
 .lv-card > p { color: var(--lv-ink-2); font-size: 15.5px; line-height: 1.6; margin: 0 0 24px; }
 .lv-chip { align-self: flex-start; background: var(--lv-tint); color: var(--lv-purple); font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; }
 .lv-rows { margin-top: auto; display: flex; flex-direction: column; gap: 9px; }
@@ -216,6 +216,12 @@
 .lv-kidphone-well { margin-top: auto; height: 235px; display: flex; justify-content: center; }
 .lv-kidphone { width: 212px; border: 7px solid var(--lv-bezel); border-bottom: none; border-radius: 32px 32px 0 0; overflow: hidden; box-shadow: 0 24px 50px rgba(36, 30, 51, 0.18); flex: none; }
 .lv-kidphone img { width: 100%; display: block; }
+/* Static popups over the Child Mode phone mock — story chrome, scaled a
+   touch down for the smaller device. */
+.lv-kidphone-well { position: relative; }
+.lv-kidpop { position: absolute; z-index: 2; pointer-events: none; }
+.lv-kidpop .lv-pop-card { padding: 9px 12px; }
+.lv-kidpop .lv-pop-text { font-size: 13.5px; }
 .lv-receipt-well { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 13px; }
 .lv-receipt {
   width: min(250px, 100%); background: var(--lv-paper); border: 1px solid rgba(36, 30, 51, 0.10); border-radius: 8px;

@@ -44,7 +44,7 @@ const RECEIPTS = {
 function schoolCard(locale) {
   if (locale.code === 'gb') {
     return {
-      title: 'Term dates, imported in one click',
+      title: 'Term dates in one click',
       desc: 'Tell Housemait the school. Every term, half-term and inset day drops straight into the family calendar.',
       chip: 'St Mary’s Primary · synced ✓',
       rows: [['Autumn term begins', 'Wed 3 Sep'], ['Half term', '27–31 Oct'], ['Inset day · school closed', 'Mon 24 Nov']],
@@ -52,7 +52,7 @@ function schoolCard(locale) {
   }
   if (locale.code === 'za') {
     return {
-      title: 'Term dates, imported in one click',
+      title: 'Term dates in one click',
       desc: 'Tell Housemait the school. Every term date and school holiday drops straight into the family calendar.',
       chip: 'Westville Primary · synced ✓',
       rows: [['Term 1 begins', 'Wed 14 Jan'], ['School holiday', '28 Mar – 14 Apr'], ['Public holiday · school closed', 'Mon 27 Apr']],
@@ -733,10 +733,17 @@ export default function LandingPage() {
               <div className="lv-kidphone">
                 <img src="/landing/app-kid-quests.jpg" alt="Housemait Child Mode, today&rsquo;s quests" loading="lazy" />
               </div>
+              {/* Static popups over the kid phone — same chrome as the story's */}
+              <div className="lv-kidpop" style={{ top: 22, left: 'calc(50% - 158px)' }}>
+                <div className="lv-pop-card"><PopEmoji e="🦷" /><span className="lv-pop-text">Brush teeth</span><PopCheck /></div>
+              </div>
+              <div className="lv-kidpop" style={{ bottom: 14, right: 'calc(50% - 152px)' }}>
+                <div className="lv-pop-card"><PopEmoji e="🔥" /><span className="lv-pop-text">3-day streak!</span></div>
+              </div>
             </div>
           </div>
           <div className="lv-card" data-lv-reveal="0">
-            <h3>Store documents &amp; moments</h3>
+            <h3>Store family documents</h3>
             <p>Keep school letters, consent forms, insurance, passports and precious memories in a single, searchable place.</p>
             <div className="lv-rows">
               <div className="lv-docrow"><span className="ic"><FileIcon /></span><span className="k">Swimming consent form</span><span className="tag">School</span></div>
