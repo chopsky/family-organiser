@@ -283,8 +283,33 @@ export default function OnboardingFlow() {
 // phases and still show navigable placeholders for now.
 function renderStep(key, ctx) {
   switch (key) {
-    case 'account':
-      return <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} signupSource={ctx.signupSource} navigate={ctx.navigate} />;
+    case 'account': {
+      // Term-dates arrivals get a value strip above the form: the page they
+      // came from sells dates, the landing page sells the product, and this
+      // is the last chance to say what the account is FOR before asking for
+      // an email. Named council when we have it; generic when only the src
+      // tag survived. Absent entirely for every other signup.
+      const laName = ctx.form.termDatesLa ? laDisplayName(ctx.form.termDatesLa) : '';
+      const fromTermDates = laName || ctx.form.signupSource === 'termdates' || ctx.form.signupSource === 'termdates-ics';
+      return (
+        <>
+          {fromTermDates && (
+            <div style={{ background: 'var(--color-plum-light, #F3EDFC)', borderRadius: 14, padding: '14px 16px', margin: '0 0 18px', textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: 'var(--color-charcoal, #2D2A33)' }}>
+                {laName ? `${laName} term dates — plus the rest of the school year, sorted.` : 'The school year, sorted for the whole family.'}
+              </p>
+              <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', fontSize: 13.5, lineHeight: 1.7, color: 'var(--color-cocoa, #4A4753)' }}>
+                <li>✓ A shared family calendar with school dates built in</li>
+                <li>✓ Photo a party invite on WhatsApp — it's in the diary</li>
+                <li>✓ Meals, lists, chores and rewards for the whole house</li>
+              </ul>
+              <p style={{ margin: '8px 0 0', fontSize: 12.5, fontWeight: 600, color: 'var(--color-plum, #6B3FA0)' }}>Free 30-day trial · no card needed</p>
+            </div>
+          )}
+          <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} signupSource={ctx.signupSource} navigate={ctx.navigate} />
+        </>
+      );
+    }
     case 'household':
       return <HouseholdStep auth={ctx.auth} form={ctx.form} update={ctx.update} next={ctx.next} setError={ctx.setError} />;
     case 'invite':

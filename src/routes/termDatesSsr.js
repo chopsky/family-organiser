@@ -543,7 +543,7 @@ const CSP_HEADER = [
 const HEADER_HTML = `
     <div class="topbar">
       <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
-      <a class="btn-try" href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+      <a class="btn-try" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
     </div>`;
 
 const FOOTER_HTML = `
@@ -552,7 +552,7 @@ const FOOTER_HTML = `
       <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
       <nav>
         <a href="https://housemait.com">Family organiser app</a>
-        <a href="https://housemait.com/signup?src=termdates">Try Housemait free</a>
+        <a href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
         <a href="https://housemait.com/support">Support</a>
         <a href="https://housemait.com/privacy">Privacy</a>
         <a href="https://housemait.com/terms">Terms</a>
@@ -655,6 +655,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .ctaband > div { flex: 1; min-width: 260px; }
     .ctaband h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #FFFFFF; margin: 0 0 6px; letter-spacing: -0.01em; }
     .ctaband p { font-size: 14.5px; color: rgba(255,255,255,0.85); margin: 0; max-width: 56ch; }
+    .ctaband p.trial { font-weight: 600; color: #FFFFFF; margin-top: 8px; font-size: 13.5px; }
     .ctaband .btn-white { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 12px; background: #FFFFFF; color: #6B3FA0; font-weight: 600; font-size: 14.5px; text-decoration: none; white-space: nowrap; }
     .ctaband .btn-white:hover { background: #F3EDFC; color: #6B3FA0; }
 
@@ -688,10 +689,13 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     ${sourceHtml}
     <div class="ctaband">
       <div>
-        <h2>Get these dates on your family calendar</h2>
-        <p>Housemait puts term dates, INSET days, school events and after-school activities on a shared family calendar — with reminders that pause in the holidays.</p>
+        <h2>The term dates are the easy bit</h2>
+        <p>Housemait runs the whole school year for the whole household: term dates and INSET days on a calendar
+          everyone shares, party invites photographed straight into the diary on WhatsApp, clubs that pause
+          themselves for half term — plus meals, shopping lists and chores the kids actually do.</p>
+        <p class="trial">Free for 30 days · no card needed</p>
       </div>
-      <a class="btn-white" href="https://housemait.com/signup?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
+      <a class="btn-white" href="https://housemait.com/gb?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
     ${contentHtml}${nearbyHtml}${FOOTER_HTML}
   </div>

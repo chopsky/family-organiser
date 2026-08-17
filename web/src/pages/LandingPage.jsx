@@ -5,6 +5,8 @@ import '../landing.css'
 import { useLocale } from '../hooks/useLocale'
 import HreflangTags from '../components/HreflangTags'
 import { APP_STORE_URL, APP_STORE_CONFIGURED, PLAY_STORE_URL, PLAY_STORE_CONFIGURED, getAppPlatform } from '../lib/app-store'
+import { resolveSignupSource } from '../lib/signupSource'
+import { resolveTermDatesLa, laDisplayName } from '../lib/termDatesLa'
 
 /**
  * Housemait marketing site — "scroll story" design, ported from
@@ -263,6 +265,24 @@ export default function LandingPage() {
   // linked from anywhere; visitors and the prerender see the sticky
   // story as usual.
   const flat = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('flat')
+
+  // Term-dates arrivals (/gb?src=termdates&la=barnet — the microsite CTAs):
+  // capture the acquisition tag + council at the door so they survive to
+  // whichever signup button gets pressed later (30-day localStorage window,
+  // same mechanism as /signup itself), and greet the visitor with a one-line
+  // ribbon naming their council. No params -> no capture, no ribbon, page
+  // identical. Runs in an effect so the prerender snapshot stays param-free.
+  const [termDatesRibbon] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    const la = new URLSearchParams(window.location.search).get('la') || ''
+    return /^[a-z0-9-]{2,64}$/.test(la) ? laDisplayName(la) : ''
+  })
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.get('src') && !params.get('la')) return
+    resolveSignupSource(params)
+    resolveTermDatesLa(params)
+  }, [])
 
   const el = useRef({})
   const setEl = (name) => (node) => { el.current[name] = node }
@@ -524,6 +544,11 @@ export default function LandingPage() {
   return (
     <div className="lv">
       <HreflangTags locale={locale} />
+      {termDatesRibbon && (
+        <div style={{ background: '#F3EDFC', color: '#6B3FA0', textAlign: 'center', padding: '10px 16px', fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>
+          ✓ {termDatesRibbon} term dates included
+        </div>
+      )}
 
       {/* ── Nav — minimal floating: logo + Get started, scrolls away with
             the hero (no fixed position, no scrolled state). ── */}

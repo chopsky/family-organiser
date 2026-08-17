@@ -94,7 +94,13 @@ describe('GET /school-term-dates/:slug (council page)', () => {
   it('CTA carries the acquisition tag and the council through to signup', async () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.status).toBe(200);
-    expect(res.text).toContain('href="https://housemait.com/signup?src=termdates&amp;la=hertfordshire"');
+    // Main CTA routes to the LANDING page (persuasion first), tags intact so
+    // the landing's capture keeps attribution + the council handoff alive.
+    expect(res.text).toContain('href="https://housemait.com/gb?src=termdates&amp;la=hertfordshire"');
+    // The warm .ics upsell stays direct-to-signup with its own tag.
+    expect(res.text).toContain('https://housemait.com/signup?src=termdates-ics');
+    // Nothing still points at the old bare-signup CTA.
+    expect(res.text).not.toContain('signup?src=termdates"');
   });
 
   it('cross-links other councils (cyclic mesh), skipping dead pages and itself', async () => {
