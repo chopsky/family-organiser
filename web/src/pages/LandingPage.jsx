@@ -544,11 +544,6 @@ export default function LandingPage() {
   return (
     <div className="lv">
       <HreflangTags locale={locale} />
-      {termDatesRibbon && (
-        <div style={{ background: '#F3EDFC', color: '#6B3FA0', textAlign: 'center', padding: '10px 16px', fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>
-          ✓ {termDatesRibbon} term dates included
-        </div>
-      )}
 
       {/* ── Nav — minimal floating: logo + Get started, scrolls away with
             the hero (no fixed position, no scrolled state). ── */}
@@ -561,6 +556,9 @@ export default function LandingPage() {
             <Link to={SIGNUP_URL} className="lv-nav-cta">Get started</Link>
           </div>
         </nav>
+        {termDatesRibbon && (
+          <div className="lv-tdchip" role="status">✓ {termDatesRibbon} term dates included</div>
+        )}
       </div>
 
       {/* ── Hero ── */}

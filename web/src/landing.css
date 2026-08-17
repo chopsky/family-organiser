@@ -66,6 +66,21 @@
 }
 .lv-nav .lv-nav-logo { height: 25px; display: block; filter: brightness(0) invert(1); }
 .lv-nav-right { display: flex; align-items: center; gap: 18px; flex: none; }
+/* Term-dates arrival chip: same frosted material as the Get started pill,
+   floating with the nav over the hero photo. Absolutely positioned inside
+   lv-navwrap so it never shifts the hero layout. */
+.lv-tdchip {
+  pointer-events: none; position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; align-items: center; white-space: nowrap;
+  background-color: #fff3; border: 1px solid #ffffff59;
+  box-shadow: 0 2px 8px -2px #00000014, inset 0 1px #ffffff80;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  color: var(--lv-cream-txt); padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+}
+@media (max-width: 640px) {
+  .lv-tdchip { white-space: normal; text-align: center; max-width: calc(100vw - 40px); top: 66px; font-size: 12.5px; }
+}
 /* Frosted-glass Get started */
 .lv-nav-cta {
   background-color: #fff3; border: 1px solid #ffffff59;
