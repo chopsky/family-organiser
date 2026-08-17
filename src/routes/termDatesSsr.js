@@ -121,8 +121,30 @@ const TAG = {
 };
 const STRIP_COL = { term: '#E7DDF3', half: '#E0A458', break: '#E8724A', bank: '#E8724A', inset: '#E8724A' };
 
+/**
+ * Barking & Dagenham (uniquely, so far) publishes a PER-SCHOOL INSET table on
+ * its council page - 42 of the dataset's 151 INSET rows are B&D's, each
+ * naming the schools it applies to. Council-wide surfaces must not treat
+ * those as borough-wide: they get their own collapsed section, stay out of
+ * the .ics download, the countdown card and the year strip.
+ *
+ * Detection keys on proper-noun school names in the label ("Godwin Primary",
+ * "The Warren School"), NOT on punctuation - other councils' generic labels
+ * include dashed forms like "INSET Day - designated for all LEA Maintained
+ * Schools" ("Schools" plural fails the singular \b match) and "Non-pupil
+ * day - All schools", which must stay council-wide.
+ */
+const SCHOOL_NAME_RE = /\b[A-Z][A-Za-z'.-]+ (School|Primary|Academy|Infants?|Juniors?|College)\b/;
+function isSchoolScopedInset(e) {
+  if (e.event_type !== 'inset_day') return false;
+  const label = e.label || '';
+  return SCHOOL_NAME_RE.test(label) || /all schools except/i.test(label);
+}
+
 /** One academic-year card: heading + legend, proportional strip, event rows. */
-function buildYearCard({ year, dates }) {
+function buildYearCard({ year, dates: allDates }) {
+  const dates = allDates.filter((e) => !isSchoolScopedInset(e));
+  const perSchool = allDates.filter(isSchoolScopedInset);
   const rows = dates.map((e) => {
     const k = kindOf(e);
     const multi = e.end_date && e.end_date !== e.date;
@@ -172,7 +194,12 @@ function buildYearCard({ year, dates }) {
           <span><span class="sq" style="background:#E8724A"></span>Holiday</span>
         </div>
       </div>${stripHtml}
-      <div class="rows">${rows}</div>
+      <div class="rows">${rows}</div>${perSchool.length ? `
+      <details class="perschool">
+        <summary>Per-school INSET days (${perSchool.length}) — each applies only to the schools named</summary>
+        <p class="ps-note">Published by the council for ${esc(year)}. Most councils don't publish these at all — your own school's newsletter is always the final word.</p>
+        <div class="rows">${perSchool.map((e) => `<div class="row"><span class="when">${esc(frShort(e.date, e.end_date))}</span><span class="lbl">${esc(e.label || 'INSET day')}<span class="pill" style="background:#FDF0EB;color:#B8431F">INSET day</span></span><span class="wdays"></span></div>`).join('')}</div>
+      </details>` : ''}
     </section>`;
 }
 
@@ -183,7 +210,7 @@ function buildYearCard({ year, dates }) {
  */
 function buildCountdown(authority, years) {
   const flat = [];
-  years.forEach(({ dates }) => dates.forEach((e) => flat.push(e)));
+  years.forEach(({ dates }) => dates.forEach((e) => { if (!isSchoolScopedInset(e)) flat.push(e); }));
   flat.sort((a, b) => isoMs(a.date) - isoMs(b.date));
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -260,7 +287,8 @@ function extractFacts(dates) {
     easter: inMonths([3, 4], 5),
     mayHalf: inMonths([5, 6]),
     summerEnd,
-    insetCount: dates.filter((d) => d.event_type === 'inset_day').length,
+    insetCount: dates.filter((d) => d.event_type === 'inset_day' && !isSchoolScopedInset(d)).length,
+    schoolInsetCount: dates.filter(isSchoolScopedInset).length,
     holidayWeekdays: ranges.reduce((n, r) => n + weekdaysIn(r.date, r.end_date), 0),
   };
 }
@@ -370,7 +398,7 @@ function buildCouncilContent(authority, years) {
   const latestInset = factsByYear[factsByYear.length - 1];
   faqs.push([
     `What are INSET days, and are they in this calendar?`,
-    `Every state school in England and Wales takes five INSET days a year — staff-training days when pupils stay at home. They're chosen school by school, not by the council, so council calendars ${latestInset.f.insetCount ? `list only some of them (${latestInset.f.insetCount} appear${latestInset.f.insetCount === 1 ? 's' : ''} here for ${latestInset.year})` : `rarely include them, this one included`}. Schools confirm their own INSET days in newsletters, usually termly — they're exactly the kind of date that slips through the cracks, and exactly what Housemait keeps on the family calendar for you.`,
+    `Every state school in England and Wales takes five INSET days a year — staff-training days when pupils stay at home. They're chosen school by school, not by the council, so council calendars ${latestInset.f.schoolInsetCount ? `rarely list them — but ${name} is a rare exception: the council publishes each school's own INSET days, and ${latestInset.f.schoolInsetCount} school-specific dates for ${latestInset.year} are listed in their own section on this page` : latestInset.f.insetCount ? `list only some of them (${latestInset.f.insetCount} appear${latestInset.f.insetCount === 1 ? 's' : ''} here for ${latestInset.year})` : `rarely include them, this one included`}. Schools confirm their own INSET days in newsletters, usually termly — they're exactly the kind of date that slips through the cracks, and exactly what Housemait keeps on the family calendar for you.`,
   ]);
 
   const contentHtml = `
@@ -437,6 +465,7 @@ function buildIcs(authority, entries) {
   ];
   for (const e of entries) {
     if (!e.date) continue;
+    if (isSchoolScopedInset(e)) continue; // school-specific rows would spam most families' calendars
     const label = e.label || TYPE_LABEL[e.event_type] || e.event_type;
     lines.push(
       'BEGIN:VEVENT',
@@ -649,6 +678,10 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .row .pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
     .row .wdays { font-size: 12.5px; color: #6B6774; }
 
+    .perschool { margin-top: 14px; border-top: 1px dashed #E8E5EC; padding-top: 12px; }
+    .perschool summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: #6B6774; }
+    .perschool summary:hover { color: #6B3FA0; }
+    .perschool .ps-note { font-size: 12.5px; color: #6B6774; margin: 10px 0 4px; }
     .srcline { font-size: 12.5px; color: #6B6774; margin: 14px 0 0; }
 
     .ctaband { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; background: #6B3FA0; border-radius: 20px; padding: 28px 30px; margin-top: 36px; }

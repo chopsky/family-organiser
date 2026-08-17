@@ -244,3 +244,54 @@ describe('council page action buttons', () => {
     expect(res.text).toContain('https://housemait.com/signup?src=termdates-ics');
   });
 });
+
+describe('per-school INSET days (the Barking & Dagenham publishing style)', () => {
+  const ENTRIES = [
+    { academic_year: '2199-2200', event_type: 'term_start', date: '2199-09-02', end_date: null, label: 'Start of term' },
+    // council-wide INSET with a dash - must STAY in the main table and the .ics
+    { academic_year: '2199-2200', event_type: 'inset_day', date: '2199-09-03', end_date: null, label: 'INSET Day - designated for all LEA Maintained Schools' },
+    // school-scoped rows - subsection only, never ics/countdown
+    { academic_year: '2199-2200', event_type: 'inset_day', date: '2199-09-01', end_date: null, label: 'INSET day - all schools except Sydney Russell School and The Warren School' },
+    { academic_year: '2199-2200', event_type: 'inset_day', date: '2199-11-20', end_date: null, label: 'INSET day - Godwin Primary, Roding Primary' },
+    { academic_year: '2199-2200', event_type: 'half_term_start', date: '2199-10-26', end_date: '2199-10-30', label: 'Half term holiday' },
+    { academic_year: '2199-2200', event_type: 'term_end', date: '2200-07-23', end_date: null, label: 'End of term' },
+  ];
+  beforeEach(() => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la-bd', name: 'Barking and Dagenham', slug: 'barking-and-dagenham',
+      region: 'England', import_status: 'ok', school_count: 68,
+    });
+    laDb.getEntriesForLA.mockResolvedValue(ENTRIES);
+  });
+
+  it('moves school-scoped rows into a collapsed section, keeps council-wide ones in the table', async () => {
+    const res = await request(app()).get('/school-term-dates/barking-and-dagenham');
+    expect(res.text).toContain('Per-school INSET days (2)');
+    expect(res.text).toContain('Godwin Primary');
+    // the dashed-but-council-wide label stays out of the subsection: it
+    // appears before the <details> block, not inside it
+    const detailsAt = res.text.indexOf('<details class="perschool"');
+    expect(detailsAt).toBeGreaterThan(-1);
+    expect(res.text.indexOf('LEA Maintained Schools')).toBeLessThan(detailsAt);
+  });
+
+  it('keeps school-scoped rows out of the .ics download', async () => {
+    const res = await request(app()).get('/school-term-dates/barking-and-dagenham/term-dates.ics');
+    expect(res.text).toContain('LEA Maintained Schools');   // council-wide INSET ships
+    expect(res.text).not.toContain('Godwin Primary');        // school-scoped does not
+    expect(res.text).not.toContain('Sydney Russell');
+  });
+
+  it('countdown card skips school-scoped INSETs and leads with back-to-school', async () => {
+    // scoped INSET (1 Sep) precedes term start (2 Sep); without the skip it
+    // would be the borough's hero card
+    const res = await request(app()).get('/school-term-dates/barking-and-dagenham');
+    expect(res.text).toContain('Back to school');
+  });
+
+  it('FAQ presents the per-school table as the exception it is', async () => {
+    const res = await request(app()).get('/school-term-dates/barking-and-dagenham');
+    expect(res.text).toContain('rare exception');
+    expect(res.text).toContain('2 school-specific dates');
+  });
+});
