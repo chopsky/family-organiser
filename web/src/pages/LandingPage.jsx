@@ -556,9 +556,6 @@ export default function LandingPage() {
             <Link to={SIGNUP_URL} className="lv-nav-cta">Get started</Link>
           </div>
         </nav>
-        {termDatesRibbon && (
-          <div className="lv-tdchip" role="status">✓ {termDatesRibbon} term dates included</div>
-        )}
       </div>
 
       {/* ── Hero ── */}
@@ -567,6 +564,9 @@ export default function LandingPage() {
         <div className="lv-hero-scrim" />
         <div className="lv-hero-noise" />
         <div className="lv-hero-inner">
+          {termDatesRibbon && (
+            <div className="lv-tdchip" role="status">✓&nbsp;{termDatesRibbon} term dates included</div>
+          )}
           <h1>Family life,<br />{organised} with AI.</h1>
           <p className="lv-hero-sub">One home for the family calendar, meals, lists and chores, with an AI assistant in WhatsApp that does it all for you.</p>
           <div className="lv-hero-ctas">
