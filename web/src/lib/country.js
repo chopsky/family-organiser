@@ -148,13 +148,27 @@ export function isUkHousehold(household) {
 }
 
 /**
- * Whether a household has access to ANY schools UI (UK-style GIAS search
- * or SA-style manual entry + national term-date import). For other
- * countries the schools section is hidden entirely with a Coming-soon
- * placeholder.
+ * Whether a household has access to the schools UI. Every country now
+ * qualifies (2026-08-14): the term-date methods (website import, PDF
+ * upload, iCal feed, manual entry) are country-neutral, so non-UK/SA
+ * families get a free-text school name plus those four methods. Only the
+ * COUNTRY-SPECIFIC conveniences stay gated elsewhere: GIAS search +
+ * council dates (GB), the national calendar import (ZA). Kept as a
+ * function so any future gating stays centralised here.
  */
-export function hasSchoolsFeature(household) {
-  return household?.country === 'GB' || household?.country === 'ZA';
+export function hasSchoolsFeature() {
+  return true;
+}
+
+/**
+ * Countries whose school year follows the CALENDAR year (southern
+ * hemisphere: terms run Jan-Dec, so the academic-year label is just the
+ * year). Everyone else - GB/IE/US/CA and unknown OTHER - gets the
+ * September-August convention, which is both the UK truth and the least-
+ * wrong default for the northern hemisphere.
+ */
+export function usesCalendarSchoolYear(country) {
+  return country === 'ZA' || country === 'AU' || country === 'NZ';
 }
 
 /**

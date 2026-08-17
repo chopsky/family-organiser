@@ -121,9 +121,13 @@ const fmtRange = (a, b) => (b ? `${fmtDay(a).replace(/,? \d{4}$/, '')} – ${fmt
  * the grouped view. South Africa runs on the calendar year and writes its
  * years with a slash, matching what the national import stores.
  */
-function academicYearFor(iso, isSa) {
+function academicYearFor(iso, country) {
   const [y, m] = iso.split('-').map(Number);
-  if (isSa) return `${y}/${y + 1}`;
+  // SA keeps its slash convention (matches what the national import
+  // stores). Other calendar-year countries (AU/NZ) label by bare year,
+  // matching what the server-side extractor tags their imports with.
+  if (country === 'ZA') return `${y}/${y + 1}`;
+  if (country === 'AU' || country === 'NZ') return String(y);
   return m >= 9 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
 }
 
@@ -135,7 +139,12 @@ const yearSpan = (dates) => {
 };
 
 export default function TermDatesSheet({ open, school, sharedDates = null, country = 'GB', onClose, onImported, onReview }) {
-  const [step, setStep] = useState('fork');
+  // The fork step ("where does this school get its dates?") only exists
+  // where there's a country-specific source to fork TO: the council row
+  // (GB), the national calendar (ZA), or a shared-directory offer. Other
+  // countries go straight to the country-neutral method picker.
+  const hasFork = country === 'GB' || country === 'ZA' || (sharedDates?.count > 0);
+  const [step, setStep] = useState(hasFork ? 'fork' : 'methods');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [url, setUrl] = useState('');
@@ -198,8 +207,8 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
 
   function back() {
     setError('');
-    if (step === 'preview') { setStep('fork'); setPreview(null); return; }
-    if (step === 'methods') { setStep('fork'); return; }
+    if (step === 'preview') { setStep(hasFork ? 'fork' : 'methods'); setPreview(null); return; }
+    if (step === 'methods') { if (hasFork) setStep('fork'); else onClose(); return; }
     setStep('methods');
   }
 
@@ -316,7 +325,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
     const rows = [];
     for (const t of terms) {
       if (!t.name.trim() || !t.start || !t.end) continue;
-      const ay = academicYearFor(t.start, isSa);
+      const ay = academicYearFor(t.start, country);
       rows.push({ event_type: 'term_start', date: t.start, label: `${t.name.trim()} begins`, academic_year: ay });
       rows.push({ event_type: 'term_end', date: t.end, label: `${t.name.trim()} ends`, academic_year: ay });
     }
@@ -477,7 +486,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
           {/* ── STEP 2: method ───────────────────────────────────────── */}
           {step === 'methods' && (
             <>
-              <Heading>How do you want to add them?</Heading>
+              <Heading>How would you like to add term dates?</Heading>
               <Sub>Whichever is easiest. You&apos;ll check the dates before anything is saved.</Sub>
               <OptionRow icon="globe" tintBg={BRAND_SOFT} tintFg={BRAND_DEEP}
                 title="From the school website"
@@ -670,7 +679,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
                 <button type="button" onClick={confirmImport} disabled={busy} style={cta(busy)}>
                   {busy ? 'Adding…' : `Add ${preview.dates.length} dates to the calendar`}
                 </button>
-                <button type="button" onClick={() => { setPreview(null); setStep('fork'); }} style={{ ...ghost, marginTop: 4 }}>
+                <button type="button" onClick={() => { setPreview(null); setStep(hasFork ? 'fork' : 'methods'); }} style={{ ...ghost, marginTop: 4 }}>
                   These don&apos;t look right
                 </button>
               </>

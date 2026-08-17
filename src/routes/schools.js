@@ -986,8 +986,8 @@ router.post('/:schoolId/import-website/preview', requireAuth, requireHousehold, 
     const now = new Date();
     let currentAY;
     let nextAY;
-    if (country === 'ZA') {
-      // SA school year = calendar year. AY label is just the year number.
+    if (country === 'ZA' || country === 'AU' || country === 'NZ') {
+      // Calendar-year school countries: AY label is just the year number.
       currentAY = String(now.getFullYear());
       nextAY = String(now.getFullYear() + 1);
     } else {

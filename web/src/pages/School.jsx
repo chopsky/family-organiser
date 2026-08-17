@@ -7,7 +7,7 @@ import Spinner from '../components/Spinner';
 import {
   IconPlus, IconBell, IconGraduation, IconMessageCircle, IconCalendar,
 } from '../components/Icons';
-import { isSouthAfricaHousehold, hasSchoolsFeature } from '../lib/country';
+import { usesCalendarSchoolYear } from '../lib/country';
 import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import ActivityModal from '../components/ActivityModal';
@@ -61,12 +61,14 @@ export default function School() {
   // School management is collaborative, so gate on canManage (any adult
   // member), not the legacy single-admin flag — same rule as FamilySetup.
   const { household, canManage: isAdmin } = useAuth();
-  // Country-specific school flow gates:
+  // Country-specific school flow modes (every country has the feature):
   //   • UK: GIAS-driven school search + LA term-date scrape (full-fat)
   //   • SA: free-text school name + national term-date import
-  //   • Other: schools feature hidden entirely with a Coming-soon card
-  const isSa = isSouthAfricaHousehold(household);
-  const showSchools = hasSchoolsFeature(household);
+  //   • Other: free-text school name + the country-neutral term-date
+  //     methods (website / PDF / iCal / manual) - no fork step
+  const isGb = household?.country === 'GB';
+  // Free-text add path: everyone except the UK (GIAS only covers GB).
+  const freeTextSchool = !isGb;
   const hasChildren = useHasChildren();
 
   const [success, setSuccess] = useState('');
@@ -251,7 +253,7 @@ export default function School() {
       // today). Adding a date for next term that crosses an AY boundary
       // previously bucketed under "today's" AY, which then showed under
       // the wrong year heading in the grouped view.
-      const academicYear = (household?.country === 'ZA')
+      const academicYear = usesCalendarSchoolYear(household?.country)
         ? getAcademicYearSa(termDateDate)
         : getAcademicYearUk(termDateDate);
       const { data } = await api.post(`/schools/${termDateSchoolId}/term-dates`, {
@@ -362,8 +364,10 @@ export default function School() {
   // Fallback to month-based bucketing only when there are no term_start
   // events in a year - defensive, rarely hits.
   function groupDatesByTerm(dates, country) {
-    const isSaCountry = country === 'ZA';
-    const termLabels = isSaCountry
+    // Calendar-year school countries (SA, AU, NZ) run four numbered terms
+    // Jan-Dec; the northern convention is three named UK-style terms.
+    const isCalYearCountry = usesCalendarSchoolYear(country);
+    const termLabels = isCalYearCountry
       ? [
           { key: 'term1', label: 'Term 1' },
           { key: 'term2', label: 'Term 2' },
@@ -375,7 +379,7 @@ export default function School() {
           { key: 'spring', label: 'Spring' },
           { key: 'summer', label: 'Summer' },
         ];
-    const getAyFallback = isSaCountry ? getAcademicYearSa : getAcademicYearUk;
+    const getAyFallback = isCalYearCountry ? getAcademicYearSa : getAcademicYearUk;
 
     // Group all events by academic year first.
     const byYear = {};
@@ -405,7 +409,7 @@ export default function School() {
         // 1:1 index mapping (4 terms, 4 labels, one start each, sometimes
         // crossing calendar quarters).
         let boundaries;
-        if (isSaCountry) {
+        if (isCalYearCountry) {
           boundaries = termStarts.map((t, i) => ({ group: i, date: t.date }));
         } else {
           const seasonOf = (d) => { const m = new Date(d).getMonth(); return m >= 7 ? 0 : m <= 2 ? 1 : 2; };
@@ -435,7 +439,7 @@ export default function School() {
         for (const td of yearEvents) {
           const m = new Date(td.date).getMonth();
           let idx;
-          if (isSaCountry) {
+          if (isCalYearCountry) {
             if (m <= 2) idx = 0;
             else if (m <= 5) idx = 1;
             else if (m <= 8) idx = 2;
@@ -538,7 +542,7 @@ export default function School() {
     try {
       let body = null;
       let reuseSchool = null;
-      if (isSa) {
+      if (freeTextSchool) {
         if (!addSchoolSaName.trim()) { setAddingSchool(false); return; }
         body = { school_name: addSchoolSaName.trim() };
       } else if (addSchoolManual) {
@@ -637,22 +641,6 @@ export default function School() {
     }
   }
 
-
-  // ── Non-supported countries: coming-soon card, nothing else ────────
-  if (!showSchools) {
-    return (
-      <div className="max-w-[1080px] mx-auto space-y-6 pb-24">
-        <PageHeader title="School" />
-        <section>
-          <p className="text-sm text-[var(--ink-2)] max-w-[560px]">
-            School directory and term-date imports are currently available
-            in the UK and South Africa. Coming soon to more countries -
-            until then, the rest of Housemait works the same.
-          </p>
-        </section>
-      </div>
-    );
-  }
 
   // ── Teaser: no dependent children yet ──────────────────────────────
   const laBanner = laHandoff ? (
@@ -864,8 +852,8 @@ export default function School() {
           <div className="absolute inset-0 bg-black/40" />
           <div className="relative bg-linen rounded-2xl shadow-lg border border-cream-border p-5 sm:p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-base md:text-medium font-semibold text-bark mb-1">Add a school</h2>
-            <p className="text-xs text-cocoa mb-4">{isSa ? 'Enter the school name. You can import term dates next.' : 'Search the UK schools directory. You can import term dates next.'}</p>
-            {isSa ? (
+            <p className="text-xs text-cocoa mb-4">{freeTextSchool ? 'Enter the school name. You can add term dates next.' : 'Search the UK schools directory. You can import term dates next.'}</p>
+            {freeTextSchool ? (
               <div>
                 <label className="block text-xs font-medium text-cocoa mb-1">School name</label>
                 <input
@@ -945,7 +933,7 @@ export default function School() {
               <button onClick={() => setAddSchoolOpen(false)} className="flex-1 border border-cream-border text-cocoa font-medium py-2.5 rounded-2xl hover:bg-sand transition-colors text-sm">Cancel</button>
               <button
                 onClick={handleCreateSchool}
-                disabled={addingSchool || (isSa ? !addSchoolSaName.trim() : (addSchoolManual ? !addSchoolManualName.trim() : !addSchoolSelected))}
+                disabled={addingSchool || (freeTextSchool ? !addSchoolSaName.trim() : (addSchoolManual ? !addSchoolManualName.trim() : !addSchoolSelected))}
                 className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-2xl hover:bg-primary-pressed transition-colors disabled:opacity-50 text-sm"
               >
                 {addingSchool ? 'Adding…' : 'Add school'}

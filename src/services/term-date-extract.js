@@ -395,7 +395,9 @@ async function fetchTermDatesPageText(url) {
  */
 function academicYearsForCountry(country) {
   const now = new Date();
-  if (country === 'ZA') {
+  // Calendar-year school countries (southern hemisphere): the school year
+  // IS the calendar year, so the AY label is just the year number.
+  if (country === 'ZA' || country === 'AU' || country === 'NZ') {
     return {
       currentAY: String(now.getFullYear()),
       nextAY: String(now.getFullYear() + 1),
