@@ -44,6 +44,15 @@ export function resolveReferralCode(now = Date.now()) {
   }
 }
 
+/**
+ * The one pre-written share message (design_handoff_referral, final copy).
+ * "First two months free" = the standard trial month plus the gift month,
+ * the honest arithmetic of what the link actually gives a new family.
+ */
+export function referralShareMessage(url) {
+  return `Fancy a couple of free months of Housemait? It keeps our family calendar, lists and school dates in one place. This link gives you your first two months free: ${url}`;
+}
+
 /** Consume once an account has been created with it. */
 export function clearReferralCode() {
   try {

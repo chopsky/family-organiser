@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import api from '../lib/api';
 import { share } from '../lib/share';
+import { referralShareMessage } from '../lib/referralCode';
 
 const LAST_KEY = 'housemait_ref_nudge_last';
 const DISMISS_KEY = 'housemait_ref_nudge_dismissed';
@@ -73,10 +74,10 @@ export default function ReferralNudge({ show, context = 'sorted' }) {
 
   const shareNow = async () => {
     const ok = await share({
-      title: 'A month of Housemait, on us',
-      text: `We've been using Housemait to keep all our family stuff in one place - calendar, lists, meals, even school letters over WhatsApp. They've given me a free month to share with another family - here's the link: ${mine.share_url}`,
+      title: 'A free month of Housemait',
+      text: referralShareMessage(mine.share_url),
       url: mine.share_url,
-      dialogTitle: 'Give a friend a month of Housemait',
+      dialogTitle: 'A free month of Housemait',
     });
     if (ok) { setShared(true); setTimeout(() => setHidden(true), 1800); }
   };

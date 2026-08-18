@@ -23,6 +23,7 @@ import {
 import { share } from '../lib/share';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
 import { SUPPORTED_COUNTRIES, COUNTRY_LABELS } from '../lib/country';
+import { referralShareMessage } from '../lib/referralCode';
 import { readLocaleCookie } from '../hooks/useLocale';
 import { openWriteReview } from '../lib/appReview';
 import { useSubscription } from '../context/SubscriptionContext';
@@ -350,6 +351,12 @@ function ProfileCard({ me, members }) {
       )}
 
       {portalError && <p className="text-sm text-coral px-5 pb-4">{portalError}</p>}
+
+      {/* Referral strip - the card's foot. The reward is a billing credit,
+          so it lives with the plan. Renders nothing outside the pilot (the
+          API is the gate) and inherits the card's bottom rounding via the
+          card's overflow-hidden. */}
+      <ReferralStrip />
     </div>
   );
 }
@@ -477,16 +484,25 @@ const IOS_SECTION_ICONS = {
 };
 
 /**
- * "Give a month, get a month" referral card. Fetches /referrals/mine once;
- * outside the pilot the API answers { enabled: false } and this renders
- * NOTHING - the server is the single rollout gate, no client flag.
- * Share URL is pinned to housemait.com (window.location.origin is
- * capacitor:// inside the app and recipients couldn't open it).
+ * "Give a month, get a month" - the amber referral strip at the FOOT of
+ * the profile/plan card (design_handoff_referral). The reward is a billing
+ * credit, so it lives with the plan rows, reads as part of that card, and
+ * is permanent (quiet enough to stay).
+ *
+ * Fetches /referrals/mine once; outside the pilot the API answers
+ * { enabled: false } and this renders NOTHING - the server is the single
+ * rollout gate, no client flag. Share URL is pinned to housemait.com
+ * (window.location.origin is capacitor:// inside the app).
+ *
+ * Desktop: link chip (click = copy, inline Copied state) + solid Share.
+ * Mobile/native: ONE control - the Share pill into the native sheet.
  */
-function ReferralSection({ sectionWrapper }) {
-  const SectionWrapper = sectionWrapper;
+const REFERRAL_AMBER_BG = '#FBF1DE';
+const REFERRAL_AMBER = '#8A5F1E';
+
+function ReferralStrip() {
   const [state, setState] = useState(null); // null = loading/disabled
-  const [shared, setShared] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -498,44 +514,73 @@ function ReferralSection({ sectionWrapper }) {
 
   if (!state) return null;
 
-  const shareNow = async () => {
-    const ok = await share({
-      title: 'A month of Housemait, on us',
-      text: `We've been using Housemait to keep all our family stuff in one place - calendar, lists, meals, even school letters over WhatsApp. They've given me a free month to share with another family - here's the link: ${state.share_url}`,
-      url: state.share_url,
-      dialogTitle: 'Give a friend a month of Housemait',
-    });
-    if (ok) { setShared(true); setTimeout(() => setShared(false), 2500); }
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(state.share_url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* clipboard blocked - the Share button still works */ }
   };
 
+  const shareNow = () => share({
+    title: 'A free month of Housemait',
+    text: referralShareMessage(state.share_url),
+    url: state.share_url,
+    dialogTitle: 'A free month of Housemait',
+  });
+
+  // Meta line only once there's something to say; "(max)" replaces a
+  // dedicated capped state (365 banked days = the 12-month cap).
+  const metaLine = state.activated > 0
+    ? `${state.activated} month${state.activated === 1 ? '' : 's'} earned${state.banked_days >= 360 ? ' (max)' : ''}`
+    : null;
+
   return (
-    <SectionWrapper slug="referral" title="Give a month, get a month" icon={IconGift} accordion>
-      <p className="text-sm text-cocoa">
-        Know another family drowning in school letters? Give them a free month
-        of Housemait. Once they start using it, you get a month free too.
-      </p>
-      {state.banked_days > 0 && (
-        <p className="text-sm font-semibold text-bark mt-2">
-          🎁 You&apos;ve banked {state.banked_days} day{state.banked_days === 1 ? '' : 's'} of free Housemait.
+    <div
+      className="flex items-center gap-3 px-[18px] py-[14px] border-t border-[rgba(26,22,32,0.07)]"
+      style={{ background: REFERRAL_AMBER_BG }}
+    >
+      <span
+        className="shrink-0 flex items-center justify-center bg-white"
+        style={{ width: 38, height: 38, borderRadius: 11 }}
+        aria-hidden="true"
+      >
+        <IconGift size={19} style={{ color: REFERRAL_AMBER }} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="m-0 text-[14px] font-bold leading-tight" style={{ color: REFERRAL_AMBER }}>
+          Give a month, get a month
         </p>
-      )}
-      {(state.pending > 0 || state.activated > 0) && (
-        <p className="text-xs text-cocoa mt-1">
-          {state.activated > 0 ? `${state.activated} famil${state.activated === 1 ? 'y' : 'ies'} joined through you. ` : ''}
-          {state.pending > 0 ? `${state.pending} still settling in.` : ''}
+        <p className="m-0 mt-0.5 text-[12px] leading-snug" style={{ color: REFERRAL_AMBER, opacity: 0.72 }}>
+          Their first two months free. A month off your bill once they start using it.
         </p>
-      )}
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={shareNow}
-          className="bg-primary text-white font-semibold text-sm px-5 py-2.5 rounded-2xl hover:bg-primary-pressed transition-colors"
-        >
-          {shared ? 'Link copied!' : 'Share your gift link'}
-        </button>
-        <span className="text-xs text-cocoa break-all">housemait.com/gift/{state.code}</span>
+        {metaLine && (
+          <p className="m-0 mt-0.5 text-[11.5px] font-semibold" style={{ color: REFERRAL_AMBER, opacity: 0.72 }}>
+            {metaLine}
+          </p>
+        )}
       </div>
-    </SectionWrapper>
+      {/* Link chip - desktop only. Click copies the full URL. */}
+      <button
+        type="button"
+        onClick={copyLink}
+        title="Copy your gift link"
+        className="hidden md:inline-flex items-center gap-1.5 bg-white px-3 py-2 rounded-[10px] text-[13px] font-semibold whitespace-nowrap"
+        style={{ color: copied ? '#2E6B44' : REFERRAL_AMBER, boxShadow: '0 1px 3px rgba(26,22,32,0.08)' }}
+      >
+        {copied
+          ? <>✓ Copied</>
+          : <><IconClipboard size={14} style={{ color: REFERRAL_AMBER }} /> housemait.com/gift/{state.code}</>}
+      </button>
+      <button
+        type="button"
+        onClick={shareNow}
+        className="shrink-0 inline-flex items-center gap-1.5 text-white px-4 rounded-full text-[13px] font-bold"
+        style={{ background: REFERRAL_AMBER, height: 36, boxShadow: '0 4px 10px rgba(138,95,30,0.3)' }}
+      >
+        Share
+      </button>
+    </div>
   );
 }
 
@@ -2520,11 +2565,6 @@ export default function Settings() {
           </div>
         ) : null}
       </SectionWrapper>
-
-      {/* Give a month, get a month - referral card. The API is the single
-          gate: outside the pilot /referrals/mine answers enabled:false and
-          this renders nothing at all. */}
-      <ReferralSection sectionWrapper={SectionWrapper} />
 
       {/* Location - device GPS is the primary source for the weather widget
           and location-aware AI answers; the Family Setup address is the
