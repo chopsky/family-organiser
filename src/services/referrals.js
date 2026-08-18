@@ -348,6 +348,30 @@ async function evaluateReferrals(deps = {}) {
   return { activated, lapsed, pending: pending.length - activated - lapsed };
 }
 
+/**
+ * The household's own INBOUND gift, if any (they were referred and it's
+ * still pending). Powers the Dashboard "your bonus month unlocks once
+ * you're up and running" card, which answers the referred family's
+ * "what do I need to do?" moment with directional guidance. NOT pilot-
+ * gated: a pending row can only exist via a pilot referrer, and the
+ * recipient is by definition outside the pilot list.
+ */
+async function getIncomingReferral(householdId) {
+  try {
+    const { data } = await supabaseAdmin
+      .from('referrals')
+      .select('status, referrer_household_id')
+      .eq('referred_household_id', householdId)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (!data) return null;
+    const referrer = await db.getHouseholdById(data.referrer_household_id).catch(() => null);
+    return { status: 'pending', from_family: referrer?.name || null };
+  } catch {
+    return null; // unmigrated table - no gift card
+  }
+}
+
 /** Summary for GET /api/referrals/mine. */
 async function getReferralStateForHousehold(householdId) {
   const code = await getOrCreateReferralCode(householdId);
@@ -389,4 +413,5 @@ module.exports = {
   grantComplimentaryDays,
   evaluateReferrals,
   getReferralStateForHousehold,
+  getIncomingReferral,
 };

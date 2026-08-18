@@ -147,6 +147,70 @@ function PromoClaimNudge() {
   );
 }
 
+/**
+ * The referred family's own gift card: their bonus month is pending and
+ * this answers "what do I need to do to unlock it?" with directional
+ * guidance (never the mechanical thresholds - those stay unpublished).
+ * "Connect WhatsApp" is named because it's the instant-qualify signal
+ * AND our most valuable onboarding action - the gift month doubles as
+ * an activation incentive. Disappears on activation or lapse (the API
+ * stops returning a pending `incoming`); dismissable per device.
+ */
+function ReferralGiftCard() {
+  const [incoming, setIncoming] = useState(null);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('housemait_gift_card_dismissed') === '1'; } catch { return false; }
+  });
+
+  useEffect(() => {
+    if (dismissed) return;
+    let cancelled = false;
+    api.get('/referrals/mine')
+      .then(({ data }) => {
+        if (!cancelled && data?.incoming?.status === 'pending') setIncoming(data.incoming);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [dismissed]);
+
+  if (dismissed || !incoming) return null;
+
+  function dismiss() {
+    try { localStorage.setItem('housemait_gift_card_dismissed', '1'); } catch { /* private mode */ }
+    setDismissed(true);
+  }
+
+  const from = incoming.from_family ? `from the ${incoming.from_family} family ` : '';
+  return (
+    <div
+      className="rounded-2xl p-4 mb-4 flex items-start gap-3"
+      style={{ background: '#FBF1DE', border: '1px solid rgba(138,95,30,0.22)' }}
+    >
+      <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎁</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium" style={{ color: '#8A5F1E' }}>
+          Your bonus month {from}is waiting
+        </p>
+        <p className="text-xs mt-1 leading-relaxed" style={{ color: '#8A5F1E', opacity: 0.8 }}>
+          It unlocks once your family is up and running. Connecting WhatsApp is the quickest way.
+        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <Link to="/settings?section=whatsapp" className="text-xs font-semibold hover:underline" style={{ color: '#8A5F1E' }}>
+            Connect WhatsApp →
+          </Link>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="text-xs text-cocoa hover:text-bark transition-colors"
+          >
+            Not now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── AI Chat Input ───────────────────────────────────────────────
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
@@ -671,6 +735,7 @@ export default function Dashboard() {
           first thing a brand-new user sees but doesn't push existing
           content off the fold. */}
       {!childMode && <PromoClaimNudge />}
+      {!childMode && <ReferralGiftCard />}
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

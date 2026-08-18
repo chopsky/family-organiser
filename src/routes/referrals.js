@@ -28,11 +28,15 @@ const giftLimiter = rateLimit({
 
 router.get('/mine', requireAuth, requireHousehold, async (req, res) => {
   try {
+    // `incoming` (this household's own pending gift) is deliberately
+    // outside the pilot gate: the recipient of a pilot household's link
+    // is by definition not on the pilot list, but their gift is real.
+    const incoming = await referrals.getIncomingReferral(req.householdId);
     if (!referrals.referralsEnabled(req.householdId)) {
-      return res.json({ enabled: false });
+      return res.json({ enabled: false, incoming });
     }
     const state = await referrals.getReferralStateForHousehold(req.householdId);
-    return res.json({ enabled: true, ...state });
+    return res.json({ enabled: true, ...state, incoming });
   } catch (err) {
     console.error('GET /api/referrals/mine error:', err);
     return res.status(500).json({ error: 'Internal server error' });

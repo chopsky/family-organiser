@@ -118,3 +118,11 @@ describe('reward cap maths', () => {
     expect(daysAhead).toBeGreaterThan(referrals.MAX_BANK_DAYS - 1);
   });
 });
+
+describe('getIncomingReferral', () => {
+  test('returns null when the table is unavailable (unmigrated tolerance)', async () => {
+    // supabaseAdmin is stubbed as {} here, so the query throws internally -
+    // the service must swallow it and report "no gift" rather than erroring.
+    await expect(referrals.getIncomingReferral('h1')).resolves.toBeNull();
+  });
+});

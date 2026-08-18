@@ -530,11 +530,18 @@ function ReferralStrip() {
     dialogTitle: 'A free month of Housemait',
   });
 
-  // Meta line only once there's something to say; "(max)" replaces a
-  // dedicated capped state (365 banked days = the 12-month cap).
-  const metaLine = state.activated > 0
-    ? `${state.activated} month${state.activated === 1 ? '' : 's'} earned${state.banked_days >= 360 ? ' (max)' : ''}`
-    : null;
+  // Meta line only once there's something to say. "(max)" replaces a
+  // dedicated capped state (365 banked days = the 12-month cap), and the
+  // pending count answers the "my friend signed up, where's my month?"
+  // moment - the referrer can SEE the system knows about them.
+  const metaParts = [];
+  if (state.activated > 0) {
+    metaParts.push(`${state.activated} month${state.activated === 1 ? '' : 's'} earned${state.banked_days >= 360 ? ' (max)' : ''}`);
+  }
+  if (state.pending > 0) {
+    metaParts.push(`${state.pending} ${state.pending === 1 ? 'family' : 'families'} settling in`);
+  }
+  const metaLine = metaParts.length > 0 ? metaParts.join(' · ') : null;
 
   return (
     <div
