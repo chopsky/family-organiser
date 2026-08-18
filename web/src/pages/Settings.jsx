@@ -575,7 +575,7 @@ function ReferralStrip() {
       <button
         type="button"
         onClick={shareNow}
-        className="shrink-0 inline-flex items-center gap-1.5 text-white px-4 rounded-full text-[13px] font-bold"
+        className="shrink-0 inline-flex items-center gap-1.5 text-white px-4 rounded-xl text-[13px] font-bold"
         style={{ background: REFERRAL_AMBER, height: 36, boxShadow: '0 4px 10px rgba(138,95,30,0.3)' }}
       >
         Share
@@ -1566,7 +1566,7 @@ export default function Settings() {
           <button
             type="button"
             onClick={startChildMode}
-            className="shrink-0 px-5 py-[11px] rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+            className="shrink-0 px-5 py-[11px] rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
             style={{ boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}
           >
             Start Child mode
@@ -2980,7 +2980,7 @@ export default function Settings() {
                     <button
                       type="button"
                       onClick={() => launchChildModeFor(null)}
-                      className="p-3 rounded-[14px] border border-[rgba(26,22,32,0.07)] bg-white text-sm font-semibold text-bark hover:bg-oat transition-colors"
+                      className="p-3 rounded-xl border border-[rgba(26,22,32,0.07)] bg-white text-sm font-semibold text-bark hover:bg-oat transition-colors"
                     >
                       Start Child mode on this device
                     </button>
