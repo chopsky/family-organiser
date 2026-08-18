@@ -59,7 +59,7 @@ export default function GiftLanding() {
   }, [code]);
 
   const heading = state.valid
-    ? 'A friend gave you a month of Housemait'
+    ? 'A friend gave you two free months of Housemait'
     : 'This gift link is no longer valid';
 
   return (
@@ -105,7 +105,7 @@ export default function GiftLanding() {
                   boxShadow: '0 6px 16px -8px rgba(107,63,160,0.45)',
                 }}
               >
-                {state.valid ? 'Claim your gift month' : 'Try Housemait free'}
+                {state.valid ? 'Claim your two free months' : 'Try Housemait free'}
               </Link>
               <p style={{ margin: '10px 0 0', fontFamily: sans, fontSize: 12, color: '#6B6774', textAlign: 'center' }}>
                 Free trial, no card needed.
