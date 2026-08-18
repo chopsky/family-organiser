@@ -18,7 +18,7 @@ import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin, IconStar,
-  IconGift,
+  IconGift, IconClipboard,
 } from '../components/Icons';
 import { share } from '../lib/share';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
