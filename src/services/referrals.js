@@ -281,8 +281,8 @@ async function notifyReferrerActivated(referrerHouseholdId, referredName) {
     const { sendBroadcastToMember } = require('./whatsapp-templates');
     const members = await db.getHouseholdMembers(referrerHouseholdId);
     const linked = (members || []).filter((m) => m.whatsapp_phone);
-    const family = referredName ? `The ${referredName} family` : 'The family you invited';
-    const message = `🎁 ${family} are in! You've both got a free month of Housemait Premium on us. Thanks for spreading the word.`;
+    // Generic on purpose: household names are private to their households.
+    const message = `🎁 The family you invited are in! You've both got a free month of Housemait Premium on us. Thanks for spreading the word.`;
     for (const m of linked.slice(0, 2)) {
       await sendBroadcastToMember(m, message).catch(() => {});
     }
@@ -327,8 +327,7 @@ async function evaluateReferrals(deps = {}) {
         if (error) continue;
         await grant(ref.referrer_household_id, ref.reward_days || REWARD_DAYS);
         await grant(ref.referred_household_id, ref.reward_days || REWARD_DAYS);
-        const referred = await db.getHouseholdById(ref.referred_household_id).catch(() => null);
-        await notify(ref.referrer_household_id, referred?.name || null);
+        await notify(ref.referrer_household_id);
         activated++;
       } else if (ageDays > LAPSE_AFTER_DAYS) {
         await supabaseAdmin
@@ -365,8 +364,9 @@ async function getIncomingReferral(householdId) {
       .eq('status', 'pending')
       .maybeSingle();
     if (!data) return null;
-    const referrer = await db.getHouseholdById(data.referrer_household_id).catch(() => null);
-    return { status: 'pending', from_family: referrer?.name || null };
+    // No giver name: household names are private (see the gift endpoint).
+    // The recipient knows who shared the link with them.
+    return { status: 'pending' };
   } catch {
     return null; // unmigrated table - no gift card
   }

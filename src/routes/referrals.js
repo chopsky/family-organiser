@@ -49,11 +49,12 @@ router.get('/gift/:code', giftLimiter, async (req, res) => {
     if (!household) {
       return res.status(404).json({ error: 'This gift link is not valid.' });
     }
-    // Display name only - never expose members, emails, or ids.
+    // No household name: families name households privately (in-jokes,
+    // kids' slang) and gift links get forwarded - the recipient already
+    // knows who sent it from the chat it arrived in.
     return res.json({
       valid: true,
       code: household.referral_code,
-      family_name: household.name || null,
     });
   } catch (err) {
     console.error('GET /api/referrals/gift error:', err);

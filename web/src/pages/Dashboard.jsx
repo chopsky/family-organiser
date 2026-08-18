@@ -180,7 +180,6 @@ function ReferralGiftCard() {
     setDismissed(true);
   }
 
-  const from = incoming.from_family ? `from the ${incoming.from_family} family ` : '';
   return (
     <div
       className="rounded-2xl p-4 mb-4 flex items-start gap-3"
@@ -189,7 +188,7 @@ function ReferralGiftCard() {
       <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎁</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium" style={{ color: '#8A5F1E' }}>
-          Your bonus month {from}is waiting
+          Your bonus month is waiting
         </p>
         <p className="text-xs mt-1 leading-relaxed" style={{ color: '#8A5F1E', opacity: 0.8 }}>
           It unlocks once your family is up and running. Connecting WhatsApp is the quickest way.

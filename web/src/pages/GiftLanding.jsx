@@ -22,11 +22,12 @@ const FEATURES = [
   ['📅', 'One shared calendar', 'School dates, clubs and appointments, colour-coded per person.'],
   ['💬', 'Runs on WhatsApp', 'Forward a school letter and the dates add themselves.'],
   ['🛒', 'Lists and meals sorted', 'Shopping lists and a weekly meal plan the whole family sees.'],
+  ['⭐', 'Chores kids actually do', 'Stars and rewards turn helping out into a game.'],
 ];
 
 export default function GiftLanding() {
   const { code } = useParams();
-  const [state, setState] = useState({ loading: true, familyName: null, valid: false });
+  const [state, setState] = useState({ loading: true, valid: false });
 
   useEffect(() => {
     document.title = 'A gift for your family | Housemait';
@@ -46,26 +47,25 @@ export default function GiftLanding() {
         if (cancelled) return;
         if (data?.valid) {
           storeReferralCode(data.code);
-          setState({ loading: false, familyName: data.family_name, valid: true });
+          setState({ loading: false, valid: true });
         } else {
-          setState({ loading: false, familyName: null, valid: false });
+          setState({ loading: false, valid: false });
         }
       } catch {
-        if (!cancelled) setState({ loading: false, familyName: null, valid: false });
+        if (!cancelled) setState({ loading: false, valid: false });
       }
     })();
     return () => { cancelled = true; };
   }, [code]);
 
-  const family = (state.familyName || '').trim();
   const heading = state.valid
-    ? `${family ? `The ${family} family` : 'A family you know'} gave you a month of Housemait`
+    ? 'A friend gave you a month of Housemait'
     : 'This gift link is no longer valid';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FBF8F3', display: 'flex', justifyContent: 'center', padding: '32px 20px' }}>
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%)', display: 'flex', justifyContent: 'center', padding: '32px 20px' }}>
       <div style={{ width: '100%', maxWidth: 480 }}>
-        <img src="/housemait-logomark.svg" alt="Housemait" style={{ width: 44, height: 44, display: 'block', margin: '8px auto 20px' }} />
+        <img src="/housemait-logo-web.svg" alt="Housemait" style={{ height: 30, display: 'block', margin: '8px auto 20px' }} />
 
         <div style={{ background: '#FFFFFF', borderRadius: 18, padding: '26px 24px', boxShadow: '0 4px 16px rgba(107,63,160,0.08)' }}>
           {state.loading ? (
