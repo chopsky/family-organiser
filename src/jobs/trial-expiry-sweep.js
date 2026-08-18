@@ -21,15 +21,23 @@ const { supabaseAdmin } = require('../db/client');
 async function runTrialExpirySweep() {
   let overdue;
   try {
+    // select('*') so the pre-migration absence of complimentary_until can't
+    // 400 the fetch and silently stop the sweep.
     const { data, error } = await supabaseAdmin
       .from('households')
-      .select('id, trial_ends_at')
+      .select('*')
       .eq('subscription_status', 'trialing')
       .eq('is_internal', false)   // middleware never applies status logic to internal rows; neither do we
       .is('trial_paused_at', null)
       .lt('trial_ends_at', new Date().toISOString());
     if (error) throw error;
-    overdue = data || [];
+    // A live complimentary credit (referral reward / goodwill grant) keeps
+    // access regardless of trial state - mirror the middleware and leave
+    // those rows alone until the credit runs out.
+    const nowMs = Date.now();
+    overdue = (data || []).filter(
+      (h) => !(h.complimentary_until && new Date(h.complimentary_until).getTime() > nowMs)
+    );
   } catch (err) {
     console.error('[trial-expiry-sweep] fetch failed:', err.message);
     return { flipped: 0, failed: 0, error: err.message };

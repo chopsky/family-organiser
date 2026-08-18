@@ -49,7 +49,19 @@ router.get('/:token', readLimiter, async (req, res) => {
     const invite = await db.getEventInviteByToken(req.params.token);
     if (!invite) return res.status(404).json({ error: 'This invite link is no longer available' });
     if (invite.expired) return res.status(410).json({ expired: true });
-    return res.json({ hostFirstName: invite.hostFirstName, event: invite.event });
+    // Referral loop weld: when the HOST household is in the referral pilot
+    // and already has a code, the pitch card on the invite page upgrades
+    // its CTA to the gift link. Existing code only - a public unauth route
+    // must never lazy-mint anything.
+    let referralCode = null;
+    try {
+      const referrals = require('../services/referrals');
+      if (referrals.referralsEnabled(invite.householdId)) {
+        const household = await db.getHouseholdById(invite.householdId);
+        referralCode = household?.referral_code || null;
+      }
+    } catch { /* garnish - the invite renders fine without it */ }
+    return res.json({ hostFirstName: invite.hostFirstName, event: invite.event, referralCode });
   } catch (err) {
     console.error('GET /api/rsvp/:token error:', err?.message || err);
     return res.status(500).json({ error: 'Internal server error' });

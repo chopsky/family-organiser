@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
-    acquisition = null, inviteLoop = null,
+    acquisition = null, inviteLoop = null, referrals = null,
   } = data || {};
 
   // Calculate DAU average
@@ -196,6 +196,31 @@ export default function AdminAnalytics() {
               ['RSVPs', inviteLoop.rsvps],
               ['Families going', inviteLoop.rsvpYes],
               ['Signups', inviteLoop.signups],
+            ].map(([label, val]) => (
+              <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
+                <div className="text-2xl font-bold text-plum">{val}</div>
+                <div className="text-xs text-warm-grey mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Referral loop: codes → referred families → activated → months granted */}
+      {referrals && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Referrals (last {referrals.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            Give a month, get a month. <strong>Activated</strong> is all-time (reward paid both
+            sides); referred/pending/lapsed are within the window.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              ['Codes minted', referrals.codes],
+              ['Families referred', referrals.referred],
+              ['Still settling in', referrals.pending],
+              ['Activated (all-time)', referrals.activated],
+              ['Months granted', referrals.monthsGranted],
             ].map(([label, val]) => (
               <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
                 <div className="text-2xl font-bold text-plum">{val}</div>

@@ -39,6 +39,7 @@ const CheckEmail      = lazy(() => import('./pages/CheckEmail'));
 const Verified        = lazy(() => import('./pages/Verified'));
 const Verify          = lazy(() => import('./pages/Verify'));
 const PartyInvite     = lazy(() => import('./pages/PartyInvite'));
+const GiftLanding     = lazy(() => import('./pages/GiftLanding'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
@@ -272,6 +273,7 @@ function AppRoutes() {
         {/* Public party-invite RSVP page - no account required (that's the
             whole growth loop: value first, signup pitch after). */}
         <Route path="/p/:token" element={<PartyInvite />} />
+        <Route path="/gift/:code" element={<GiftLanding />} />
         {/* /open - deep-link target for "Open Housemait" email buttons. It's a
             Universal Link / App Link path (AASA + Android intent-filter), so on
             a phone with the app installed the OS opens the app instead of the

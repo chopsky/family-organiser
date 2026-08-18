@@ -30,6 +30,7 @@ import ErrorBanner from '../../components/ErrorBanner';
 import AuthHeader from '../../components/AuthHeader';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
+import { clearReferralCode } from '../../lib/referralCode';
 import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
 import { resolveTermDatesLa, readTermDatesLa, laDisplayName } from '../../lib/termDatesLa';
 import WelcomeNotifications from './steps/WelcomeNotifications';
@@ -176,6 +177,7 @@ export default function OnboardingFlow() {
   const goAfterAuth = (data) => {
     clearSignupPromo();
     clearSignupSource();
+    clearReferralCode();
     auth.login(data);
     setIdx(STEPS.indexOf(data?.household ? 'invite' : 'household'));
   };

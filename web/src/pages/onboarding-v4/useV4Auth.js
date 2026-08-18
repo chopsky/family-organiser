@@ -25,6 +25,7 @@ import { detectCountryFromTimezone, detectCountryFromLocaleCookie, detectCountry
 import { readLocaleCookie } from '../../hooks/useLocale';
 import { getStorefrontCountry } from '../../lib/revenuecat';
 import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
+import { resolveReferralCode, clearReferralCode } from '../../lib/referralCode';
 import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
 import { isNative } from '../../lib/platform';
 import { replayQueued } from './replay';
@@ -80,6 +81,7 @@ export default function useV4Auth(d) {
   const runFinish = async (existingHousehold) => {
     clearSignupPromo();
     clearSignupSource();
+    clearReferralCode();
 
     // The household name was collected at step 07 and has been sitting in the
     // draft ever since. A brand-new account has no household yet; one created
@@ -180,6 +182,7 @@ export default function useV4Auth(d) {
         inviteToken: searchParams.get('invite') || undefined,
         promoCode: resolveSignupPromo(searchParams) || undefined,
         source: resolveSignupSource(searchParams) || undefined,
+        referralCode: resolveReferralCode() || undefined,
         client: CLIENT,
         // No turnstile_token: the middleware bypasses native clients entirely
         // (Apple rejected 1.1.0(8) over a Turnstile race), and v4 is native.
@@ -231,6 +234,7 @@ export default function useV4Auth(d) {
       const { data } = await api.post('/auth/login', { email: email.trim(), password });
       clearSignupPromo();
       clearSignupSource();
+      clearReferralCode();
       auth.login(data);
       return true;
     } catch (err) {

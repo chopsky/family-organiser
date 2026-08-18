@@ -4,6 +4,7 @@ import SocialButtons from '../../../components/SocialButtons';
 import TurnstileWidget from '../../../components/TurnstileWidget';
 import ErrorBanner from '../../../components/ErrorBanner';
 import { clearSignupPromo } from '../../../lib/signupPromo';
+import { resolveReferralCode, clearReferralCode } from '../../../lib/referralCode';
 import { clearSignupSource } from '../../../lib/signupSource';
 import { Title, Em, Kicker, PrimaryButton, Ghost } from './_ui';
 import { inputStyle, labelStyle } from './_styles';
@@ -67,10 +68,12 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
         source: signupSource || undefined,
+        referralCode: resolveReferralCode() || undefined,
         turnstile_token: turnstile,
       });
       clearSignupPromo();              // account created - consume the code
       clearSignupSource();             // ...and the acquisition tag
+      clearReferralCode();             // ...and the gift-link referral
       update({ accName: name.trim() });
       if (data.token) {
         goAfterAuth(data);             // invite auto-join: straight on, logged in

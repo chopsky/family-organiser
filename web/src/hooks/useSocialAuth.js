@@ -19,6 +19,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import api from '../lib/api';
+import { resolveReferralCode } from '../lib/referralCode';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const GOOGLE_IOS_CLIENT_ID = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID;
@@ -99,6 +100,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
         source: signupSource || undefined,
+        referralCode: resolveReferralCode() || undefined,
       });
       onSuccess(data);
     } catch (err) {
@@ -230,6 +232,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
           source: signupSource || undefined,
+          referralCode: resolveReferralCode() || undefined,
         });
         onSuccess(data);
       } catch (err) {
@@ -290,6 +293,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
           source: signupSource || undefined,
+          referralCode: resolveReferralCode() || undefined,
         });
         onSuccess(data);
       } catch (err) {
@@ -327,6 +331,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
         source: signupSource || undefined,
+        referralCode: resolveReferralCode() || undefined,
       });
       onSuccess(data);
     } catch (err) {

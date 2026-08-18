@@ -6,6 +6,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
 import { resolveSignupPromo, clearSignupPromo } from '../lib/signupPromo';
+import { resolveReferralCode, clearReferralCode } from '../lib/referralCode';
 
 // Human label for a confirmed promo, e.g. "25% off" or "£10 off".
 function promoDiscountLabel(info) {
@@ -78,6 +79,7 @@ export default function Signup() {
         name: name.trim(),
         inviteToken: inviteToken || undefined,
         promoCode,
+        referralCode: resolveReferralCode() || undefined,
         turnstile_token: turnstileToken,
       });
 
@@ -85,6 +87,7 @@ export default function Signup() {
       // row). Consume the stored promo so it can't attach to a later signup
       // on this browser - whether we auto-join or go verify email next.
       clearSignupPromo();
+      clearReferralCode();
       if (data.token) {
         // Invite flow - auto-joined
         login(data);
@@ -109,6 +112,7 @@ export default function Signup() {
 
   function handleSocialSuccess(data) {
     clearSignupPromo(); // SSO account created with the promo - consume it.
+    clearReferralCode();
     login(data);
     navigate(data.household ? '/dashboard' : '/setup');
   }

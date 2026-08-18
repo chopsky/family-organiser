@@ -225,6 +225,11 @@ app.use('/api/la-term-dates', require('./routes/laTermDates'));
 // families are usually not Housemait users at all - that's the point.
 app.use('/api/rsvp', require('./routes/rsvp'));
 
+// Referral scheme: /mine is auth'd, /gift/:code is public (gift landing
+// page). Mounted before the subscription gate list matters not at all -
+// both endpoints are GETs, which the gate always lets through.
+app.use('/api/referrals', require('./routes/referrals'));
+
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,
 // /admin, /inbound-email, /webhooks via an internal allowlist - see

@@ -10,6 +10,7 @@ import ErrorBanner from '../components/ErrorBanner';
 import { IconUtensils, IconSearch, IconPlus, IconCart, IconChevronLeft, IconChevronRight } from '../components/Icons';
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
+import ReferralNudge from '../components/ReferralNudge';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Segmented from '../components/ui/Segmented';
@@ -264,7 +265,10 @@ function MealPlanView({ setError }) {
   const [shoppingListSummary, setShoppingListSummary] = useState(null); // { added, skipped, summary }
 
   // Suggest meals (AI) - shows a modal with suggestions for empty dinner slots
-  const [suggestResults, setSuggestResults] = useState(null); // { suggestions: [...], emptySlots: [...] }
+  const [suggestResults, setSuggestResults] = useState(null);
+  // Flips true when AI suggestions are accepted - the delight peak the
+  // referral nudge keys off.
+  const [planWin, setPlanWin] = useState(false);
 
   async function suggestMeals() {
     setSuggesting(true);
@@ -315,6 +319,7 @@ function MealPlanView({ setError }) {
         });
       }
       setSuggestResults(null);
+      setPlanWin(true);
       await loadMeals();
     } catch {
       setError('Could not save suggested meals.');
@@ -374,6 +379,9 @@ function MealPlanView({ setError }) {
 
   return (
     <>
+      {/* Win-moment referral nudge - appears only after the AI plan lands
+          (and only inside the pilot; the component gates itself). */}
+      <ReferralNudge show={planWin} context="meals" />
       {/* Week navigation - hidden on print (the print-only heading below
           replaces it with a clean "Weekly Meal Plan · Week of X" title). */}
       <div className="flex items-center justify-center gap-5 bg-white rounded-[14px] border border-light-grey px-5 py-3 no-print">

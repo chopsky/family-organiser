@@ -136,7 +136,7 @@ function generateVerifyCode(len = 6) {
 // ─── POST /api/auth/register ────────────────────────────────────────────────
 
 router.post('/register', requireTurnstile, async (req, res) => {
-  const { email: userEmail, password, name, inviteToken, promoCode, source, client } = req.body;
+  const { email: userEmail, password, name, inviteToken, promoCode, source, client, referralCode } = req.body;
 
   if (!userEmail?.trim() || !password || !name?.trim()) {
     return res.status(400).json({ error: 'email, password, and name are required' });
@@ -150,6 +150,8 @@ router.post('/register', requireTurnstile, async (req, res) => {
   // branch below creates a member who joins someone else's billing).
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  // Referral code from a /gift/<code> landing (same charset as promo codes).
+  const referredByCode = sanitizePromoCode(referralCode);
 
   // Strength gate: minimum length, no personal-info, not in HaveIBeenPwned's
   // breach corpus. See src/utils/password-strength.js for policy + rationale.
@@ -223,6 +225,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       authProvider: 'email',
       signupPromoCode,
       signupSource,
+      referredByCode,
     });
 
     const token = generateToken();
@@ -511,6 +514,13 @@ router.post('/create-household', requireAuth, async (req, res) => {
     // Seed public holidays in the background (don't block response)
     publicHolidays.seedHolidaysForNewHousehold(household.id, household.timezone, req.user.id, household.country)
       .catch((err) => console.error('Failed to seed public holidays:', err));
+
+    // Referral capture (fire-and-forget): if this owner signed up through a
+    // /gift/<code> link, record the pending referral. All guards live in the
+    // service; failure can never affect household creation.
+    require('../services/referrals')
+      .captureReferralOnHouseholdCreate({ userId: req.user.id, householdId: household.id })
+      .catch((err) => console.warn('[create-household] referral capture failed:', err.message));
 
     // Pre-populate the recipe box with the starter set (background, never block
     // signup). Idempotent, so a retry won't double-seed.
@@ -1306,9 +1316,10 @@ router.delete('/sessions', requireAuth, async (req, res) => {
 // ─── POST /api/auth/google ──────────────────────────────────────────────────
 
 router.post('/google', async (req, res) => {
-  const { idToken, code, inviteToken, promoCode, source } = req.body;
+  const { idToken, code, inviteToken, promoCode, source, referralCode } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  const referredByCode = sanitizePromoCode(referralCode);
 
   if (!idToken && !code) {
     return res.status(400).json({ error: 'idToken or code is required' });
@@ -1408,6 +1419,7 @@ router.post('/google', async (req, res) => {
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
         signupSource: acceptedInvite ? null : signupSource,
+        referredByCode: acceptedInvite ? null : referredByCode,
       });
 
       if (acceptedInvite) {
@@ -1438,9 +1450,10 @@ router.post('/google', async (req, res) => {
 // ─── POST /api/auth/apple ───────────────────────────────────────────────────
 
 router.post('/apple', async (req, res) => {
-  const { idToken, name: appleName, inviteToken, promoCode, source } = req.body;
+  const { idToken, name: appleName, inviteToken, promoCode, source, referralCode } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  const referredByCode = sanitizePromoCode(referralCode);
 
   if (!idToken) {
     return res.status(400).json({ error: 'idToken is required' });
@@ -1525,6 +1538,7 @@ router.post('/apple', async (req, res) => {
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
         signupSource: acceptedInvite ? null : signupSource,
+        referredByCode: acceptedInvite ? null : referredByCode,
       });
 
       if (acceptedInvite) {

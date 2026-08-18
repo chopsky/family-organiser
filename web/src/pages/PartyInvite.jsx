@@ -393,11 +393,14 @@ export default function PartyInvite() {
                 The family organiser that keeps the calendar, lists and meals in one calm place.
               </p>
             </div>
+            {/* When the host household is in the referral pilot, the CTA
+                upgrades to their gift link - the visitor gets a free month
+                and the host earns one, through the same tracked path. */}
             <Link
-              to="/signup?src=rsvp"
+              to={invite?.referralCode ? `/gift/${invite.referralCode}` : '/signup?src=rsvp'}
               style={{ flexShrink: 0, padding: '10px 14px', borderRadius: 10, background: '#6B3FA0', color: '#FFFFFF', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap' }}
             >
-              Try it free
+              {invite?.referralCode ? 'Get a free month' : 'Try it free'}
             </Link>
           </div>
         )}

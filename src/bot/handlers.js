@@ -4291,7 +4291,8 @@ async function handleTermDatesImport(pageText, sourceLabel, user, household, ctx
   if (schools.length === 1) {
     const n = await saveTermDatesToSchool(schools[0].id, dates, country, household.id);
     ctx.intent = 'term_dates_import';
-    return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${schools[0].school_name} — review them under Family → Schools.`, actions };
+    const refLine = await referralShareLine(user, household);
+    return { response: `📅 Imported ${n} term date${n === 1 ? '' : 's'} for ${schools[0].school_name} — review them under Family → Schools.${refLine}`, actions };
   }
 
   rememberTermDatesImport(user.id, {
@@ -4301,6 +4302,34 @@ async function handleTermDatesImport(pageText, sourceLabel, user, household, ctx
   ctx.intent = 'term_dates_import_disambiguation';
   const list = schools.map((s, i) => `${i + 1}. ${s.school_name}`).join('\n');
   return { response: `📅 I found term dates — which school are they for?\n${list}\n\nReply with the number or the name.`, actions };
+}
+
+/**
+ * One-time referral share line, appended to a term-dates import success -
+ * the highest-delight moment in the product. Durable throttle: at most
+ * ONCE EVER per user via users.referral_offer_sent_at (a column, not an
+ * in-memory Map - deploys wipe Maps; see the evening-brief post-mortem
+ * above). Passive line only - no pending yes/no state, so it never
+ * competes with the one-question-per-turn ladder.
+ */
+async function referralShareLine(user, household) {
+  try {
+    const referrals = require('../services/referrals');
+    if (!referrals.referralsEnabled(household.id)) return '';
+    if (user.referral_offer_sent_at) return '';
+    const code = await referrals.getOrCreateReferralCode(household.id);
+    if (!code) return '';
+    // Column may be unmigrated - if the stamp fails, skip the line rather
+    // than risk repeating it forever.
+    const { error } = await require('../db/client').supabaseAdmin
+      .from('users')
+      .update({ referral_offer_sent_at: new Date().toISOString() })
+      .eq('id', user.id);
+    if (error) return '';
+    return `\n\n🎁 Know another family drowning in school letters? Give them a free month of Housemait (you get one too): https://housemait.com/gift/${code}`;
+  } catch {
+    return '';
+  }
 }
 
 async function handleDocument(buffer, mediaType, filename, user, household, ctx = {}) {

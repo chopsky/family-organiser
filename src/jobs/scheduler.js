@@ -733,6 +733,21 @@ function startScheduler() {
   cron.schedule('45 3 * * *', () => runTrialExpirySweep());
   console.log('✓ Trial expiry sweep scheduled (daily 03:45)');
 
+  // Referral settlement: activate/lapse pending referrals + grant credit.
+  // Scheduler-locked so multi-instance deploys settle each day exactly once
+  // (the per-row conditional UPDATE inside is the second belt anyway).
+  cron.schedule('15 4 * * *', async () => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const locked = await db.acquireSchedulerLock('referral_eval', today);
+      if (!locked) return;
+      await require('../services/referrals').evaluateReferrals();
+    } catch (err) {
+      console.error('[scheduler] referral evaluation failed:', err.message);
+    }
+  });
+  console.log('✓ Referral settlement scheduled (daily 04:15)');
+
   // ── Daily reminders: check every minute ─────────────────────────────────────
   cron.schedule('* * * * *', () => runDailyReminderCheck());
   console.log('✓ Daily reminder scheduler started (checks every minute)');

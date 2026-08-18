@@ -575,4 +575,46 @@ describe('requireActiveSubscription', () => {
       });
     });
   });
+
+  describe('complimentary credit (referral rewards)', () => {
+    test('expired household with a FUTURE complimentary_until passes', async () => {
+      const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+      primeChain({
+        household: {
+          id: HOUSEHOLD_ID,
+          is_internal: false,
+          subscription_status: 'expired',
+          trial_ends_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+          trial_paused_at: null,
+          complimentary_until: tomorrow,
+        },
+      });
+      const req = makeReq();
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    test('expired household with a PAST complimentary_until still 402s', async () => {
+      const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+      primeChain({
+        household: {
+          id: HOUSEHOLD_ID,
+          is_internal: false,
+          subscription_status: 'expired',
+          trial_ends_at: new Date(Date.now() - 30 * 86_400_000).toISOString(),
+          trial_paused_at: null,
+          complimentary_until: yesterday,
+        },
+      });
+      const req = makeReq();
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(402);
+    });
+  });
 });

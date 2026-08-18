@@ -12,6 +12,7 @@ import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import ActivityModal from '../components/ActivityModal';
 import TermDatesSheet from '../components/TermDatesSheet';
+import ReferralNudge from '../components/ReferralNudge';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
@@ -72,6 +73,9 @@ export default function School() {
   const hasChildren = useHasChildren();
 
   const [success, setSuccess] = useState('');
+  // Flips true after a successful term-dates import - the delight peak
+  // the referral nudge keys off.
+  const [termWin, setTermWin] = useState(false);
   const [error, setError] = useState('');
   // Council handoff from the public term-dates pages (/signup?la=...):
   // greet the job they arrived with, and stop once it's done or dismissed.
@@ -710,6 +714,9 @@ export default function School() {
       {success && (
         <p className="text-sm text-sage bg-sage-light rounded-xl px-3 py-2">{success}</p>
       )}
+      {/* Win-moment referral nudge - only after a successful term-dates
+          import (and only inside the pilot; the component gates itself). */}
+      <ReferralNudge show={termWin} context="school" />
 
       {/* Schools - manage each school and its term dates here (decoupled
           from individual children, for privacy). */}
@@ -1109,6 +1116,7 @@ export default function School() {
           onClose={() => setShowTermDateOptions(false)}
           onImported={async () => {
             setSuccess('Term dates added.');
+            setTermWin(true);
             setTimeout(() => setSuccess(''), 3000);
             setDirectoryOffer(null);
             await loadSchools();

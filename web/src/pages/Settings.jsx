@@ -18,7 +18,9 @@ import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin, IconStar,
+  IconGift,
 } from '../components/Icons';
+import { share } from '../lib/share';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
 import { SUPPORTED_COUNTRIES, COUNTRY_LABELS } from '../lib/country';
 import { readLocaleCookie } from '../hooks/useLocale';
@@ -473,6 +475,69 @@ const IOS_SECTION_ICONS = {
   IconMessageCircle, IconCalendar, IconMail, IconBell, IconMapPin,
   IconShield, IconDownload, IconUser, IconTrash, IconStar,
 };
+
+/**
+ * "Give a month, get a month" referral card. Fetches /referrals/mine once;
+ * outside the pilot the API answers { enabled: false } and this renders
+ * NOTHING - the server is the single rollout gate, no client flag.
+ * Share URL is pinned to housemait.com (window.location.origin is
+ * capacitor:// inside the app and recipients couldn't open it).
+ */
+function ReferralSection({ sectionWrapper }) {
+  const SectionWrapper = sectionWrapper;
+  const [state, setState] = useState(null); // null = loading/disabled
+  const [shared, setShared] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/referrals/mine')
+      .then(({ data }) => { if (!cancelled && data?.enabled && data.code) setState(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!state) return null;
+
+  const shareNow = async () => {
+    const ok = await share({
+      title: 'A month of Housemait, on us',
+      text: `We've been using Housemait to keep all our family stuff in one place - calendar, lists, meals, even school letters over WhatsApp. They've given me a free month to share with another family - here's the link: ${state.share_url}`,
+      url: state.share_url,
+      dialogTitle: 'Give a friend a month of Housemait',
+    });
+    if (ok) { setShared(true); setTimeout(() => setShared(false), 2500); }
+  };
+
+  return (
+    <SectionWrapper slug="referral" title="Give a month, get a month" icon={IconGift} accordion>
+      <p className="text-sm text-cocoa">
+        Know another family drowning in school letters? Give them a free month
+        of Housemait. When they get set up, you get a month free too.
+      </p>
+      {state.banked_days > 0 && (
+        <p className="text-sm font-semibold text-bark mt-2">
+          🎁 You&apos;ve banked {state.banked_days} day{state.banked_days === 1 ? '' : 's'} of free Housemait.
+        </p>
+      )}
+      {(state.pending > 0 || state.activated > 0) && (
+        <p className="text-xs text-cocoa mt-1">
+          {state.activated > 0 ? `${state.activated} famil${state.activated === 1 ? 'y' : 'ies'} joined through you. ` : ''}
+          {state.pending > 0 ? `${state.pending} still settling in.` : ''}
+        </p>
+      )}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={shareNow}
+          className="bg-primary text-white font-semibold text-sm px-5 py-2.5 rounded-2xl hover:bg-primary-pressed transition-colors"
+        >
+          {shared ? 'Link copied!' : 'Share your gift link'}
+        </button>
+        <span className="text-xs text-cocoa break-all">housemait.com/gift/{state.code}</span>
+      </div>
+    </SectionWrapper>
+  );
+}
 
 export default function Settings() {
   // Management controls (e.g. the Send-Emails-to-AI allowlist) gate on
@@ -2455,6 +2520,11 @@ export default function Settings() {
           </div>
         ) : null}
       </SectionWrapper>
+
+      {/* Give a month, get a month - referral card. The API is the single
+          gate: outside the pilot /referrals/mine answers enabled:false and
+          this renders nothing at all. */}
+      <ReferralSection sectionWrapper={SectionWrapper} />
 
       {/* Location - device GPS is the primary source for the weather widget
           and location-aware AI answers; the Family Setup address is the

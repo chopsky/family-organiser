@@ -40,6 +40,24 @@ describe('runTrialExpirySweep', () => {
     expect(sel.lt).toHaveBeenCalledWith('trial_ends_at', expect.any(String));
   });
 
+  it('skips households holding a live complimentary credit (referral reward)', async () => {
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+    const rows = [
+      { id: 'hh-credited', trial_ends_at: '2026-08-01T00:00:00Z', complimentary_until: tomorrow },
+      { id: 'hh-lapsed-credit', trial_ends_at: '2026-08-01T00:00:00Z', complimentary_until: yesterday },
+    ];
+    const sel = selectChain({ data: rows, error: null });
+    const upd = updateChain({ error: null });
+    supabaseAdmin.from
+      .mockReturnValueOnce(sel)
+      .mockReturnValue(upd);
+    const out = await runTrialExpirySweep();
+    // Only the household whose credit has lapsed gets flipped.
+    expect(out.flipped).toBe(1);
+    expect(upd.eq).toHaveBeenCalledWith('id', 'hh-lapsed-credit');
+  });
+
   it('flips each overdue row with the conditional status guard and retention timestamp', async () => {
     const rows = [
       { id: 'hh-1', trial_ends_at: '2026-08-01T00:00:00Z' },

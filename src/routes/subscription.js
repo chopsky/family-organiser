@@ -77,11 +77,23 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       daysRemaining = Math.max(0, Math.ceil(diffMs / 86_400_000));
     }
 
+    // Complimentary credit (referral rewards / goodwill grants): a future
+    // complimentary_until means Premium regardless of billing state. The
+    // gate honours it server-side; these fields let the web mirror it.
+    const complimentaryUntil = household.complimentary_until || null;
+    const complimentaryActive = !!(complimentaryUntil && new Date(complimentaryUntil) > new Date());
+    const complimentaryDays = complimentaryActive
+      ? Math.max(0, Math.ceil((new Date(complimentaryUntil).getTime() - Date.now()) / 86_400_000))
+      : 0;
+
     return res.json({
       status,
       trial_ends_at: trialEndsAt,
       trial_paused: trialPaused,
       days_remaining: daysRemaining,
+      complimentary_until: complimentaryUntil,
+      complimentary_active: complimentaryActive,
+      complimentary_days_remaining: complimentaryDays,
       subscription_plan: household.subscription_plan || null,
       // Lowercase ISO-4217 code the household is billed in (gbp, usd,
       // eur, aud, cad, zar). NULL for trialing/never-subscribed

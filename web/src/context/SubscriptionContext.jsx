@@ -27,6 +27,7 @@ export function SubscriptionProvider({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState(null);              // 'trialing' | 'active' | 'expired' | 'cancelled' | null
+  const [complimentaryActive, setComplimentaryActive] = useState(false); // referral/goodwill credit in force
   const [daysRemaining, setDaysRemaining] = useState(null); // number | null
   const [trialEndsAt, setTrialEndsAt] = useState(null);     // ISO string | null
   const [plan, setPlan] = useState(null);                   // 'monthly' | 'annual' | null
@@ -45,6 +46,7 @@ export function SubscriptionProvider({ children }) {
     if (!token || !household?.id) {
       // Nothing to fetch - reset to "unknown but not loading".
       setStatus(null);
+      setComplimentaryActive(false);
       setDaysRemaining(null);
       setTrialEndsAt(null);
       setPlan(null);
@@ -70,6 +72,7 @@ export function SubscriptionProvider({ children }) {
     try {
       const { data } = await api.get('/subscription/status');
       setStatus(data.status || null);
+      setComplimentaryActive(data.complimentary_active === true);
       setDaysRemaining(data.days_remaining ?? null);
       setTrialEndsAt(data.trial_ends_at || null);
       setPlan(data.subscription_plan || null);
@@ -140,7 +143,10 @@ export function SubscriptionProvider({ children }) {
   // Internal accounts are treated as always-active: the backend already
   // bypasses the subscription gate for them, and the UI shouldn't show
   // trial banners / subscribe prompts to testers.
-  const effectiveStatus = isInternal ? 'active' : status;
+  // A live complimentary credit (referral reward / goodwill grant) is
+  // Premium regardless of billing state - same mapping as is_internal, and
+  // the backend gate honours the same rule server-side.
+  const effectiveStatus = (isInternal || complimentaryActive) ? 'active' : status;
   const isActive   = effectiveStatus === 'active';
   const isTrialing = effectiveStatus === 'trialing';
   const isExpired  = effectiveStatus === 'expired' || effectiveStatus === 'cancelled';

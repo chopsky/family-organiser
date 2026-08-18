@@ -102,9 +102,12 @@ async function requireActiveSubscription(req, res, next) {
   //    the gate itself to become a reliability hazard.
   let household;
   try {
+    // select('*') rather than a named list: complimentary_until ships in a
+    // pending migration, and naming a missing column makes PostgREST 400 -
+    // which would fail the WHOLE gate open until the migration runs.
     const { data, error } = await supabaseAdmin
       .from('households')
-      .select('id, is_internal, subscription_status, trial_ends_at, trial_paused_at')
+      .select('*')
       .eq('id', householdId)
       .single();
     if (error || !data) {
@@ -128,6 +131,15 @@ async function requireActiveSubscription(req, res, next) {
   const status = household.subscription_status;
   const trialEndsAt = household.trial_ends_at ? new Date(household.trial_ends_at) : null;
   const now = new Date();
+
+  // 6b. Complimentary credit (referral rewards, goodwill grants). Sits
+  //     ABOVE the billing providers: while the credit runs, access is
+  //     granted regardless of subscription_status - deliberately checked
+  //     before the expiry branches so an expired household with an earned
+  //     month gets it without any status flip.
+  if (household.complimentary_until && now < new Date(household.complimentary_until)) {
+    return next();
+  }
 
   // 7. Active paid subscription.
   if (status === 'active') return next();

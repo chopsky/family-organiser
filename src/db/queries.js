@@ -246,7 +246,7 @@ async function getUserByEmail(email, db = supabase) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null, signupSource = null }, db = supabase) {
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null, signupSource = null, referredByCode = null }, db = supabase) {
   const row = {
     email,
     password_hash: passwordHash,
@@ -277,6 +277,14 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
       await db.from('users').update({ signup_source: signupSource }).eq('id', data.id);
       data.signup_source = signupSource;
     } catch { /* column not migrated yet - attribution is best-effort */ }
+  }
+  // Referral code, same deal - and a SEPARATE update from signup_source so
+  // one pending migration can't take the other field down with it.
+  if (referredByCode && data?.id) {
+    try {
+      await db.from('users').update({ referred_by_code: referredByCode }).eq('id', data.id);
+      data.referred_by_code = referredByCode;
+    } catch { /* column not migrated yet - referral capture is best-effort */ }
   }
   return data;
 }
@@ -6848,6 +6856,42 @@ async function getUpcomingInviteEvents(householdId, db = supabase) {
 }
 
 /**
+ * Referral funnel: codes minted → referred signups (window) → activated →
+ * lapsed → total complimentary months granted (all-time activated * 1).
+ * Zeroed shape when the referrals migration hasn't run.
+ */
+async function getReferralFunnel({ days = 30 } = {}, db = supabase) {
+  const out = { days, codes: 0, referred: 0, activated: 0, lapsed: 0, pending: 0, monthsGranted: 0 };
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  try {
+    const { count } = await db
+      .from('households')
+      .select('id', { count: 'exact', head: true })
+      .not('referral_code', 'is', null);
+    out.codes = count || 0;
+  } catch { /* column not migrated yet */ }
+  try {
+    const { data: recent } = await db
+      .from('referrals')
+      .select('status, created_at')
+      .gte('created_at', since);
+    for (const r of recent || []) {
+      out.referred++;
+      if (r.status === 'pending') out.pending++;
+      if (r.status === 'lapsed') out.lapsed++;
+    }
+    const { count: activatedAll } = await db
+      .from('referrals')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'activated');
+    out.activated = activatedAll || 0;
+    // Both sides get a month per activation.
+    out.monthsGranted = out.activated * 2;
+  } catch { /* table not migrated yet */ }
+  return out;
+}
+
+/**
  * The party-loop funnel: links created → link opens → RSVPs → signups
  * attributed to the RSVP pitch card (users.signup_source = 'rsvp'). All
  * within a recent window. Zeroed shape when the tables aren't migrated.
@@ -9445,9 +9489,11 @@ async function findHouseholdsWithTrialEndingInDays(daysLeft, db = supabase) {
   const windowStart = new Date(now.getTime() + daysLeft * 86_400_000).toISOString();
   const windowEnd   = new Date(now.getTime() + (daysLeft + 1) * 86_400_000).toISOString();
 
+  // select('*') so complimentary_until rides along once migrated (naming it
+  // pre-migration would 400 and kill the whole nudge run).
   const { data, error } = await db
     .from('households')
-    .select('id, name, trial_started_at, trial_ends_at, subscription_status, trial_emails_enabled, is_internal, subscription_provider')
+    .select('*')
     .eq('subscription_status', 'trialing')
     .eq('is_internal', false)
     .neq('subscription_provider', 'apple')
@@ -10667,4 +10713,5 @@ module.exports = {
   getEventRsvps,
   getUpcomingInviteEvents,
   getInviteLoopFunnel,
+  getReferralFunnel,
 };

@@ -112,6 +112,13 @@ async function processNudgeDay({ daysLeft, emailType, sender, respectOptOut }) {
   console.log(`[trial-emails] ${households.length} household(s) with ${daysLeft} days left - emailType=${emailType}`);
   for (const household of households) {
     try {
+      // A live complimentary credit (referral reward) means the trial
+      // countdown isn't their reality - "3 days left" would be wrong and
+      // alarming. Skip; the nudges resume if the credit lapses mid-trial.
+      if (household.complimentary_until && new Date(household.complimentary_until) > new Date()) {
+        console.log(`[trial-emails] household ${household.id} has complimentary credit - skipping ${emailType}`);
+        continue;
+      }
       if (respectOptOut && !household.trial_emails_enabled) {
         // Soft-skip: we still mark the dedupe row so the count in any
         // ops dashboard reflects reality, BUT we won't send again if
