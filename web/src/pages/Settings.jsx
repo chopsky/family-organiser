@@ -524,10 +524,12 @@ function ReferralStrip() {
 
   // No `url` param: the text already ends with the link, and share
   // targets (WhatsApp) render the url param as a SECOND link on top.
+  // Text only - no title: the desktop clipboard fallback joins title +
+  // text into one blob, so a title becomes a stray first line in the
+  // pasted message. dialogTitle is sheet chrome only, never in the message.
   const shareNow = () => share({
-    title: 'A free month of Housemait',
     text: referralShareMessage(state.share_url),
-    dialogTitle: 'A free month of Housemait',
+    dialogTitle: 'Share your gift link',
   });
 
   // Meta line only once there's something to say. "(max)" replaces a

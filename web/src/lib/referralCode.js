@@ -52,7 +52,7 @@ export function resolveReferralCode(now = Date.now()) {
  * prepend that param as a second link above the text.
  */
 export function referralShareMessage(url) {
-  return `Fancy two free months of Housemait? It keeps our family calendar, lists and school dates in one place. Here's your link: ${url}`;
+  return `Hey, I've been using Housemait to keep our family calendar, lists and school dates in one place. Here's a link to claim two free months: ${url}`;
 }
 
 /** Consume once an account has been created with it. */
