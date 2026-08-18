@@ -102,18 +102,40 @@ describe('isHouseholdActivated (the anti-farm gate)', () => {
   });
 });
 
-describe('reward cap maths', () => {
-  // grantComplimentaryDays hits the DB, so we verify the CAP invariant via
-  // the exported constants + a pure re-derivation of its formula.
+describe('reward maths (complimentaryBaseMs + cap)', () => {
+  const DAY = 86_400_000;
+  const now = Date.parse('2026-08-18T12:00:00Z');
+  const iso = (ms) => new Date(ms).toISOString();
+
+  test('credit banks after the trial, never alongside it', () => {
+    // The founder's own test case: referred household mid-trial. A grant
+    // based from `now` would expire the same day the trial does - worth
+    // nothing. The base must be the trial end.
+    const base = referrals.complimentaryBaseMs({ trial_ends_at: iso(now + 30 * DAY) }, now);
+    expect(base).toBe(now + 30 * DAY);
+  });
+
+  test('for paying households the credit banks after the paid period', () => {
+    const base = referrals.complimentaryBaseMs(
+      { trial_ends_at: iso(now - 300 * DAY), subscription_current_period_end: iso(now + 20 * DAY) },
+      now,
+    );
+    expect(base).toBe(now + 20 * DAY);
+  });
+
+  test('expired household with no future entitlement starts from now', () => {
+    const base = referrals.complimentaryBaseMs({ trial_ends_at: iso(now - 40 * DAY) }, now);
+    expect(base).toBe(now);
+  });
+
   test('stacking never exceeds MAX_BANK_DAYS ahead', () => {
-    const now = Date.now();
-    let compUntil = null;
+    const household = { trial_ends_at: iso(now + 30 * DAY), complimentary_until: null };
     for (let i = 0; i < 20; i++) {
-      const base = Math.max(now, compUntil ? compUntil : 0);
-      const cap = now + referrals.MAX_BANK_DAYS * 86_400_000;
-      compUntil = Math.min(base + referrals.REWARD_DAYS * 86_400_000, cap);
+      const base = referrals.complimentaryBaseMs(household, now);
+      const cap = now + referrals.MAX_BANK_DAYS * DAY;
+      household.complimentary_until = iso(Math.min(base + referrals.REWARD_DAYS * DAY, cap));
     }
-    const daysAhead = (compUntil - now) / 86_400_000;
+    const daysAhead = (Date.parse(household.complimentary_until) - now) / DAY;
     expect(daysAhead).toBeLessThanOrEqual(referrals.MAX_BANK_DAYS);
     expect(daysAhead).toBeGreaterThan(referrals.MAX_BANK_DAYS - 1);
   });

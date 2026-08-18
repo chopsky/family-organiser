@@ -1651,6 +1651,17 @@ router.post('/whatsapp-verify-code', requireAuth, async (req, res) => {
     await db.markWhatsAppVerificationCodeUsed(record.id);
     if (req.householdId) cache.invalidate(`members:${req.householdId}`);
 
+    // Linking WhatsApp is the referral scheme's instant-qualify signal -
+    // settle any pending gift now rather than making both families wait
+    // for the nightly sweep. Fire-and-forget; the try/catch also swallows
+    // a synchronous require/setup throw so it can never fail the link.
+    if (req.householdId) {
+      try {
+        const referrals = require('../services/referrals');
+        referrals.settleReferralForHousehold(req.householdId).catch(() => {});
+      } catch { /* best-effort - the nightly sweep covers it */ }
+    }
+
     // Send a welcome / onboarding message. Fire-and-forget - a WhatsApp
     // hiccup must not break the connect flow since the DB is already updated.
     //

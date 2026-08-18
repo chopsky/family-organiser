@@ -250,18 +250,29 @@ async function isHouseholdActivated(householdId, referredAtIso, deps = {}) {
 // ─── Reward grant ───────────────────────────────────────────────────────────
 
 /**
- * Extend a household's complimentary credit by rewardDays. Extends from
- * whichever is later - now or the existing credit end - and never sets the
- * end more than MAX_BANK_DAYS ahead (the 12-month bank cap).
+ * Extend a household's complimentary credit by rewardDays. The credit banks
+ * on TOP of whatever entitlement the household already holds - the reward
+ * starts when their trial ends, their paid period ends, or their existing
+ * credit runs out, whichever is furthest away (a credit that ran concurrently
+ * with the trial would be worth nothing). Never sets the end more than
+ * MAX_BANK_DAYS ahead (the 12-month bank cap).
  */
+function complimentaryBaseMs(household, nowMs) {
+  return Math.max(
+    nowMs,
+    household.trial_ends_at ? new Date(household.trial_ends_at).getTime() : 0,
+    household.subscription_current_period_end
+      ? new Date(household.subscription_current_period_end).getTime()
+      : 0,
+    household.complimentary_until ? new Date(household.complimentary_until).getTime() : 0,
+  );
+}
+
 async function grantComplimentaryDays(householdId, rewardDays) {
   const household = await db.getHouseholdById(householdId);
   if (!household) return null;
   const nowMs = Date.now();
-  const baseMs = Math.max(
-    nowMs,
-    household.complimentary_until ? new Date(household.complimentary_until).getTime() : 0,
-  );
+  const baseMs = complimentaryBaseMs(household, nowMs);
   const capMs = nowMs + MAX_BANK_DAYS * 86_400_000;
   const nextMs = Math.min(baseMs + rewardDays * 86_400_000, capMs);
   const nextIso = new Date(nextMs).toISOString();
@@ -276,7 +287,7 @@ async function grantComplimentaryDays(householdId, rewardDays) {
   return nextIso;
 }
 
-async function notifyReferrerActivated(referrerHouseholdId, referredName) {
+async function notifyReferrerActivated(referrerHouseholdId) {
   try {
     const { sendBroadcastToMember } = require('./whatsapp-templates');
     const members = await db.getHouseholdMembers(referrerHouseholdId);
@@ -292,14 +303,46 @@ async function notifyReferrerActivated(referrerHouseholdId, referredName) {
 }
 
 /**
- * Daily job: settle pending referrals. Activation -> reward both sides;
- * pending past LAPSE_AFTER_DAYS -> lapsed. Returns counts for logging.
+ * Settle one pending referral row: activated -> reward both sides + notify,
+ * pending past LAPSE_AFTER_DAYS -> lapsed. The status UPDATE is conditional
+ * on `status = 'pending'`, so the nightly sweep and an opportunistic settle
+ * racing each other reward at most once. Returns 'activated' | 'lapsed' |
+ * null (still pending / lost the race).
  */
-async function evaluateReferrals(deps = {}) {
+async function settleReferral(ref, deps = {}) {
   const checkActivated = deps.isHouseholdActivated || isHouseholdActivated;
   const grant = deps.grantComplimentaryDays || grantComplimentaryDays;
   const notify = deps.notifyReferrerActivated || notifyReferrerActivated;
 
+  const ageDays = (Date.now() - new Date(ref.created_at).getTime()) / 86_400_000;
+  if (await checkActivated(ref.referred_household_id, ref.created_at)) {
+    const { data, error } = await supabaseAdmin
+      .from('referrals')
+      .update({ status: 'activated', activated_at: new Date().toISOString() })
+      .eq('id', ref.id)
+      .eq('status', 'pending') // settle once even if two runs race
+      .select('id');
+    if (error || !data || data.length === 0) return null;
+    await grant(ref.referrer_household_id, ref.reward_days || REWARD_DAYS);
+    await grant(ref.referred_household_id, ref.reward_days || REWARD_DAYS);
+    await notify(ref.referrer_household_id);
+    return 'activated';
+  }
+  if (ageDays > LAPSE_AFTER_DAYS) {
+    await supabaseAdmin
+      .from('referrals')
+      .update({ status: 'lapsed' })
+      .eq('id', ref.id)
+      .eq('status', 'pending');
+    return 'lapsed';
+  }
+  return null;
+}
+
+/**
+ * Daily job: settle pending referrals. Returns counts for logging.
+ */
+async function evaluateReferrals(deps = {}) {
   let pending = [];
   try {
     const { data, error } = await supabaseAdmin
@@ -317,26 +360,9 @@ async function evaluateReferrals(deps = {}) {
   let lapsed = 0;
   for (const ref of pending) {
     try {
-      const ageDays = (Date.now() - new Date(ref.created_at).getTime()) / 86_400_000;
-      if (await checkActivated(ref.referred_household_id, ref.created_at)) {
-        const { error } = await supabaseAdmin
-          .from('referrals')
-          .update({ status: 'activated', activated_at: new Date().toISOString() })
-          .eq('id', ref.id)
-          .eq('status', 'pending'); // settle once even if two runs race
-        if (error) continue;
-        await grant(ref.referrer_household_id, ref.reward_days || REWARD_DAYS);
-        await grant(ref.referred_household_id, ref.reward_days || REWARD_DAYS);
-        await notify(ref.referrer_household_id);
-        activated++;
-      } else if (ageDays > LAPSE_AFTER_DAYS) {
-        await supabaseAdmin
-          .from('referrals')
-          .update({ status: 'lapsed' })
-          .eq('id', ref.id)
-          .eq('status', 'pending');
-        lapsed++;
-      }
+      const outcome = await settleReferral(ref, deps);
+      if (outcome === 'activated') activated++;
+      else if (outcome === 'lapsed') lapsed++;
     } catch (err) {
       console.error('[referrals] evaluate failed for', ref.id, err.message);
     }
@@ -345,6 +371,31 @@ async function evaluateReferrals(deps = {}) {
     console.log(`[referrals] evaluated: ${activated} activated, ${lapsed} lapsed, ${pending.length - activated - lapsed} still pending`);
   }
   return { activated, lapsed, pending: pending.length - activated - lapsed };
+}
+
+/**
+ * Opportunistic settle for ONE household, fired when it crosses an
+ * instant-qualify moment (linking WhatsApp). Without this the reward waits
+ * for the nightly sweep - and the referred family's "I've signed up, did
+ * you get your month?" conversation happens hours before the credit lands.
+ * Fire-and-forget at call sites; never throws.
+ */
+async function settleReferralForHousehold(referredHouseholdId, deps = {}) {
+  if (!referredHouseholdId) return null;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('referrals')
+      .select('*')
+      .eq('referred_household_id', referredHouseholdId)
+      .eq('status', 'pending')
+      .limit(1);
+    if (error || !data || data.length === 0) return null;
+    return await settleReferral(data[0], deps);
+  } catch (err) {
+    // Unmigrated table or transient DB error - the nightly sweep covers it.
+    console.warn('[referrals] opportunistic settle skipped:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -410,8 +461,10 @@ module.exports = {
   findHouseholdByReferralCode,
   captureReferralOnHouseholdCreate,
   isHouseholdActivated,
+  complimentaryBaseMs,
   grantComplimentaryDays,
   evaluateReferrals,
+  settleReferralForHousehold,
   getReferralStateForHousehold,
   getIncomingReferral,
 };

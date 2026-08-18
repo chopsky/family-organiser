@@ -28,6 +28,7 @@ export function SubscriptionProvider({ children }) {
   const location = useLocation();
   const [status, setStatus] = useState(null);              // 'trialing' | 'active' | 'expired' | 'cancelled' | null
   const [complimentaryActive, setComplimentaryActive] = useState(false); // referral/goodwill credit in force
+  const [complimentaryDays, setComplimentaryDays] = useState(0); // days until complimentary_until, 0 if none
   const [daysRemaining, setDaysRemaining] = useState(null); // number | null
   const [trialEndsAt, setTrialEndsAt] = useState(null);     // ISO string | null
   const [plan, setPlan] = useState(null);                   // 'monthly' | 'annual' | null
@@ -73,6 +74,7 @@ export function SubscriptionProvider({ children }) {
       const { data } = await api.get('/subscription/status');
       setStatus(data.status || null);
       setComplimentaryActive(data.complimentary_active === true);
+      setComplimentaryDays(data.complimentary_days_remaining ?? 0);
       setDaysRemaining(data.days_remaining ?? null);
       setTrialEndsAt(data.trial_ends_at || null);
       setPlan(data.subscription_plan || null);
@@ -144,18 +146,30 @@ export function SubscriptionProvider({ children }) {
   // bypasses the subscription gate for them, and the UI shouldn't show
   // trial banners / subscribe prompts to testers.
   // A live complimentary credit (referral reward / goodwill grant) is
-  // Premium regardless of billing state - same mapping as is_internal, and
-  // the backend gate honours the same rule server-side.
-  const effectiveStatus = (isInternal || complimentaryActive) ? 'active' : status;
+  // Premium regardless of billing state - the backend gate honours the same
+  // rule server-side. A credit banks AFTER the trial, so a mid-trial
+  // household with one stays 'trialing' (the countdown must keep showing);
+  // the credit rescues only states that would otherwise deny access.
+  const effectiveStatus = isInternal ? 'active'
+    : (complimentaryActive && status !== 'trialing') ? 'active'
+    : status;
   const isActive   = effectiveStatus === 'active';
   const isTrialing = effectiveStatus === 'trialing';
   const isExpired  = effectiveStatus === 'expired' || effectiveStatus === 'cancelled';
+
+  // The number the UI shows as "days left": the household's whole free
+  // runway. Banked credit extends past trial_ends_at, so when a credit is
+  // live the days-to-credit-end figure IS trial + gift combined ("60 days
+  // left", not the bare trial's 30 with a month invisibly banked).
+  const effectiveDaysRemaining = complimentaryActive
+    ? Math.max(daysRemaining ?? 0, complimentaryDays)
+    : daysRemaining;
 
   return (
     <SubscriptionContext.Provider value={{
       status: effectiveStatus,
       rawStatus: status, // unfiltered - useful for admin views
-      daysRemaining: isInternal ? null : daysRemaining,
+      daysRemaining: isInternal ? null : effectiveDaysRemaining,
       trialEndsAt,
       plan,
       currency, // 'gbp' | 'usd' | 'eur' | 'aud' | 'cad' | 'zar' | null

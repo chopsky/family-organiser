@@ -264,6 +264,17 @@ router.post('/webhook', async (req, res) => {
               for (const d of displaced) {
                 if (d.household_id) cache.invalidate(`members:${d.household_id}`);
               }
+              // Linking WhatsApp is the referral scheme's instant-qualify
+              // signal - settle any pending gift now rather than making both
+              // families wait for the nightly sweep. Fire-and-forget; the
+              // try/catch also swallows a synchronous require/setup throw,
+              // which must never knock the pairing path off its `return`.
+              if (linkedUser?.household_id) {
+                try {
+                  const referrals = require('../services/referrals');
+                  referrals.settleReferralForHousehold(linkedUser.household_id).catch(() => {});
+                } catch { /* best-effort - the nightly sweep covers it */ }
+              }
               return;
             }
           }
