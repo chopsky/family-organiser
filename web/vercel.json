@@ -15,6 +15,7 @@
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://api.housemait.com/api/:path*" },
+    { "source": "/gift/:code", "destination": "/gift" },
     { "source": "/school-term-dates/", "destination": "https://api.housemait.com/school-term-dates/" },
     { "source": "/school-term-dates/:path*", "destination": "https://api.housemait.com/school-term-dates/:path*" },
     { "source": "/(.*)", "destination": "/app" }

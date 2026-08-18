@@ -274,6 +274,8 @@ function AppRoutes() {
             whole growth loop: value first, signup pitch after). */}
         <Route path="/p/:token" element={<PartyInvite />} />
         <Route path="/gift/:code" element={<GiftLanding />} />
+        {/* Bare /gift: the prerendered OG shell (stays in loading state). */}
+        <Route path="/gift" element={<GiftLanding />} />
         {/* /open - deep-link target for "Open Housemait" email buttons. It's a
             Universal Link / App Link path (AASA + Android intent-filter), so on
             a phone with the app installed the OS opens the app instead of the

@@ -55,6 +55,9 @@ const ROUTES = [
   ['/support', 'support.html'],
   ['/privacy', 'privacy.html'],
   ['/terms', 'terms.html'],
+  // OG shell for gift links: vercel rewrites /gift/:code here so WhatsApp's
+  // no-JS preview bot sees gift-specific OG tags; humans hydrate normally.
+  ['/gift', 'gift.html'],
 ];
 
 const MIME = {

@@ -28,8 +28,19 @@ export function storeReferralCode(code, now = Date.now()) {
   } catch { /* private mode - the signup will just miss the referral */ }
 }
 
-/** Resolve the code for the signup happening now (undefined if none/stale). */
+/** Resolve the code for the signup happening now (undefined if none/stale).
+ *  A ?gift=<CODE> in the current URL always wins and (re)stamps the store -
+ *  the gift page's CTA carries the code through as /signup?gift=<CODE>, so
+ *  the URL is the primary channel and storage covers detours (email
+ *  verification, SSO popups, coming back later). */
 export function resolveReferralCode(now = Date.now()) {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('gift');
+    if (fromUrl) {
+      storeReferralCode(fromUrl, now);
+      return String(fromUrl).toUpperCase();
+    }
+  } catch { /* no window (tests) - fall through to storage */ }
   try {
     const stored = localStorage.getItem(KEY);
     if (!stored) return undefined;
