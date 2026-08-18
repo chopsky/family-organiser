@@ -522,10 +522,11 @@ function ReferralStrip() {
     } catch { /* clipboard blocked - the Share button still works */ }
   };
 
+  // No `url` param: the text already ends with the link, and share
+  // targets (WhatsApp) render the url param as a SECOND link on top.
   const shareNow = () => share({
     title: 'A free month of Housemait',
     text: referralShareMessage(state.share_url),
-    url: state.share_url,
     dialogTitle: 'A free month of Housemait',
   });
 

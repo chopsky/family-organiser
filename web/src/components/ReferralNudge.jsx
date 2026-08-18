@@ -73,10 +73,11 @@ export default function ReferralNudge({ show, context = 'sorted' }) {
   };
 
   const shareNow = async () => {
+    // No `url` param - the text ends with the link; WhatsApp renders a
+    // url param as a second link above the message.
     const ok = await share({
       title: 'A free month of Housemait',
       text: referralShareMessage(mine.share_url),
-      url: mine.share_url,
       dialogTitle: 'A free month of Housemait',
     });
     if (ok) { setShared(true); setTimeout(() => setHidden(true), 1800); }
