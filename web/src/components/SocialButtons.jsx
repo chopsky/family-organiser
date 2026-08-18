@@ -8,10 +8,10 @@
  */
 import useSocialAuth from '../hooks/useSocialAuth';
 
-export default function SocialButtons({ inviteToken, promoCode, signupSource, onSuccess, onError }) {
+export default function SocialButtons({ inviteToken, promoCode, signupSource, gclid, onSuccess, onError }) {
   const {
     showGoogle, showApple, googleReady, appleReady, signInWithGoogle, signInWithApple,
-  } = useSocialAuth({ inviteToken, promoCode, signupSource, onSuccess, onError });
+  } = useSocialAuth({ inviteToken, promoCode, signupSource, gclid, onSuccess, onError });
 
   if (!showGoogle && !showApple) return null;
 

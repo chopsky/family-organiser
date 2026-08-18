@@ -7,6 +7,7 @@ import HreflangTags from '../components/HreflangTags'
 import { APP_STORE_URL, APP_STORE_CONFIGURED, PLAY_STORE_URL, PLAY_STORE_CONFIGURED, getAppPlatform } from '../lib/app-store'
 import { resolveSignupSource } from '../lib/signupSource'
 import { resolveTermDatesLa, laDisplayName } from '../lib/termDatesLa'
+import { resolveGclid } from '../lib/gclid'
 
 /**
  * Housemait marketing site — "scroll story" design, ported from
@@ -279,6 +280,7 @@ export default function LandingPage() {
   })
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    resolveGclid(params)   // ad click id - capture regardless of src/la
     if (!params.get('src') && !params.get('la')) return
     resolveSignupSource(params)
     resolveTermDatesLa(params)

@@ -73,7 +73,7 @@ function isCancelError(err) {
   return false;
 }
 
-export default function useSocialAuth({ inviteToken, promoCode, signupSource, onSuccess, onError } = {}) {
+export default function useSocialAuth({ inviteToken, promoCode, signupSource, gclid, onSuccess, onError } = {}) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
   // Holds Google's OAuth code client (web), initialised once the GIS SDK loads.
@@ -100,13 +100,14 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
         source: signupSource || undefined,
+        gclid: gclid || undefined,
         referralCode: resolveReferralCode() || undefined,
       });
       onSuccess(data);
     } catch (err) {
       onError(err.response?.data?.error || 'Google sign-in failed.');
     }
-  }, [inviteToken, promoCode, signupSource, onSuccess, onError]);
+  }, [inviteToken, promoCode, signupSource, gclid, onSuccess, onError]);
 
   // On iOS native: initialise the Capgo Social Login plugin once on mount so
   // the Google SDK is ready by the time the user taps the button. The plugin
@@ -232,6 +233,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
           source: signupSource || undefined,
+        gclid: gclid || undefined,
           referralCode: resolveReferralCode() || undefined,
         });
         onSuccess(data);
@@ -293,6 +295,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
           inviteToken: inviteToken || undefined,
           promoCode: promoCode || undefined,
           source: signupSource || undefined,
+        gclid: gclid || undefined,
           referralCode: resolveReferralCode() || undefined,
         });
         onSuccess(data);
@@ -331,6 +334,7 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, on
         inviteToken: inviteToken || undefined,
         promoCode: promoCode || undefined,
         source: signupSource || undefined,
+        gclid: gclid || undefined,
         referralCode: resolveReferralCode() || undefined,
       });
       onSuccess(data);

@@ -33,6 +33,7 @@ import { resolveSignupPromo, clearSignupPromo } from '../../lib/signupPromo';
 import { clearReferralCode } from '../../lib/referralCode';
 import { resolveSignupSource, clearSignupSource } from '../../lib/signupSource';
 import { resolveTermDatesLa, readTermDatesLa, laDisplayName } from '../../lib/termDatesLa';
+import { resolveGclid } from '../../lib/gclid';
 import WelcomeNotifications from './steps/WelcomeNotifications';
 import AccountStep from './steps/AccountStep';
 import HouseholdStep from './steps/HouseholdStep';
@@ -124,6 +125,7 @@ export default function OnboardingFlow() {
     promoCode: resolveSignupPromo(searchParams),
     signupSource: resolveSignupSource(searchParams),
     termDatesLa: resolveTermDatesLa(searchParams),
+    gclid: resolveGclid(searchParams),
     hhMode: 'new', hhName: '', joinCode: '',
     invited: [],
     calProvider: null, calUrl: '',
@@ -299,7 +301,7 @@ function renderStep(key, ctx) {
               ✓ {laName} term dates included
             </p>
           )}
-          <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} signupSource={ctx.signupSource} navigate={ctx.navigate} />
+          <AccountStep form={ctx.form} update={ctx.update} setError={ctx.setError} goAfterAuth={ctx.goAfterAuth} inviteToken={ctx.inviteToken} promoCode={ctx.promoCode} signupSource={ctx.signupSource} gclid={ctx.form.gclid} navigate={ctx.navigate} />
         </>
       );
     }

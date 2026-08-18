@@ -43,6 +43,16 @@ function sanitizeSignupSource(raw) {
     : null;
 }
 
+// Google Ads click id (?gclid=..., appended by account auto-tagging). Stored
+// on the user so paid signups are separable from organic ones and so
+// conversions can later be imported back into Google Ads by gclid. Opaque
+// URL-safe token - bound it, never interpret it.
+function sanitizeGclid(raw) {
+  return typeof raw === 'string' && /^[A-Za-z0-9_-]{10,200}$/.test(raw.trim())
+    ? raw.trim()
+    : null;
+}
+
 function sessionMetaFromReq(req) {
   if (!req) return {};
   return {
@@ -150,6 +160,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
   // branch below creates a member who joins someone else's billing).
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  const signupGclid = sanitizeGclid(req.body?.gclid);
   // Referral code from a /gift/<code> landing (same charset as promo codes).
   const referredByCode = sanitizePromoCode(referralCode);
 
@@ -225,6 +236,7 @@ router.post('/register', requireTurnstile, async (req, res) => {
       authProvider: 'email',
       signupPromoCode,
       signupSource,
+      signupGclid,
       referredByCode,
     });
 
@@ -1055,6 +1067,7 @@ router.delete('/account', requireAuth, async (req, res) => {
         stripe_cancelled:       stripeCancelled,
         ip_address: req.ip || null,
         user_agent: req.headers['user-agent'] || null,
+        signup_gclid: user.signup_gclid || null,
       };
       // Churn context - the difference between a ledger and an answer to
       // "who signs up and then deletes?". Falls back to the base row while
@@ -1319,6 +1332,7 @@ router.post('/google', async (req, res) => {
   const { idToken, code, inviteToken, promoCode, source, referralCode } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  const signupGclid = sanitizeGclid(req.body?.gclid);
   const referredByCode = sanitizePromoCode(referralCode);
 
   if (!idToken && !code) {
@@ -1419,6 +1433,7 @@ router.post('/google', async (req, res) => {
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
         signupSource: acceptedInvite ? null : signupSource,
+        signupGclid: acceptedInvite ? null : signupGclid,
         referredByCode: acceptedInvite ? null : referredByCode,
       });
 
@@ -1453,6 +1468,7 @@ router.post('/apple', async (req, res) => {
   const { idToken, name: appleName, inviteToken, promoCode, source, referralCode } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
+  const signupGclid = sanitizeGclid(req.body?.gclid);
   const referredByCode = sanitizePromoCode(referralCode);
 
   if (!idToken) {
@@ -1538,6 +1554,7 @@ router.post('/apple', async (req, res) => {
         // Only the household owner (no invite) carries the campaign promo.
         signupPromoCode: acceptedInvite ? null : signupPromoCode,
         signupSource: acceptedInvite ? null : signupSource,
+        signupGclid: acceptedInvite ? null : signupGclid,
         referredByCode: acceptedInvite ? null : referredByCode,
       });
 

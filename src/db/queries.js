@@ -246,7 +246,7 @@ async function getUserByEmail(email, db = supabase) {
   return data || null;
 }
 
-async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null, signupSource = null, referredByCode = null }, db = supabase) {
+async function createUserWithEmail({ email, passwordHash, name, householdId = null, emailVerified = false, role = 'member', authProvider = null, signupPromoCode = null, signupSource = null, signupGclid = null, referredByCode = null }, db = supabase) {
   const row = {
     email,
     password_hash: passwordHash,
@@ -277,6 +277,14 @@ async function createUserWithEmail({ email, passwordHash, name, householdId = nu
       await db.from('users').update({ signup_source: signupSource }).eq('id', data.id);
       data.signup_source = signupSource;
     } catch { /* column not migrated yet - attribution is best-effort */ }
+  }
+  // Google Ads click id, same best-effort separate-update contract: a
+  // pending migration must never fail account creation.
+  if (signupGclid && data?.id) {
+    try {
+      await db.from('users').update({ signup_gclid: signupGclid }).eq('id', data.id);
+      data.signup_gclid = signupGclid;
+    } catch { /* column not migrated yet */ }
   }
   // Referral code, same deal - and a SEPARATE update from signup_source so
   // one pending migration can't take the other field down with it.
