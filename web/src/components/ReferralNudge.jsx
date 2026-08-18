@@ -92,7 +92,7 @@ export default function ReferralNudge({ show, context = 'sorted' }) {
           {context === 'meals' ? 'Meal plan sorted!' : 'That was easy, right?'} Know a family who&apos;d love this?
         </p>
         <p className="text-xs text-cocoa mt-0.5">
-          Give them a free month of Housemait - and get a month free yourself when they join.
+          Give them a free month of Housemait, and get a month free yourself once they start using it.
         </p>
         <div className="mt-2 flex items-center gap-3">
           <button

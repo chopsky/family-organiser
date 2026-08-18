@@ -80,7 +80,7 @@ export default function GiftLanding() {
               </h1>
               <p style={{ margin: '0 0 18px', fontFamily: sans, fontSize: 14.5, lineHeight: 1.55, color: '#6B6774', textAlign: 'center' }}>
                 {state.valid
-                  ? 'Housemait is the calm home for your family’s calendar, lists and meals. Start your free trial and your gift month is added on top once you’re set up.'
+                  ? 'Housemait is the calm home for your family’s calendar, lists and meals. Start your free trial. Your bonus month is added automatically once your family starts using Housemait.'
                   : 'You can still try Housemait free - every new family gets a full trial of everything.'}
               </p>
 
@@ -108,7 +108,7 @@ export default function GiftLanding() {
                 {state.valid ? 'Claim your gift month' : 'Try Housemait free'}
               </Link>
               <p style={{ margin: '10px 0 0', fontFamily: sans, fontSize: 12, color: '#6B6774', textAlign: 'center' }}>
-                Free trial, no card needed.{state.valid ? ' Your extra month unlocks once your family is set up.' : ''}
+                Free trial, no card needed.
               </p>
             </>
           )}

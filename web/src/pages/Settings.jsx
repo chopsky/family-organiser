@@ -512,7 +512,7 @@ function ReferralSection({ sectionWrapper }) {
     <SectionWrapper slug="referral" title="Give a month, get a month" icon={IconGift} accordion>
       <p className="text-sm text-cocoa">
         Know another family drowning in school letters? Give them a free month
-        of Housemait. When they get set up, you get a month free too.
+        of Housemait. Once they start using it, you get a month free too.
       </p>
       {state.banked_days > 0 && (
         <p className="text-sm font-semibold text-bark mt-2">
