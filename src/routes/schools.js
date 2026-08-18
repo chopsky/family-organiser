@@ -667,6 +667,7 @@ Only return valid JSON array, nothing else.`;
       term_dates_last_updated: new Date().toISOString(),
       ical_last_sync: new Date().toISOString(),
       ical_last_sync_status: 'success',
+      uses_la_dates: false,
     });
 
     cache.invalidate(`schools:${req.householdId}`);
@@ -935,6 +936,7 @@ router.post('/:schoolId/import-la-dates', requireAuth, requireHousehold, require
     await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'local_authority',
       term_dates_last_updated: new Date().toISOString(),
+      uses_la_dates: true,
     });
 
     cache.invalidate(`schools:${req.householdId}`);
@@ -1436,6 +1438,7 @@ router.post('/:schoolId/import-website/confirm', requireAuth, requireHousehold, 
     await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: 'website_scrape',
       term_dates_last_updated: new Date().toISOString(),
+      uses_la_dates: false,
     });
 
     cache.invalidate(`schools:${req.householdId}`);
@@ -1550,6 +1553,7 @@ router.post('/:schoolId/adopt-directory-dates', requireAuth, requireHousehold, r
     await db.addSchoolTermDates(school.id, hit.dates.map(d => ({ ...d, source: 'school_directory' })));
     await db.updateHouseholdSchoolMeta(school.id, {
       term_dates_source: 'school_directory',
+      uses_la_dates: false,
       term_dates_last_updated: new Date().toISOString(),
     });
     await schoolDirDb.linkHouseholdSchoolToDirectory(school.id, hit.school.id);
@@ -1828,6 +1832,9 @@ router.post('/:schoolId/term-dates/confirm', requireAuth, requireHousehold, requ
     await db.updateHouseholdSchoolMeta(req.params.schoolId, {
       term_dates_source: SOURCE_MAP[source],
       term_dates_last_updated: new Date().toISOString(),
+      // council + the SA national calendar ARE the public dates; every
+      // other source proves the school sets its own.
+      uses_la_dates: source === 'council' || source === 'sa_national',
     });
 
     // An iCal feed only starts syncing once the parent has approved what it

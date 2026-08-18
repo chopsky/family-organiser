@@ -579,11 +579,31 @@ function SchoolsCard({ schools }) {
                     No term dates
                   </span>
                 )}
-                {/* uses_la_dates records the family's CHOICE at add time, not
-                    what was imported. With zero dates present, a bare "LA
-                    dates" badge contradicts the "No term dates" one - say
-                    what actually happened instead. */}
-                {s.uses_la_dates && !hasDates ? (
+                {/* Label from EVIDENCE (the stored dates' actual source),
+                    not the add-time uses_la_dates flag - that flag defaulted
+                    true on manual adds and mislabelled a school's own
+                    website import as "LA dates" (the Lucks, 2026-08-18).
+                    Only when no dates exist do we fall back to the choice:
+                    "chosen · never imported" needs an LA on file to be
+                    meaningful (the backfill sweep can then run); without
+                    one, nothing was really chosen at all. */}
+                {hasDates ? (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    s.term_dates_source === 'local_authority' || s.term_dates_source === 'sa-national'
+                      ? 'bg-plum-light text-plum' : 'bg-cream text-warm-grey'
+                  }`}>
+                    {{
+                      local_authority: 'LA dates',
+                      'sa-national': 'SA national dates',
+                      website_scrape: "School's own dates",
+                      pdf_upload: "School's own dates (PDF)",
+                      ical: 'iCal feed',
+                      ical_import: 'iCal feed',
+                      school_directory: 'Shared directory',
+                      manual: 'Entered manually',
+                    }[s.term_dates_source] || (s.uses_la_dates ? 'LA dates' : 'Own dates')}
+                  </span>
+                ) : s.uses_la_dates && s.local_authority ? (
                   <span
                     className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-warm-grey text-xs font-semibold"
                     title="The family chose council dates when adding the school, but the import never ran - the weekly backfill sweep will fill it from the directory or LA cache when possible."
@@ -591,10 +611,8 @@ function SchoolsCard({ schools }) {
                     LA dates chosen · never imported
                   </span>
                 ) : (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
-                    s.uses_la_dates ? 'bg-plum-light text-plum' : 'bg-cream text-warm-grey'
-                  }`}>
-                    {s.uses_la_dates ? 'LA dates' : 'Own dates'}
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-cream text-warm-grey text-xs font-semibold">
+                    No source yet
                   </span>
                 )}
                 {s.ical_url && (

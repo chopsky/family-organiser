@@ -1310,6 +1310,9 @@ async function updateHouseholdSchoolMeta(schoolId, meta, db = supabase) {
   const allowed = {};
   if (meta.term_dates_source !== undefined) allowed.term_dates_source = meta.term_dates_source;
   if (meta.term_dates_last_updated !== undefined) allowed.term_dates_last_updated = meta.term_dates_last_updated;
+  // Imports correct the add-time choice: an LA import (re)confirms it, any
+  // other source disproves it (the school demonstrably has its own dates).
+  if (meta.uses_la_dates !== undefined) allowed.uses_la_dates = meta.uses_la_dates;
   if (meta.ical_last_sync !== undefined) allowed.ical_last_sync = meta.ical_last_sync;
   if (meta.ical_last_sync_status !== undefined) allowed.ical_last_sync_status = meta.ical_last_sync_status;
   const { data, error } = await db
@@ -5963,7 +5966,7 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
 async function getHouseholdSchoolsAdmin(householdId, db = supabase) {
   const { data: schools, error } = await db
     .from('household_schools')
-    .select('id, school_name, school_urn, school_type, local_authority, postcode, uses_la_dates, ical_url, created_at')
+    .select('id, school_name, school_urn, school_type, local_authority, postcode, uses_la_dates, term_dates_source, ical_url, created_at')
     .eq('household_id', householdId)
     .order('created_at', { ascending: true });
   if (error) throw error;
