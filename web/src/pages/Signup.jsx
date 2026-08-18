@@ -5,7 +5,7 @@ import api from '../lib/api';
 import ErrorBanner from '../components/ErrorBanner';
 import SocialButtons from '../components/SocialButtons';
 import TurnstileWidget from '../components/TurnstileWidget';
-import { resolveSignupPromo, clearSignupPromo } from '../lib/signupPromo';
+import { resolveSignupPromo, clearSignupPromo, promoCapturedThisSession } from '../lib/signupPromo';
 import { resolveReferralCode, clearReferralCode } from '../lib/referralCode';
 
 // Human label for a confirmed promo, e.g. "25% off" or "£10 off".
@@ -211,7 +211,7 @@ export default function Signup() {
           </p>
         )}
 
-        {promoInfo?.valid && (
+        {promoInfo?.valid && promoCapturedThisSession() && (
           <div
             className="text-center"
             style={{

@@ -18,8 +18,21 @@
 
 const KEY = 'housemait_signup_promo';
 const AT_KEY = 'housemait_signup_promo_at';
-const MAX_AGE_DAYS = 30;
+// Session marker: was the promo link clicked in THIS browser session? The
+// stored code silently applies at signup/checkout for MAX_AGE_DAYS (so a
+// verification round trip or a later return never loses the discount), but
+// the "applied!" banner only shows in the session that carried the link -
+// on later organic visits a permanent banner read as stuck (and implied a
+// claim the visitor might not recognise). Standard persist-quietly,
+// surface-at-relevance behaviour.
+const SESSION_KEY = 'housemait_signup_promo_session';
+const MAX_AGE_DAYS = 14;
 const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+/** True when the promo arrived via URL during this browser session. */
+export function promoCapturedThisSession() {
+  try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+}
 
 /**
  * Resolve the promo for the signup happening now. A `promo` in the URL
@@ -35,6 +48,7 @@ export function resolveSignupPromo(searchParams, now = Date.now()) {
     if (fromUrl) {
       localStorage.setItem(KEY, fromUrl);
       localStorage.setItem(AT_KEY, String(now));
+      try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* private mode */ }
       return fromUrl;
     }
     const stored = localStorage.getItem(KEY);

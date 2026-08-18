@@ -3,7 +3,7 @@ import api from '../../../lib/api';
 import SocialButtons from '../../../components/SocialButtons';
 import TurnstileWidget from '../../../components/TurnstileWidget';
 import ErrorBanner from '../../../components/ErrorBanner';
-import { clearSignupPromo } from '../../../lib/signupPromo';
+import { clearSignupPromo, promoCapturedThisSession } from '../../../lib/signupPromo';
 import { resolveReferralCode, clearReferralCode } from '../../../lib/referralCode';
 import { clearSignupSource } from '../../../lib/signupSource';
 import { Title, Em, Kicker, PrimaryButton, Ghost } from './_ui';
@@ -121,8 +121,10 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
         </div>
       )}
 
-      {/* Confirmed promo discount banner (reassurance). */}
-      {promoInfo?.valid && (
+      {/* Confirmed promo discount banner (reassurance). Only in the session
+          that carried the promo link - the stored code still applies silently
+          on later visits (dashboard nudge + checkout disclose it). */}
+      {promoInfo?.valid && promoCapturedThisSession() && (
         <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 12, background: 'rgba(125,174,130,0.14)', border: '1px solid rgba(125,174,130,0.35)', fontSize: 13, color: 'var(--color-charcoal)', lineHeight: 1.45 }}>
           🎉 <strong>{promoDiscountLabel(promoInfo)}</strong> applied with code <strong>{promoInfo.code}</strong>, finish signing up to claim it.
         </div>
