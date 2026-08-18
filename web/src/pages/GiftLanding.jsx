@@ -49,25 +49,25 @@ const ICONS = {
     </svg>
   ),
   calendar: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4A1D96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="5" width="18" height="16" rx="3" />
       <path d="M8 3v4m8-4v4M3 10h18" />
     </svg>
   ),
   chat: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4A1D96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z" />
     </svg>
   ),
   trolley: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4A1D96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="9.5" cy="19.5" r="1.6" />
       <circle cx="16.5" cy="19.5" r="1.6" />
       <path d="M3 4h2l2.3 10.5h11L20.5 7.5H6" />
     </svg>
   ),
   star: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#4A1D96" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#6B3FA0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z" />
     </svg>
   ),
@@ -81,23 +81,26 @@ const BENEFITS = [
 ];
 
 const CSS = `
-.giftp{min-height:100vh;font-family:var(--font-sans,Inter,system-ui,sans-serif);color:#1A1620;background:linear-gradient(175deg,#f1ecf6 0%,#f5eff7 26%,#F7F1EC 52%,#f5eee7 76%,#f0e7dd 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:34px 20px 26px}
-.giftp a{color:#4A1D96}.giftp a:hover{color:#6D38AD}
+.giftp{position:relative;overflow:hidden;min-height:100vh;font-family:var(--font-sans,Inter,system-ui,sans-serif);color:#1A1620;background:radial-gradient(120% 80% at 50% 0%, #EFE9FB 0%, #FAF7F2 55%, #F3EEE5 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:34px 20px 26px}
+.giftp::before{content:'';pointer-events:none;position:absolute;width:760px;height:760px;border-radius:50%;left:-180px;bottom:-300px;background:radial-gradient(circle, rgba(232,180,160,0.45) 0%, rgba(232,180,160,0) 70%);filter:blur(20px)}
+.giftp::after{content:'';pointer-events:none;position:absolute;width:600px;height:600px;border-radius:50%;right:-160px;top:-200px;background:radial-gradient(circle, rgba(107,63,160,0.18) 0%, rgba(107,63,160,0) 70%);filter:blur(20px)}
+.giftp>div{position:relative;z-index:1}
+.giftp a{color:#6B3FA0}.giftp a:hover{color:#5A3488}
 .giftp-lockup{width:126px;display:block;margin:0 auto 26px}
-.giftp-card{width:100%;max-width:480px;background:#FFFDFA;border-radius:24px;padding:30px 28px 26px;box-shadow:0 26px 60px -26px rgba(26,22,32,.35),0 0 0 1px rgba(26,22,32,.05);text-align:center;animation:giftp-rise .55s cubic-bezier(.22,.8,.2,1) backwards}
+.giftp-card{width:100%;max-width:480px;background:rgba(255,253,250,0.86);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid rgba(255,255,255,0.9);border-radius:24px;padding:30px 28px 26px;box-shadow:0 30px 80px -20px rgba(26,22,32,0.25),inset 0 2px 0 rgba(255,255,255,0.6);text-align:center;animation:giftp-rise .55s cubic-bezier(.22,.8,.2,1) backwards}
 .giftp-ribbon{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:99px;background:#FBF1DE;color:#8A5F1E;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-.giftp-ribbon--neutral{background:#F2ECFA;color:#4A1D96}
-.giftp-h1{font-family:var(--font-serif-display,Georgia,serif);font-weight:400;font-size:34px;line-height:1.12;letter-spacing:-.015em;margin:16px auto 0;max-width:330px;text-wrap:balance}
-.giftp-h1 em{font-style:normal;color:#6D38AD}
+.giftp-ribbon--neutral{background:#F3EDFC;color:#6B3FA0}
+.giftp-h1{font-family:var(--font-serif-display,Georgia,serif);font-weight:400;font-size:34px;line-height:1.12;letter-spacing:-.02em;margin:16px auto 0;max-width:330px;text-wrap:balance}
+.giftp-h1 em{font-style:normal;color:#6B3FA0}
 .giftp-sub{font-size:15px;line-height:1.5;color:#4A4453;margin:12px auto 0;width:330px;max-width:100%;text-wrap:pretty}
 .giftp-rows{margin:20px 0 0;border-top:1px solid rgba(26,22,32,.08)}
 .giftp-row{display:flex;align-items:center;gap:13px;padding:12px 2px;border-bottom:1px solid rgba(26,22,32,.08);text-align:left}
 .giftp-row:last-child{border-bottom:none}
-.giftp-tile{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#F2ECFA}
+.giftp-tile{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#F3EDFC}
 .giftp-row b{display:block;font-size:14px;font-weight:600;color:#2D2A33}
 .giftp-row small{display:block;font-size:12.5px;color:#8A8493;margin-top:1px}
-.giftp-cta{display:block;width:100%;margin-top:20px;padding:16px;border-radius:16px;border:0;background:#6D38AD;color:#fff !important;font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(109,56,173,.55);text-decoration:none}
-.giftp-cta:hover{background:#4A1D96;color:#fff !important}
+.giftp-cta{display:block;width:100%;margin-top:20px;padding:16px;border-radius:16px;border:1px solid transparent;background:#6B3FA0;color:#fff !important;font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 6px 16px -8px rgba(107,63,160,0.45);text-decoration:none;transition:transform .15s ease, box-shadow .15s ease, background .15s ease}
+.giftp-cta:hover{background:#5A3488;color:#fff !important}
 .giftp-mini{font-size:12.5px;color:#8A8493;margin-top:11px}
 .giftp-quote{margin-top:22px;text-align:center;animation:giftp-rise .55s .12s cubic-bezier(.22,.8,.2,1) backwards}
 .giftp-stars{color:#D89B3A;font-size:13px;letter-spacing:2.5px}
