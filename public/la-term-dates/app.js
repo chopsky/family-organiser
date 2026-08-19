@@ -1,4 +1,4 @@
-/* eslint-env browser */
+/* global document, fetch, location, URLSearchParams */
 /**
  * Directory index - progressive enhancement over the server-rendered grid.
  *
