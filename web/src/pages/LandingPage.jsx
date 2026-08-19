@@ -752,8 +752,8 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lv-card crop" data-lv-reveal="1">
-            <h3>Build healthy habits</h3>
-            <p>Child Mode lets kids see their day, tick off their tasks, earn stars and spend them on rewards.</p>
+            <h3>Child Mode enabled</h3>
+            <p>Finally a good reason to give them a screen. Kids manage their own chores and tasks - and build independence.</p>
             <div className="lv-kidphone-well">
               <div className="lv-kidphone">
                 <img src="/landing/app-kid-quests.jpg" alt="Housemait Child Mode, today&rsquo;s quests" loading="lazy" />
