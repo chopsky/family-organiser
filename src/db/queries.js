@@ -6949,6 +6949,46 @@ async function getInviteLoopFunnel({ days = 30 } = {}, db = supabase) {
  * carries the signup→verified→onboarded→WhatsApp-linked→subscribed funnel.
  * Injectable db for tests.
  */
+/**
+ * Sign-ups grouped by acquisition source tag (signup_source), each split into
+ * paid (arrived on a Google Ads click - signup_gclid present) vs organic.
+ * The self-serve answer to "are the ads producing signups?" - before this,
+ * attribution existed per-user but nobody could see the totals without a
+ * database query. Internal households excluded like every cohort count.
+ */
+async function getSignupSourceBreakdown({ days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const out = { days, total: 0, sources: [] };
+
+  const { data: users, error } = await db.from('users')
+    .select('id, email, created_at, signup_source, signup_gclid, onboarded_at, household_id')
+    .eq('member_type', 'account').gte('created_at', since).limit(3000);
+  if (error) return out;
+  let real = (users || []).filter((u) => u.email && !/@example\.com/i.test(u.email));
+
+  const hhIds = [...new Set(real.map((u) => u.household_id).filter(Boolean))];
+  if (hhIds.length) {
+    try {
+      const { data: hhs } = await db.from('households').select('id, is_internal').in('id', hhIds);
+      const internal = new Set((hhs || []).filter((h) => h.is_internal).map((h) => h.id));
+      real = real.filter((u) => !internal.has(u.household_id));
+    } catch { /* internal filter is best-effort */ }
+  }
+
+  const bySource = new Map();
+  for (const u of real) {
+    const key = u.signup_source || 'untagged';
+    const row = bySource.get(key) || { source: key, signups: 0, viaAds: 0, onboarded: 0 };
+    row.signups += 1;
+    if (u.signup_gclid) row.viaAds += 1;
+    if (u.onboarded_at) row.onboarded += 1;
+    bySource.set(key, row);
+  }
+  out.total = real.length;
+  out.sources = [...bySource.values()].sort((a, b) => b.signups - a.signups);
+  return out;
+}
+
 async function getAcquisitionFunnel({ days = 14 } = {}, db = supabase) {
   const since = new Date(Date.now() - days * 86400000).toISOString();
   const seg = () => ({ signups: 0, verified: 0, onboarded: 0, whatsapp: 0, subscribed: 0 });
@@ -10717,6 +10757,7 @@ module.exports = {
   recordWhatsAppDeliveryStatus,
   getWhatsAppDeliveryStats,
   getAcquisitionFunnel,
+  getSignupSourceBreakdown,
   createOrGetEventInviteLink,
   getEventInviteByToken,
   upsertEventRsvp,

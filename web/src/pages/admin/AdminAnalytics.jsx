@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
-    acquisition = null, inviteLoop = null, referrals = null,
+    acquisition = null, inviteLoop = null, referrals = null, signupSources = null,
   } = data || {};
 
   // Calculate DAU average
@@ -177,6 +177,40 @@ export default function AdminAnalytics() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Signups by source tag: the self-serve "are the ads working?" table.
+          "via ads" = the account was created carrying a Google Ads click id. */}
+      {signupSources && signupSources.total > 0 && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Sign-ups by source (last {signupSources.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            <strong>termdates</strong> = the school-term-dates funnel; <strong>via ads</strong> = arrived on a Google Ads
+            click (gclid). Untagged = every signup with no acquisition tag (App Store, direct, word of mouth).
+          </p>
+          <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-warm-grey">
+                  <th className="py-2 pr-4">Source</th>
+                  <th className="py-2 pr-4 text-right">Sign-ups</th>
+                  <th className="py-2 pr-4 text-right">via ads</th>
+                  <th className="py-2 text-right">Onboarded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signupSources.sources.map((row) => (
+                  <tr key={row.source} className="border-t border-light-grey">
+                    <td className="py-2 pr-4 font-medium text-charcoal">{row.source === 'untagged' ? <span className="text-warm-grey">(untagged)</span> : row.source}</td>
+                    <td className="py-2 pr-4 text-right font-bold text-plum">{row.signups}</td>
+                    <td className="py-2 pr-4 text-right">{row.viaAds > 0 ? row.viaAds : <span className="text-warm-grey">—</span>}</td>
+                    <td className="py-2 text-right">{row.onboarded}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
