@@ -502,6 +502,23 @@ export default function LandingPage() {
         }
       }
 
+      // Progress dots: rail fades in just before step 0 (p 0.16→0.20) and
+      // out past A+5W (=1.0, so the unpin carries it away); the active dot
+      // stretches to a 26px plum pill via the CSS width/background
+      // transitions — per-frame writes are idempotent value swaps.
+      if (E.dots) {
+        const railIn = ease(inv(prog, A - 0.04, A))
+        const railOut = 1 - ease(inv(prog, A + 5 * W, A + 5 * W + 0.03))
+        E.dots.style.opacity = (railIn * railOut).toFixed(3)
+        const act = Math.min(4, Math.max(0, Math.floor((prog - A) / W)))
+        for (let i = 0; i < 5; i++) {
+          const d = E.dots.children[i]
+          if (!d) continue
+          d.style.width = i === act ? '26px' : '8px'
+          d.style.background = i === act ? '#6D38AD' : 'rgba(36,30,51,0.16)'
+        }
+      }
+
       // Companion phone (desktop, chapters 1–4): tilted mock behind the
       // main phone on the opposite side of the text card.
       if (E.compWrap && !narrow) {
@@ -730,6 +747,13 @@ export default function LandingPage() {
               )}
             </div>
           ))}
+
+          {/* Story progress dots (UPDATE-story-dots.md) — decorative rail on
+              the story's scroll clock; JS swaps active width/colour per
+              frame, the CSS transition morphs the pill. */}
+          <div className="lv-dots" ref={setEl('dots')} aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => <span key={i} className="lv-dot" />)}
+          </div>
         </div>
       </section>
       )}

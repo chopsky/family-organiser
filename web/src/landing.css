@@ -174,6 +174,10 @@
 .lv-story-card h3 { font-size: clamp(28px, 2.8vw, 40px); line-height: 1.12; margin: 0 0 12px; }
 .lv-story-card p { color: var(--lv-ink-2); font-size: 16px; line-height: 1.6; margin: 0; }
 
+/* Story progress dots — bottom-centre of the sticky viewport */
+.lv-dots { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 8px; opacity: 0; pointer-events: none; will-change: opacity; }
+.lv-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(36, 30, 51, 0.16); transition: width 0.3s ease, background 0.3s ease; }
+
 /* Calendar-sync tile row (Calendar feature panel; inherits panel align) */
 .lv-sync { margin-top: 20px; display: inline-flex; align-items: center; gap: 12px; }
 .lv-sync-label { font-size: 13.5px; font-weight: 600; color: #8A8399; }
