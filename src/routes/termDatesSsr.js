@@ -59,6 +59,23 @@ function groupByYear(entries) {
  * nobody is looking for it and leading the page with it reads as stale.
  * A year survives while any of its dates is today or later.
  */
+/**
+ * Should this council appear on the public site?
+ *
+ * Deliberately keyed on DATA, not on import health. import_status records
+ * whether the LAST refresh succeeded, which is a different question: a
+ * council whose page started 403ing (Enfield, Richmond, Calderdale,
+ * Blackpool, Blackburn with Darwen - all found 2026-08-19) flips to 'failed'
+ * while still holding a complete, current calendar imported weeks earlier.
+ * Gating the site on status silently 404'd five councils that had perfectly
+ * good dates, breaking inbound links and de-indexing the pages. Stale data is
+ * a separate concern, handled by the weekly freshness audit
+ * (services/laTermDatesFreshness.js) and by withoutFinishedYears() below.
+ */
+function isListable(authority) {
+  return (authority?.date_count || 0) > 0;
+}
+
 function withoutFinishedYears(entries) {
   const today = new Date().toISOString().slice(0, 10);
   const lastByYear = {};
@@ -757,8 +774,7 @@ router.use((req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const html = fs.readFileSync(INDEX_HTML, 'utf-8');
-    const authorities = (await laDb.listAllAuthorities())
-      .filter((a) => ['ok', 'partial'].includes(a.import_status));
+    const authorities = (await laDb.listAllAuthorities()).filter(isListable);
 
     // Group by first letter for the letter-headed grid + jump nav.
     const byLetter = new Map();
@@ -802,7 +818,7 @@ router.get('/sitemap.xml', async (req, res) => {
     // for e.g. Jewish schools) - they live in-app only.
     const urls = [
       `${CANONICAL_BASE}/`,
-      ...authorities.filter((a) => ['ok', 'partial'].includes(a.import_status)).map((a) => `${CANONICAL_BASE}/${a.slug}`),
+      ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
     ];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}\n</urlset>`;
     res.set('Cache-Control', CACHE_HEADER).type('application/xml').send(xml);
@@ -834,7 +850,7 @@ router.get('/:slug/term-dates.ics', async (req, res, next) => {
   try {
     if (!SLUG_RE.test(req.params.slug)) return next();
     const authority = await laDb.getAuthorityBySlug(req.params.slug);
-    if (!authority || !['ok', 'partial'].includes(authority.import_status)) return next();
+    if (!authority || !isListable(authority)) return next();
     const entries = withoutFinishedYears(await laDb.getEntriesForLA(authority.id));
     if (!entries.length) return next();
     res
@@ -852,17 +868,16 @@ router.get('/:slug', async (req, res, next) => {
   try {
     if (!SLUG_RE.test(req.params.slug)) return next();
     const authority = await laDb.getAuthorityBySlug(req.params.slug);
-    if (!authority || !['ok', 'partial'].includes(authority.import_status)) return next();
+    if (!authority || !isListable(authority)) return next();
     const entries = withoutFinishedYears(await laDb.getEntriesForLA(authority.id));
     const years = groupByYear(entries);
     const content = buildCouncilContent(authority, years);
-    // Live siblings for the cross-link mesh (same ok/partial filter as the
+    // Live siblings for the cross-link mesh (same isListable filter as the
     // index + sitemap, so we never link to a 404). Fail-open: the page must
     // render even if the sibling fetch breaks — the mesh is a garnish.
     let allLive = [];
     try {
-      allLive = (await laDb.listAllAuthorities() || [])
-        .filter((a) => ['ok', 'partial'].includes(a.import_status));
+      allLive = (await laDb.listAllAuthorities() || []).filter(isListable);
     } catch (err) {
       console.error('[term-dates-ssr] nearby fetch failed:', err.message);
     }

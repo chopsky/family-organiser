@@ -25,11 +25,15 @@ const app = () => {
   return a;
 };
 
+// Listability is keyed on HOLDING DATES, not on import health: a council
+// whose last refresh 403'd still has a usable calendar and must stay on the
+// site (five real councils were 404'ing this way until 2026-08-19).
 const AUTHORITIES = [
-  { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok' },
-  { name: 'Cardiff', slug: 'cardiff', region: 'Wales', import_status: 'partial' },
-  { name: 'Nevershire', slug: 'nevershire', region: 'England', import_status: 'pending' },
-  { name: 'Brokenshire', slug: 'brokenshire', region: 'England', import_status: 'failed' },
+  { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok', date_count: 40 },
+  { name: 'Cardiff', slug: 'cardiff', region: 'Wales', import_status: 'partial', date_count: 20 },
+  { name: 'Nevershire', slug: 'nevershire', region: 'England', import_status: 'pending', date_count: 0 },
+  // Last import failed, but June's dates are still stored - must STILL list.
+  { name: 'Brokenshire', slug: 'brokenshire', region: 'England', import_status: 'failed', date_count: 30 },
 ];
 
 describe('GET /school-term-dates/ (SSR index)', () => {
@@ -42,6 +46,10 @@ describe('GET /school-term-dates/ (SSR index)', () => {
     expect(res.status).toBe(200);
     expect(res.text).toContain('href="/school-term-dates/hertfordshire"');
     expect(res.text).toContain('href="/school-term-dates/cardiff"'); // partial still shows
+    // A failed LAST import does not unpublish a council that still holds dates.
+    expect(res.text).toContain('href="/school-term-dates/brokenshire"');
+    // Never imported, no dates: nothing to show.
+    expect(res.text).not.toContain('href="/school-term-dates/nevershire"');
   });
 
   it('carries the data attributes the client-side filter reads', async () => {
@@ -51,15 +59,15 @@ describe('GET /school-term-dates/ (SSR index)', () => {
     expect(res.text).toContain('data-region="Wales"');
   });
 
-  it('excludes councils that never imported', async () => {
+  it('excludes councils holding no dates, but keeps ones whose last import failed', async () => {
     const res = await request(app()).get('/school-term-dates/');
-    expect(res.text).not.toContain('nevershire');
-    expect(res.text).not.toContain('brokenshire');
+    expect(res.text).not.toContain('nevershire'); // never imported, no dates
+    expect(res.text).toContain('brokenshire'); // import failed, dates still held
   });
 
   it('escapes authority names in the injected markup', async () => {
     laDb.listAllAuthorities.mockResolvedValue([
-      { name: 'Evil<script>alert(1)</script>', slug: 'evil', region: 'England', import_status: 'ok' },
+      { name: 'Evil<script>alert(1)</script>', slug: 'evil', region: 'England', import_status: 'ok', date_count: 10 },
     ]);
     const res = await request(app()).get('/school-term-dates/');
     expect(res.text).not.toContain('<script>alert(1)</script>');
@@ -79,7 +87,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
   beforeEach(() => {
     laDb.getAuthorityBySlug.mockResolvedValue({
       id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire',
-      region: 'England', import_status: 'ok', source_url: 'https://www.hertfordshire.gov.uk/term-dates',
+      region: 'England', import_status: 'ok', date_count: 40, source_url: 'https://www.hertfordshire.gov.uk/term-dates',
     });
     laDb.getEntriesForLA.mockResolvedValue([
       { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
@@ -105,11 +113,11 @@ describe('GET /school-term-dates/:slug (council page)', () => {
 
   it('cross-links other councils (cyclic mesh), skipping dead pages and itself', async () => {
     laDb.listAllAuthorities.mockResolvedValue([
-      { name: 'Barnet', slug: 'barnet', region: 'England', import_status: 'ok' },
-      { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok' },
-      { name: 'Kent', slug: 'kent', region: 'England', import_status: 'ok' },
-      { name: 'Luton', slug: 'luton', region: 'England', import_status: 'failed' }, // dead → never linked
-      { name: 'Surrey', slug: 'surrey', region: 'England', import_status: 'partial' },
+      { name: 'Barnet', slug: 'barnet', region: 'England', import_status: 'ok', date_count: 40 },
+      { name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok', date_count: 40 },
+      { name: 'Kent', slug: 'kent', region: 'England', import_status: 'ok', date_count: 40 },
+      { name: 'Luton', slug: 'luton', region: 'England', import_status: 'ok', date_count: 0 }, // no dates → never linked
+      { name: 'Surrey', slug: 'surrey', region: 'England', import_status: 'partial', date_count: 20 },
     ]);
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.status).toBe(200);
@@ -118,7 +126,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     expect(res.text).toContain('href="/school-term-dates/kent"');
     expect(res.text).toContain('href="/school-term-dates/surrey"');
     expect(res.text).toContain('href="/school-term-dates/barnet"');
-    expect(res.text).not.toContain('href="/school-term-dates/luton"'); // failed import
+    expect(res.text).not.toContain('href="/school-term-dates/luton"'); // holds no dates
     expect(res.text).not.toContain('href="/school-term-dates/hertfordshire"'); // not itself
   });
 
@@ -180,16 +188,30 @@ describe('GET /school-term-dates/:slug (council page)', () => {
   });
 
   it('never-imported councils fall through rather than render empty pages', async () => {
-    laDb.getAuthorityBySlug.mockResolvedValue({ id: 'x', name: 'Nevershire', slug: 'nevershire', import_status: 'pending' });
+    laDb.getAuthorityBySlug.mockResolvedValue({ id: 'x', name: 'Nevershire', slug: 'nevershire', import_status: 'pending', date_count: 0 });
     const res = await request(app()).get('/school-term-dates/nevershire');
     expect(res.status).toBe(404);
+  });
+
+  // The Enfield regression (2026-08-19): five councils whose council page had
+  // started 403ing flipped to import_status 'failed' and their pages began
+  // returning 404 - despite each still holding a complete, current calendar.
+  // A failed refresh must never unpublish data we already hold.
+  it('a council whose last import failed still serves its page', async () => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la9', name: 'Enfield', slug: 'enfield', region: 'England',
+      import_status: 'failed', date_count: 30, source_url: 'https://www.enfield.gov.uk/term-dates',
+    });
+    const res = await request(app()).get('/school-term-dates/enfield');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Enfield');
   });
 });
 
 describe('GET /school-term-dates/:slug/term-dates.ics', () => {
   beforeEach(() => {
     laDb.getAuthorityBySlug.mockResolvedValue({
-      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok',
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok', date_count: 40,
     });
     laDb.getEntriesForLA.mockResolvedValue([
       { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
@@ -229,7 +251,7 @@ describe('GET /school-term-dates/:slug/term-dates.ics', () => {
 describe('council page action buttons', () => {
   beforeEach(() => {
     laDb.getAuthorityBySlug.mockResolvedValue({
-      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok',
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok', date_count: 40,
     });
     laDb.getEntriesForLA.mockResolvedValue([
       { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
@@ -259,7 +281,7 @@ describe('per-school INSET days (the Barking & Dagenham publishing style)', () =
   beforeEach(() => {
     laDb.getAuthorityBySlug.mockResolvedValue({
       id: 'la-bd', name: 'Barking and Dagenham', slug: 'barking-and-dagenham',
-      region: 'England', import_status: 'ok', school_count: 68,
+      region: 'England', import_status: 'ok', date_count: 55, school_count: 68,
     });
     laDb.getEntriesForLA.mockResolvedValue(ENTRIES);
   });
