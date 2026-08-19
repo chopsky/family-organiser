@@ -93,7 +93,7 @@ export default function ReferralNudge({ show, context = 'sorted' }) {
           {context === 'meals' ? 'Meal plan sorted!' : 'That was easy, right?'} Know a family who&apos;d love this?
         </p>
         <p className="text-xs text-cocoa mt-0.5">
-          Give them a free month of Housemait, and get a month free yourself once they start using it.
+          Their first two months free, and an extra free month for you once they start using it.
         </p>
         <div className="mt-2 flex items-center gap-3">
           <button
@@ -101,7 +101,7 @@ export default function ReferralNudge({ show, context = 'sorted' }) {
             onClick={shareNow}
             className="bg-primary text-white font-semibold text-xs px-4 py-2 rounded-xl hover:bg-primary-pressed transition-colors"
           >
-            {shared ? 'Link copied!' : 'Share a free month'}
+            {shared ? 'Link copied!' : 'Share two free months'}
           </button>
           <button
             type="button"
