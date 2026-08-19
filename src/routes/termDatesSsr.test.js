@@ -12,12 +12,19 @@ jest.mock('../db/laTermDates', () => ({
   listAuthoritySchools: jest.fn(),
   getAuthorityBySlug: jest.fn(),
   getEntriesForLA: jest.fn(),
+  listAllEntries: jest.fn(),
+  getStats: jest.fn(),
 }));
 
 const request = require('supertest');
 const express = require('express');
 const laDb = require('../db/laTermDates');
 const router = require('./termDatesSsr');
+
+beforeEach(() => {
+  laDb.listAllEntries.mockResolvedValue([]);
+  laDb.getStats.mockResolvedValue({ total: 176, dateCount: 4800, lastRun: { started_at: '2026-08-16T07:43:00Z' } });
+});
 
 const app = () => {
   const a = express();
@@ -175,7 +182,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.status).toBe(200);
     expect(res.text).toContain('go back in September 2026');       // fact exists -> question stays
-    expect(res.text).not.toContain('October half term');            // fact missing -> question dropped
+    expect(res.text).not.toContain('half term in Hertfordshire');    // fact missing -> question dropped
   });
 
 
@@ -315,5 +322,96 @@ describe('per-school INSET days (the Barking & Dagenham publishing style)', () =
     const res = await request(app()).get('/school-term-dates/barking-and-dagenham');
     expect(res.text).toContain('rare exception');
     expect(res.text).toContain('2 school-specific dates');
+  });
+});
+
+
+describe('seasonal guide pages', () => {
+  // The AY label rolls with the real clock, so fixtures pin the season.
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-08-19T12:00:00Z'));
+    laDb.listAllAuthorities.mockResolvedValue([
+      { id: 'a', name: 'Aleshire', slug: 'aleshire', region: 'England', import_status: 'ok', date_count: 10 },
+      { id: 'b', name: 'Beeshire', slug: 'beeshire', region: 'England', import_status: 'ok', date_count: 10 },
+      { id: 'z', name: 'Zeroshire', slug: 'zeroshire', region: 'England', import_status: 'pending', date_count: 0 },
+    ]);
+    laDb.getAuthorityBySlug.mockResolvedValue(null); // fall-through must 404, not hit a stale council mock
+    laDb.listAllEntries.mockResolvedValue([
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_end', date: '2026-10-23', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2026-11-02', end_date: null, label: null },
+      { la_id: 'b', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-07', end_date: null, label: null },
+      { la_id: 'b', academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-10-26', end_date: '2026-10-30', label: 'Half term' },
+      // Zeroshire's rows must never be counted - it is not listable.
+      { la_id: 'z', academic_year: '2026-2027', event_type: 'term_start', date: '2026-08-01', end_date: null, label: null },
+    ]);
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('when-do-schools-go-back groups councils and links each one', async () => {
+    const res = await request(app()).get('/school-term-dates/when-do-schools-go-back');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('September 2026');
+    expect(res.text).toContain('href="/school-term-dates/aleshire"');
+    expect(res.text).toContain('href="/school-term-dates/beeshire"');
+    expect(res.text).not.toContain('zeroshire'); // unlistable council stays invisible
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/when-do-schools-go-back"');
+  });
+
+  it('october-half-term derives the same week from both council notations', async () => {
+    const res = await request(app()).get('/school-term-dates/october-half-term');
+    expect(res.status).toBe(200);
+    // Aleshire (break-up/return) and Beeshire (holiday-week row) share a group.
+    expect(res.text).toContain('2 councils');
+    expect(res.text).toContain('Mon 26 Oct 2026');
+  });
+
+  it('falls through (404) rather than rendering an empty page when nothing is derivable', async () => {
+    laDb.listAllEntries.mockResolvedValue([]);
+    const res = await request(app()).get('/school-term-dates/easter-holidays');
+    expect(res.status).toBe(404);
+  });
+
+  it('db failure falls through, never a 500', async () => {
+    laDb.listAllEntries.mockRejectedValue(new Error('db down'));
+    const res = await request(app()).get('/school-term-dates/summer-holidays');
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('about page', () => {
+  it('renders with live stats and the methodology essentials', async () => {
+    const res = await request(app()).get('/school-term-dates/about-this-data');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('176 local education authorities');
+    expect(res.text).toContain('4800 dated entries');
+    expect(res.text).toContain('hello@housemait.com');
+    expect(res.text).toContain('INSET');
+  });
+
+  it('still renders when stats are unavailable', async () => {
+    laDb.getStats.mockRejectedValue(new Error('db down'));
+    const res = await request(app()).get('/school-term-dates/about-this-data');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Where the dates come from');
+  });
+});
+
+describe('verification date on council pages', () => {
+  it('shows the actual date the source was last checked', async () => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England',
+      import_status: 'ok', date_count: 40,
+      source_url: 'https://www.hertfordshire.gov.uk/term-dates',
+      last_imported_at: '2026-08-03T09:18:00Z',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Start of term' },
+    ]);
+    laDb.listAllAuthorities.mockResolvedValue([]);
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('checked 3 Aug 2026');
+    expect(res.text).toContain('re-checked monthly');
   });
 });

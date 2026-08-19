@@ -71,7 +71,7 @@ async function listAllEntries() {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from('la_term_date_entries')
-      .select('la_id, academic_year, date, end_date')
+      .select('la_id, academic_year, event_type, date, end_date, label')
       .range(from, from + 999);
     if (error) throw error;
     out.push(...(data || []));

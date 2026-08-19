@@ -23,6 +23,8 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const laDb = require('../db/laTermDates');
+const { academicYearsForCountry } = require('../services/term-date-extract');
+const { summariseSeason } = require('../services/termDatesSeasonal');
 
 const CANONICAL_BASE = 'https://housemait.com/school-term-dates';
 const INDEX_HTML = path.join(__dirname, '..', '..', 'public', 'la-term-dates', 'index.html');
@@ -596,6 +598,14 @@ const FOOTER_HTML = `
     <footer class="site-footer">
       <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
       <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
+      <nav class="guides">
+        <a href="/school-term-dates/when-do-schools-go-back">When do schools go back?</a>
+        <a href="/school-term-dates/october-half-term">October half term</a>
+        <a href="/school-term-dates/february-half-term">February half term</a>
+        <a href="/school-term-dates/easter-holidays">Easter holidays</a>
+        <a href="/school-term-dates/summer-holidays">Summer holidays</a>
+        <a href="/school-term-dates/about-this-data">About this data</a>
+      </nav>
       <nav>
         <a href="https://housemait.com">Family organiser app</a>
         <a href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
@@ -613,8 +623,13 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   const srcDomain = authority && authority.source_url
     ? authority.source_url.replace(/^https?:\/\//i, '').replace(/\/$/, '')
     : '';
+  // The strongest trust signal the page carries: the actual date we last
+  // read the council's own calendar, not just a promise of a cadence.
+  const checkedOn = authority && authority.last_imported_at
+    ? fmtDate(String(authority.last_imported_at).slice(0, 10)).replace(/^\w+ /, '')
+    : null;
   const sourceHtml = srcDomain
-    ? `<p class="srcline">Source: <a href="${esc(authority.source_url)}" target="_blank" rel="nofollow noopener noreferrer">${esc(srcDomain)}</a> · re-checked monthly</p>`
+    ? `<p class="srcline">Source: <a href="${esc(authority.source_url)}" target="_blank" rel="nofollow noopener noreferrer">${esc(srcDomain)}</a>${checkedOn ? ` · checked ${esc(checkedOn)}` : ''} · re-checked monthly</p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -764,6 +779,252 @@ function breadcrumbLd(name, pathSuffix) {
   };
 }
 
+
+// ── Seasonal guide pages ─────────────────────────────────────────────────────
+// Evergreen URLs (/october-half-term, not /october-half-term-2026) so link
+// equity accumulates year over year; titles and content carry the year and
+// roll automatically with the academic calendar, using the importer's season
+// logic (May-Aug looks at the NEXT academic year - families plan September).
+
+const SEASONAL_SLUGS = ['when-do-schools-go-back', 'october-half-term', 'february-half-term', 'easter-holidays', 'summer-holidays'];
+
+function seasonalDefs() {
+  const { currentAY, nextAY } = academicYearsForCountry('GB');
+  const month = new Date().getUTCMonth(); // 4..7 = May..Aug
+  const ay = month >= 4 && month <= 7 ? nextAY : currentAY;
+  const y1 = parseInt(ay, 10);
+  const y2 = y1 + 1;
+  const ayLabel = `${y1}/${String(y2).slice(2)}`;
+  return {
+    ay, y1, y2, ayLabel,
+    pages: {
+      'when-do-schools-go-back': {
+        cfg: { ay, mode: 'start', from: `${y1}-08-10`, to: `${y1}-09-30` },
+        title: `When Do Schools Go Back in September ${y1}? Every UK Council | Housemait`,
+        description: `The first day of the ${ayLabel} school year for all 176 councils in England and Wales, from each council's own published calendar.`,
+        h1: `When do schools go back in September ${y1}?`,
+        sub: `The first day of the ${ayLabel} school year, council by council, taken from each council's own published calendar.`,
+        noun: 'first day back',
+      },
+      'october-half-term': {
+        cfg: { ay, mode: 'break', from: `${y1}-10-01`, to: `${y1}-11-15` },
+        title: `October Half Term ${y1} Dates for Every UK Council | Housemait`,
+        description: `October ${y1} half-term dates for all 176 councils in England and Wales - including the councils taking a different week from everyone else.`,
+        h1: `October half term ${y1}, council by council`,
+        sub: 'The autumn half-term week for every council in England and Wales - and it is not the same week everywhere.',
+        noun: 'October half term',
+      },
+      'february-half-term': {
+        cfg: { ay, mode: 'break', from: `${y2}-01-25`, to: `${y2}-03-05` },
+        title: `February Half Term ${y2} Dates for Every UK Council | Housemait`,
+        description: `February ${y2} half-term (spring half-term) dates for all 176 councils in England and Wales, including the England-Wales split.`,
+        h1: `February half term ${y2}, council by council`,
+        sub: 'The spring half-term week for every council in England and Wales. Wales takes a different week from most of England.',
+        noun: 'February half term',
+      },
+      'easter-holidays': {
+        cfg: { ay, mode: 'break', from: `${y2}-03-01`, to: `${y2}-05-05` },
+        title: `Easter School Holidays ${y2} for Every UK Council | Housemait`,
+        description: `Easter ${y2} school holiday dates for all 176 councils in England and Wales, from each council's own published calendar.`,
+        h1: `Easter school holidays ${y2}, council by council`,
+        sub: 'When schools break up for Easter and go back, for every council in England and Wales.',
+        noun: 'Easter holidays',
+      },
+      'summer-holidays': {
+        cfg: { ay, mode: 'end', from: `${y2}-06-01`, to: `${y2}-08-15` },
+        title: `When Do Schools Break Up for Summer ${y2}? Every UK Council | Housemait`,
+        description: `The last day of the ${ayLabel} school year for all 176 councils in England and Wales - break-up dates vary by up to three weeks.`,
+        h1: `When do schools break up for summer ${y2}?`,
+        sub: `The last day of the ${ayLabel} school year, council by council. The spread is wider than most families expect.`,
+        noun: 'summer break-up',
+      },
+    },
+  };
+}
+
+const fmtNoDow = (iso) => fmtDate(iso).replace(/^\w+ /, '');
+const seasonalRange = (g) => (g.last && g.last !== g.first ? `${fmtDate(g.first)} to ${fmtDate(g.last)}` : fmtDate(g.first));
+
+/** Data-driven intro + FAQ for a seasonal page - only states what the data shows. */
+function seasonalNarrative(def, defs, result) {
+  const total = result.perCouncil.length;
+  if (!total) return { intro: '', faq: [] };
+  const big = result.groups[0];
+  const spreadFirst = result.perCouncil.reduce((m, c) => (c.first < m.first ? c : m), result.perCouncil[0]);
+  const spreadLast = result.perCouncil.reduce((m, c) => (c.first > m.first ? c : m), result.perCouncil[0]);
+  const nameFew = (councils, cap = 3) => councils.slice(0, cap).map((c) => c.name).join(', ') + (councils.length > cap ? ` and ${councils.length - cap} more` : '');
+  const earlyGroup = result.perCouncil.filter((c) => c.first === spreadFirst.first);
+  const lateGroup = result.perCouncil.filter((c) => c.first === spreadLast.first);
+
+  // Only call out the ends of the spread when they genuinely differ from the
+  // common date - "the latest is X (145 councils)" reads absurd when X IS the
+  // common date.
+  const callouts = [];
+  if (spreadFirst.first !== big.first) callouts.push(`the earliest is <strong>${esc(fmtNoDow(spreadFirst.first))}</strong> (${esc(nameFew(earlyGroup))})`);
+  if (spreadLast.first !== big.first) callouts.push(`the latest <strong>${esc(fmtNoDow(spreadLast.first))}</strong> (${esc(nameFew(lateGroup))})`);
+  const spreadLine = callouts.length ? ` But it is not universal: ${callouts.join(' and ')}.` : '';
+  const intro = `<p>The most common ${esc(def.noun)} for ${esc(defs.ayLabel)} is <strong>${esc(seasonalRange(big))}</strong>, shared by ${big.count} of the ${total} councils with confirmed dates.${spreadLine} Council dates formally apply to community and voluntary-controlled schools - academies and free schools set their own, usually close by. Always confirm with your own school.</p>`;
+
+  const faq = [
+    { q: `When is ${def.noun} ${def.cfg.mode === 'start' || def.cfg.mode === 'break' ? 'for most councils' : 'for most schools'} in ${defs.ayLabel}?`,
+      a: `For most of England and Wales, ${seasonalRange(big)} - that is the date ${big.count} of ${total} councils publish. The full council-by-council list is on this page, each linking to that council's own calendar.` },
+    { q: 'Why do neighbouring councils have different dates?',
+      a: 'Each local authority consults on and sets its own calendar. Most follow a common pattern, but councils can and do move weeks - which is why families near a council boundary should check the right council, not the nearest one.' },
+    { q: 'Do academies and free schools follow these dates?',
+      a: 'Not automatically. Council term dates formally apply to community and voluntary-controlled schools; academies, free schools and foundation schools set their own, though most stay within a day or two of the council calendar. Your school’s own published dates are the final word.' },
+  ];
+  return { intro, faq };
+}
+
+const SEASONAL_CSS = `
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #FBF8F3; color: #2D2A33; line-height: 1.6; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 20px 56px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+    .topbar img { height: 26px; width: auto; display: block; }
+    .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; background: #6B3FA0; color: #fff; font-weight: 600; font-size: 13.5px; text-decoration: none; }
+    .crumb { display: inline-block; font-size: 13px; color: #6B3FA0; text-decoration: none; font-weight: 600; margin-bottom: 14px; }
+    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(30px, 5vw, 42px); line-height: 1.08; letter-spacing: -0.01em; color: #2D2A33; margin-bottom: 10px; }
+    .sub { font-size: 15.5px; color: #6B6774; max-width: 64ch; margin-bottom: 26px; }
+    .prose p { font-size: 15px; color: #4A4552; max-width: 68ch; margin-bottom: 12px; }
+    h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 25px; color: #6B3FA0; margin: 34px 0 12px; }
+    .gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
+    .gcard { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
+    .gcard .when { font-weight: 600; font-size: 15px; color: #2D2A33; }
+    .gcard .count { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: #6B3FA0; background: #F3EDFC; border-radius: 8px; padding: 2px 9px; }
+    .gcard .who { margin-top: 8px; font-size: 12.5px; color: #6B6774; }
+    .tableWrap { overflow-x: auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); margin-top: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #6B6774; padding: 12px 16px; border-bottom: 1px solid #E8E5EC; }
+    td { padding: 10px 16px; border-bottom: 1px solid #F3F1F6; }
+    td a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
+    td a:hover { text-decoration: underline; }
+    tr:last-child td { border-bottom: none; }
+    .note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 68ch; }
+    .guides-strip { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 16px; }
+    .guides-strip a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 8px 16px; text-decoration: none; }
+    .guides-strip a:hover { border-color: #6B3FA0; }
+    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
+    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
+    .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
+    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    .site-footer nav a { font-weight: 600; text-decoration: none; color: #6B3FA0; }
+    .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
+    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+    @media print { .topbar, .btn-try, .guides-strip, .site-footer { display: none; } body { background: #fff; } }`;
+
+function guidesStrip(exceptSlug) {
+  const defs = seasonalDefs();
+  const links = SEASONAL_SLUGS.filter((s) => s !== exceptSlug)
+    .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].h1)}</a>`)
+    .join('');
+  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/about-this-data">About this data</a></div>`;
+}
+
+function seasonalPage(slug, result) {
+  const defs = seasonalDefs();
+  const def = defs.pages[slug];
+  const { intro, faq } = seasonalNarrative(def, defs, result);
+  const canonical = `${CANONICAL_BASE}/${slug}`;
+
+  const cards = result.groups.map((g) => {
+    const sample = g.councils.slice(0, 4).map((c) => c.name).join(', ');
+    const more = g.councils.length > 4 ? ` +${g.councils.length - 4} more` : '';
+    return `<div class="gcard"><div class="when">${esc(seasonalRange(g))}</div><span class="count">${g.count} council${g.count === 1 ? '' : 's'}</span><div class="who">${esc(sample)}${esc(more)}</div></div>`;
+  }).join('');
+
+  const tableRows = result.perCouncil.map((c) =>
+    `<tr><td><a href="/school-term-dates/${esc(c.slug)}">${esc(c.name)}</a></td><td>${esc(seasonalRange(c))}</td></tr>`).join('\n');
+
+  const unresolvedHtml = result.unresolved.length
+    ? `<p class="note">We could not derive the ${esc(def.noun)} from the published structure for ${result.unresolved.map((u) => `<a href="/school-term-dates/${esc(u.slug)}">${esc(u.name)}</a>`).join(', ')} - check those councils' own pages via the links.</p>`
+    : '';
+
+  const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+  const crumbLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'UK School Term Dates', item: `${CANONICAL_BASE}/` },
+    { '@type': 'ListItem', position: 2, name: def.h1, item: canonical },
+  ] };
+
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(def.title)}</title>
+  <meta name="description" content="${esc(def.description)}" />
+  <link rel="canonical" href="${esc(canonical)}" />
+  <meta property="og:title" content="${esc(def.title)}" />
+  <meta property="og:description" content="${esc(def.description)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${esc(canonical)}" />
+  <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
+  <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
+  <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
+  <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}
+    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+    <h1>${esc(def.h1)}</h1>
+    <p class="sub">${esc(def.sub)}</p>
+    <div class="prose">${intro}</div>
+    <h2>At a glance</h2>
+    <div class="gcards">${cards}</div>
+    <h2>Every council</h2>
+    <div class="tableWrap"><table><thead><tr><th>Council</th><th>${esc(def.noun)}</th></tr></thead><tbody>
+${tableRows}
+    </tbody></table></div>
+    ${unresolvedHtml}
+    <h2>Common questions</h2>
+    <div class="prose">${faq.map((f) => `<p><strong>${esc(f.q)}</strong><br/>${esc(f.a)}</p>`).join('')}</div>
+    ${guidesStrip(slug)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
+
+function aboutPage(stats) {
+  const canonical = `${CANONICAL_BASE}/about-this-data`;
+  const title = 'About This Term-Dates Data | Housemait';
+  const lastRun = stats && stats.lastRun && stats.lastRun.started_at ? fmtNoDow(String(stats.lastRun.started_at).slice(0, 10)) : null;
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
+  <link rel="canonical" href="${esc(canonical)}" />
+  <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}
+    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+    <h1>About this data</h1>
+    <p class="sub">What this directory is, where every date comes from, and what you should still double-check.</p>
+    <div class="prose">
+      <h2>Where the dates come from</h2>
+      <p>Every date in this directory is taken from the relevant council's own published term-dates calendar - the page or PDF the council itself maintains. Each council page here links to that source at the bottom and shows the date we last checked it. Nothing is estimated, crowd-sourced or copied from other aggregator sites.</p>
+      <p>The directory currently covers <strong>${stats ? stats.total : 176} local education authorities</strong> across England and Wales${stats ? `, tracking <strong>${stats.dateCount} dated entries</strong>` : ''}. It is rebuilt monthly${lastRun ? ` (most recent refresh: ${esc(lastRun)})` : ''}, and a separate weekly audit checks that every council's stored calendar still runs into the current school year.</p>
+      <h2>What to double-check</h2>
+      <p>Council term dates formally apply to community and voluntary-controlled schools. Academies, free schools and foundation schools set their own calendars - most stay within a day or two of the council's, but not all. A few councils also publish named exceptions for individual schools; where they do, we keep those out of the council-wide summary.</p>
+      <p>Every state school also takes five INSET days a year, chosen school by school - so they rarely appear in council calendars, this one included. Your school's own published dates are always the final word.</p>
+      <h2>Why Scotland and Northern Ireland are not listed</h2>
+      <p>Scotland and Northern Ireland set school holidays through separate systems, so their dates are not part of this directory yet.</p>
+      <h2>Spotted an error?</h2>
+      <p>If a date here disagrees with your council's own page, we want to know: email <a href="mailto:hello@housemait.com">hello@housemait.com</a> with the council name and we will re-check it against the source.</p>
+      <h2>Who builds this</h2>
+      <p>This directory is built and maintained by <a href="https://housemait.com">Housemait</a>, a family organiser app for UK households. It is free to use, free to link to, and has no signup wall - the same data powers the term-dates features inside the app.</p>
+    </div>
+    ${guidesStrip(null)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
+
 // GA-aware CSP for every term-dates response (harmless on .ics/xml).
 router.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', CSP_HEADER);
@@ -809,6 +1070,36 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// ── Seasonal guides + about ─────────────────────────────────────────────────
+// Registered before /:slug so these literal paths are never treated as
+// council lookups.
+for (const seasonalSlug of SEASONAL_SLUGS) {
+  router.get(`/${seasonalSlug}`, async (req, res, next) => {
+    try {
+      const defs = seasonalDefs();
+      const authorities = (await laDb.listAllAuthorities()).filter(isListable);
+      const entries = await laDb.listAllEntries();
+      const result = summariseSeason(authorities, entries, defs.pages[seasonalSlug].cfg);
+      if (!result.perCouncil.length) return next(); // nothing derivable: 404 beats an empty page
+      res.set('Cache-Control', CACHE_HEADER).type('html').send(seasonalPage(seasonalSlug, result));
+    } catch (err) {
+      console.error(`[term-dates-ssr] ${seasonalSlug} failed:`, err.message);
+      next();
+    }
+  });
+}
+
+router.get('/about-this-data', async (req, res, next) => {
+  try {
+    let stats = null;
+    try { stats = await laDb.getStats(); } catch { stats = null; } // page renders without stats
+    res.set('Cache-Control', CACHE_HEADER).type('html').send(aboutPage(stats));
+  } catch (err) {
+    console.error('[term-dates-ssr] about failed:', err.message);
+    next();
+  }
+});
+
 // ── Sitemap ────────────────────────────────────────────────────────────────
 router.get('/sitemap.xml', async (req, res) => {
   try {
@@ -818,6 +1109,8 @@ router.get('/sitemap.xml', async (req, res) => {
     // for e.g. Jewish schools) - they live in-app only.
     const urls = [
       `${CANONICAL_BASE}/`,
+      ...SEASONAL_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
+      `${CANONICAL_BASE}/about-this-data`,
       ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
     ];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}\n</urlset>`;
