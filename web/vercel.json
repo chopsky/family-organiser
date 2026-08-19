@@ -11,7 +11,9 @@
       "destination": "/privacy",
       "permanent": true
     },
-    { "source": "/school-term-dates", "destination": "/school-term-dates/", "permanent": false }
+    { "source": "/school-term-dates", "destination": "/school-term-dates/", "permanent": false },
+    { "source": "/term-dates", "destination": "/school-term-dates/", "permanent": true },
+    { "source": "/term-dates/:path*", "destination": "/school-term-dates/:path*", "permanent": true }
   ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://api.housemait.com/api/:path*" },
