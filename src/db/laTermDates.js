@@ -220,10 +220,12 @@ async function listAllAuthorities({ onlyPending = false, onlyStale = false, slug
   // source_url + import_attempts are selected so the importer can reuse a known
   // council URL (skipping a web_search) and count attempts. import_attempts is
   // newer than the base table, so we degrade gracefully if it isn't migrated.
+  // date_count is REQUIRED by the public site: termDatesSsr's isListable()
+  // decides what to publish from it, so omitting it here empties the index.
   const build = (withAttempts) => {
     const cols = withAttempts
-      ? 'id, name, slug, region, import_status, source_url, import_attempts'
-      : 'id, name, slug, region, import_status, source_url';
+      ? 'id, name, slug, region, import_status, source_url, import_attempts, date_count'
+      : 'id, name, slug, region, import_status, source_url, date_count';
     let query = supabase.from('la_directory').select(cols).order('name', { ascending: true });
     if (slugs && slugs.length) query = query.in('slug', slugs);
     if (onlyPending) query = query.eq('import_status', 'pending');
