@@ -1,3 +1,4 @@
+/* eslint-env browser */
 /**
  * Directory index - progressive enhancement over the server-rendered grid.
  *
