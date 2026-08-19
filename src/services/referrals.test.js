@@ -53,12 +53,42 @@ describe('isHouseholdActivated (the anti-farm gate)', () => {
   const referredAt = '2026-08-01T10:00:00Z';
   const day = (n, h = 12) => new Date(Date.parse(referredAt) + n * 86_400_000 + h).getTime();
 
-  test('tier 1a: a WhatsApp-linked member activates instantly', async () => {
+  test('tier 1a: a WhatsApp link ALONE no longer activates (setup, not usage)', async () => {
     const ok = await referrals.isHouseholdActivated('h9', referredAt, {
       fetchMembers: async () => [{ id: 'u1', whatsapp_phone: '+447700900000' }],
       fetchActions: async () => [],
+      fetchSetup: async () => [],
+    });
+    expect(ok).toBe(false);
+  });
+
+  test('tier 1a: WhatsApp plus one usage action activates instantly', async () => {
+    const ok = await referrals.isHouseholdActivated('h9', referredAt, {
+      fetchMembers: async () => [{ id: 'u1', whatsapp_phone: '+447700900000' }],
+      fetchActions: async () => [day(0)],
+      fetchSetup: async () => [],
     });
     expect(ok).toBe(true);
+  });
+
+  test('tier 1a: WhatsApp plus a setup signal (kid or pet added) activates instantly', async () => {
+    const ok = await referrals.isHouseholdActivated('h9', referredAt, {
+      fetchMembers: async () => [{ id: 'u1', whatsapp_phone: '+447700900000' }],
+      fetchActions: async () => [],
+      fetchSetup: async () => [day(0)],
+    });
+    expect(ok).toBe(true);
+  });
+
+  test('tier 1b: setup signals alone never satisfy the action requirement', async () => {
+    // Two email addresses + a joined member must NOT mint a reward with
+    // zero product use - that would be the free farm path.
+    const ok = await referrals.isHouseholdActivated('h9', referredAt, {
+      fetchMembers: async () => [{ id: 'u1' }, { id: 'u2' }],
+      fetchActions: async () => [],
+      fetchSetup: async () => [day(0), day(0)],
+    });
+    expect(ok).toBe(false);
   });
 
   test('tier 1b: two real members plus any action', async () => {
@@ -99,6 +129,28 @@ describe('isHouseholdActivated (the anti-farm gate)', () => {
       fetchActions: async () => [],
     });
     expect(ok).toBe(false);
+  });
+});
+
+describe('getActivationProgress (the gift-card checklist truth)', () => {
+  const referredAt = '2026-08-01T10:00:00Z';
+
+  test('mirrors tier 1a: whatsapp + first thing (usage or setup)', async () => {
+    const p = await referrals.getActivationProgress('h9', referredAt, {
+      fetchMembers: async () => [{ id: 'u1', whatsapp_phone: '+447700900000' }],
+      fetchActions: async () => [],
+      fetchSetup: async () => [Date.parse(referredAt) + 1000],
+    });
+    expect(p).toEqual({ whatsapp_linked: true, has_action: true });
+  });
+
+  test('fresh signup shows both steps open', async () => {
+    const p = await referrals.getActivationProgress('h9', referredAt, {
+      fetchMembers: async () => [{ id: 'u1' }],
+      fetchActions: async () => [],
+      fetchSetup: async () => [],
+    });
+    expect(p).toEqual({ whatsapp_linked: false, has_action: false });
   });
 });
 

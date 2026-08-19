@@ -177,6 +177,10 @@ const ACTION_SOURCES = [
   { table: 'chore_completions', ts: 'completed_at', filter: (q) => q },
   { table: 'tasks', ts: 'created_at', filter: (q) => q },
   { table: 'meal_plan', ts: 'created_at', filter: (q) => q },
+  // Adding a school is a content act, not mere configuration: term dates
+  // land on the calendar for the whole year, and school-adders retain at
+  // over twice the rate of the rest of the estate.
+  { table: 'household_schools', ts: 'created_at', filter: (q) => q },
 ];
 
 async function fetchHouseholdActionTimes(householdId, sinceIso, untilIso) {
@@ -215,6 +219,31 @@ async function fetchHouseholdActionTimes(householdId, sinceIso, untilIso) {
   return times;
 }
 
+// Setup signals: the household taking shape rather than being used -
+// dependents (children or pets) added and further members joining after
+// the referral was captured. The owner's own row predates the referral
+// row, so a created_at window starting at the referral excludes them.
+// Deliberately SEPARATE from usage actions: paired with a WhatsApp link
+// they prove a real family fast, but alone they must not satisfy the
+// usage tiers - two free email addresses could otherwise mint a reward
+// with zero product use.
+async function fetchSetupSignalTimes(householdId, sinceIso, untilIso) {
+  try {
+    const { data } = await supabaseAdmin
+      .from('users')
+      .select('created_at')
+      .eq('household_id', householdId)
+      .gte('created_at', sinceIso)
+      .lte('created_at', untilIso)
+      .limit(50);
+    return (data || [])
+      .map((r) => new Date(r.created_at).getTime())
+      .filter((t) => Number.isFinite(t));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Is the referred household genuinely activated?
  * Exported for tests; `deps` allows injecting the fetchers.
@@ -222,29 +251,71 @@ async function fetchHouseholdActionTimes(householdId, sinceIso, untilIso) {
 async function isHouseholdActivated(householdId, referredAtIso, deps = {}) {
   const fetchMembers = deps.fetchMembers || ((id) => db.getHouseholdMembers(id));
   const fetchActions = deps.fetchActions || fetchHouseholdActionTimes;
+  const fetchSetup = deps.fetchSetup || fetchSetupSignalTimes;
 
   const referredAt = new Date(referredAtIso).getTime();
+  const sinceIso = new Date(referredAt).toISOString();
   const windowEnd = new Date(referredAt + ACTIVATION_WINDOW_DAYS * 86_400_000).toISOString();
 
   let members = [];
   try { members = (await fetchMembers(householdId)) || []; } catch { members = []; }
 
-  // Tier 1a: a WhatsApp-linked member. A distinct SIM is the most
-  // expensive signal to fake and the strongest retention signal we have.
-  if (members.some((m) => m.whatsapp_linked || m.whatsapp_phone)) return true;
+  const times = await fetchActions(householdId, sinceIso, windowEnd);
 
-  const times = await fetchActions(householdId, new Date(referredAt).toISOString(), windowEnd);
+  // Tier 1a: a WhatsApp-linked member PLUS at least one deliberate act
+  // (usage or setup - adding the kids counts). The SIM is the anti-fraud
+  // cost; the act filters link-and-abandon. Linking alone is
+  // configuration, not usage: 8 of the first 14 expired trials had
+  // linked WhatsApp.
+  if (members.some((m) => m.whatsapp_linked || m.whatsapp_phone)) {
+    if (times.length > 0) return true;
+    const setup = await fetchSetup(householdId, sinceIso, windowEnd);
+    if (setup.length > 0) return true;
+  }
 
-  // Tier 1b: two-plus real people, and somebody has done something.
+  // Tier 1b: two-plus real people, and somebody has USED it. Setup
+  // signals don't count here: the second member joining is already the
+  // substance of this tier, so letting the join double as the action
+  // would reduce it to "two email addresses".
   const realMembers = members.filter((m) => !m.is_dependent && !m.is_child);
   if (realMembers.length >= 2 && times.length > 0) return true;
 
-  // Tier 2: five deliberate actions across two distinct days in the window.
+  // Tier 2: five usage actions across two distinct days in the window.
   if (times.length >= ACTIVATION_MIN_ACTIONS) {
     const days = new Set(times.map((t) => new Date(t).toISOString().slice(0, 10)));
     if (days.size >= ACTIVATION_MIN_DAYS) return true;
   }
   return false;
+}
+
+/**
+ * Per-condition progress for the recipient's gift-card checklist -
+ * a truthful mirror of tier 1a: step 1 = WhatsApp linked, step 2 = any
+ * first thing (usage action or setup signal).
+ */
+async function getActivationProgress(householdId, referredAtIso, deps = {}) {
+  const fetchMembers = deps.fetchMembers || ((id) => db.getHouseholdMembers(id));
+  const fetchActions = deps.fetchActions || fetchHouseholdActionTimes;
+  const fetchSetup = deps.fetchSetup || fetchSetupSignalTimes;
+
+  const referredAt = new Date(referredAtIso).getTime();
+  const sinceIso = new Date(referredAt).toISOString();
+  const windowEnd = new Date(referredAt + ACTIVATION_WINDOW_DAYS * 86_400_000).toISOString();
+
+  let whatsappLinked = false;
+  try {
+    const members = (await fetchMembers(householdId)) || [];
+    whatsappLinked = members.some((m) => m.whatsapp_linked || m.whatsapp_phone);
+  } catch { /* stays false */ }
+
+  let hasAction = false;
+  try {
+    const times = await fetchActions(householdId, sinceIso, windowEnd);
+    hasAction = times.length > 0
+      || (await fetchSetup(householdId, sinceIso, windowEnd)).length > 0;
+  } catch { /* stays false */ }
+
+  return { whatsapp_linked: whatsappLinked, has_action: hasAction };
 }
 
 // ─── Reward grant ───────────────────────────────────────────────────────────
@@ -410,14 +481,23 @@ async function getIncomingReferral(householdId) {
   try {
     const { data } = await supabaseAdmin
       .from('referrals')
-      .select('status, referrer_household_id')
+      .select('status, created_at, activated_at')
       .eq('referred_household_id', householdId)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'activated'])
       .maybeSingle();
     if (!data) return null;
+    if (data.status === 'activated') {
+      // A freshly landed reward gets its celebration card; an old one
+      // doesn't resurrect months later for a settled household.
+      const landedMs = data.activated_at ? new Date(data.activated_at).getTime() : 0;
+      if (Date.now() - landedMs > 30 * 86_400_000) return null;
+      return { status: 'activated' };
+    }
     // No giver name: household names are private (see the gift endpoint).
-    // The recipient knows who shared the link with them.
-    return { status: 'pending' };
+    // The recipient knows who shared the link with them. Progress booleans
+    // drive the card's checklist so it always tells the truth.
+    const progress = await getActivationProgress(householdId, data.created_at);
+    return { status: 'pending', ...progress };
   } catch {
     return null; // unmigrated table - no gift card
   }
@@ -461,6 +541,7 @@ module.exports = {
   findHouseholdByReferralCode,
   captureReferralOnHouseholdCreate,
   isHouseholdActivated,
+  getActivationProgress,
   complimentaryBaseMs,
   grantComplimentaryDays,
   evaluateReferrals,

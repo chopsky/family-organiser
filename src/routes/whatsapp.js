@@ -353,6 +353,17 @@ router.post('/webhook', async (req, res) => {
     // window it falls back to a pre-approved Content Template.
     db.touchWhatsAppInbound(user.id);
 
+    // If this household is someone's pending referral, give settlement a
+    // chance once this message's writes have landed - the message itself
+    // (and whatever it created) is the qualifying action for a family
+    // that linked WhatsApp but hasn't opened the app. Delayed because
+    // handling is still in flight right now; /mine and the nightly job
+    // backstop any miss. No-ops on one indexed select for everyone else.
+    setTimeout(() => {
+      const referrals = require('../services/referrals');
+      referrals.settleReferralForHousehold(user.household_id).catch(() => {});
+    }, 20_000);
+
     // Load household context. Reuse the householdRow fetched above for
     // the subscription check - the full row carries address, timezone,
     // name, country, etc. that downstream handlers (weather, classifier

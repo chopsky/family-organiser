@@ -156,29 +156,92 @@ function PromoClaimNudge() {
  * an activation incentive. Disappears on activation or lapse (the API
  * stops returning a pending `incoming`); dismissable per device.
  */
+function GiftStepMark({ done }) {
+  return done ? (
+    <span
+      className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ background: '#7DAE82' }}
+      aria-hidden="true"
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    </span>
+  ) : (
+    <span
+      className="w-4 h-4 rounded-full flex-shrink-0"
+      style={{ border: '1.5px solid rgba(138,95,30,0.45)' }}
+      aria-hidden="true"
+    />
+  );
+}
+
 function ReferralGiftCard() {
   const [incoming, setIncoming] = useState(null);
-  const [dismissed, setDismissed] = useState(() => {
+  const [dismissedPending, setDismissedPending] = useState(() => {
     try { return localStorage.getItem('housemait_gift_card_dismissed') === '1'; } catch { return false; }
+  });
+  const [dismissedLanded, setDismissedLanded] = useState(() => {
+    try { return localStorage.getItem('housemait_gift_landed_dismissed') === '1'; } catch { return false; }
   });
 
   useEffect(() => {
-    if (dismissed) return;
+    // Landed can arrive even after the pending card was dismissed - good
+    // news doesn't stay muted - so only both dismissals skip the fetch.
+    if (dismissedPending && dismissedLanded) return;
     let cancelled = false;
     api.get('/referrals/mine')
       .then(({ data }) => {
-        if (!cancelled && data?.incoming?.status === 'pending') setIncoming(data.incoming);
+        if (!cancelled && data?.incoming) setIncoming(data.incoming);
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [dismissed]);
+  }, [dismissedPending, dismissedLanded]);
 
-  if (dismissed || !incoming) return null;
+  if (!incoming) return null;
 
-  function dismiss() {
+  function dismissPending() {
     try { localStorage.setItem('housemait_gift_card_dismissed', '1'); } catch { /* private mode */ }
-    setDismissed(true);
+    setDismissedPending(true);
   }
+  function dismissLanded() {
+    try { localStorage.setItem('housemait_gift_landed_dismissed', '1'); } catch { /* private mode */ }
+    setDismissedLanded(true);
+  }
+
+  if (incoming.status === 'activated') {
+    if (dismissedLanded) return null;
+    return (
+      <div
+        className="rounded-2xl p-4 mb-4 flex items-start gap-3"
+        style={{ background: '#EDF5EE', border: '1px solid rgba(63,107,68,0.25)' }}
+      >
+        <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎉</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium" style={{ color: '#3F6B44' }}>
+            Your free month has landed
+          </p>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: '#3F6B44', opacity: 0.85 }}>
+            30 extra days added on top of your trial. Enjoy!
+          </p>
+          <button
+            type="button"
+            onClick={dismissLanded}
+            className="mt-2 text-xs font-semibold hover:underline"
+            style={{ color: '#3F6B44' }}
+          >
+            Nice one
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (incoming.status !== 'pending' || dismissedPending) return null;
+
+  const whatsappDone = !!incoming.whatsapp_linked;
+  const actionDone = !!incoming.has_action;
+  const oneToGo = whatsappDone !== actionDone;
 
   return (
     <div
@@ -188,23 +251,41 @@ function ReferralGiftCard() {
       <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎁</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium" style={{ color: '#8A5F1E' }}>
-          Your bonus month is waiting
+          {oneToGo ? 'One step to go' : 'Your bonus month is waiting'}
         </p>
-        <p className="text-xs mt-1 leading-relaxed" style={{ color: '#8A5F1E', opacity: 0.8 }}>
-          It unlocks once your family is up and running. Connecting WhatsApp is the quickest way.
-        </p>
-        <div className="mt-3 flex items-center gap-4">
-          <Link to="/settings?section=whatsapp" className="text-xs font-semibold hover:underline" style={{ color: '#8A5F1E' }}>
-            Connect WhatsApp →
-          </Link>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="text-xs text-cocoa hover:text-bark transition-colors"
-          >
-            Not now
-          </button>
+        <div className="mt-2 flex items-center gap-2">
+          <GiftStepMark done={whatsappDone} />
+          {whatsappDone ? (
+            <span className="text-xs line-through" style={{ color: '#8A5F1E', opacity: 0.65 }}>
+              Connect WhatsApp
+            </span>
+          ) : (
+            <Link to="/settings?section=whatsapp" className="text-xs font-semibold hover:underline" style={{ color: '#8A5F1E' }}>
+              Connect WhatsApp →
+            </Link>
+          )}
         </div>
+        <div className="mt-1.5 flex items-center gap-2">
+          <GiftStepMark done={actionDone} />
+          <span
+            className={actionDone ? 'text-xs line-through' : `text-xs${whatsappDone ? ' font-semibold' : ''}`}
+            style={{ color: '#8A5F1E', opacity: actionDone ? 0.65 : 1 }}
+          >
+            Add your first thing: an event, a list item, or your family
+          </span>
+        </div>
+        {!whatsappDone && (
+          <p className="mt-2 text-[11px] italic leading-relaxed" style={{ color: '#8A5F1E', opacity: 0.75 }}>
+            Not a WhatsApp family? It unlocks after a couple of days of normal use instead.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={dismissPending}
+          className="mt-2 text-xs text-cocoa hover:text-bark transition-colors"
+        >
+          Maybe later
+        </button>
       </div>
     </div>
   );

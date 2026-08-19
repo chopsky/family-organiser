@@ -31,7 +31,17 @@ router.get('/mine', requireAuth, requireHousehold, async (req, res) => {
     // `incoming` (this household's own pending gift) is deliberately
     // outside the pilot gate: the recipient of a pilot household's link
     // is by definition not on the pilot list, but their gift is real.
-    const incoming = await referrals.getIncomingReferral(req.householdId);
+    let incoming = await referrals.getIncomingReferral(req.householdId);
+    if (incoming?.status === 'pending') {
+      // Opportunistic settlement: the Dashboard polling its own gift is
+      // the one moment we know the recipient is looking, so the card can
+      // flip to "landed" on the very load where the household crossed
+      // the line. Same conditional-update rules as the nightly job.
+      const outcome = await referrals.settleReferralForHousehold(req.householdId);
+      if (outcome === 'activated') {
+        incoming = await referrals.getIncomingReferral(req.householdId);
+      }
+    }
     if (!referrals.referralsEnabled(req.householdId)) {
       return res.json({ enabled: false, incoming });
     }
