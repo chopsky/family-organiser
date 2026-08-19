@@ -583,7 +583,8 @@ const CSP_HEADER = [
   `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}'`,
   "script-src-attr 'none'",
   "style-src 'self' https: 'unsafe-inline'",
-  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+  // postcodes.io powers the index's find-my-council postcode lookup.
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.postcodes.io",
   'upgrade-insecure-requests',
 ].join(';');
 
@@ -736,6 +737,12 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
     .site-footer nav a { font-weight: 600; text-decoration: none; }
     .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
+    @media print {
+      body { background: #fff; }
+      .topbar .btn-try, .crumb, .actions, .ctaband, .nearby, .prose, .site-footer { display: none !important; }
+      .yearcard { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+      .srcline { margin-top: 16px; }
+    }
   </style>${GA_SNIPPET}
 </head>
 <body>
@@ -918,7 +925,8 @@ function guidesStrip(exceptSlug) {
   const links = SEASONAL_SLUGS.filter((s) => s !== exceptSlug)
     .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].h1)}</a>`)
     .join('');
-  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/about-this-data">About this data</a></div>`;
+  const hubs = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`).join('');
+  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/about-this-data">About this data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
 }
 
 function seasonalPage(slug, result) {
@@ -1025,6 +1033,135 @@ function aboutPage(stats) {
 </html>`;
 }
 
+
+// ── Region hub pages ─────────────────────────────────────────────────────────
+// Metro-area comparison tables ("all 32 London boroughs side by side"). The
+// groupings are hand-defined by slug (the DB's region column only splits
+// England/Wales) and were validated against la_directory before shipping;
+// resolution is defensive anyway - an unknown slug is skipped, never invented.
+
+const HUB_DEFS = {
+  london: {
+    name: 'London', label: 'all 32 boroughs', membersBy: 'slugs',
+    slugs: ['barking-and-dagenham', 'barnet', 'bexley', 'brent', 'bromley', 'camden', 'croydon', 'ealing', 'enfield', 'greenwich', 'hackney', 'hammersmith-and-fulham', 'haringey', 'harrow', 'havering', 'hillingdon', 'hounslow', 'islington', 'kensington-and-chelsea', 'kingston-upon-thames', 'lambeth', 'lewisham', 'merton', 'newham', 'redbridge', 'richmond-upon-thames', 'southwark', 'sutton', 'tower-hamlets', 'waltham-forest', 'wandsworth', 'westminster'],
+  },
+  'greater-manchester': {
+    name: 'Greater Manchester', label: 'all ten boroughs', membersBy: 'slugs',
+    slugs: ['manchester', 'salford', 'stockport', 'tameside', 'oldham', 'rochdale', 'bury', 'bolton', 'wigan', 'trafford'],
+  },
+  'west-midlands': {
+    name: 'West Midlands', label: 'the seven metropolitan boroughs', membersBy: 'slugs',
+    slugs: ['birmingham', 'coventry', 'dudley', 'sandwell', 'solihull', 'walsall', 'wolverhampton'],
+  },
+  merseyside: {
+    name: 'Merseyside', label: 'all five boroughs', membersBy: 'slugs',
+    slugs: ['liverpool', 'wirral', 'sefton', 'knowsley', 'st-helens'],
+  },
+  'west-yorkshire': {
+    name: 'West Yorkshire', label: 'all five districts', membersBy: 'slugs',
+    slugs: ['leeds', 'bradford', 'kirklees', 'calderdale', 'wakefield'],
+  },
+  'south-yorkshire': {
+    name: 'South Yorkshire', label: 'all four districts', membersBy: 'slugs',
+    slugs: ['sheffield', 'barnsley', 'doncaster', 'rotherham'],
+  },
+  'north-east': {
+    name: 'North East England', label: 'Tyne and Wear, Northumberland and Durham', membersBy: 'slugs',
+    slugs: ['newcastle-upon-tyne', 'gateshead', 'north-tyneside', 'south-tyneside', 'sunderland', 'northumberland', 'county-durham'],
+  },
+  wales: {
+    name: 'Wales', label: 'all 22 Welsh authorities', membersBy: 'region', region: 'Wales',
+    note: 'Wales publishes a national approved calendar (gov.wales), so most authorities align - but the spring half term falls a week earlier than in most of England, which matters for cross-border families and holiday pricing.',
+  },
+};
+const HUB_SLUGS = Object.keys(HUB_DEFS);
+
+function hubMembers(def, authorities) {
+  if (def.membersBy === 'region') return authorities.filter((a) => a.region === def.region);
+  const wanted = new Set(def.slugs);
+  return authorities.filter((a) => wanted.has(a.slug));
+}
+
+function hubPage(hubSlug, members, entries) {
+  const def = HUB_DEFS[hubSlug];
+  const defs = seasonalDefs();
+  const canonical = `${CANONICAL_BASE}/${hubSlug}`;
+
+  // One seasonal question per comparison column, restricted to the members.
+  const cols = [
+    { key: 'start', heading: 'First day back', cfg: defs.pages['when-do-schools-go-back'].cfg },
+    { key: 'oct', heading: 'October half term', cfg: defs.pages['october-half-term'].cfg },
+    { key: 'feb', heading: 'February half term', cfg: defs.pages['february-half-term'].cfg },
+    { key: 'summer', heading: 'Summer break-up', cfg: defs.pages['summer-holidays'].cfg },
+  ];
+  const byCol = {};
+  for (const col of cols) {
+    const r = summariseSeason(members, entries, col.cfg);
+    byCol[col.key] = new Map(r.perCouncil.map((c) => [c.slug, c]));
+  }
+
+  const rows = [...members].sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
+    const cells = cols.map((col) => {
+      const v = byCol[col.key].get(m.slug);
+      return `<td>${v ? esc(seasonalRange(v)) : '&mdash;'}</td>`;
+    }).join('');
+    return `<tr><td><a href="/school-term-dates/${esc(m.slug)}">${esc(m.name)}</a></td>${cells}</tr>`;
+  }).join('\n');
+
+  // Data-driven intro: does the area agree on the start date?
+  const starts = members.map((m) => byCol.start.get(m.slug)).filter(Boolean);
+  const startDates = [...new Set(starts.map((s) => s.first))].sort();
+  let aligned = '';
+  if (starts.length && startDates.length === 1) {
+    aligned = `All ${starts.length} go back on <strong>${esc(fmtDate(startDates[0]))}</strong>.`;
+  } else if (starts.length) {
+    const spread = startDates.map((d) => {
+      const who = starts.filter((s) => s.first === d);
+      return `<strong>${esc(fmtNoDow(d))}</strong> (${who.length === 1 ? esc(who[0].name) : `${who.length} councils`})`;
+    }).join(', ');
+    aligned = `They do not all go back on the same day: ${spread}.`;
+  }
+
+  const title = `${def.name} School Term Dates ${defs.ayLabel}: ${def.label.charAt(0).toUpperCase() + def.label.slice(1)} Compared | Housemait`;
+  const description = `Term dates for ${def.label} in ${def.name} for ${defs.ayLabel}, side by side: first day back, half terms and summer break-up, from each council's own calendar.`;
+  const crumbLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'UK School Term Dates', item: `${CANONICAL_BASE}/` },
+    { '@type': 'ListItem', position: 2, name: `${def.name} term dates`, item: canonical },
+  ] };
+
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}" />
+  <link rel="canonical" href="${esc(canonical)}" />
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${esc(canonical)}" />
+  <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
+  <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
+  <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}
+    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+    <h1>${esc(def.name)} school term dates, side by side</h1>
+    <p class="sub">The ${esc(defs.ayLabel)} school year for ${esc(def.label)}, compared in one table - from each council's own published calendar.</p>
+    <div class="prose"><p>${aligned}${def.note ? ` ${esc(def.note)}` : ''} Council dates formally apply to community and voluntary-controlled schools - academies and free schools set their own, usually close by. Click any council for its full calendar, source link and free add-to-phone download.</p></div>
+    <div class="tableWrap"><table><thead><tr><th>Council</th>${cols.map((c) => `<th>${esc(c.heading)}</th>`).join('')}</tr></thead><tbody>
+${rows}
+    </tbody></table></div>
+    <p class="note">A dash means that answer could not be derived from the council's published structure - check the council's own page via its link.</p>
+    ${guidesStrip(null)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
+
 // GA-aware CSP for every term-dates response (harmless on .ics/xml).
 router.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', CSP_HEADER);
@@ -1089,6 +1226,21 @@ for (const seasonalSlug of SEASONAL_SLUGS) {
   });
 }
 
+for (const hubSlug of HUB_SLUGS) {
+  router.get(`/${hubSlug}`, async (req, res, next) => {
+    try {
+      const authorities = (await laDb.listAllAuthorities()).filter(isListable);
+      const members = hubMembers(HUB_DEFS[hubSlug], authorities);
+      if (!members.length) return next();
+      const entries = await laDb.listAllEntries();
+      res.set('Cache-Control', CACHE_HEADER).type('html').send(hubPage(hubSlug, members, entries));
+    } catch (err) {
+      console.error(`[term-dates-ssr] hub ${hubSlug} failed:`, err.message);
+      next();
+    }
+  });
+}
+
 router.get('/about-this-data', async (req, res, next) => {
   try {
     let stats = null;
@@ -1110,6 +1262,7 @@ router.get('/sitemap.xml', async (req, res) => {
     const urls = [
       `${CANONICAL_BASE}/`,
       ...SEASONAL_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
+      ...HUB_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
       `${CANONICAL_BASE}/about-this-data`,
       ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
     ];

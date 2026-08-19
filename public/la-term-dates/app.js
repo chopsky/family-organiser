@@ -56,10 +56,50 @@
     if (emptyEl) emptyEl.hidden = shown !== 0;
   }
 
+  // ── Postcode lookup ──────────────────────────────────────────────────────
+  // Parents often don't know which authority sets their dates (county vs
+  // borough, metropolitan vs district). If the search input looks like a full
+  // UK postcode, resolve it via postcodes.io (free, no key) and filter to
+  // that council. Education is set by the UPPER tier, so admin_county wins
+  // over admin_district when present. Fails soft: any error just leaves the
+  // normal name search in charge.
+  var POSTCODE_RE = /^[A-Z]{1,2}[0-9][A-Z0-9]?\s*[0-9][A-Z]{2}$/i;
+  var postcodeSeq = 0;
+
+  function normName(s) {
+    return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function lookupPostcode(pc) {
+    var seq = ++postcodeSeq;
+    fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(pc.replace(/\s+/g, '')))
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (seq !== postcodeSeq) return; // a newer keystroke superseded this lookup
+        var d = res && res.result;
+        if (!d) { apply(); return; }
+        var candidates = [d.admin_county, d.admin_district].filter(Boolean).map(normName);
+        var match = null;
+        cards.forEach(function (card) {
+          var name = normName(card.getAttribute('data-name'));
+          if (!match && candidates.some(function (c) { return c === name || c.indexOf(name) === 0 || name.indexOf(c) === 0; })) match = card;
+        });
+        if (!match) { apply(); return; }
+        cards.forEach(function (card) { card.hidden = card !== match; });
+        sections.forEach(function (sec) { sec.hidden = !sec.querySelector('.ccard:not([hidden])'); });
+        if (countEl) countEl.textContent = 'Your council for ' + pc.toUpperCase() + ': ' + match.querySelector('.cname').textContent;
+        if (lettersEl) lettersEl.hidden = true;
+        if (emptyEl) emptyEl.hidden = true;
+      })
+      .catch(function () { if (seq === postcodeSeq) apply(); });
+  }
+
   if (searchEl) {
+    searchEl.placeholder = 'Search your council or enter a postcode…';
     searchEl.addEventListener('input', function (e) {
       q = e.target.value;
-      apply();
+      if (POSTCODE_RE.test(q.trim())) lookupPostcode(q.trim());
+      else { postcodeSeq++; apply(); }
     });
   }
 

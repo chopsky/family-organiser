@@ -415,3 +415,47 @@ describe('verification date on council pages', () => {
     expect(res.text).toContain('re-checked monthly');
   });
 });
+
+
+describe('region hub pages', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-08-19T12:00:00Z'));
+    laDb.getAuthorityBySlug.mockResolvedValue(null);
+    laDb.listAllAuthorities.mockResolvedValue([
+      { id: 'm', name: 'Manchester', slug: 'manchester', region: 'England', import_status: 'ok', date_count: 10 },
+      { id: 'w', name: 'Wigan', slug: 'wigan', region: 'England', import_status: 'ok', date_count: 10 },
+      { id: 'c', name: 'Cardiff', slug: 'cardiff', region: 'Wales', import_status: 'ok', date_count: 10 },
+      { id: 'k', name: 'Kent', slug: 'kent', region: 'England', import_status: 'ok', date_count: 10 },
+    ]);
+    laDb.listAllEntries.mockResolvedValue([
+      { la_id: 'm', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+      { la_id: 'w', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-02', end_date: null, label: null },
+      { la_id: 'c', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+    ]);
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('greater-manchester compares only its member councils', async () => {
+    const res = await request(app()).get('/school-term-dates/greater-manchester');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('href="/school-term-dates/manchester"');
+    expect(res.text).toContain('href="/school-term-dates/wigan"');
+    expect(res.text).not.toContain('href="/school-term-dates/kent"');   // not a member
+    expect(res.text).not.toContain('href="/school-term-dates/cardiff"'); // not a member
+    // The divergent start dates are surfaced, not averaged away.
+    expect(res.text).toContain('They do not all go back on the same day');
+  });
+
+  it('wales membership comes from the region column', async () => {
+    const res = await request(app()).get('/school-term-dates/wales');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('href="/school-term-dates/cardiff"');
+    expect(res.text).not.toContain('href="/school-term-dates/kent"');
+  });
+
+  it('falls through when no members are listable', async () => {
+    laDb.listAllAuthorities.mockResolvedValue([]);
+    const res = await request(app()).get('/school-term-dates/merseyside');
+    expect(res.status).toBe(404);
+  });
+});
