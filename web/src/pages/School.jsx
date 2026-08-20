@@ -960,6 +960,19 @@ export default function School() {
         );
         // One row per club occurrence, sorted by weekday then time (matches the
         // design). day pill + kid-colour glyph tile + name + time + pickup.
+        const keepActivityRunning = async (a) => {
+          // Clearing the window makes the activity ongoing: it expands
+          // every week regardless of term dates (see isOngoingActivity)
+          // and stops appearing in "Other terms" / term rollovers.
+          try {
+            await api.patch(`/schools/activities/${a.id}`, {
+              start_date: null,
+              end_date: null,
+              term_label: null,
+            });
+            loadActivities();
+          } catch { /* row stays finished; nothing lost */ }
+        };
         const renderRow = (kid, a, dim) => {
           const kidColor = hexFor(kid);
           const Glyph = ACTIVITY_ICONS[iconFor(a.activity)] || ACTIVITY_ICONS.star;
@@ -992,7 +1005,21 @@ export default function School() {
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-semibold text-charcoal truncate">{a.activity}</span>
                 {dim && a.term_label && <span className="block text-xs text-warm-grey truncate">{a.term_label}</span>}
+                {!dim && isOngoingActivity(a) && <span className="block text-xs text-sage truncate">All year round</span>}
               </span>
+              {dim && isAdmin && a.end_date && a.end_date < new Date().toISOString().slice(0, 10) && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); e.preventDefault(); keepActivityRunning(a); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); e.preventDefault(); keepActivityRunning(a); } }}
+                  className="shrink-0 text-[11px] font-semibold rounded-lg px-2.5 py-1 bg-white hover:bg-sage-light"
+                  style={{ color: '#3F6B44', border: '1.5px solid rgba(63,107,68,0.3)' }}
+                  aria-label={`Keep ${a.activity} running through the holidays`}
+                >
+                  Keep running
+                </span>
+              )}
               {topTime && (
                 <span className="shrink-0" style={{ fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
                   <span className="block" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>{topTime}</span>

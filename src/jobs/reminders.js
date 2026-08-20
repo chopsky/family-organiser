@@ -739,7 +739,12 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           // own term window is the only gate.
           const { isSchoolInSession, activityActiveOn, resolveTermSchoolForChild } = require('../utils/school-terms');
           const termSchoolId = resolveTermSchoolForChild(child, householdSchools);
-          if (termSchoolId && !(await isSchoolInSession(termSchoolId, todayStr))) continue; // school holiday/inset/half-term
+          // School holiday/inset/half-term suppresses TERM-WINDOWED
+          // activities only. An activity with no window is ongoing (gym,
+          // private tennis) and runs right through the holidays - a
+          // blanket per-child skip here is how those vanished from the
+          // brief every holiday.
+          const schoolInSession = !termSchoolId || (await isSchoolInSession(termSchoolId, todayStr));
 
           const activities = await db.getChildActivities(child.id);
           // Honour the activity's term window (today inside [start_date,
@@ -747,6 +752,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
           // swimming today" must keep it out of the morning brief too).
           const todayActivities = activities.filter(a =>
             a.day_of_week === dayOfWeek && a.term_only !== false && activityActiveOn(a, todayStr)
+            && (schoolInSession || (!a.start_date && !a.end_date))
             && !(a.skips || []).includes(todayStr));
           for (const act of todayActivities) {
             // Per-date override: the brief must show today's one-off

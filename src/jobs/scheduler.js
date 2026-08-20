@@ -17,10 +17,11 @@ const { runTrialExpirySweep } = require('./trial-expiry-sweep');
 const { runCaptureOpenerCheck } = require('./capture-openers');
 const { runSetupNudgeCheck } = require('./setup-nudges');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
+const { runHolidayPauseCheck } = require('./holiday-pause');
 const publicHolidays = require('../services/publicHolidays');
 const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
-const { isSchoolInSession, resolveTermSchoolForChild } = require('../utils/school-terms');
+const { isSchoolInSession, activityActiveOn, resolveTermSchoolForChild } = require('../utils/school-terms');
 
 /**
  * Returns the current time as "HH:MM" (zero-padded) in the given IANA timezone.
@@ -315,18 +316,21 @@ async function runEveningSchoolPrepCheck() {
       let hasActivities = false;
 
       for (const child of dependents) {
-        // Skip if this child's school is NOT in session tomorrow (holidays,
-        // inset days, half terms). Resolve the school via the child's own
-        // school_id or the household's single school; with none resolved, the
-        // activity's own term window is the only gate.
+        // School-not-in-session (holidays, inset days, half terms)
+        // suppresses TERM-WINDOWED activities only: an activity with no
+        // window is ongoing (gym, private lessons) and runs through the
+        // holidays, so it stays in the prep. Also honour each activity's
+        // own window and per-date skips - previously an expired term's
+        // rows and "no swimming tomorrow" days still got listed.
         const termSchoolId = resolveTermSchoolForChild(child, householdSchools);
-        if (termSchoolId && !(await isSchoolInSession(termSchoolId, tomorrowStr))) {
-          console.log(`[scheduler] Skipping ${child.name}'s activities - school not in session on ${tomorrowStr}`);
-          continue;
-        }
+        const schoolInSession = !termSchoolId || (await isSchoolInSession(termSchoolId, tomorrowStr));
 
         const activities = await db.getChildActivities(child.id);
-        const tomorrowActivities = activities.filter(a => a.day_of_week === tomorrowDow);
+        const tomorrowActivities = activities.filter(a =>
+          a.day_of_week === tomorrowDow
+          && activityActiveOn(a, tomorrowStr)
+          && (schoolInSession || (!a.start_date && !a.end_date))
+          && !(a.skips || []).includes(tomorrowStr));
         for (const act of tomorrowActivities) {
           hasActivities = true;
           const timeStr = act.time_end ? ` until ${act.time_end.substring(0, 5)}` : '';
@@ -779,6 +783,13 @@ function startScheduler() {
   // ── Scheduler lock cleanup: daily at 03:00 UTC ─────────────────────────────
   cron.schedule('0 3 * * *', () => db.cleanupSchedulerLocks());
   console.log('✓ Scheduler lock cleanup scheduled (03:00 UTC daily)');
+
+  // ── Holiday-pause notifier: daily at 07:30 UTC (breakfast-ish in the UK) ──
+  // One push per household per term-gap when weekly activities slip past
+  // their end_date: "these are paused - keep any running through the
+  // holidays?" The Dashboard card renders from live data; this only pushes.
+  cron.schedule('30 7 * * *', () => runHolidayPauseCheck());
+  console.log('✓ Holiday-pause notifier scheduled (07:30 UTC daily)');
 
   // ── Data retention cleanup: daily at 04:00 UTC ─────────────────────────────
   // Implements the retention commitments in /privacy Section 8 - trims

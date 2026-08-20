@@ -291,6 +291,192 @@ function ReferralGiftCard() {
   );
 }
 
+// ── Holiday-pause card ──────────────────────────────────────────
+// When a child's term-windowed weekly activities slip past their end_date
+// they pause silently - right for school clubs, wrong for the gym lesson
+// that runs all year. This card appears once per gap and lets a parent
+// keep individual activities running by clearing their window (an
+// activity with no window expands every week forever - see
+// activity-occurrences on the server). Untouched rows stay paused, so
+// ignoring the card is safe and identical to the old behaviour.
+
+const HOLIDAY_PAUSE_LOOKBACK_DAYS = 60;
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Weekend activities first: Saturday/Sunday things (private lessons, gym,
+// swimming) are the likely holiday-runners, so they surface above the fold.
+const DAY_SORT = [5, 6, 0, 1, 2, 3, 4];
+
+function HolidayPauseCard({ members }) {
+  const [rows, setRows] = useState(null); // grouped rows, null = loading/none
+  const [gapKey, setGapKey] = useState('');
+  const [expanded, setExpanded] = useState({});
+  const [kept, setKept] = useState({});
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/schools/activities')
+      .then(({ data }) => {
+        if (cancelled) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const floor = new Date(Date.now() - HOLIDAY_PAUSE_LOOKBACK_DAYS * 86_400_000)
+          .toISOString().slice(0, 10);
+        const paused = (data?.activities || []).filter(
+          (a) => a.end_date && a.end_date < today && a.end_date >= floor,
+        );
+        if (paused.length === 0) return;
+        const maxEnd = paused.reduce((m, a) => (a.end_date > m ? a.end_date : m), '');
+        try {
+          if (localStorage.getItem('housemait_holiday_pause_dismissed') === maxEnd) {
+            setDismissed(true);
+          }
+        } catch { /* private mode */ }
+        // Group by child, collapse same-name rows (wraparound care runs
+        // Mon/Tue/Wed as three DB rows - one question, one answer).
+        const byChild = new Map();
+        for (const a of paused) {
+          const list = byChild.get(a.child_id) || [];
+          const key = (a.activity || '').trim().toLowerCase();
+          const existing = list.find((r) => r.key === key);
+          if (existing) {
+            existing.ids.push(a.id);
+            existing.days.push(a.day_of_week);
+          } else {
+            list.push({
+              key,
+              name: (a.activity || '').trim(),
+              ids: [a.id],
+              days: [a.day_of_week],
+              time: a.time_start ? a.time_start.slice(0, 5) : null,
+            });
+          }
+          byChild.set(a.child_id, list);
+        }
+        for (const list of byChild.values()) {
+          list.sort((a, b) => DAY_SORT.indexOf(a.days[0]) - DAY_SORT.indexOf(b.days[0]));
+        }
+        setGapKey(maxEnd);
+        setRows(byChild);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (dismissed || !rows || rows.size === 0) return null;
+
+  function dismiss() {
+    try { localStorage.setItem('housemait_holiday_pause_dismissed', gapKey); } catch { /* private mode */ }
+    setDismissed(true);
+  }
+
+  async function keepRunning(row) {
+    setKept((k) => ({ ...k, [row.key + row.ids[0]]: true }));
+    for (const id of row.ids) {
+      try {
+        await api.patch(`/schools/activities/${id}`, {
+          start_date: null,
+          end_date: null,
+          term_label: null,
+        });
+      } catch { /* one failed row shouldn't undo the optimistic flip; the Family page shows truth */ }
+    }
+  }
+
+  function dayLabel(days) {
+    const sorted = [...new Set(days)].sort((a, b) => DAY_SORT.indexOf(a) - DAY_SORT.indexOf(b));
+    if (sorted.length === 1) return DAY_LABELS[sorted[0]] || '';
+    const labels = sorted.map((d) => DAY_LABELS[d] || '');
+    return `${labels.slice(0, -1).join(', ')} + ${labels[labels.length - 1]}`;
+  }
+
+  const anyKept = Object.keys(kept).length > 0;
+
+  return (
+    <div
+      className="rounded-2xl p-4 mb-4"
+      style={{ background: '#FBF1DE', border: '1px solid rgba(138,95,30,0.22)' }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="text-2xl leading-none mt-0.5" aria-hidden="true">🎒</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium" style={{ color: '#8A5F1E' }}>
+            Paused for the holidays
+          </p>
+          <p className="text-xs mt-0.5 leading-relaxed" style={{ color: '#8A5F1E', opacity: 0.85 }}>
+            These stopped when the term ended. Do any keep running?
+          </p>
+        </div>
+      </div>
+      {[...rows.entries()].map(([childId, list]) => {
+        const child = (members || []).find((m) => m.id === childId);
+        const showAll = !!expanded[childId];
+        const visible = showAll ? list : list.slice(0, 4);
+        const hidden = list.length - visible.length;
+        return (
+          <div key={childId} className="mt-3">
+            {rows.size > 1 && (
+              <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#5C3F12' }}>
+                {child?.name || 'Activities'}
+              </p>
+            )}
+            <div className="flex flex-col gap-1.5">
+              {visible.map((row) => {
+                const isKept = kept[row.key + row.ids[0]];
+                return (
+                  <div
+                    key={row.key + row.ids[0]}
+                    className="flex items-center justify-between gap-2 rounded-[10px] px-2.5 py-2"
+                    style={{ background: isKept ? '#EDF5EE' : 'rgba(255,255,255,0.55)' }}
+                  >
+                    <span className="text-xs min-w-0 truncate" style={{ color: isKept ? '#3F6B44' : '#5C3F12' }}>
+                      <span className="font-medium">{row.name}</span>
+                      {' · '}{dayLabel(row.days)}{row.time && !isKept ? ` ${row.time}` : ''}
+                    </span>
+                    {isKept ? (
+                      <span
+                        className="text-[11px] font-semibold rounded-lg px-2.5 py-1 flex-shrink-0"
+                        style={{ color: '#3F6B44', background: 'rgba(125,174,130,0.25)' }}
+                      >
+                        Runs all year ✓
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => keepRunning(row)}
+                        className="text-[11px] font-semibold rounded-lg px-2.5 py-1 flex-shrink-0 bg-white"
+                        style={{ color: '#8A5F1E', border: '1.5px solid rgba(138,95,30,0.35)' }}
+                      >
+                        Keep running
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {hidden > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpanded((e) => ({ ...e, [childId]: true }))}
+                className="mt-1.5 text-[11px] font-semibold"
+                style={{ color: '#8A5F1E' }}
+              >
+                Show {hidden} more
+              </button>
+            )}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={dismiss}
+        className="mt-3 text-xs text-cocoa hover:text-bark transition-colors"
+      >
+        {anyKept ? 'Done' : "They're all paused, thanks"}
+      </button>
+    </div>
+  );
+}
+
 // ── AI Chat Input ───────────────────────────────────────────────
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
@@ -816,6 +1002,7 @@ export default function Dashboard() {
           content off the fold. */}
       {!childMode && <PromoClaimNudge />}
       {!childMode && <ReferralGiftCard />}
+      {!childMode && <HolidayPauseCard members={members} />}
 
       {/* 2-column grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

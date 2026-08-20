@@ -3469,6 +3469,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // Handle school activity add/remove
   if (result.intent === 'school_activity' && result.school_activity) {
+    let dupNote = '';
     try {
       const sa = result.school_activity;
       // Extracurricular activities belong to a CHILD, never a pet - so match
@@ -3537,18 +3538,33 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           await db.deleteChildActivity(match.id);
         }
       } else {
+        // A same-name activity paused from a finished term is usually the
+        // SAME club moving day/time, not a sibling - creating silently
+        // leaves two pianos come the next term rollover. Create as asked,
+        // but say what we spotted so the parent can delete the old one.
+        const existing = await db.getChildActivities(child.id);
+        const todayYmd = new Date().toISOString().slice(0, 10);
+        const pausedTwin = (existing || []).find(a =>
+          a.activity.toLowerCase() === String(sa.activity || '').toLowerCase()
+          && a.end_date && a.end_date < todayYmd
+        );
         await db.addChildActivity({
           child_id: child.id,
           day_of_week: sa.day_of_week,
           activity: sa.activity,
+          time_start: sa.time_start || null,
           time_end: sa.time_end || null,
         });
+        if (pausedTwin) {
+          const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][pausedTwin.day_of_week] || 'another day';
+          dupNote = ` (${child.name} also has a paused "${pausedTwin.activity}" from last term on ${dayName}s - if this replaced it, delete the old one in Family → Activities.)`;
+        }
       }
     } catch (err) {
       console.error('School activity update failed:', err.message);
       return { response: "⚠️ I understood the activity but couldn't save it just now. Mind trying again in a minute?", actions };
     }
-    return { response: result.response_message || '🏫 Activity updated! ✅', actions };
+    return { response: (result.response_message || '🏫 Activity updated! ✅') + dupNote, actions };
   }
 
   // Handle school event (one-off trip, INSET day, etc.) - create as calendar event
