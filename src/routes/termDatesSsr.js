@@ -822,6 +822,7 @@ function seasonalDefs() {
         title: `When Do Schools Go Back in September ${y1}? Every UK Council | Housemait`,
         description: `The first day of the ${ayLabel} school year for all 176 councils in England and Wales, from each council's own published calendar.`,
         h1: `When do schools go back in September ${y1}?`,
+        navLabel: 'When do schools go back?',
         sub: `The first day of the ${ayLabel} school year, council by council, taken from each council's own published calendar.`,
         noun: 'first day back',
       },
@@ -829,7 +830,8 @@ function seasonalDefs() {
         cfg: { ay, mode: 'break', from: `${y1}-10-01`, to: `${y1}-11-15` },
         title: `October Half Term ${y1} Dates for Every UK Council | Housemait`,
         description: `October ${y1} half-term dates for all 176 councils in England and Wales - including the councils taking a different week from everyone else.`,
-        h1: `October half term ${y1}, council by council`,
+        h1: `October half term ${y1}`,
+        navLabel: 'October half term',
         sub: 'The autumn half-term week for every council in England and Wales - and it is not the same week everywhere.',
         noun: 'October half term',
       },
@@ -837,7 +839,8 @@ function seasonalDefs() {
         cfg: { ay, mode: 'break', from: `${y2}-01-25`, to: `${y2}-03-05` },
         title: `February Half Term ${y2} Dates for Every UK Council | Housemait`,
         description: `February ${y2} half-term (spring half-term) dates for all 176 councils in England and Wales, including the England-Wales split.`,
-        h1: `February half term ${y2}, council by council`,
+        h1: `February half term ${y2}`,
+        navLabel: 'February half term',
         sub: 'The spring half-term week for every council in England and Wales. Wales takes a different week from most of England.',
         noun: 'February half term',
       },
@@ -845,7 +848,8 @@ function seasonalDefs() {
         cfg: { ay, mode: 'break', from: `${y2}-03-01`, to: `${y2}-05-05` },
         title: `Easter School Holidays ${y2} for Every UK Council | Housemait`,
         description: `Easter ${y2} school holiday dates for all 176 councils in England and Wales, from each council's own published calendar.`,
-        h1: `Easter school holidays ${y2}, council by council`,
+        h1: `Easter school holidays ${y2}`,
+        navLabel: 'Easter holidays',
         sub: 'When schools break up for Easter and go back, for every council in England and Wales.',
         noun: 'Easter holidays',
       },
@@ -854,6 +858,7 @@ function seasonalDefs() {
         title: `When Do Schools Break Up for Summer ${y2}? Every UK Council | Housemait`,
         description: `The last day of the ${ayLabel} school year for all 176 councils in England and Wales - break-up dates vary by up to three weeks.`,
         h1: `When do schools break up for summer ${y2}?`,
+        navLabel: 'Summer holidays',
         sub: `The last day of the ${ayLabel} school year, council by council. The spread is wider than most families expect.`,
         noun: 'summer break-up',
       },
@@ -902,7 +907,7 @@ const SEASONAL_CSS = `
 function guidesStrip(exceptSlug) {
   const defs = seasonalDefs();
   const links = SEASONAL_SLUGS.filter((s) => s !== exceptSlug)
-    .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].h1)}</a>`)
+    .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].navLabel)}</a>`)
     .join('');
   const hubs = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`).join('');
   return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/bank-holidays">Bank holidays</a><a href="/school-term-dates/about-this-data">About this data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
@@ -1246,7 +1251,7 @@ function navBar(active, activeSlug) {
   const defs = seasonalDefs();
   const cur = (k) => (active === k ? ' aria-current="page"' : '');
   const curLink = (s) => (activeSlug === s ? ' aria-current="page"' : '');
-  const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].h1)}</a>`).join('')
+  const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].navLabel)}</a>`).join('')
     + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`;
   const regionLinks = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(HUB_DEFS[s].name)}</a>`).join('');
   return `
