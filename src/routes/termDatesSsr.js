@@ -691,7 +691,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=6" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=7" />
   <style>
 
 
@@ -960,7 +960,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=6" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=7" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -997,7 +997,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=6" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=7" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1034,40 +1034,24 @@ function aboutPage(stats) {
 // resolution is defensive anyway - an unknown slug is skipped, never invented.
 
 const HUB_DEFS = {
-  london: {
-    name: 'London', label: 'all 32 boroughs', membersBy: 'slugs',
-    slugs: ['barking-and-dagenham', 'barnet', 'bexley', 'brent', 'bromley', 'camden', 'croydon', 'ealing', 'enfield', 'greenwich', 'hackney', 'hammersmith-and-fulham', 'haringey', 'harrow', 'havering', 'hillingdon', 'hounslow', 'islington', 'kensington-and-chelsea', 'kingston-upon-thames', 'lambeth', 'lewisham', 'merton', 'newham', 'redbridge', 'richmond-upon-thames', 'southwark', 'sutton', 'tower-hamlets', 'waltham-forest', 'wandsworth', 'westminster'],
-  },
-  'greater-manchester': {
-    name: 'Greater Manchester', label: 'all ten boroughs', membersBy: 'slugs',
-    slugs: ['manchester', 'salford', 'stockport', 'tameside', 'oldham', 'rochdale', 'bury', 'bolton', 'wigan', 'trafford'],
-  },
-  'west-midlands': {
-    name: 'West Midlands', label: 'the seven metropolitan boroughs', membersBy: 'slugs',
-    slugs: ['birmingham', 'coventry', 'dudley', 'sandwell', 'solihull', 'walsall', 'wolverhampton'],
-  },
-  merseyside: {
-    name: 'Merseyside', label: 'all five boroughs', membersBy: 'slugs',
-    slugs: ['liverpool', 'wirral', 'sefton', 'knowsley', 'st-helens'],
-  },
-  'west-yorkshire': {
-    name: 'West Yorkshire', label: 'all five districts', membersBy: 'slugs',
-    slugs: ['leeds', 'bradford', 'kirklees', 'calderdale', 'wakefield'],
-  },
-  'south-yorkshire': {
-    name: 'South Yorkshire', label: 'all four districts', membersBy: 'slugs',
-    slugs: ['sheffield', 'barnsley', 'doncaster', 'rotherham'],
-  },
-  'north-east': {
-    name: 'North East England', label: 'Tyne and Wear, Northumberland and Durham', membersBy: 'slugs',
-    slugs: ['newcastle-upon-tyne', 'gateshead', 'north-tyneside', 'south-tyneside', 'sunderland', 'northumberland', 'county-durham'],
-  },
-  wales: {
-    name: 'Wales', label: 'all 22 Welsh authorities', membersBy: 'region', region: 'Wales',
-    note: 'Wales publishes a national approved calendar (gov.wales), so most authorities align - but the spring half term falls a week earlier than in most of England, which matters for cross-border families and holiday pricing.',
-  },
+  'north-east': { name: 'North East England', label: 'all 12 authorities', kind: 'region', membersBy: 'slugs', slugs: ['county-durham', 'darlington', 'gateshead', 'hartlepool', 'middlesbrough', 'newcastle-upon-tyne', 'north-tyneside', 'northumberland', 'redcar-and-cleveland', 'south-tyneside', 'stockton-on-tees', 'sunderland'] },
+  'north-west': { name: 'North West England', label: 'all 24 authorities', kind: 'region', membersBy: 'slugs', slugs: ['blackburn-with-darwen', 'blackpool', 'bolton', 'bury', 'cheshire-east', 'cheshire-west-and-chester', 'cumberland', 'westmorland-and-furness', 'halton', 'knowsley', 'lancashire', 'liverpool', 'manchester', 'oldham', 'rochdale', 'salford', 'sefton', 'st-helens', 'stockport', 'tameside', 'trafford', 'warrington', 'wigan', 'wirral'] },
+  'yorkshire-and-the-humber': { name: 'Yorkshire and the Humber', label: 'all 15 authorities', kind: 'region', membersBy: 'slugs', slugs: ['barnsley', 'bradford', 'calderdale', 'doncaster', 'east-riding-of-yorkshire', 'kingston-upon-hull-city-of', 'kirklees', 'leeds', 'north-east-lincolnshire', 'north-lincolnshire', 'north-yorkshire', 'rotherham', 'sheffield', 'wakefield', 'york'] },
+  'east-midlands': { name: 'East Midlands', label: 'all 10 authorities', kind: 'region', membersBy: 'slugs', slugs: ['derby', 'derbyshire', 'leicester', 'leicestershire', 'lincolnshire', 'north-northamptonshire', 'west-northamptonshire', 'nottingham', 'nottinghamshire', 'rutland'] },
+  'west-midlands': { name: 'West Midlands', label: 'all 14 authorities', kind: 'region', membersBy: 'slugs', slugs: ['birmingham', 'coventry', 'dudley', 'herefordshire-county-of', 'sandwell', 'shropshire', 'solihull', 'staffordshire', 'stoke-on-trent', 'telford-and-wrekin', 'walsall', 'warwickshire', 'wolverhampton', 'worcestershire'] },
+  'east-of-england': { name: 'East of England', label: 'all 11 authorities', kind: 'region', membersBy: 'slugs', slugs: ['bedford', 'cambridgeshire', 'central-bedfordshire', 'essex', 'hertfordshire', 'luton', 'norfolk', 'peterborough', 'southend-on-sea', 'suffolk', 'thurrock'] },
+  'london': { name: 'London', label: 'all 32 boroughs', kind: 'region', membersBy: 'slugs', slugs: ['barking-and-dagenham', 'barnet', 'bexley', 'brent', 'bromley', 'camden', 'croydon', 'ealing', 'enfield', 'greenwich', 'hackney', 'hammersmith-and-fulham', 'haringey', 'harrow', 'havering', 'hillingdon', 'hounslow', 'islington', 'kensington-and-chelsea', 'kingston-upon-thames', 'lambeth', 'lewisham', 'merton', 'newham', 'redbridge', 'richmond-upon-thames', 'southwark', 'sutton', 'tower-hamlets', 'waltham-forest', 'wandsworth', 'westminster'] },
+  'south-east': { name: 'South East England', label: 'all 19 authorities', kind: 'region', membersBy: 'slugs', slugs: ['bracknell-forest', 'brighton-and-hove', 'buckinghamshire', 'east-sussex', 'hampshire', 'isle-of-wight', 'kent', 'medway', 'milton-keynes', 'oxfordshire', 'portsmouth', 'reading', 'slough', 'southampton', 'surrey', 'west-berkshire', 'west-sussex', 'windsor-and-maidenhead', 'wokingham'] },
+  'south-west': { name: 'South West England', label: 'all 15 authorities', kind: 'region', membersBy: 'slugs', slugs: ['bath-and-north-east-somerset', 'bournemouth-christchurch-and-poole', 'bristol-city-of', 'cornwall', 'devon', 'dorset', 'gloucestershire', 'isles-of-scilly', 'north-somerset', 'plymouth', 'somerset', 'south-gloucestershire', 'swindon', 'torbay', 'wiltshire'] },
+  wales: { name: 'Wales', label: 'all 22 Welsh authorities', kind: 'region', membersBy: 'region', region: 'Wales', note: 'Wales publishes a national approved calendar (gov.wales), so most authorities align - but the spring half term falls a week earlier than in most of England, which matters for cross-border families and holiday pricing.' },
+  'greater-manchester': { name: 'Greater Manchester', label: 'all ten boroughs', kind: 'metro', parent: 'north-west', membersBy: 'slugs', slugs: ['manchester', 'salford', 'stockport', 'tameside', 'oldham', 'rochdale', 'bury', 'bolton', 'wigan', 'trafford'] },
+  'merseyside': { name: 'Merseyside', label: 'all five boroughs', kind: 'metro', parent: 'north-west', membersBy: 'slugs', slugs: ['liverpool', 'wirral', 'sefton', 'knowsley', 'st-helens'] },
+  'west-yorkshire': { name: 'West Yorkshire', label: 'all five districts', kind: 'metro', parent: 'yorkshire-and-the-humber', membersBy: 'slugs', slugs: ['leeds', 'bradford', 'kirklees', 'calderdale', 'wakefield'] },
+  'south-yorkshire': { name: 'South Yorkshire', label: 'all four districts', kind: 'metro', parent: 'yorkshire-and-the-humber', membersBy: 'slugs', slugs: ['sheffield', 'barnsley', 'doncaster', 'rotherham'] },
 };
 const HUB_SLUGS = Object.keys(HUB_DEFS);
+const REGION_SLUGS = HUB_SLUGS.filter((s) => HUB_DEFS[s].kind === 'region');
+const METRO_SLUGS = HUB_SLUGS.filter((s) => HUB_DEFS[s].kind === 'metro');
 
 // slug -> its hub, for the contextual "compare the whole region" link on
 // council pages. Region-membership hubs (Wales) resolve at request time.
@@ -1126,6 +1110,14 @@ function hubPage(hubSlug, members, entries) {
     aligned = `They do not all go back on the same day: ${spread}.`;
   }
 
+  // Cross-links: a region offers its metro areas; a metro points back up.
+  const children = METRO_SLUGS.filter((s) => HUB_DEFS[s].parent === hubSlug);
+  const relatedBits = children.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`);
+  if (def.parent) relatedBits.push(`<a href="/school-term-dates/${def.parent}">All of ${esc(HUB_DEFS[def.parent].name)}</a>`);
+  const relatedHubsHtml = relatedBits.length
+    ? `<h2>${def.parent ? 'Wider region' : `Areas within ${esc(def.name)}`}</h2><div class="guides-strip">${relatedBits.join('')}</div>`
+    : '';
+
   const title = `${def.name} School Term Dates ${defs.ayLabel}: ${def.label.charAt(0).toUpperCase() + def.label.slice(1)} Compared | Housemait`;
   const description = `Term dates for ${def.label} in ${def.name} for ${defs.ayLabel}, side by side: first day back, half terms and summer break-up, from each council's own calendar.`;
   const crumbLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
@@ -1147,7 +1139,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=6" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=7" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1160,6 +1152,7 @@ function hubPage(hubSlug, members, entries) {
 ${rows}
     </tbody></table></div>
     <p class="note">A dash means that answer could not be derived from the council's published structure - check the council's own page via its link.</p>
+    ${relatedHubsHtml}
     ${guidesStrip(null)}
     ${FOOTER_HTML}
   </div>
@@ -1225,7 +1218,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=6" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=7" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
@@ -1483,5 +1476,9 @@ router.get('/:slug', async (req, res, next) => {
     next();
   }
 });
+
+// Exported for tests only - lets the suite assert regional coverage without
+// duplicating the mapping.
+router.__testables = { HUB_DEFS, REGION_SLUGS, METRO_SLUGS, SEASONAL_SLUGS };
 
 module.exports = router;

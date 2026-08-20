@@ -541,3 +541,32 @@ describe('site navigation', () => {
     expect(res.text).toMatch(/href="\/school-term-dates\/when-do-schools-go-back" aria-current="page"/);
   });
 });
+
+
+describe('regional coverage', () => {
+  const { HUB_DEFS, REGION_SLUGS, METRO_SLUGS } = require('./termDatesSsr').__testables || {};
+
+  it('every English council belongs to exactly one ONS region', () => {
+    if (!HUB_DEFS) return; // exported only for tests
+    const seen = new Map();
+    for (const slug of REGION_SLUGS) {
+      for (const c of HUB_DEFS[slug].slugs || []) {
+        expect(seen.has(c)).toBe(false); // no council in two regions
+        seen.set(c, slug);
+      }
+    }
+    expect(seen.size).toBe(152); // 154 England rows minus 2 offshore buckets
+  });
+
+  it('every metro sub-area sits inside a real region', () => {
+    if (!HUB_DEFS) return;
+    for (const slug of METRO_SLUGS) {
+      const parent = HUB_DEFS[slug].parent;
+      expect(REGION_SLUGS).toContain(parent);
+      // and each of its councils is in that parent region
+      for (const c of HUB_DEFS[slug].slugs) {
+        expect(HUB_DEFS[parent].slugs).toContain(c);
+      }
+    }
+  });
+});
