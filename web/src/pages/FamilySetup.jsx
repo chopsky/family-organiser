@@ -2006,7 +2006,7 @@ export default function FamilySetup() {
                   multi-school household read it as "assign my school to me"
                   and expected effects that don't exist (real report
                   2026-08-11). Schools are added/managed on the School page. */}
-              {showSchools && editingMember?.member_type === 'dependent' && householdSchools.length >= 2 && (
+              {showSchools && editingMember?.member_type === 'dependent' && editingMember?.dependent_kind !== 'pet' && householdSchools.length >= 2 && (
                 <div>
                   <label className="block text-sm font-medium text-bark mb-1">School <span className="text-xs text-cocoa font-normal">(optional)</span></label>
                   <div className="relative">

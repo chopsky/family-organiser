@@ -32,7 +32,9 @@ const pdfUpload = multer({
 async function childInHousehold(childId, householdId) {
   if (!childId) return false;
   const members = await db.getHouseholdMembers(householdId);
-  return members.some((m) => m.id === childId);
+  // Pets are dependents but never school children - no clubs, no school
+  // links. Same rule the bot's school_activity branch enforces.
+  return members.some((m) => m.id === childId && m.dependent_kind !== 'pet');
 }
 async function schoolInHousehold(schoolId, householdId) {
   if (!schoolId) return false;

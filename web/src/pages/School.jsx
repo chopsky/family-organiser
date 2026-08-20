@@ -954,7 +954,11 @@ export default function School() {
           per-child; this is just one front door). Add/edit happens in the
           activity modal below. */}
       {(() => {
-        const activityKids = members.filter(m => m.member_type === 'dependent' || m.school_id);
+        // Children only - a dog has no after-school clubs. Same rule the
+        // bot's school_activity branch enforces (pets fall through to
+        // "no child called X").
+        const activityKids = members.filter(m =>
+          (m.member_type === 'dependent' && m.dependent_kind !== 'pet') || m.school_id);
         const sortByDayTime = (list) => list.slice().sort(
           (a, b) => (a.day_of_week - b.day_of_week) || ((a.time_start || '').localeCompare(b.time_start || '')),
         );
