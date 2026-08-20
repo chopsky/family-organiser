@@ -575,6 +575,20 @@ const GA_SNIPPET = `
   <script>${GA_INLINE_JS}</script>`;
 const GA_INLINE_HASH = crypto.createHash('sha256').update(GA_INLINE_JS).digest('base64');
 
+// Closes any open nav dropdown on an outside click. Native <details> never
+// closes itself, so two open panels stack absurdly. Registered on document
+// so it is safe to include in <head>; its sha256 joins the CSP alongside the
+// GA snippet's - a new inline script silently no-ops under script-src 'self'.
+const NAV_JS = `
+    document.addEventListener('click', function (e) {
+      document.querySelectorAll('details.navdrop[open]').forEach(function (d) {
+        if (!d.contains(e.target)) d.removeAttribute('open');
+      });
+    });
+  `;
+const NAV_JS_HASH = crypto.createHash('sha256').update(NAV_JS).digest('base64');
+
+
 // The app-wide helmet CSP is script-src 'self', which would silently kill
 // both the gtag loader and the inline snippet — so these routes replace it
 // with the same policy plus exactly what GA needs: the loader origin, the
@@ -587,7 +601,7 @@ const CSP_HEADER = [
   "frame-ancestors 'self'",
   "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com",
   "object-src 'none'",
-  `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}'`,
+  `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}' 'sha256-${NAV_JS_HASH}'`,
   "script-src-attr 'none'",
   "style-src 'self' https: 'unsafe-inline'",
   // postcodes.io powers the index's find-my-council postcode lookup.
@@ -765,6 +779,7 @@ ${SITENAV_CSS}
       .srcline { margin-top: 16px; }
     }
   </style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('councils')}
@@ -1008,6 +1023,7 @@ function seasonalPage(slug, result) {
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('dates', slug)}
@@ -1043,6 +1059,7 @@ function aboutPage(stats) {
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('about')}
@@ -1191,6 +1208,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('regions', hubSlug)}
@@ -1271,6 +1289,7 @@ function bankHolidayPage(annotated, defs) {
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
     .gcards.one-col { grid-template-columns: 1fr; }
   </style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('dates', 'bank-holidays')}
@@ -1353,7 +1372,7 @@ router.get('/', async (req, res, next) => {
       .replace('<!--SSR:COUNT-->', esc(countText))
       .replace('<!--SSR:LETTERS-->', lettersHtml)
       .replace('<!--SSR:GRID-->', gridHtml)
-      .replace('</head>', `${GA_SNIPPET}\n</head>`);
+      .replace('</head>', `${GA_SNIPPET}\n  <script>${NAV_JS}</script>\n</head>`);
     res.set('Cache-Control', CACHE_HEADER).type('html').send(injected);
   } catch (err) {
     console.error('[term-dates-ssr] index failed:', err.message);
