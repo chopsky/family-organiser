@@ -585,6 +585,13 @@ const NAV_JS = `
         if (!d.contains(e.target)) d.removeAttribute('open');
       });
     });
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      document.querySelectorAll('details.navdrop').forEach(function (d) {
+        d.addEventListener('mouseenter', function () { d.open = true; });
+        d.addEventListener('mouseleave', function () { d.open = false; });
+      });
+    });
   `;
 const NAV_JS_HASH = crypto.createHash('sha256').update(NAV_JS).digest('base64');
 
@@ -612,7 +619,7 @@ const CSP_HEADER = [
 /** Shared header row + footer used by index (static) and council pages. */
 const HEADER_HTML = `
     <div class="topbar">
-      <a class="brand" href="/school-term-dates/" aria-label="School term dates home"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /><span class="lockup">Term dates</span></a>
+      <a class="brand" href="/school-term-dates/" aria-label="School term dates home"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
       <a class="btn-try" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
     </div>`;
 
@@ -684,7 +691,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=2" />
   <style>
 
 
@@ -953,7 +960,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=2" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -990,7 +997,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=2" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1140,13 +1147,13 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=2" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
   <div class="wrap">${HEADER_HTML}${navBar('regions', hubSlug)}
-    <h1>${esc(def.name)} school term dates, side by side</h1>
+    <h1>${esc(def.name)} school term dates</h1>
     <p class="sub">The ${esc(defs.ayLabel)} school year for ${esc(def.label)}, compared in one table - from each council's own published calendar.</p>
     <div class="prose"><p>${aligned}${def.note ? ` ${esc(def.note)}` : ''} Council dates formally apply to community and voluntary-controlled schools - academies and free schools set their own, usually close by. Click any council for its full calendar, source link and free add-to-phone download.</p></div>
     <div class="tableWrap"><table><thead><tr><th>Council</th>${cols.map((c) => `<th>${esc(c.heading)}</th>`).join('')}</tr></thead><tbody>
@@ -1218,7 +1225,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=2" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }

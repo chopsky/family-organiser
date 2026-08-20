@@ -27,18 +27,20 @@ a:hover { color: #54317E; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
 .topbar img { height: 26px; width: auto; display: block; }
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
 .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
 .btn-try:hover { background: #5A3488; color: #FFFFFF; }
 
 /* ── Site navigation ── */
-.sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
+.sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 30px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
 .sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
 .sitenav summary::-webkit-details-marker { display: none; }
 .sitenav summary::after { content: '\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
 .sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
 .sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
 .navdrop { position: relative; }
+/* Invisible bridge across the 6px gap below the label, so hovering from the
+   label down to the panel never counts as leaving the dropdown. */
+.navdrop[open]::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
 .navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
 .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
 .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
