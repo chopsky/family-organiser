@@ -22,6 +22,10 @@ a { color: #6B3FA0; }
 a:hover { color: #54317E; }
 
 .wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 72px; }
+/* Text-led pages (guides, hubs, bank holidays, about, council pages) sit
+   narrower, so a readable ~640px paragraph doesn't look stranded in a wide
+   container. The index keeps the full width for its council-card grid. */
+.wrap.narrow { max-width: 880px; }
 
 /* ── Header ── */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
