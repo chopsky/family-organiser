@@ -22,10 +22,6 @@ a { color: #6B3FA0; }
 a:hover { color: #54317E; }
 
 .wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 72px; }
-/* Text-led pages (guides, hubs, bank holidays, about, council pages) sit
-   narrower, so a readable ~640px paragraph doesn't look stranded in a wide
-   container. The index keeps the full width for its council-card grid. */
-.wrap.narrow { max-width: 880px; }
 
 /* ── Header ── */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
@@ -49,14 +45,28 @@ a:hover { color: #54317E; }
 .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
 .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
 .navdrop .panel a[aria-current] { background: #F3EDFC; color: #6B3FA0; }
-@media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
+.lbl-short { display: none; }
+@media (max-width: 640px) {
+  .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; }
+  /* Four items overflow a 375px viewport by ~50px and wrap 'About' onto its
+     own row. Tighter padding plus the short label ("Councils") brings the row
+     back to one line without shrinking the tap targets below 34px. */
+  .sitenav { gap: 2px; }
+  .sitenav > a, .sitenav summary { padding: 0 10px; font-size: 12.5px; }
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+  .btn-try { padding: 0 13px; font-size: 13px; }
+}
 
-/* ── Typography ── */
+/* ── Typography ──
+   .sub (16px) and .prose p (15px) carry different ch counts to land on the
+   SAME rendered width (~730px, about 75% of the container): ch is the width
+   of the "0" glyph, so it scales with font-size and is NOT a character count. */
 h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(32px, 5.5vw, 46px); line-height: 1.08; letter-spacing: -0.02em; color: #6B3FA0; margin: 12px 0 8px; }
 h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 34px 0 12px; letter-spacing: -0.01em; }
-.sub, .lede { font-size: 16px; color: #6B6774; max-width: 62ch; margin: 0 0 26px; }
-.prose p { font-size: 15px; color: #4A4552; max-width: 68ch; margin: 0 0 12px; }
-.note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 68ch; }
+.sub, .lede { font-size: 16px; color: #6B6774; max-width: 72ch; margin: 0 0 26px; }
+.prose p { font-size: 15px; color: #4A4552; max-width: 78ch; margin: 0 0 12px; }
+.note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 88ch; }
 
 /* ── Shared components (guide, hub and bank-holiday pages) ── */
 .gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
