@@ -32,16 +32,19 @@ const LOOKBACK_DAYS = 60;
 function buildHolidayPauseBody(byChild) {
   const children = Object.keys(byChild);
   if (children.length === 0) return null;
+  // Same-name rows (childminders on Mon/Tue/Wed are three DB rows) are one
+  // activity to a parent - count and name them once, like the card does.
+  const uniq = (list) => [...new Set(list)];
   if (children.length === 1) {
     const child = children[0];
-    const acts = byChild[child];
+    const acts = uniq(byChild[child]);
     const more = acts.length - 2;
     const list = more > 0
       ? `${acts.slice(0, 2).join(', ')} and ${more} more`
       : acts.slice(0, 2).join(' and ');
     return `Term's ended: ${child}'s ${list} ${acts.length === 1 ? 'is' : 'are'} paused. Keep any running through the holidays?`;
   }
-  const total = children.reduce((n, c) => n + byChild[c].length, 0);
+  const total = children.reduce((n, c) => n + [...new Set(byChild[c])].length, 0);
   const names = children.slice(0, 2).join(' and ');
   return `Term's ended: ${names}'s clubs (${total}) are paused. Keep any running through the holidays?`;
 }

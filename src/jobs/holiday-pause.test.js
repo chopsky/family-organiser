@@ -30,13 +30,19 @@ describe('buildHolidayPauseBody', () => {
     );
   });
 
-  test('two children counts the lot', () => {
+  test('two children counts distinct activities, not DB rows', () => {
     const body = buildHolidayPauseBody({
       Mason: ['Tennis', 'Gym', 'Art', 'Piano', 'Cooking', 'Swimming', 'Club Hillel'],
       Logan: ['Swimming', 'Wraparound Care', 'Wraparound Care', 'Wraparound Care'],
     });
     expect(body).toBe(
-      "Term's ended: Mason and Logan's clubs (11) are paused. Keep any running through the holidays?",
+      "Term's ended: Mason and Logan's clubs (9) are paused. Keep any running through the holidays?",
+    );
+  });
+
+  test('same-name multi-day rows are named once', () => {
+    expect(buildHolidayPauseBody({ Leon: ['Childminders', 'Childminders', 'Childminders'] })).toBe(
+      "Term's ended: Leon's Childminders is paused. Keep any running through the holidays?",
     );
   });
 
