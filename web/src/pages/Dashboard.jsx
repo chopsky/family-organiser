@@ -327,8 +327,23 @@ function HolidayPauseCard({ members }) {
         if (paused.length === 0) return;
         const maxEnd = paused.reduce((m, a) => (a.end_date > m ? a.end_date : m), '');
         try {
-          if (localStorage.getItem('housemait_holiday_pause_dismissed') === maxEnd) {
+          // >= not ===: keeping an activity running can REMOVE the row
+          // holding the newest end_date, shifting maxEnd - a strict match
+          // resurrected cards the user had already dismissed. A dismissal
+          // covers this gap and every earlier one; only a genuinely NEWER
+          // term-end brings the card back.
+          const dismissedUpTo = localStorage.getItem('housemait_holiday_pause_dismissed') || '';
+          if (dismissedUpTo >= maxEnd) { setDismissed(true); return; }
+          // Never-dismissed cards still retire themselves: after 14 days
+          // on screen the question has been declined by inaction, and
+          // "paused" is the safe default anyway.
+          const seenKey = `housemait_holiday_pause_seen_${maxEnd}`;
+          const firstSeen = Number(localStorage.getItem(seenKey) || 0);
+          if (!firstSeen) {
+            localStorage.setItem(seenKey, String(Date.now()));
+          } else if (Date.now() - firstSeen > 14 * 86_400_000) {
             setDismissed(true);
+            return;
           }
         } catch { /* private mode */ }
         // Group by child, collapse same-name rows (wraparound care runs
