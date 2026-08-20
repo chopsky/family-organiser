@@ -25,6 +25,7 @@ const router = express.Router();
 const laDb = require('../db/laTermDates');
 const { academicYearsForCountry } = require('../services/term-date-extract');
 const { summariseSeason } = require('../services/termDatesSeasonal');
+const { fetchBankHolidaysEnglandWales, classifyBankHolidays } = require('../services/bankHolidays');
 
 const CANONICAL_BASE = 'https://housemait.com/school-term-dates';
 const INDEX_HTML = path.join(__dirname, '..', '..', 'public', 'la-term-dates', 'index.html');
@@ -597,7 +598,7 @@ const CSP_HEADER = [
 /** Shared header row + footer used by index (static) and council pages. */
 const HEADER_HTML = `
     <div class="topbar">
-      <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
+      <a class="brand" href="/school-term-dates/" aria-label="School term dates home"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /><span class="lockup">Term dates</span></a>
       <a class="btn-try" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
     </div>`;
 
@@ -611,6 +612,7 @@ const FOOTER_HTML = `
         <a href="/school-term-dates/february-half-term">February half term</a>
         <a href="/school-term-dates/easter-holidays">Easter holidays</a>
         <a href="/school-term-dates/summer-holidays">Summer holidays</a>
+        <a href="/school-term-dates/bank-holidays">Bank holidays</a>
         <a href="/school-term-dates/about-this-data">About this data</a>
       </nav>
       <nav class="guides" aria-label="Compare term dates by region">
@@ -680,6 +682,8 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
 
     .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 30px; }
     .topbar img { height: 26px; width: auto; display: block; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+    .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
     .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
     .btn-try:hover { background: #5A3488; color: #FFFFFF; }
 
@@ -905,6 +909,8 @@ const SEASONAL_CSS = `
     .wrap { max-width: 860px; margin: 0 auto; padding: 24px 20px 56px; }
     .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
     .topbar img { height: 26px; width: auto; display: block; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+    .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
     .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; background: #6B3FA0; color: #fff; font-weight: 600; font-size: 13.5px; text-decoration: none; }
     .crumb { display: inline-block; font-size: 13px; color: #6B3FA0; text-decoration: none; font-weight: 600; margin-bottom: 14px; }
     h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(30px, 5vw, 42px); line-height: 1.08; letter-spacing: -0.01em; color: #2D2A33; margin-bottom: 10px; }
@@ -942,7 +948,7 @@ function guidesStrip(exceptSlug) {
     .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].h1)}</a>`)
     .join('');
   const hubs = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`).join('');
-  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/about-this-data">About this data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
+  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/bank-holidays">Bank holidays</a><a href="/school-term-dates/about-this-data">About this data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
 }
 
 function seasonalPage(slug, result) {
@@ -1189,6 +1195,85 @@ ${rows}
 </html>`;
 }
 
+
+// ── Bank holidays × the school year ─────────────────────────────────────────
+// GOV.UK's official England & Wales list, annotated with the question parents
+// actually have: does this bank holiday fall in term time (an extra day off
+// school) or inside a school break (children are off anyway)?
+
+function bankHolidayPage(annotated, defs) {
+  const canonical = `${CANONICAL_BASE}/bank-holidays`;
+  const title = `Bank Holidays ${defs.y1}/${defs.y2} and the School Year (England & Wales) | Housemait`;
+  const description = `Every England and Wales bank holiday to summer ${defs.y2}, with the answer schools never spell out: is it an extra day off school, or are children on holiday anyway?`;
+
+  const badge = {
+    'extra-day': ['Extra day off school', '#EDF5EE', '#3E7444'],
+    'already-off': ['Schools already closed', '#F3EDFC', '#6B3FA0'],
+    mixed: ['Depends on your council', '#FBF1DE', '#936314'],
+  };
+  const rows = annotated.map((h) => {
+    const [label, bg, fg] = badge[h.verdict];
+    const resolved = h.counts.termTime + h.counts.off;
+    let detail = '';
+    if (h.verdict === 'extra-day') {
+      detail = `Falls in term time for ${h.counts.termTime} of ${resolved} councils — schools close for the bank holiday, so it's a genuine extra day off.`;
+      if (h.exceptions.length) detail += ` Already on holiday anyway in ${h.exceptions.map((x) => `<a href="/school-term-dates/${esc(x.slug)}">${esc(x.name)}</a>`).join(', ')}.`;
+    } else if (h.verdict === 'already-off') {
+      detail = `Falls inside the school holidays for ${h.counts.off} of ${resolved} councils — children are off anyway, so no extra day.`;
+      if (h.exceptions.length) detail += ` The exception${h.exceptions.length > 1 ? 's' : ''}: term time in ${h.exceptions.map((x) => `<a href="/school-term-dates/${esc(x.slug)}">${esc(x.name)}</a>`).join(', ')}, where it IS an extra day off.`;
+    } else {
+      detail = `Genuinely split: term time for ${h.counts.termTime} councils, inside school holidays for ${h.counts.off}. Check your council's page.`;
+    }
+    return `<div class="gcard bh"><div class="when">${esc(fmtDate(h.date))}</div><div class="bh-title">${esc(h.title)}</div><span class="count" style="background:${bg};color:${fg}">${esc(label)}</span><div class="who">${detail}</div></div>`;
+  }).join('');
+
+  const faq = [
+    { q: 'Do schools close on bank holidays?', a: 'Yes - state schools in England and Wales close on bank holidays. Whether that means an extra day off depends on the calendar: a bank holiday in term time adds a day off, while one that falls inside half term or the summer break changes nothing, because children are off anyway.' },
+    { q: `Which bank holidays give children an extra day off in ${defs.ayLabel}?`, a: 'Typically the early May bank holiday is the only one that falls squarely in term time for most councils - the spring bank holiday usually sits inside the late-May half term, Good Friday and Easter Monday inside the Easter break, and the August and Christmas holidays inside school holidays. The list above shows the picture council by council.' },
+    { q: 'Are bank holidays the same across the UK?', a: 'England and Wales share one list (shown here). Scotland and Northern Ireland have their own, with differences such as 2 January and St Patrick’s Day.' },
+  ];
+  const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+  const crumbLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'UK School Term Dates', item: `${CANONICAL_BASE}/` },
+    { '@type': 'ListItem', position: 2, name: 'Bank holidays and the school year', item: canonical },
+  ] };
+
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}" />
+  <link rel="canonical" href="${esc(canonical)}" />
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${esc(canonical)}" />
+  <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
+  <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
+  <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
+  <style>${SEASONAL_CSS}
+    .bh { max-width: 640px; }
+    .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
+    .gcards.one-col { grid-template-columns: 1fr; }
+  </style>${GA_SNIPPET}
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}
+    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+    <h1>Bank holidays and the school year</h1>
+    <p class="sub">Every England &amp; Wales bank holiday to summer ${defs.y2} - and whether it's a genuine extra day off school, or falls when children are on holiday anyway. Dates from GOV.UK; school calendars from each council's own published dates.</p>
+    <div class="gcards one-col">${rows}</div>
+    <h2>Common questions</h2>
+    <div class="prose">${faq.map((f) => `<p><strong>${esc(f.q)}</strong><br/>${esc(f.a)}</p>`).join('')}</div>
+    ${guidesStrip(null)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
+
 // GA-aware CSP for every term-dates response (harmless on .ics/xml).
 router.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', CSP_HEADER);
@@ -1268,6 +1353,24 @@ for (const hubSlug of HUB_SLUGS) {
   });
 }
 
+router.get('/bank-holidays', async (req, res, next) => {
+  try {
+    const defs = seasonalDefs();
+    const [events, authorities, entries] = await Promise.all([
+      fetchBankHolidaysEnglandWales(),
+      laDb.listAllAuthorities().then((a) => a.filter(isListable)),
+      laDb.listAllEntries(),
+    ]);
+    const fromIso = new Date().toISOString().slice(0, 10);
+    const annotated = classifyBankHolidays(authorities, entries, events, { fromIso, untilIso: `${defs.y2}-08-31` });
+    if (!annotated.length) return next();
+    res.set('Cache-Control', CACHE_HEADER).type('html').send(bankHolidayPage(annotated, defs));
+  } catch (err) {
+    console.error('[term-dates-ssr] bank-holidays failed:', err.message);
+    next();
+  }
+});
+
 router.get('/about-this-data', async (req, res, next) => {
   try {
     let stats = null;
@@ -1290,6 +1393,7 @@ router.get('/sitemap.xml', async (req, res) => {
       `${CANONICAL_BASE}/`,
       ...SEASONAL_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
       ...HUB_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
+      `${CANONICAL_BASE}/bank-holidays`,
       `${CANONICAL_BASE}/about-this-data`,
       ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
     ];

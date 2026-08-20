@@ -7,6 +7,11 @@
  * These tests pin the server half of that contract: real links, the data-*
  * attributes the client filter needs, and no never-imported councils.
  */
+jest.mock('../services/bankHolidays', () => {
+  const real = jest.requireActual('../services/bankHolidays');
+  return { ...real, fetchBankHolidaysEnglandWales: jest.fn() };
+});
+
 jest.mock('../db/laTermDates', () => ({
   listAllAuthorities: jest.fn(),
   listAuthoritySchools: jest.fn(),
@@ -456,6 +461,46 @@ describe('region hub pages', () => {
   it('falls through when no members are listable', async () => {
     laDb.listAllAuthorities.mockResolvedValue([]);
     const res = await request(app()).get('/school-term-dates/merseyside');
+    expect(res.status).toBe(404);
+  });
+});
+
+
+describe('bank holidays page', () => {
+  const bh = require('../services/bankHolidays');
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-08-19T12:00:00Z'));
+    laDb.getAuthorityBySlug.mockResolvedValue(null);
+    laDb.listAllAuthorities.mockResolvedValue([
+      { id: 'a', name: 'Aleshire', slug: 'aleshire', region: 'England', import_status: 'ok', date_count: 10 },
+    ]);
+    laDb.listAllEntries.mockResolvedValue([
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_end', date: '2026-12-18', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2027-01-04', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_end', date: '2027-03-25', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2027-04-12', end_date: null, label: null },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_end', date: '2027-07-21', end_date: null, label: null },
+    ]);
+    bh.fetchBankHolidaysEnglandWales.mockResolvedValue([
+      { date: '2026-12-25', title: 'Christmas Day', notes: '' },
+      { date: '2027-05-03', title: 'Early May bank holiday', notes: '' },
+    ]);
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('annotates term-time bank holidays as extra days off', async () => {
+    const res = await request(app()).get('/school-term-dates/bank-holidays');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Early May bank holiday');
+    expect(res.text).toContain('Extra day off school');
+    expect(res.text).toContain('Christmas Day');
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/bank-holidays"');
+  });
+
+  it('gov.uk failure falls through, never a 500', async () => {
+    bh.fetchBankHolidaysEnglandWales.mockRejectedValue(new Error('gov.uk down'));
+    const res = await request(app()).get('/school-term-dates/bank-holidays');
     expect(res.status).toBe(404);
   });
 });

@@ -158,4 +158,4 @@ function summariseSeason(authorities, entries, cfg) {
   return { perCouncil, groups, unresolved };
 }
 
-module.exports = { summariseSeason, breakWindow, firstDayBack, lastDayOfTerm, weekdaysBetween };
+module.exports = { summariseSeason, breakWindow, firstDayBack, lastDayOfTerm, weekdaysBetween, isSchoolScoped };
