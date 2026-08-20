@@ -432,11 +432,56 @@ module.exports = [
       const sa = r.school_activity;
       if (!sa) return 'missing school_activity payload';
       if (sa.action === 'add') return 'chose "add" despite an existing same-name activity (the duplicate principle)';
-      if (sa.action !== 'change' && sa.action !== 'update') return `expected change or update, got "${sa.action}"`;
+      if (sa.action !== 'change') return `expected "change" (no movement words = one date), got "${sa.action}"`;
       if (sa.time_start !== '13:00') return `expected time_start 13:00, got ${sa.time_start}`;
-      if (sa.action === 'change' && !/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) {
         return `change without a resolvable skip_date: ${sa.skip_date}`;
       }
+      return null;
+    },
+  },
+  {
+    name: 'movement-words test: bare time for an existing activity is one date, with no invented end time (real transcript 2026-08-21)',
+    message: 'Mason has gym with Gavin at 8.30 sunday',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: Gym with Gavin (Sundays 10:30, all year)',
+    },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'change') return `expected "change" (no movement words), got "${sa.action}"`;
+      if (sa.time_start !== '08:30') return `expected time_start 08:30, got ${sa.time_start}`;
+      if (sa.time_end) return `time_end must stay empty when only the start was given, got ${sa.time_end} (the 3-hour-gym bug)`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) return `unresolved skip_date: ${sa.skip_date}`;
+      return null;
+    },
+  },
+  {
+    name: 'correction reinterprets: "just a once off" keeps the 8:30, not a bare revert (real transcript 2026-08-21)',
+    message: "No you weren't meant to move it. Was just a once off",
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: Gym with Gavin (Sundays 08:30, all year)',
+      history: [
+        { role: 'user', content: 'Mason has gym with Gavin at 8.30 sunday' },
+        { role: 'assistant', content: "Got it - Mason's Gym with Gavin is moving to Sundays at 08:30 going forward, instead of the current 10:30 slot. If that was just for this Sunday, let me know and I'll treat it as a one-off instead." },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action === 'add') return 'a correction must never create a duplicate';
+      // The one thing the correction must NOT lose: the 8:30 the parent
+      // asked for. Reverting the series to 10:30 while dropping the
+      // one-off 8:30 is the transcript's "runs at its normal time" bug.
+      const carried = sa.time_start === '08:30'
+        || /8[:.]30/.test(r.response_message || '');
+      if (!carried) return `the 08:30 was lost in the correction (action ${sa.action}, time_start ${sa.time_start}, reply: "${r.response_message}")`;
       return null;
     },
   },
