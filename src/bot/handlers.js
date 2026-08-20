@@ -3538,16 +3538,17 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           await db.deleteChildActivity(match.id);
         }
       } else {
-        // A same-name activity paused from a finished term is usually the
-        // SAME club moving day/time, not a sibling - creating silently
-        // leaves two pianos come the next term rollover. Create as asked,
-        // but say what we spotted so the parent can delete the old one.
+        // A same-name activity is usually the SAME club moving day/time,
+        // not a sibling - creating silently leaves two pianos. Create as
+        // asked, but say what we spotted so the parent can delete the old
+        // one. A LIVE twin (current or ongoing) beats a paused one from a
+        // finished term: a live duplicate shows up twice a week from now.
         const existing = await db.getChildActivities(child.id);
         const todayYmd = new Date().toISOString().slice(0, 10);
-        const pausedTwin = (existing || []).find(a =>
-          a.activity.toLowerCase() === String(sa.activity || '').toLowerCase()
-          && a.end_date && a.end_date < todayYmd
-        );
+        const twins = (existing || []).filter(a =>
+          a.activity.toLowerCase() === String(sa.activity || '').toLowerCase());
+        const liveTwin = twins.find(a => !a.end_date || a.end_date >= todayYmd);
+        const pausedTwin = twins.find(a => a.end_date && a.end_date < todayYmd);
         await db.addChildActivity({
           child_id: child.id,
           day_of_week: sa.day_of_week,
@@ -3555,8 +3556,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           time_start: sa.time_start || null,
           time_end: sa.time_end || null,
         });
-        if (pausedTwin) {
-          const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][pausedTwin.day_of_week] || 'another day';
+        const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        if (liveTwin) {
+          const dayName = DAY_NAMES[liveTwin.day_of_week] || 'another day';
+          dupNote = ` (${child.name} already has "${liveTwin.activity}" on ${dayName}s - if it's moved, delete the ${dayName} one in Family → Activities.)`;
+        } else if (pausedTwin) {
+          const dayName = DAY_NAMES[pausedTwin.day_of_week] || 'another day';
           dupNote = ` (${child.name} also has a paused "${pausedTwin.activity}" from last term on ${dayName}s - if this replaced it, delete the old one in Family → Activities.)`;
         }
       }
