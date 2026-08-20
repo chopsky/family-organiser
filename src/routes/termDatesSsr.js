@@ -684,27 +684,11 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: #FBF8F3; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    a { color: #6B3FA0; }
-    a:hover { color: #54317E; }
-    .wrap { max-width: 880px; margin: 0 auto; padding: 26px 20px 72px; }
 
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 30px; }
-    .topbar img { height: 26px; width: auto; display: block; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-${SITENAV_CSS}
-    .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
-    .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
-    .btn-try:hover { background: #5A3488; color: #FFFFFF; }
 
     .crumb { font-size: 13.5px; font-weight: 600; text-decoration: none; }
-    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(32px, 5.5vw, 46px); line-height: 1.08; letter-spacing: -0.02em; color: #6B3FA0; margin: 12px 0 8px; }
-    .sub { color: #6B6774; font-size: 15.5px; margin: 0; max-width: 62ch; }
 
     .nextcard { display: flex; align-items: center; gap: 22px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 18px; padding: 20px 24px; box-shadow: 0 4px 16px rgba(107,63,160,0.08); margin: 24px 0 4px; flex-wrap: wrap; }
     .nc-left { flex: 1; min-width: 230px; }
@@ -766,14 +750,7 @@ ${SITENAV_CSS}
     .prose h3 { font-size: 16px; font-weight: 600; color: #2D2A33; margin: 20px 0 4px; }
     .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 10px; }
 
-    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
-    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
-    .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
-    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-    .site-footer nav a { font-weight: 600; text-decoration: none; }
-    .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
     @media print {
-      body { background: #fff; }
       .topbar .btn-try, .crumb, .actions, .ctaband, .nearby, .prose, .site-footer { display: none !important; }
       .yearcard { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
       .srcline { margin-top: 16px; }
@@ -918,60 +895,9 @@ function seasonalNarrative(def, defs, result) {
   return { intro, faq };
 }
 
-const SITENAV_CSS = `
-    .sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
-    .sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
-    .sitenav summary::-webkit-details-marker { display: none; }
-    .sitenav summary::after { content: '\\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
-    .sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
-    .sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
-    .navdrop { position: relative; }
-    .navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
-    .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
-    .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
-    .navdrop .panel a[aria-current] { background: #F3EDFC; color: #6B3FA0; }
-    @media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
-    @media print { .sitenav { display: none !important; } }`;
 
 const SEASONAL_CSS = `
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #FBF8F3; color: #2D2A33; line-height: 1.6; }
-    .wrap { max-width: 860px; margin: 0 auto; padding: 24px 20px 56px; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
-    .topbar img { height: 26px; width: auto; display: block; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-${SITENAV_CSS}
-    .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
-    .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; background: #6B3FA0; color: #fff; font-weight: 600; font-size: 13.5px; text-decoration: none; }
-    .crumb { display: inline-block; font-size: 13px; color: #6B3FA0; text-decoration: none; font-weight: 600; margin-bottom: 14px; }
-    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(30px, 5vw, 42px); line-height: 1.08; letter-spacing: -0.01em; color: #2D2A33; margin-bottom: 10px; }
-    .sub { font-size: 15.5px; color: #6B6774; max-width: 64ch; margin-bottom: 26px; }
-    .prose p { font-size: 15px; color: #4A4552; max-width: 68ch; margin-bottom: 12px; }
-    h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 25px; color: #6B3FA0; margin: 34px 0 12px; }
-    .gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
-    .gcard { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
-    .gcard .when { font-weight: 600; font-size: 15px; color: #2D2A33; }
-    .gcard .count { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: #6B3FA0; background: #F3EDFC; border-radius: 8px; padding: 2px 9px; }
-    .gcard .who { margin-top: 8px; font-size: 12.5px; color: #6B6774; }
-    .tableWrap { overflow-x: auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); margin-top: 14px; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #6B6774; padding: 12px 16px; border-bottom: 1px solid #E8E5EC; }
-    td { padding: 10px 16px; border-bottom: 1px solid #F3F1F6; }
-    td a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
-    td a:hover { text-decoration: underline; }
-    tr:last-child td { border-bottom: none; }
-    .note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 68ch; }
-    .guides-strip { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 16px; }
-    .guides-strip a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 8px 16px; text-decoration: none; }
-    .guides-strip a:hover { border-color: #6B3FA0; }
-    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
-    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
-    .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
-    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-    .site-footer nav a { font-weight: 600; text-decoration: none; color: #6B3FA0; }
-    .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-    @media print { .topbar, .btn-try, .guides-strip, .site-footer { display: none; } body { background: #fff; } }`;
+    /* Page-specific extras only - the shared system lives in site.css. */`;
 
 function guidesStrip(exceptSlug) {
   const defs = seasonalDefs();
@@ -1022,6 +948,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1058,6 +985,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1207,6 +1135,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1284,6 +1213,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }

@@ -17,39 +17,13 @@
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"UK School Term & Holiday Dates","description":"Term dates for every UK local education authority, refreshed monthly.","url":"https://housemait.com/school-term-dates/","creator":{"@type":"Organization","name":"Housemait","url":"https://housemait.com"}}</script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Are these school term dates official?","acceptedAnswer":{"@type":"Answer","text":"Yes - every page is built from the relevant council's own published term-date calendar, with a link to the source at the bottom. We re-check each council monthly. Your school's own published dates are always the final word, since individual schools can add INSET days or vary the odd date."}},{"@type":"Question","name":"Why do neighbouring councils have different term dates?","acceptedAnswer":{"@type":"Answer","text":"Each local authority consults on and sets its own calendar, so two councils a few miles apart can place half term or the Easter break a week apart. It usually comes down to how they fit 190 teaching days around bank holidays and local traditions - and it is why families near a council boundary should always check the right council, not the nearest one."}},{"@type":"Question","name":"Do academies, free schools and private schools follow these dates?","acceptedAnswer":{"@type":"Answer","text":"Not automatically. Council term dates formally apply to community and voluntary-controlled schools. Academies, free schools and foundation schools set their own calendars - though most stay close to the council's to keep life simple for families - and independent schools run noticeably different, usually longer, holidays. Always confirm with the school itself."}},{"@type":"Question","name":"What is an INSET day?","acceptedAnswer":{"@type":"Answer","text":"An in-service training day: the school is open for staff but closed to pupils. Every state school in England and Wales takes five a year, chosen by the school rather than the council - which is why they rarely appear in council calendars and catch so many families out. Schools confirm them in newsletters, usually a term at a time."}},{"@type":"Question","name":"Which parts of the UK does this directory cover?","acceptedAnswer":{"@type":"Answer","text":"The 176 local education authorities across England and Wales - the bodies that publish term dates this way. Scotland and Northern Ireland set school holidays through separate systems, so their dates are not listed here yet."}}]}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=1" />
   <style>
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
-    @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
-    * { box-sizing: border-box; }
     /* .ccard's display:flex would otherwise beat the UA's [hidden] rule,
        silently breaking every show/hide filter on this page. */
-    [hidden] { display: none !important; }
-    html, body { margin: 0; padding: 0; background: #FBF8F3; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    a { color: #6B3FA0; }
-    a:hover { color: #54317E; }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 72px; }
 
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 34px; }
-    .topbar img { height: 26px; width: auto; display: block; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-    .sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
-    .sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
-    .sitenav summary::-webkit-details-marker { display: none; }
-    .sitenav summary::after { content: '\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
-    .sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
-    .sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
-    .navdrop { position: relative; }
-    .navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
-    .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
-    .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
-    @media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
-    .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
-    .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
-    .btn-try:hover { background: #5A3488; color: #FFFFFF; }
 
-    h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1.05; letter-spacing: -0.02em; color: #6B3FA0; margin: 0 0 10px; max-width: 16ch; }
-    .lede { color: #6B6774; font-size: 16px; margin: 0; max-width: 60ch; }
+    h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.05; margin: 0 0 10px; max-width: 16ch; }
 
     .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 26px 0 6px; }
     .search { position: relative; flex: 1 1 300px; }
@@ -95,16 +69,6 @@
 
     .guides { margin-top: 40px; }
     .guidesTitle { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 0 0 12px; letter-spacing: -0.01em; }
-    .guidesStrip { display: flex; flex-wrap: wrap; gap: 8px 10px; }
-    .topStrip { margin: 4px 0 16px; }
-    .guidesStrip a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #FFFFFF; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 9px 16px; text-decoration: none; }
-    .guidesStrip a:hover { border-color: #6B3FA0; }
-    .site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
-    .site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
-    .site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
-    .site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-    .site-footer nav a { font-weight: 600; text-decoration: none; }
-    .site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
   </style>
   <!-- Google Analytics is injected server-side (GA_SNIPPET in
        src/routes/termDatesSsr.js) so the inline script stays single-source

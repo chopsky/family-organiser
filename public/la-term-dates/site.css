@@ -1,0 +1,86 @@
+/*
+ * Shared design system for the term-dates site - the ONE source of truth for
+ * everything that appears on more than one page. The index and the SSR
+ * templates all <link> this before their own <style> block, so page-specific
+ * rules can override it but shared values cannot drift again (2026-08-19:
+ * three inline copies had diverged to three page widths and two h1 colours).
+ *
+ * Bump the ?v= query on the <link> tags when this file changes - pages are
+ * CDN-cached and the version pin keeps HTML/CSS in step.
+ */
+
+@font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+
+* { box-sizing: border-box; }
+/* .ccard's display:flex would otherwise beat the UA's [hidden] rule,
+   silently breaking every show/hide filter. */
+[hidden] { display: none !important; }
+html, body { margin: 0; padding: 0; background: #FBF8F3; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: #6B3FA0; }
+a:hover { color: #54317E; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 72px; }
+
+/* ── Header ── */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+.topbar img { height: 26px; width: auto; display: block; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
+.btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.btn-try:hover { background: #5A3488; color: #FFFFFF; }
+
+/* ── Site navigation ── */
+.sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
+.sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
+.sitenav summary::-webkit-details-marker { display: none; }
+.sitenav summary::after { content: '\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
+.sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
+.sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
+.navdrop { position: relative; }
+.navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
+.navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
+.navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
+.navdrop .panel a[aria-current] { background: #F3EDFC; color: #6B3FA0; }
+@media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
+
+/* ── Typography ── */
+h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(32px, 5.5vw, 46px); line-height: 1.08; letter-spacing: -0.02em; color: #6B3FA0; margin: 12px 0 8px; }
+h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 34px 0 12px; letter-spacing: -0.01em; }
+.sub, .lede { font-size: 16px; color: #6B6774; max-width: 62ch; margin: 0 0 26px; }
+.prose p { font-size: 15px; color: #4A4552; max-width: 68ch; margin: 0 0 12px; }
+.note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 68ch; }
+
+/* ── Shared components (guide, hub and bank-holiday pages) ── */
+.gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
+.gcards.one-col { grid-template-columns: 1fr; }
+.gcard { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
+.gcard .when { font-weight: 600; font-size: 15px; color: #2D2A33; }
+.gcard .count { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: #6B3FA0; background: #F3EDFC; border-radius: 8px; padding: 2px 9px; }
+.gcard .who { margin-top: 8px; font-size: 12.5px; color: #6B6774; }
+.tableWrap { overflow-x: auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); margin-top: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #6B6774; padding: 12px 16px; border-bottom: 1px solid #E8E5EC; }
+td { padding: 10px 16px; border-bottom: 1px solid #F3F1F6; }
+td a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
+td a:hover { text-decoration: underline; }
+tr:last-child td { border-bottom: none; }
+
+/* ── Guide pill strips (both historical spellings) ── */
+.guides-strip, .guidesStrip { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.guides-strip a, .guidesStrip a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 8px 16px; text-decoration: none; }
+.guides-strip a:hover, .guidesStrip a:hover { border-color: #6B3FA0; }
+
+/* ── Footer ── */
+.site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
+.site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
+.site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
+.site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.site-footer nav a { font-weight: 600; text-decoration: none; }
+.site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
+
+@media print {
+  body { background: #fff; }
+  .topbar .btn-try, .sitenav, .guides-strip, .guidesStrip, .site-footer { display: none !important; }
+}
