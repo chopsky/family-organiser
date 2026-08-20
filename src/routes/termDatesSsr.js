@@ -532,11 +532,17 @@ function buildNearbyHtml(authority, allLive) {
   takeCyclic(others.filter((a) => a.region && a.region === authority.region));
   if (pick.length < 6) takeCyclic(others);
   if (!pick.length) return '';
+  // A council that belongs to a region hub leads its mesh with the
+  // whole-region comparison - the link a borough visitor actually wants.
+  const hubSlug = hubForAuthority(authority);
+  const hubLink = hubSlug
+    ? `<a href="/school-term-dates/${hubSlug}"><strong>${esc(HUB_DEFS[hubSlug].name)}: ${esc(HUB_DEFS[hubSlug].label)} compared →</strong></a>`
+    : '';
   return `
     <nav class="nearby" aria-label="More council term dates">
       <h2>More UK council term dates</h2>
       <div class="nearby-grid">
-        ${pick.map((a) => `<a href="/school-term-dates/${esc(a.slug)}">${esc(a.name)}</a>`).join('\n        ')}
+        ${hubLink}${pick.map((a) => `<a href="/school-term-dates/${esc(a.slug)}">${esc(a.name)}</a>`).join('\n        ')}
       </div>
       <p class="nearby-all"><a href="/school-term-dates/">Browse all UK councils →</a></p>
     </nav>`;
@@ -606,6 +612,16 @@ const FOOTER_HTML = `
         <a href="/school-term-dates/easter-holidays">Easter holidays</a>
         <a href="/school-term-dates/summer-holidays">Summer holidays</a>
         <a href="/school-term-dates/about-this-data">About this data</a>
+      </nav>
+      <nav class="guides" aria-label="Compare term dates by region">
+        <a href="/school-term-dates/london">London</a>
+        <a href="/school-term-dates/greater-manchester">Greater Manchester</a>
+        <a href="/school-term-dates/west-midlands">West Midlands</a>
+        <a href="/school-term-dates/merseyside">Merseyside</a>
+        <a href="/school-term-dates/west-yorkshire">West Yorkshire</a>
+        <a href="/school-term-dates/south-yorkshire">South Yorkshire</a>
+        <a href="/school-term-dates/north-east">North East</a>
+        <a href="/school-term-dates/wales">Wales</a>
       </nav>
       <nav>
         <a href="https://housemait.com">Family organiser app</a>
@@ -1075,6 +1091,17 @@ const HUB_DEFS = {
   },
 };
 const HUB_SLUGS = Object.keys(HUB_DEFS);
+
+// slug -> its hub, for the contextual "compare the whole region" link on
+// council pages. Region-membership hubs (Wales) resolve at request time.
+const SLUG_TO_HUB = {};
+for (const [hubSlug, def] of Object.entries(HUB_DEFS)) {
+  (def.slugs || []).forEach((s) => { SLUG_TO_HUB[s] = hubSlug; });
+}
+function hubForAuthority(authority) {
+  if (authority.region === 'Wales') return 'wales';
+  return SLUG_TO_HUB[authority.slug] || null;
+}
 
 function hubMembers(def, authorities) {
   if (def.membersBy === 'region') return authorities.filter((a) => a.region === def.region);
