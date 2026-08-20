@@ -21,6 +21,9 @@
     @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
     @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
     * { box-sizing: border-box; }
+    /* .ccard's display:flex would otherwise beat the UA's [hidden] rule,
+       silently breaking every show/hide filter on this page. */
+    [hidden] { display: none !important; }
     html, body { margin: 0; padding: 0; background: #FBF8F3; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
     a { color: #6B3FA0; }

@@ -73,19 +73,28 @@
 
   function lookupPostcode(pc) {
     var seq = ++postcodeSeq;
+    if (countEl) countEl.textContent = 'Looking up ' + pc.toUpperCase() + '\u2026';
     fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(pc.replace(/\s+/g, '')))
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (seq !== postcodeSeq) return; // a newer keystroke superseded this lookup
         var d = res && res.result;
-        if (!d) { apply(); return; }
+        if (!d) {
+          apply();
+          if (countEl) countEl.textContent = pc.toUpperCase() + " doesn't look like a live UK postcode \u2014 try the council name instead.";
+          return;
+        }
         var candidates = [d.admin_county, d.admin_district].filter(Boolean).map(normName);
         var match = null;
         cards.forEach(function (card) {
           var name = normName(card.getAttribute('data-name'));
           if (!match && candidates.some(function (c) { return c === name || c.indexOf(name) === 0 || name.indexOf(c) === 0; })) match = card;
         });
-        if (!match) { apply(); return; }
+        if (!match) {
+          apply();
+          if (countEl) countEl.textContent = 'No council page matched ' + pc.toUpperCase() + ' \u2014 try searching by council name.';
+          return;
+        }
         cards.forEach(function (card) { card.hidden = card !== match; });
         sections.forEach(function (sec) { sec.hidden = !sec.querySelector('.ccard:not([hidden])'); });
         if (countEl) countEl.textContent = 'Your council for ' + pc.toUpperCase() + ': ' + match.querySelector('.cname').textContent;
