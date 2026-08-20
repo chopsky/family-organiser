@@ -440,8 +440,8 @@ describe('region hub pages', () => {
   });
   afterEach(() => jest.useRealTimers());
 
-  it('greater-manchester compares only its member councils', async () => {
-    const res = await request(app()).get('/school-term-dates/greater-manchester');
+  it('north-west compares only its member councils', async () => {
+    const res = await request(app()).get('/school-term-dates/north-west');
     expect(res.status).toBe(200);
     expect(res.text).toContain('href="/school-term-dates/manchester"');
     expect(res.text).toContain('href="/school-term-dates/wigan"');
@@ -460,7 +460,7 @@ describe('region hub pages', () => {
 
   it('falls through when no members are listable', async () => {
     laDb.listAllAuthorities.mockResolvedValue([]);
-    const res = await request(app()).get('/school-term-dates/merseyside');
+    const res = await request(app()).get('/school-term-dates/east-midlands');
     expect(res.status).toBe(404);
   });
 });
@@ -544,7 +544,7 @@ describe('site navigation', () => {
 
 
 describe('regional coverage', () => {
-  const { HUB_DEFS, REGION_SLUGS, METRO_SLUGS } = require('./termDatesSsr').__testables || {};
+  const { HUB_DEFS, REGION_SLUGS } = require('./termDatesSsr').__testables || {};
 
   it('every English council belongs to exactly one ONS region', () => {
     if (!HUB_DEFS) return; // exported only for tests
@@ -558,15 +558,19 @@ describe('regional coverage', () => {
     expect(seen.size).toBe(152); // 154 England rows minus 2 offshore buckets
   });
 
-  it('every metro sub-area sits inside a real region', () => {
+  it('there is exactly one region layer - no overlapping sub-areas', () => {
     if (!HUB_DEFS) return;
-    for (const slug of METRO_SLUGS) {
-      const parent = HUB_DEFS[slug].parent;
-      expect(REGION_SLUGS).toContain(parent);
-      // and each of its councils is in that parent region
-      for (const c of HUB_DEFS[slug].slugs) {
-        expect(HUB_DEFS[parent].slugs).toContain(c);
-      }
+    // Every hub is an ONS region; nothing carries a parent, so no council can
+    // belong to two areas (the reason the metro layer was retired).
+    expect(REGION_SLUGS).toHaveLength(10);
+    for (const slug of REGION_SLUGS) expect(HUB_DEFS[slug].parent).toBeUndefined();
+  });
+
+  it('the retired metro slugs redirect rather than 404', async () => {
+    for (const slug of ['greater-manchester', 'merseyside', 'west-yorkshire', 'south-yorkshire']) {
+      const res = await request(app()).get(`/school-term-dates/${slug}`);
+      expect(res.status).toBe(301);
+      expect(res.headers.location).toMatch(/^\/school-term-dates\/(north-west|yorkshire-and-the-humber)$/);
     }
   });
 });
