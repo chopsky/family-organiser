@@ -683,6 +683,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 30px; }
     .topbar img { height: 26px; width: auto; display: block; }
     .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+${SITENAV_CSS}
     .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
     .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
     .btn-try:hover { background: #5A3488; color: #FFFFFF; }
@@ -766,8 +767,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   </style>${GA_SNIPPET}
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}
-    <a class="crumb" href="/school-term-dates/">← All UK school term dates</a>
+  <div class="wrap">${HEADER_HTML}${navBar('councils')}
     <h1>${esc(h1)}</h1>
     <p class="sub">${esc(sub)}</p>
     ${countdownHtml}
@@ -903,6 +903,21 @@ function seasonalNarrative(def, defs, result) {
   return { intro, faq };
 }
 
+const SITENAV_CSS = `
+    .sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
+    .sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
+    .sitenav summary::-webkit-details-marker { display: none; }
+    .sitenav summary::after { content: '\\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
+    .sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
+    .sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
+    .navdrop { position: relative; }
+    .navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
+    .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
+    .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
+    .navdrop .panel a[aria-current] { background: #F3EDFC; color: #6B3FA0; }
+    @media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
+    @media print { .sitenav { display: none !important; } }`;
+
 const SEASONAL_CSS = `
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; background: #FBF8F3; color: #2D2A33; line-height: 1.6; }
@@ -910,6 +925,7 @@ const SEASONAL_CSS = `
     .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
     .topbar img { height: 26px; width: auto; display: block; }
     .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+${SITENAV_CSS}
     .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
     .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 12px; background: #6B3FA0; color: #fff; font-weight: 600; font-size: 13.5px; text-decoration: none; }
     .crumb { display: inline-block; font-size: 13px; color: #6B3FA0; text-decoration: none; font-weight: 600; margin-bottom: 14px; }
@@ -994,8 +1010,7 @@ function seasonalPage(slug, result) {
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}
-    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+  <div class="wrap">${HEADER_HTML}${navBar('dates', slug)}
     <h1>${esc(def.h1)}</h1>
     <p class="sub">${esc(def.sub)}</p>
     <div class="prose">${intro}</div>
@@ -1030,8 +1045,7 @@ function aboutPage(stats) {
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}
-    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+  <div class="wrap">${HEADER_HTML}${navBar('about')}
     <h1>About this data</h1>
     <p class="sub">What this directory is, where every date comes from, and what you should still double-check.</p>
     <div class="prose">
@@ -1179,8 +1193,7 @@ function hubPage(hubSlug, members, entries) {
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}
-    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+  <div class="wrap">${HEADER_HTML}${navBar('regions', hubSlug)}
     <h1>${esc(def.name)} school term dates, side by side</h1>
     <p class="sub">The ${esc(defs.ayLabel)} school year for ${esc(def.label)}, compared in one table - from each council's own published calendar.</p>
     <div class="prose"><p>${aligned}${def.note ? ` ${esc(def.note)}` : ''} Council dates formally apply to community and voluntary-controlled schools - academies and free schools set their own, usually close by. Click any council for its full calendar, source link and free add-to-phone download.</p></div>
@@ -1260,8 +1273,7 @@ function bankHolidayPage(annotated, defs) {
   </style>${GA_SNIPPET}
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}
-    <a class="crumb" href="/school-term-dates/">&larr; All UK school term dates</a>
+  <div class="wrap">${HEADER_HTML}${navBar('dates', 'bank-holidays')}
     <h1>Bank holidays and the school year</h1>
     <p class="sub">Every England &amp; Wales bank holiday to summer ${defs.y2} - and whether it's a genuine extra day off school, or falls when children are on holiday anyway. Dates from GOV.UK; school calendars from each council's own published dates.</p>
     <div class="gcards one-col">${rows}</div>
@@ -1273,6 +1285,36 @@ function bankHolidayPage(annotated, defs) {
 </body>
 </html>`;
 }
+
+
+// ── Site navigation ─────────────────────────────────────────────────────────
+// One slim bar on every page: All councils · Key dates ▾ · Regions ▾ · About.
+// The dropdowns are native <details> disclosures - no JS, keyboard and mobile
+// friendly - grouping what used to be a 15-pill blob into its two natural
+// families. Active page gets the plum-light pill (the app's nav convention).
+
+function navBar(active, activeSlug) {
+  const defs = seasonalDefs();
+  const cur = (k) => (active === k ? ' aria-current="page"' : '');
+  const curLink = (s) => (activeSlug === s ? ' aria-current="page"' : '');
+  const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].h1)}</a>`).join('')
+    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`;
+  const regionLinks = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(HUB_DEFS[s].name)}</a>`).join('');
+  return `
+    <nav class="sitenav" aria-label="Term dates sections">
+      <a href="/school-term-dates/"${cur('councils')}>All councils</a>
+      <details class="navdrop"${active === 'dates' ? ' data-active="1"' : ''}>
+        <summary>Key dates</summary>
+        <div class="panel">${dateLinks}</div>
+      </details>
+      <details class="navdrop"${active === 'regions' ? ' data-active="1"' : ''}>
+        <summary>Regions</summary>
+        <div class="panel">${regionLinks}</div>
+      </details>
+      <a href="/school-term-dates/about-this-data"${cur('about')}>About</a>
+    </nav>`;
+}
+
 
 // GA-aware CSP for every term-dates response (harmless on .ics/xml).
 router.use((req, res, next) => {

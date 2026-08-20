@@ -504,3 +504,40 @@ describe('bank holidays page', () => {
     expect(res.status).toBe(404);
   });
 });
+
+
+describe('site navigation', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-08-19T12:00:00Z'));
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England',
+      import_status: 'ok', date_count: 40, source_url: 'https://example.gov.uk/terms',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+    ]);
+    laDb.listAllAuthorities.mockResolvedValue([
+      { id: 'la1', name: 'Hertfordshire', slug: 'hertfordshire', region: 'England', import_status: 'ok', date_count: 40 },
+    ]);
+    laDb.listAllEntries.mockResolvedValue([
+      { la_id: 'la1', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+    ]);
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('council pages carry the nav bar with both dropdowns', async () => {
+    const res = await request(app()).get('/school-term-dates/hertfordshire');
+    expect(res.text).toContain('class="sitenav"');
+    expect(res.text).toContain('<summary>Key dates</summary>');
+    expect(res.text).toContain('<summary>Regions</summary>');
+    expect(res.text).toContain('href="/school-term-dates/london"');
+  });
+
+  it('the active seasonal page is marked in the nav', async () => {
+    const res = await request(app()).get('/school-term-dates/when-do-schools-go-back');
+    expect(res.status).toBe(200);
+    // Its dropdown group is highlighted and its own link carries aria-current.
+    expect(res.text).toContain('data-active="1"');
+    expect(res.text).toMatch(/href="\/school-term-dates\/when-do-schools-go-back" aria-current="page"/);
+  });
+});

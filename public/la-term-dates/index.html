@@ -33,6 +33,21 @@
     .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 34px; }
     .topbar img { height: 26px; width: auto; display: block; }
     .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+    .sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 24px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
+    .sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
+    .sitenav summary::-webkit-details-marker { display: none; }
+    .sitenav summary::after { content: '\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
+    .sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
+    .sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
+    .navdrop { position: relative; }
+    .navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
+    .navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
+    .navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
+    @media (max-width: 640px) { .navdrop .panel { position: static; box-shadow: none; border: none; padding: 2px 0 4px 12px; min-width: 0; } }
+    .popular { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 2px 0 14px; }
+    .popLabel { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #6B6774; margin-right: 2px; }
+    .popular a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #FFFFFF; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 7px 14px; text-decoration: none; }
+    .popular a:hover { border-color: #6B3FA0; }
     .lockup { font-family: 'Recoleta', Georgia, serif; font-size: 19px; color: #6B3FA0; border-left: 1px solid #E8E5EC; padding-left: 10px; line-height: 1.1; white-space: nowrap; }
     .btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
     .btn-try:hover { background: #5A3488; color: #FFFFFF; }
@@ -106,7 +121,35 @@
       <a class="btn-try" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
     </div>
     <header>
-      <h1>School term &amp; holiday dates</h1>
+      <nav class="sitenav" aria-label="Term dates sections">
+      <a href="/school-term-dates/" aria-current="page">All councils</a>
+      <details class="navdrop">
+        <summary>Key dates</summary>
+        <div class="panel">
+          <a href="/school-term-dates/when-do-schools-go-back">When do schools go back in September 2026?</a>
+          <a href="/school-term-dates/october-half-term">October half term 2026, council by council</a>
+          <a href="/school-term-dates/february-half-term">February half term 2027, council by council</a>
+          <a href="/school-term-dates/easter-holidays">Easter school holidays 2027, council by council</a>
+          <a href="/school-term-dates/summer-holidays">When do schools break up for summer 2027?</a>
+          <a href="/school-term-dates/bank-holidays">Bank holidays</a>
+        </div>
+      </details>
+      <details class="navdrop">
+        <summary>Regions</summary>
+        <div class="panel">
+          <a href="/school-term-dates/london">London</a>
+          <a href="/school-term-dates/greater-manchester">Greater Manchester</a>
+          <a href="/school-term-dates/west-midlands">West Midlands</a>
+          <a href="/school-term-dates/merseyside">Merseyside</a>
+          <a href="/school-term-dates/west-yorkshire">West Yorkshire</a>
+          <a href="/school-term-dates/south-yorkshire">South Yorkshire</a>
+          <a href="/school-term-dates/north-east">North East</a>
+          <a href="/school-term-dates/wales">Wales</a>
+        </div>
+      </details>
+      <a href="/school-term-dates/about-this-data">About</a>
+    </nav>
+    <h1>School term &amp; holiday dates</h1>
       <p class="lede">Term dates published by every UK local education authority, in one searchable place. Sourced from each council's own pages and refreshed monthly.</p>
     </header>
 
@@ -122,24 +165,15 @@
       </div>
     </div>
 
-    <nav class="guidesStrip topStrip" aria-label="Term-date guides">
+    <nav class="popular" aria-label="Key dates">
+      <span class="popLabel">Key dates:</span>
       <a href="/school-term-dates/when-do-schools-go-back">When do schools go back?</a>
       <a href="/school-term-dates/october-half-term">October half term</a>
       <a href="/school-term-dates/february-half-term">February half term</a>
       <a href="/school-term-dates/easter-holidays">Easter holidays</a>
       <a href="/school-term-dates/summer-holidays">Summer holidays</a>
-      <a href="/school-term-dates/london">London</a>
-      <a href="/school-term-dates/greater-manchester">Greater Manchester</a>
-      <a href="/school-term-dates/west-midlands">West Midlands</a>
-      <a href="/school-term-dates/merseyside">Merseyside</a>
-      <a href="/school-term-dates/west-yorkshire">West Yorkshire</a>
-      <a href="/school-term-dates/south-yorkshire">South Yorkshire</a>
-      <a href="/school-term-dates/north-east">North East</a>
-      <a href="/school-term-dates/wales">Wales</a>
       <a href="/school-term-dates/bank-holidays">Bank holidays</a>
-      <a href="/school-term-dates/about-this-data">About this data</a>
     </nav>
-
     <p class="countline" id="countLine"><!--SSR:COUNT--></p>
 
     <nav class="letters" id="letterNav" aria-label="Jump to letter"><!--SSR:LETTERS--></nav>
