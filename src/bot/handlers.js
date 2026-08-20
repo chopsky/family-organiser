@@ -2963,6 +2963,32 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
   const schoolTermDates = summariseSchoolTermDates(householdSchools, termDates);
 
+  // Each child's existing weekly activities, so the classifier can apply
+  // THE DUPLICATE PRINCIPLE (a same-name activity means change/update, not
+  // a silent second "add"). One indexed query; compact one-line-per-child.
+  let schoolActivities = '';
+  try {
+    const allActivities = (await db.getHouseholdActivities(household.id)) || [];
+    if (allActivities.length) {
+      const DAYS = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
+      const todayYmd = new Date().toISOString().slice(0, 10);
+      const byChild = new Map();
+      for (const a of allActivities) {
+        const kid = household.members.find((m) => m.id === a.child_id);
+        if (!kid) continue;
+        const status = a.end_date && a.end_date < todayYmd
+          ? `paused, term ended ${a.end_date}`
+          : (!a.start_date && !a.end_date ? 'all year' : 'this term');
+        const time = a.time_start ? ` ${String(a.time_start).slice(0, 5)}` : '';
+        if (!byChild.has(kid.name)) byChild.set(kid.name, []);
+        byChild.get(kid.name).push(`${a.activity} (${DAYS[a.day_of_week] || '?'}${time}, ${status})`);
+      }
+      schoolActivities = [...byChild.entries()]
+        .map(([name, list]) => `${name}: ${list.join('; ')}`)
+        .join('\n');
+    }
+  } catch { /* context garnish - never block the message */ }
+
   // Conditional wider context (Phase 3): the meal plan, shopping list and
   // kids' star balances are fetched ONLY when the message plausibly needs
   // them (keyword gates in utils/context-relevance.js — same pattern as the
@@ -3012,7 +3038,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
 
   console.log(`[handlers] Classifying "${text.slice(0, 60)}" with ${calendarEvents.length} events, ${openTasks.length} open tasks, ${notes.length} notes, ${history.length} history turns`);
-  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, preferences, mealPlan, shoppingItems: shoppingContext, starBalances, choresToday });
+  const result = await classify(text, memberNames, notes, { householdId: household.id, userId: user.id, sender: user.name, calendarEvents, tasks: openTasks, timezone: userTz, history, address: household.address, schoolTermDates, schoolActivities, preferences, mealPlan, shoppingItems: shoppingContext, starBalances, choresToday });
 
   console.log('[handlers] Classified intent:', result.intent, 'for message:', text.slice(0, 50));
 
@@ -3527,6 +3553,44 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         if (start) bits.push(`at ${start}`);
         if (sa.pickup_name) bits.push(`${sa.pickup_name} collects`);
         return { response: result.response_message || `🏫 Changed ${child.name}'s ${match.activity} on ${sa.skip_date}${bits.length ? ` (${bits.join(', ')})` : ''} - just that day. ✅`, actions };
+      } else if (sa.action === 'update') {
+        // Permanent change to the series - new day, new regular time, new
+        // pickup ("piano is moving to Wednesdays", "swimming is 5pm from
+        // now on"). Prefer the LIVE same-name activity; fall back to a
+        // paused one, whose window we clear (an update means it's
+        // evidently running again). Nothing matching = the model
+        // misjudged; create it rather than fail the parent.
+        const todayYmd = new Date().toISOString().slice(0, 10);
+        const activities = await db.getChildActivities(child.id);
+        const twins = activities.filter(a =>
+          a.activity.toLowerCase() === String(sa.activity || '').toLowerCase());
+        const target = twins.find(a => !a.end_date || a.end_date >= todayYmd) || twins[0];
+        if (target) {
+          const fields = {};
+          if (sa.day_of_week !== undefined && sa.day_of_week !== null) fields.day_of_week = sa.day_of_week;
+          if (sa.time_start) fields.time_start = sa.time_start;
+          if (sa.time_end) fields.time_end = sa.time_end;
+          if (sa.pickup_name) {
+            const pick = household.members.find(m => m.name.toLowerCase() === String(sa.pickup_name).toLowerCase());
+            if (pick) fields.pickup_member_id = pick.id;
+          }
+          if (target.end_date && target.end_date < todayYmd) {
+            fields.start_date = null;
+            fields.end_date = null;
+            fields.term_label = null;
+          }
+          await db.updateChildActivity(target.id, fields);
+          const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][fields.day_of_week ?? target.day_of_week];
+          const at = fields.time_start || (target.time_start ? String(target.time_start).slice(0, 5) : null);
+          return { response: result.response_message || `🏫 Updated ${child.name}'s ${target.activity} - now ${dayName}s${at ? ` at ${at}` : ''}. ✅`, actions };
+        }
+        await db.addChildActivity({
+          child_id: child.id,
+          day_of_week: sa.day_of_week,
+          activity: sa.activity,
+          time_start: sa.time_start || null,
+          time_end: sa.time_end || null,
+        });
       } else if (sa.action === 'remove') {
         // Find and remove the activity
         const activities = await db.getChildActivities(child.id);

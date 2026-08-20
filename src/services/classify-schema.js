@@ -170,7 +170,7 @@ const CLASSIFY_SCHEMA = obj({
     child_name: str,
     activity: str,
     day_of_week: int,
-    action: en(['add', 'remove', 'skip', 'change']),
+    action: en(['add', 'remove', 'skip', 'change', 'update']),
     time_start: opt(str),
     time_end: opt(str),
     skip_date: opt(str),

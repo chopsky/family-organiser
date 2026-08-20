@@ -29,7 +29,7 @@ function todayInTimezone(timezone) {
   }
 }
 
-async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [], choresToday = [] } = {}) {
+async function classify(message, memberNames = [], notes = [], { householdId, userId, sender, calendarEvents = [], tasks = [], timezone, history = [], address = null, schoolTermDates = '', schoolActivities = '', preferences = [], mealPlan = [], shoppingItems = [], starBalances = [], choresToday = [] } = {}) {
   // "Today" needs to be computed in the user's timezone, not UTC, or
   // we drift on either side of midnight (a 23:30 BST message gets
   // tagged "tomorrow" by a UTC-only Railway). Also include the weekday
@@ -172,6 +172,7 @@ async function classify(message, memberNames = [], notes = [], { householdId, us
     .replace(/{{CALENDAR_EVENTS}}/g, calendarStr)
     .replace(/{{TASKS}}/g, tasksStr)
     .replace(/{{SCHOOL_TERM_DATES}}/g, schoolTermDates || '(none)')
+    .replace(/{{SCHOOL_ACTIVITIES}}/g, schoolActivities || '(none)')
     .replace(/{{EXTRA_CONTEXT}}/g, extraContextStr);
 
   const systemPrompt = [

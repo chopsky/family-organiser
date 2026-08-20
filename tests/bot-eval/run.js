@@ -35,6 +35,7 @@ async function runCase(c) {
     {
       sender: c.ctx.sender,
       tasks: c.ctx.tasks || [],
+      schoolActivities: c.ctx.schoolActivities || '',
       calendarEvents: c.ctx.calendarEvents || [],
       history: c.ctx.history || [],
       preferences: c.ctx.preferences || [],

@@ -400,7 +400,13 @@ module.exports = [
   {
     name: 'activity change: "piano is at 4pm today" is a one-date CHANGE, not a series update or skip',
     message: "Mason's piano is at 4pm today",
-    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Mason'] },
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      // The household really has piano - without this the new activities
+      // context reads "(none)" and "change" looks impossible to the model.
+      schoolActivities: 'Mason: piano (Thursdays 15:30, this term)',
+    },
     check: (r) => {
       if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
       const sa = r.school_activity;
@@ -410,6 +416,85 @@ module.exports = [
       if (sa.skip_date !== today) return `expected skip_date ${today}, got ${sa.skip_date}`;
       if (sa.time_start !== '16:00') return `expected time_start 16:00, got ${sa.time_start}`;
       if (!/piano/i.test(sa.activity || '')) return `wrong activity: "${sa.activity}"`;
+      return null;
+    },
+  },
+  {
+    name: 'duplicate principle: teacher-call reschedule of an EXISTING activity is a one-date change, not a second series (real failure 2026-08-20)',
+    message: 'Mason has piano on Thursday at 13:00',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: piano (Thursdays 16:00, all year)',
+    },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action === 'add') return 'chose "add" despite an existing same-name activity (the duplicate principle)';
+      if (sa.action !== 'change' && sa.action !== 'update') return `expected change or update, got "${sa.action}"`;
+      if (sa.time_start !== '13:00') return `expected time_start 13:00, got ${sa.time_start}`;
+      if (sa.action === 'change' && !/^\d{4}-\d{2}-\d{2}$/.test(sa.skip_date || '')) {
+        return `change without a resolvable skip_date: ${sa.skip_date}`;
+      }
+      return null;
+    },
+  },
+  {
+    name: 'duplicate principle: "moving to Wednesdays" is a permanent series update',
+    message: "Mason's piano is moving to Wednesdays at 14:00 from now on",
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: piano (Thursdays 16:00, all year)',
+    },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'update') return `expected action "update" (permanent move), got "${sa.action}"`;
+      if (sa.day_of_week !== 2) return `expected day_of_week 2 (Wednesday), got ${sa.day_of_week}`;
+      if (sa.time_start !== '14:00') return `expected time_start 14:00, got ${sa.time_start}`;
+      return null;
+    },
+  },
+  {
+    name: 'stated reading: a fresh weekly add names its cadence in the reply',
+    message: 'Mason has karate on Fridays at 5pm',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: piano (Thursdays 16:00, all year)',
+    },
+    check: (r) => {
+      if (r.intent !== 'school_activity') return `expected school_activity, got ${r.intent}`;
+      const sa = r.school_activity;
+      if (!sa) return 'missing school_activity payload';
+      if (sa.action !== 'add') return `expected action "add" (no same-name activity exists), got "${sa.action}"`;
+      if (sa.day_of_week !== 4) return `expected day_of_week 4 (Friday), got ${sa.day_of_week}`;
+      if (!/every|weekly|fridays/i.test(r.response_message || '')) {
+        return `reply must state the recurring reading, got: "${r.response_message}"`;
+      }
+      return null;
+    },
+  },
+  {
+    name: 'one-off stays an event: "this Sunday" gym session is not a weekly activity',
+    message: 'Mason has a gym session this Sunday at 8.30',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason'],
+      schoolActivities: 'Mason: piano (Thursdays 16:00, all year)',
+    },
+    check: (r) => {
+      if (r.intent === 'school_activity') return '"this Sunday" is one date - must not become a weekly activity';
+      if (r.intent !== 'create_event' && r.intent !== 'school_event') {
+        return `expected create_event/school_event, got ${r.intent}`;
+      }
+      const ev = r.calendar_event;
+      if (!ev) return 'missing calendar_event payload';
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ev.date || '')) return `unresolved date: ${ev.date}`;
+      if (new Date(ev.date + 'T12:00:00Z').getUTCDay() !== 0) return `expected a Sunday, got ${ev.date}`;
       return null;
     },
   },
