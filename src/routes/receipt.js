@@ -29,7 +29,7 @@ function parseReceiptDate(raw) {
   const s = raw.trim();
   let y; let mo; let d;
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  const uk = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
+  const uk = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
   if (iso) {
     y = +iso[1]; mo = +iso[2]; d = +iso[3];
   } else if (uk) {

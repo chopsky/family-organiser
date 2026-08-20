@@ -241,7 +241,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       // UNDO link can reverse them. checkedOffSet dedupes if the same
       // list item gets matched by both paths (unlikely but defensible).
       const checkedOffSet = new Set();
-      async function checkOffListItem(listItemId, listItemName) {
+      const checkOffListItem = async (listItemId, listItemName) => {
         if (!listItemId || checkedOffSet.has(listItemId)) return;
         if (!listItemsById[listItemId]) return; // hallucinated UUID - skip
         await db.completeShoppingItemById(listItemId);
@@ -249,7 +249,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
         itemsCheckedOff++;
         actionsTaken.checked_off.push(listItemId);
         actionsTaken.checked_off_names.push(listItemName || listItemsById[listItemId].item);
-      }
+      };
 
       try {
         // Path 1: inline matches from extractFromEmail

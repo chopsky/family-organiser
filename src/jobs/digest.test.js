@@ -23,7 +23,6 @@ function makeTask(overrides = {}) {
   return {
     id: 'task-1',
     title: 'Homework',
-    assigned_to_names: names,
     due_date: TODAY,
     recurrence: 'weekly',
     priority: 'medium',

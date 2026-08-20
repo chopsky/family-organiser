@@ -51,6 +51,7 @@ app.use('/api/inbound-email', inboundEmailRouter);
 
 // The webhook 200s immediately and processes in a detached async block -
 // flush the microtask queue until the mocked pipeline has run.
+/* global setImmediate */
 async function postAndSettle(body) {
   await request(app).post('/api/inbound-email/webhook').send(body).expect(200);
   for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));

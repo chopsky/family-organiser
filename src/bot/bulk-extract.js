@@ -26,7 +26,7 @@
 // normal classifier (no harm); a false positive costs one extra LLM call
 // and still falls through to classify if nothing is extracted. We bias
 // toward catching real schedules without hijacking ordinary chat.
-const DATE_RE = /\b(\d{1,2}[\/.\-]\d{1,2}(?:[\/.\-]\d{2,4})?)\b|\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i;
+const DATE_RE = /\b(\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?)\b|\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i;
 const TIME_RE = /\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?(?:am|pm)\b/i;
 const KEYWORD_RE = /\b(fixture|fixtures|match|kick.?off|venue|squad|team\s?sheet|practice|training|rehearsal|parents?.?evening|inset|half.?term|sports\s?day|nativity|concert|assembly|deadline|due|term\s?dates?|trip|swimming|cricket|football|rugby|netball|hockey|tournament)\b/i;
 

@@ -36,7 +36,7 @@ function buildReminderMessage(sub) {
   return [
     `💳 *${sub.name}*${priceClause} renews on *${renewLabel}*.`,
     '',
-    `If you want to skip this one, cancel before then. Reply _"I cancelled ${sub.name}"_ and I\'ll stop tracking it.`,
+    `If you want to skip this one, cancel before then. Reply _"I cancelled ${sub.name}"_ and I'll stop tracking it.`,
   ].join('\n');
 }
 

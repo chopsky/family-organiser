@@ -26,7 +26,6 @@ function makeEvent(overrides = {}) {
     start_time: '2026-05-15T09:30:00.000Z',
     end_time: '2026-05-15T10:30:00.000Z',
     all_day: false,
-    assigned_to_names: names,
     assignees: null,
     category: 'general',
     ...rest,

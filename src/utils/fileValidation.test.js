@@ -61,12 +61,13 @@ describe('validateUpload()', () => {
     });
 
     test('attaches statusCode 415 to thrown errors', () => {
+      let thrown;
       try {
         validateUpload(Buffer.from(''), 'evil.exe');
-        fail('expected throw');
       } catch (err) {
-        expect(err.statusCode).toBe(415);
+        thrown = err;
       }
+      expect(thrown?.statusCode).toBe(415);
     });
   });
 
