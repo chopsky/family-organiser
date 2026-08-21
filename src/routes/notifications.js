@@ -128,4 +128,39 @@ router.put('/preferences', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/notifications
+ * This user's notification centre: the full text of every push we sent
+ * them (the OS truncates; this doesn't), newest first, plus the unread
+ * count for the bell badge. Empty + zero while the migration is pending.
+ */
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const [notifications, unread] = await Promise.all([
+      db.getNotifications(req.user.id, { limit: 50 }),
+      db.getUnreadNotificationCount(req.user.id),
+    ]);
+    return res.json({ notifications, unread });
+  } catch (err) {
+    console.error('GET /api/notifications error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/notifications/read
+ * Body: { id } to mark one read, or {} to mark every unread one read.
+ * Scoped to the caller - an id from someone else's inbox matches nothing.
+ */
+router.post('/read', requireAuth, async (req, res) => {
+  try {
+    await db.markNotificationsRead(req.user.id, req.body?.id || null);
+    const unread = await db.getUnreadNotificationCount(req.user.id);
+    return res.json({ success: true, unread });
+  } catch (err) {
+    console.error('POST /api/notifications/read error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

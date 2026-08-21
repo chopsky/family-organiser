@@ -291,6 +291,49 @@ function ReferralGiftCard() {
   );
 }
 
+// ── Notification bell ───────────────────────────────────────────
+// Opens the notification centre, with the coral unread dot from the
+// design system. The tab bar's five slots are sacred, so the entry
+// point lives in the Dashboard header.
+
+function NotificationBell() {
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => api.get('/notifications')
+      .then(({ data }) => { if (!cancelled) setUnread(data?.unread || 0); })
+      .catch(() => {});
+    load();
+    // The centre marks everything read on open; clear the dot without a refetch.
+    const clear = () => setUnread(0);
+    window.addEventListener('housemait:notifications-read', clear);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('housemait:notifications-read', clear);
+    };
+  }, []);
+
+  return (
+    <Link
+      to="/notifications"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+      className="relative flex-shrink-0 w-10 h-10 rounded-full bg-linen flex items-center justify-center hover:bg-[#F3EEE5] transition-colors"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-plum)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+      {unread > 0 && (
+        <span
+          className="absolute top-1.5 right-1.5 w-[7px] h-[7px] rounded-full"
+          style={{ background: 'var(--color-coral)', border: '1.5px solid var(--color-white)' }}
+        />
+      )}
+    </Link>
+  );
+}
+
 // ── Holiday-pause card ──────────────────────────────────────────
 // When a child's term-windowed weekly activities slip past their end_date
 // they pause silently - right for school clubs, wrong for the gym lesson
@@ -909,17 +952,20 @@ export default function Dashboard() {
           the home-screen greeting keeps its editorial 38/52px treatment.
           On mobile this block IS the page header (the Layout logo bar is
           gone). */}
-      <div className="mb-4 md:mb-2">
-        <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
-          {todayStr}
-          {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
+      <div className="mb-4 md:mb-2 flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+            {todayStr}
+            {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
+          </div>
+          <h1
+            className="m-0 text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
+            style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
+          >
+            {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}. 👋
+          </h1>
         </div>
-        <h1
-          className="m-0 text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
-          style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
-        >
-          {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}. 👋
-        </h1>
+        {!childMode && <NotificationBell />}
       </div>
 
       {/* Setup nudges - phone placement: first item in the feed, under the

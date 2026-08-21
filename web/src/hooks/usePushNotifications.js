@@ -61,7 +61,13 @@ export default function usePushNotifications(user) {
           const data = action.notification?.data;
           if (data?.url) {
             window.location.href = data.url;
+            return;
           }
+          // No explicit url (almost every push we send): open the
+          // notification centre, where the full untruncated text lives.
+          // Tapping used to do nothing at all - the message existed only
+          // on the lock screen (founder report 2026-08-21).
+          window.location.href = '/notifications';
         });
 
         cleanup = () => {

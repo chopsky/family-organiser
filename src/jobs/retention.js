@@ -49,6 +49,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const HOUSEHOLD_INACTIVE_RETENTION_DAYS = 365;   // 12 months - spec §9
 const ORPHAN_HOUSEHOLD_MIN_AGE_DAYS = 30;        // don't nuke brand-new signups mid-onboarding
 const AUDIT_LOG_IP_RETENTION_DAYS = 90;          // IP / user-agent fields only, not the row itself
+const NOTIFICATION_RETENTION_DAYS = 30;          // in-app notification centre (a re-read buffer, not an archive)
 
 /**
  * Delete rows from a table where `column < cutoff`. Logs the count. Errors
@@ -267,6 +268,12 @@ async function runRetentionCleanup() {
     sweep('whatsapp_message_log', 'created_at', ninetyDaysAgo, 'WhatsApp log 90d'),
     sweep('ai_usage_log',         'created_at', ninetyDaysAgo, 'AI usage log 90d'),
   ]);
+
+  // In-app notification centre: 30 days. It's a re-read buffer for pushes
+  // already delivered, not an archive - the underlying events (calendar,
+  // tasks, notes) remain in the app.
+  const thirtyDaysAgo = new Date(now - NOTIFICATION_RETENTION_DAYS * MS_PER_DAY).toISOString();
+  await sweep('notifications', 'created_at', thirtyDaysAgo, 'notification centre 30d');
 
   // Expired auth-flow tokens (all of these store an expires_at column).
   const [email, password, whatsapp, refresh] = await Promise.all([

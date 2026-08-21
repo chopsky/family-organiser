@@ -57,6 +57,7 @@ const School          = lazy(() => import('./pages/School'));
 const Settings        = lazy(() => import('./pages/Settings'));
 const Documents       = lazy(() => import('./pages/Documents'));
 const KidNotesArchive = lazy(() => import('./pages/KidNotesArchive'));
+const Notifications = lazy(() => import('./pages/Notifications'));
 const Privacy         = lazy(() => import('./pages/Privacy'));
 const Terms           = lazy(() => import('./pages/Terms'));
 const Support         = lazy(() => import('./pages/Support'));
@@ -321,6 +322,7 @@ function AppRoutes() {
         {/* Kids' notes archive - adult-only; in Child Mode the ChildGate
             redirects /notes to the kids' home (it's not a CHILD_OPEN route). */}
         <Route path="/notes" element={<RequireAuth><ChildGate><Layout><KidNotesArchive /></Layout></ChildGate></RequireAuth>} />
+        <Route path="/notifications" element={<RequireAuth><ChildGate><Layout><Notifications /></Layout></ChildGate></RequireAuth>} />
         <Route path="/family" element={<RequireAuth><ChildGate><Layout><FamilySetup /></Layout></ChildGate></RequireAuth>} />
         <Route path="/school" element={<RequireAuth><ChildGate><Layout><School /></Layout></ChildGate></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><ChildGate><Layout><Settings /></Layout></ChildGate></RequireAuth>} />

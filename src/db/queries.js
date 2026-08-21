@@ -8870,6 +8870,73 @@ async function unregisterDeviceToken(token) {
   return data;
 }
 
+// ─── In-app notification centre ──────────────────────────────────────────────
+// The durable copy of every push we send (push itself is fire-and-forget and
+// the OS truncates long bodies). All of these degrade to a no-op / empty list
+// when migration-notifications.sql hasn't been run yet - a missing table must
+// never break a send or blank the Dashboard.
+
+async function recordNotifications(rows) {
+  if (!rows || rows.length === 0) return 0;
+  try {
+    const { error } = await supabase.from('notifications').insert(rows);
+    if (error) throw error;
+    return rows.length;
+  } catch (err) {
+    console.warn('[notifications] record skipped:', err.message);
+    return 0;
+  }
+}
+
+async function getNotifications(userId, { limit = 50 } = {}) {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('[notifications] list unavailable:', err.message);
+    return [];
+  }
+}
+
+async function getUnreadNotificationCount(userId) {
+  try {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .is('read_at', null);
+    if (error) throw error;
+    return count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Mark one notification read, or all of this user's when id is omitted.
+// Always scoped by user_id: an id from another user's inbox matches nothing.
+async function markNotificationsRead(userId, notificationId = null) {
+  try {
+    let q = supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('read_at', null);
+    if (notificationId) q = q.eq('id', notificationId);
+    const { error } = await q;
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.warn('[notifications] mark-read skipped:', err.message);
+    return false;
+  }
+}
+
 async function getActiveDeviceTokens(userId) {
   const { data, error } = await supabase
     .from('device_tokens')
@@ -10702,6 +10769,10 @@ module.exports = {
   registerDeviceToken,
   unregisterDeviceToken,
   getActiveDeviceTokens,
+  recordNotifications,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationsRead,
   getDeviceTokensForUserAdmin,
   getSetupNudgeCandidates,
   getHouseholdDeviceTokens,

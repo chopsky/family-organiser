@@ -101,6 +101,13 @@ async function runHolidayPauseCheck() {
 
       const members = (await db.getHouseholdMembers(householdId)) || [];
       const adults = members.filter((m) => m.member_type === 'account');
+      // Durable in-app copy for every adult, device or not.
+      await push.recordForUsers(adults.map((a) => a.id), {
+        title: 'Paused for the holidays',
+        body,
+        data: { type: 'holiday_pause' },
+        householdId,
+      });
       let sent = 0;
       for (const adult of adults) {
         try {

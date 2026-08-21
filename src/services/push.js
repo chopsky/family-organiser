@@ -481,22 +481,48 @@ async function sendPushNotification(deviceTokens, { title, body, data, badge, so
 /**
  * Send a push notification to a specific user, respecting their preferences.
  */
-async function sendToUser(userId, { title, body, data, category } = {}) {
+/**
+ * Write the durable in-app copy of a notification for each recipient.
+ * Best-effort by design: a failure here must never stop the push, and the
+ * table may not exist yet (migration-notifications.sql pending).
+ */
+async function recordForUsers(userIds, { title, body, data, householdId } = {}) {
+  if (!title || !body || !userIds || userIds.length === 0) return;
+  try {
+    await db.recordNotifications(userIds.map((uid) => ({
+      user_id: uid,
+      household_id: householdId || null,
+      type: data?.type || null,
+      title,
+      body,
+      data: data || null,
+    })));
+  } catch (err) {
+    console.warn('[push] notification record skipped:', err.message);
+  }
+}
+
+async function sendToUser(userId, { title, body, data, category, householdId } = {}) {
+  // NOT gated on push being configured: the in-app centre is the durable
+  // copy and must exist even when APNs/FCM aren't set up or the user has
+  // no device registered. Only a preference opt-out suppresses it.
+  let preferences = null;
+  try {
+    preferences = await db.getNotificationPreferences(userId);
+  } catch { /* unreadable prefs must not lose the notification */ }
+  if (category && !isCategoryEnabled(preferences, category)) {
+    return { sent: 0, failed: 0 };
+  }
+  await recordForUsers([userId], { title, body, data, householdId });
+
   if (!configured && !fcmConfigured) {
     return { sent: 0, failed: 0 };
   }
 
   try {
-    const [tokens, preferences] = await Promise.all([
-      db.getActiveDeviceTokens(userId),
-      db.getNotificationPreferences(userId),
-    ]);
+    const tokens = await db.getActiveDeviceTokens(userId);
 
     if (!tokens || tokens.length === 0) {
-      return { sent: 0, failed: 0 };
-    }
-
-    if (category && !isCategoryEnabled(preferences, category)) {
       return { sent: 0, failed: 0 };
     }
 
@@ -517,6 +543,26 @@ async function sendToUser(userId, { title, body, data, category } = {}) {
  * respecting each member's notification preferences.
  */
 async function sendToHousehold(householdId, excludeUserId, { title, body, data, category } = {}) {
+  // Record for every eligible ACCOUNT member first - including those with
+  // no device registered, who can still read it in the app. Dependents
+  // (children, pets) have no inbox. Runs before the push-configured gate
+  // for the same reason as sendToUser.
+  try {
+    const members = (await db.getHouseholdMembers(householdId)) || [];
+    const recipients = members.filter((m) =>
+      m.member_type === 'account' && m.id !== excludeUserId);
+    const eligible = [];
+    for (const m of recipients) {
+      if (!category) { eligible.push(m.id); continue; }
+      let prefs = null;
+      try { prefs = await db.getNotificationPreferences(m.id); } catch { /* keep them */ }
+      if (isCategoryEnabled(prefs, category)) eligible.push(m.id);
+    }
+    await recordForUsers(eligible, { title, body, data, householdId });
+  } catch (err) {
+    console.warn('[push] household notification record skipped:', err.message);
+  }
+
   if (!configured && !fcmConfigured) {
     return { sent: 0, failed: 0 };
   }
@@ -592,6 +638,9 @@ module.exports = {
   getConfigInfo,
   sendToUser,
   sendToHousehold,
+  // For the two senders that address explicit device tokens (morning brief,
+  // holiday pause) and so bypass sendToUser/sendToHousehold.
+  recordForUsers,
   isConfigured: () => configured,
   deliverDiagnostic,
   // Exported for unit testing the environment-retry decision.

@@ -849,6 +849,14 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
         { householdId, userId: member.id },
       );
       let pushSent = 0;
+      // The durable in-app copy: the brief is the longest push we send and
+      // the one most often truncated on the lock screen.
+      await push.recordForUsers([member.id], {
+        title,
+        body,
+        data: { type: variant === 'evening' ? 'evening_brief' : 'morning_brief' },
+        householdId,
+      });
       try {
         const result = await push.sendPushNotification(
           deviceTokens.map((t) => t.token),
