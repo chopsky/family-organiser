@@ -40,6 +40,55 @@ const H1 = {
 };
 const SUB = { fontSize: 14.5, lineHeight: 1.45, color: T.ink2, margin: '10px 0 0', textWrap: 'pretty' };
 
+/** "works out to £5.00 a month" from the annual package's numeric price.
+ *  Computed from Apple's own localized pricing - never hardcoded (App
+ *  Review checks displayed prices against App Store Connect). */
+function annualPerMonth(pkg) {
+  const amount = pkg?.product?.price;
+  const currencyCode = pkg?.product?.currencyCode;
+  if (typeof amount !== 'number' || !currencyCode) return null;
+  try {
+    const per = new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: currencyCode,
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(amount / 12);
+    return `${per} a month`;
+  } catch {
+    return null;
+  }
+}
+
+function PlanChoice({ label, price, per, badge, note, selected, onPick }) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      aria-pressed={selected}
+      style={{
+        flex: 1, padding: '12px 10px', borderRadius: 14, cursor: 'pointer',
+        border: selected ? `2px solid ${T.purple}` : `1.5px solid ${T.line2}`,
+        background: selected ? T.purpleSoft : T.surface,
+        textAlign: 'center', position: 'relative',
+      }}
+    >
+      {badge && (
+        <span style={{
+          position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)',
+          whiteSpace: 'nowrap', padding: '2px 8px', borderRadius: 99,
+          background: T.okBg, color: T.okInk, font: '700 9.5px Inter, sans-serif',
+          letterSpacing: '.05em', textTransform: 'uppercase',
+        }}>
+          {badge}
+        </span>
+      )}
+      <span style={{ display: 'block', font: '600 13px Inter, sans-serif', color: T.ink }}>{label}</span>
+      <span style={{ display: 'block', font: '700 15px Inter, sans-serif', color: T.ink, marginTop: 3 }}>{price}</span>
+      <span style={{ display: 'block', fontSize: 11.5, color: T.ink3, marginTop: 1 }}>{per}</span>
+      {note && <span style={{ display: 'block', fontSize: 10.5, color: T.okInk, marginTop: 2 }}>{note}</span>}
+    </button>
+  );
+}
+
 const BENEFITS = [
   'Everything in Housemait, for the whole household',
   'School term dates and clubs on the family calendar',
@@ -52,9 +101,14 @@ const BENEFITS = [
  * @param {() => void} onDone - purchased, restored, or failed open.
  */
 export default function PaywallScreen({ householdId, onDone }) {
-  const [pkg, setPkg] = useState(null);
+  // Both plans, monthly selected by default: leading with the annual
+  // number alone made the first price anyone saw look like the only
+  // price ("£59.99 sounds like a lot" - founder, first live test).
+  const [pkgs, setPkgs] = useState({ monthly: null, annual: null });
+  const [plan, setPlan] = useState('monthly');
   const [state, setState] = useState('loading'); // loading | ready | buying | restoring
   const [error, setError] = useState('');
+  const pkg = pkgs[plan] || pkgs.monthly || pkgs.annual;
 
   useEffect(() => {
     let cancelled = false;
@@ -76,10 +130,14 @@ export default function PaywallScreen({ householdId, onDone }) {
         const existing = await getCustomerInfo();
         if (hasActivePremium(existing)) { onDone(); return; }
         const offering = await getCurrentOffering();
-        const first = offering?.availablePackages?.[0] || null;
+        const all = offering?.availablePackages || [];
+        // Same matching as IosSubscribe - RevenueCat's canonical package
+        // identifiers first, packageType as the fallback.
+        const monthly = all.find((p) => p.identifier === '$rc_monthly' || p.packageType === 'MONTHLY') || null;
+        const annual = all.find((p) => p.identifier === '$rc_annual' || p.packageType === 'ANNUAL') || null;
         if (cancelled) return;
-        if (!first) { onDone(); return; } // no offering configured - fail open
-        setPkg(first);
+        if (!monthly && !annual && !all[0]) { onDone(); return; } // nothing configured - fail open
+        setPkgs({ monthly: monthly || all[0] || null, annual });
         setState('ready');
       } catch {
         if (!cancelled) onDone(); // store unreachable - fail open
@@ -128,9 +186,13 @@ export default function PaywallScreen({ householdId, onDone }) {
 
   // RevenueCat gives the localised price and, when an introductory offer
   // is configured, its duration - so the copy is never a hardcoded claim
-  // that could drift from what StoreKit actually charges.
+  // that could drift from what StoreKit actually charges. (If a tester
+  // sees $ instead of £, that's the SANDBOX ACCOUNT's storefront country,
+  // not a bug - real users get their own storefront's currency.)
   const product = pkg?.product || {};
   const price = product.priceString || '';
+  const isAnnual = plan === 'annual' && !!pkgs.annual;
+  const period = isAnnual ? 'a year' : 'a month';
   const introPeriod = product.introPrice?.periodNumberOfUnits;
   const introUnit = product.introPrice?.periodUnit;
   const trialLabel = introPeriod && introUnit
@@ -158,9 +220,30 @@ export default function PaywallScreen({ householdId, onDone }) {
         <h1 style={H1}>Your family, all in one place.</h1>
         <p style={SUB}>
           {trialLabel
-            ? `Start with ${trialLabel}. After that it’s ${price} for the whole household, and you can cancel any time.`
-            : `${price} for the whole household. Cancel any time.`}
+            ? `Start with ${trialLabel}. After that it’s ${price} ${period} for the whole household, and you can cancel any time.`
+            : `${price} ${period} for the whole household. Cancel any time.`}
         </p>
+
+        {pkgs.monthly && pkgs.annual && (
+          <div style={{ display: 'flex', gap: 8, margin: '16px 0 0' }}>
+            <PlanChoice
+              label="Monthly"
+              price={pkgs.monthly.product?.priceString}
+              per="a month"
+              selected={plan === 'monthly'}
+              onPick={() => setPlan('monthly')}
+            />
+            <PlanChoice
+              label="Annual"
+              price={pkgs.annual.product?.priceString}
+              per="a year"
+              badge="2 months free"
+              note={annualPerMonth(pkgs.annual)}
+              selected={plan === 'annual'}
+              onPick={() => setPlan('annual')}
+            />
+          </div>
+        )}
 
         <div style={{ margin: '18px 0 0', textAlign: 'left' }}>
           {BENEFITS.map((b) => (
@@ -200,7 +283,8 @@ export default function PaywallScreen({ householdId, onDone }) {
         {/* Apple requires the auto-renew terms and both policy links on the
             screen where the purchase is made. */}
         <p style={{ fontSize: 11.5, lineHeight: 1.5, color: T.ink3, margin: '12px 0 0' }}>
-          Subscriptions renew automatically unless cancelled at least 24 hours before the period
+          {isAnnual ? '1 year subscription, auto-renewing.' : '1 month subscription, auto-renewing.'}{' '}
+          Renews automatically unless cancelled at least 24 hours before the period
           ends. Manage or cancel in Settings &rsaquo; Apple ID &rsaquo; Subscriptions.{' '}
           <Link to="/terms" style={{ color: T.ink3, textDecoration: 'underline' }}>Terms of Use</Link>
           {' '}&middot;{' '}
