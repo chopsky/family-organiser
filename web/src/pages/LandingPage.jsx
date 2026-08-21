@@ -342,6 +342,26 @@ export default function LandingPage() {
           acceptedAnswer: { '@type': 'Answer', text: f.a },
         })),
       },
+      // Organization + sameAs is the entity signal: it tells Google that
+      // "Housemait" is a proper noun with corroborating profiles, not a
+      // misspelling of "housemaid" (which it currently autocorrects to).
+      // Doesn't fix it alone - branded search volume does most of the
+      // work - but it's the one lever that lives on our own site.
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'Housemait',
+        alternateName: 'Housemait App',
+        url: 'https://housemait.com',
+        logo: 'https://housemait.com/housemait-logo-web@2x.png',
+        description: locale.seo?.description,
+        sameAs: [
+          'https://www.instagram.com/housemaitapp',
+          'https://www.facebook.com/housemait',
+          APP_STORE_CONFIGURED ? APP_STORE_URL : null,
+          PLAY_STORE_CONFIGURED ? PLAY_STORE_URL : null,
+        ].filter(Boolean),
+      },
       {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
