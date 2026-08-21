@@ -471,7 +471,9 @@ I'm always here if you need me!`;
         if (coords) payload.coords = coords;
       } catch { /* no location → backend falls back to the saved address */ }
 
-      const { data } = await api.post('/chat', payload);
+      // AI replies can legitimately outrun the client's default timeout
+      // (the server's own reasoning budget is 90s), so this opts out of it.
+      const { data } = await api.post('/chat', payload, { timeout: 120000 });
 
       // Set conversation ID from response (created on first message)
       if (data.conversation_id && !activeConversationId) {
@@ -554,6 +556,9 @@ I'm always here if you need me!`;
 
       const { data } = await api.post('/chat/image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        // Upload + vision analysis of a school letter or receipt: slower
+        // than the default budget, and worth waiting for.
+        timeout: 120000,
       });
 
       if (data.conversation_id && !activeConversationId) {

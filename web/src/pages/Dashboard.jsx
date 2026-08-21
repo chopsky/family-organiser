@@ -319,6 +319,7 @@ function NotificationBell() {
       to="/notifications"
       aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
       className="relative flex-shrink-0 w-10 h-10 rounded-full bg-linen flex items-center justify-center hover:bg-[#F3EEE5] transition-colors"
+      style={{ border: '1px solid rgba(26,22,32,0.07)' }}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-plum)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -609,7 +610,7 @@ function DashboardAiInput() {
       try {
         const fd = new FormData();
         fd.append('audio', blob, `voice.${ext}`);
-        const { data } = await api.post('/chat/transcribe', fd);
+        const { data } = await api.post('/chat/transcribe', fd, { timeout: 120000 });
         const text = (data?.text || '').trim();
         if (text && aiInputRef.current) {
           const cur = aiInputRef.current.value;
@@ -954,7 +955,7 @@ export default function Dashboard() {
           gone). */}
       <div className="mb-4 md:mb-2 flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-1.5">
+          <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-plum mb-2">
             {todayStr}
             {eventCount > 0 && <span> · {eventCount} event{eventCount !== 1 ? 's' : ''}</span>}
           </div>
@@ -962,7 +963,7 @@ export default function Dashboard() {
             className="m-0 text-[38px] md:text-[42px] leading-[1.05] font-normal text-charcoal"
             style={{ fontFamily: 'var(--font-serif-display)', letterSpacing: '-0.01em' }}
           >
-            {getGreeting()},{' '}<br className="hidden md:inline" />{user?.name}. 👋
+            {getGreeting()},{' '}<br />{user?.name}. 👋
           </h1>
         </div>
         {!childMode && <NotificationBell />}

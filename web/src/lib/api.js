@@ -6,7 +6,15 @@ import { App as CapApp } from '@capacitor/app';
 // In development, the Vite proxy handles /api → localhost:3000, so leave VITE_API_URL unset.
 const BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
 
-const api = axios.create({ baseURL: BASE });
+// A default timeout is deliberate, not decoration. Without one, axios waits
+// forever: a request whose response never arrives (mobile network handover,
+// a dropped connection on a backgrounded app) leaves the UI stuck on its
+// busy state with no error and no way back - the founder hit exactly that on
+// an iOS login that had ALREADY succeeded server-side, sitting on "One
+// moment…" while the account was logged in fine. 60s is far longer than any
+// normal call; the genuinely slow ones (term-date extraction, AI replies)
+// pass their own larger `timeout` per request and are unaffected.
+const api = axios.create({ baseURL: BASE, timeout: 60000 });
 
 // ── App version reporting ────────────────────────────────────────
 // The native shell knows its own version (App.getInfo()); resolve it once at

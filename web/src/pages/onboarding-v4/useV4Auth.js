@@ -231,14 +231,29 @@ export default function useV4Auth(d) {
     setBusy(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/login', { email: email.trim(), password });
+      // Login is a fast endpoint (a hash compare and two reads), so it gets
+      // a tighter budget than the client default - nobody should watch
+      // "One moment…" for a minute when the network has stalled.
+      const { data } = await api.post(
+        '/auth/login',
+        { email: email.trim(), password },
+        { timeout: 20000 },
+      );
       clearSignupPromo();
       clearSignupSource();
       clearReferralCode();
       auth.login(data);
       return true;
     } catch (err) {
-      setError(err?.response?.data?.error || 'That email and password didn’t match.');
+      // A stalled or timed-out request has no response body. Saying "that
+      // email and password didn't match" there is a lie that sends people
+      // resetting a password that was never wrong - and the sign-in may
+      // even have succeeded on the server before the connection dropped.
+      if (!err?.response) {
+        setError('Couldn’t reach Housemait just then. Check your connection and try again.');
+      } else {
+        setError(err.response.data?.error || 'That email and password didn’t match.');
+      }
       return false;
     } finally {
       setBusy(false);
