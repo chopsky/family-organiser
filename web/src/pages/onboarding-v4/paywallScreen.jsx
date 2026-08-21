@@ -118,7 +118,7 @@ function setupLine(d) {
   if (hasCal && d?.wa) return 'Your calendar\u2019s connected and WhatsApp is set up. It\u2019s all waiting.';
   if (hasCal) return 'Your calendar\u2019s connected and the family\u2019s in. It\u2019s all waiting.';
   if (d?.wa) return 'WhatsApp is set up and the family\u2019s in. It\u2019s all waiting.';
-  return 'Your household\u2019s created and ready. It\u2019s all waiting.';
+  return 'Your household\u2019s created & ready. It\u2019s all waiting.';
 }
 
 /** "4 September" for the day an intro offer starting today would end. */
