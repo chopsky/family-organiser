@@ -42,6 +42,22 @@ const ACTIVATION_MIN_DAYS = 2;
 // No ambiguous chars (0/O, 1/I/L) - codes get read out at school gates.
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
+/**
+ * Is the programme running AT ALL? Unset/empty REFERRAL_PILOT_HOUSEHOLDS
+ * means the whole scheme is off, not merely invisible.
+ *
+ * This distinction matters: hiding the share surfaces while still
+ * capturing referrals, honouring old /gift links and settling rewards
+ * would keep making promises nobody is watching. Suspended 2026-08-21
+ * because the iOS onboarding paywall makes a subscriber of every new
+ * household on day one, and complimentary days can't skip an Apple
+ * payment - so "six weeks free" and "an extra free month" are both
+ * unhonourable on iOS until offer codes exist. See the memory note.
+ */
+function referralsRunning() {
+  return Boolean((process.env.REFERRAL_PILOT_HOUSEHOLDS || '').trim());
+}
+
 function referralsEnabled(householdId) {
   const raw = (process.env.REFERRAL_PILOT_HOUSEHOLDS || '').trim();
   if (!raw) return false;
@@ -117,6 +133,7 @@ async function findHouseholdByReferralCode(code) {
  * is never affected; the person just isn't a rewarded referral).
  */
 async function captureReferralOnHouseholdCreate({ userId, householdId }) {
+  if (!referralsRunning()) return null; // suspended: promise nothing new
   try {
     const user = await db.getUserById(userId);
     const code = String(user?.referred_by_code || '').trim().toUpperCase();
@@ -414,6 +431,10 @@ async function settleReferral(ref, deps = {}) {
  * Daily job: settle pending referrals. Returns counts for logging.
  */
 async function evaluateReferrals(deps = {}) {
+  // Suspended: leave pending rows exactly as they are. They settle when
+  // the programme resumes, so nothing is lost and nothing is granted
+  // that we can't currently honour.
+  if (!referralsRunning()) return { activated: 0, lapsed: 0, pending: 0, skipped: 'suspended' };
   let pending = [];
   try {
     const { data, error } = await supabaseAdmin
@@ -478,6 +499,7 @@ async function settleReferralForHousehold(referredHouseholdId, deps = {}) {
  * recipient is by definition outside the pilot list.
  */
 async function getIncomingReferral(householdId) {
+  if (!referralsRunning()) return null; // suspended: no gift card, no promise
   try {
     const { data } = await supabaseAdmin
       .from('referrals')
@@ -535,6 +557,7 @@ async function getReferralStateForHousehold(householdId) {
 module.exports = {
   REWARD_DAYS,
   MAX_BANK_DAYS,
+  referralsRunning,
   referralsEnabled,
   normalizeReferralEmail,
   getOrCreateReferralCode,

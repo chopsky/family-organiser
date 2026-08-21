@@ -132,6 +132,37 @@ describe('isHouseholdActivated (the anti-farm gate)', () => {
   });
 });
 
+describe('suspension: unset env switches the WHOLE programme off', () => {
+  const OLD = process.env.REFERRAL_PILOT_HOUSEHOLDS;
+  beforeEach(() => { delete process.env.REFERRAL_PILOT_HOUSEHOLDS; });
+  afterEach(() => {
+    if (OLD === undefined) delete process.env.REFERRAL_PILOT_HOUSEHOLDS;
+    else process.env.REFERRAL_PILOT_HOUSEHOLDS = OLD;
+  });
+
+  test('referralsRunning reflects the switch', () => {
+    expect(referrals.referralsRunning()).toBe(false);
+    process.env.REFERRAL_PILOT_HOUSEHOLDS = '*';
+    expect(referrals.referralsRunning()).toBe(true);
+  });
+
+  test('no new referral is captured while suspended', async () => {
+    await expect(referrals.captureReferralOnHouseholdCreate({ userId: 'u1', householdId: 'h1' }))
+      .resolves.toBeNull();
+  });
+
+  test('settlement grants nothing while suspended (pending rows survive)', async () => {
+    const grant = jest.fn();
+    const res = await referrals.evaluateReferrals({ grantComplimentaryDays: grant });
+    expect(grant).not.toHaveBeenCalled();
+    expect(res).toEqual(expect.objectContaining({ activated: 0, skipped: 'suspended' }));
+  });
+
+  test('the recipient gift card disappears while suspended', async () => {
+    await expect(referrals.getIncomingReferral('h1')).resolves.toBeNull();
+  });
+});
+
 describe('getActivationProgress (the gift-card checklist truth)', () => {
   const referredAt = '2026-08-01T10:00:00Z';
 

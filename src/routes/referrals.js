@@ -55,6 +55,12 @@ router.get('/mine', requireAuth, requireHousehold, async (req, res) => {
 
 router.get('/gift/:code', giftLimiter, async (req, res) => {
   try {
+    // Suspended: gift links already out in the world must stop promising
+    // free months we can't currently honour. The page falls back to its
+    // plain "try Housemait free" state rather than erroring.
+    if (!referrals.referralsRunning()) {
+      return res.status(404).json({ error: 'This gift link is not valid.' });
+    }
     const household = await referrals.findHouseholdByReferralCode(req.params.code);
     if (!household) {
       return res.status(404).json({ error: 'This gift link is not valid.' });
