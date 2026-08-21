@@ -72,11 +72,7 @@ export default function Notifications() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader
-        kicker="Notifications"
-        title="What you've missed"
-        subtitle="Everything we've sent you in the last 30 days, in full."
-      />
+      <PageHeader title="Notifications" />
 
       {items.length === 0 ? (
         <div className="bg-linen rounded-2xl p-8 text-center">
