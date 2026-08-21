@@ -131,8 +131,11 @@ function trialEndLabel(introPeriod, introUnit) {
         : unit.startsWith('YEAR') ? introPeriod * 365 : 0;
   if (!days) return null;
   try {
+    // Abbreviated month ("4 Sept", not "4 September") so the renewal
+    // line stays on one line on a phone. Locale-aware: this is the
+    // browser's own short form, so non-UK storefronts still read right.
     return new Date(Date.now() + days * 86400000)
-      .toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+      .toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   } catch {
     return null;
   }
