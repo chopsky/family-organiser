@@ -37,7 +37,7 @@ describe('buildDigestWeatherLine', () => {
       });
       expect(line).toMatch(/wet day in London/);
       expect(line).toMatch(/40% chance/);
-      expect(line).toMatch(/brolly/);
+      expect(line).toMatch(/umbrella/);
     });
 
     it('does NOT say "heavy rain" when probability is below the 50% threshold', () => {
@@ -58,7 +58,46 @@ describe('buildDigestWeatherLine', () => {
         precipProbability: 70,
       });
       expect(line).toMatch(/heavy rain in London/);
-      expect(line).toMatch(/brolly all day/);
+      expect(line).toMatch(/umbrella|stay dry/);
+    });
+  });
+
+  describe('universal voice + day-to-day variety (founder call 2026-08-21)', () => {
+    const { RAIN_NUDGES, HEAVY_RAIN_NUDGES } = require('./weather-line');
+    const rainy = { cityName: 'London', code: 61, hi: 18, precipProbability: 40 };
+
+    it('never says "brolly" - the app ships outside the UK', () => {
+      expect([...RAIN_NUDGES, ...HEAVY_RAIN_NUDGES].join(' ')).not.toMatch(/brolly/);
+    });
+
+    it('rotates the rain nudge across days, deterministically within a day', () => {
+      const day = (n) => new Date(Date.UTC(2026, 7, 21 + n, 7, 0, 0));
+      const lines = [0, 1, 2, 3].map((n) => buildDigestWeatherLine(rainy, day(n)));
+      expect(new Set(lines).size).toBe(RAIN_NUDGES.length);
+      expect(buildDigestWeatherLine(rainy, day(0))).toBe(lines[0]);
+    });
+  });
+
+  describe('generic "home" location label', () => {
+    it('drops the place instead of saying "wet day in home" (real screenshot 2026-08-21)', () => {
+      const line = buildDigestWeatherLine({
+        cityName: 'home',
+        code: 61,
+        hi: 20,
+        precipProbability: 45,
+      });
+      expect(line).not.toMatch(/in home/i);
+      expect(line).toMatch(/wet day \(45% chance\)/);
+    });
+
+    it('a real city name keeps its place', () => {
+      const line = buildDigestWeatherLine({
+        cityName: 'Cape Town',
+        code: 0,
+        hi: 22,
+        precipProbability: 0,
+      });
+      expect(line).toMatch(/sunny in Cape Town/);
     });
   });
 
