@@ -692,7 +692,7 @@ async function sendTrialDay20Email({ to, firstName, trialEndsAt, householdId, us
     model: {
       first_name: firstName || 'there',
       trial_end_date: formatTrialEndDate(trialEndsAt),
-      days_remaining: 10,
+      days_remaining: 7,
       app_url: BASE_URL,
       subscribe_url: `${BASE_URL}/subscribe`,
       unsubscribe_url: unsubscribeUrl(householdId),

@@ -120,7 +120,7 @@ export function Splash({ onStart, onLogin, reduced }) {
       <div style={rise(0.74, reduced)}>
         <Cta onClick={onStart}>Hand it over to Housemait</Cta>
         <p style={{ fontSize: 12.5, color: T.ink3, textAlign: 'center', marginTop: 10 }}>
-          Free for 30 days · no card needed
+          Free for 14 days · no card needed
         </p>
         <Ghost onClick={onLogin}>I already have an account</Ghost>
       </div>

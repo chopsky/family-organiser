@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { computeStreak, DEFAULT_LOOKBACK_DAYS, addDaysStr } = require('../services/kids-streak');
 const { shortenError } = require('../utils/error-snippet');
 const { encryptFeedRow, maskFeedUrl, resolveFeedUrl } = require('../utils/feed-url-crypto');
+const { trialEndsAtFor } = require('../services/trial-length');
 
 // Sanitise a free-text value before embedding it in a PostgREST `.or()` filter
 // STRING. PostgREST parses that whole string, so commas / parentheses (its
@@ -40,10 +41,18 @@ function generateJoinCode() {
   return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A3F9B2"
 }
 
-async function createHousehold(name, timezone, country, db = supabase) {
+async function createHousehold(name, timezone, country, db = supabase, opts = {}) {
   const join_code = generateJoinCode();
   const inbound_email_token = crypto.randomBytes(6).toString('hex');
   const row = { name, join_code, inbound_email_token };
+  // Trial length is set EXPLICITLY here rather than left to the column
+  // default, because it varies by client (see services/trial-length.js:
+  // older app builds promised 30 days and must get 30). The DB default
+  // stays as a backstop for any row created outside this path.
+  if (opts.trialDays) {
+    row.trial_started_at = new Date().toISOString();
+    row.trial_ends_at = trialEndsAtFor(opts.trialDays);
+  }
   if (timezone) row.timezone = timezone;
   // Country is validated by the route layer (allowed values from a fixed
   // list). Only set if provided - otherwise the DB default 'GB' applies,

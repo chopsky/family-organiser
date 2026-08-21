@@ -228,7 +228,7 @@ export default function Help() {
           question="How long is the free trial?"
         >
           <p>
-            30 days from when you sign up - no card or payment details
+            14 days from when you sign up - no card or payment details
             required to start. We'll only ask for payment if you choose
             to keep using Housemait at the end of the trial.
           </p>

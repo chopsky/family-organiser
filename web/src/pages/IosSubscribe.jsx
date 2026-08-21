@@ -8,7 +8,7 @@
  * Reachability:
  *   - Routed from /subscribe when isIos() === true (see Subscribe.jsx
  *     dispatcher in Phase 3b).
- *   - Day-30 trial expiry on iOS triggers a 402 from any mutation,
+ *   - Trial expiry on iOS triggers a 402 from any mutation,
  *     which the SubscriptionContext catches and navigates to
  *     /subscribe.
  *

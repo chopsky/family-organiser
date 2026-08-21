@@ -120,7 +120,7 @@ export default function AccountStep({ update, setError, goAfterAuth, inviteToken
       ) : (
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, margin: '16px 0 0', padding: '6px 14px', borderRadius: 99, background: '#E5F0E2', fontSize: 13, fontWeight: 600, color: '#3F6E3D' }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6BA368' }} />
-          Free for 30 days, no card needed
+          Free for 14 days, no card needed
         </div>
       )}
 

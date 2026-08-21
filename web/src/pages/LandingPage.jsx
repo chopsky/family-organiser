@@ -355,7 +355,7 @@ export default function LandingPage() {
           '@type': 'Offer',
           price,
           priceCurrency: locale.currency,
-          description: 'Free 30-day trial, then per household per month. Annual plan available.',
+          description: 'Free 14-day trial, then per household per month. Annual plan available.',
         } : undefined,
       },
     ])
@@ -601,7 +601,7 @@ export default function LandingPage() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
             </a>
           </div>
-          <div className="lv-hero-trial">Free 30-day trial · No card to start&nbsp;<span style={{ letterSpacing: '0.27px' }}>· Cancel anytime</span></div>
+          <div className="lv-hero-trial">Free 14-day trial · No card to start&nbsp;<span style={{ letterSpacing: '0.27px' }}>· Cancel anytime</span></div>
         </div>
       </section>
 

@@ -562,7 +562,7 @@ function ReferralStrip() {
           Give a month, get a month
         </p>
         <p className="m-0 mt-0.5 text-[12px] leading-snug" style={{ color: REFERRAL_AMBER, opacity: 0.72 }}>
-          Their first two months free. An extra free month for you once they start using it.
+          Their first six weeks free. An extra free month for you once they start using it.
         </p>
         {metaLine && (
           <p className="m-0 mt-0.5 text-[11.5px] font-semibold" style={{ color: REFERRAL_AMBER, opacity: 0.72 }}>

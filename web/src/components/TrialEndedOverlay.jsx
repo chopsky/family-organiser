@@ -147,7 +147,7 @@ function UsageSummary({ usage }) {
     // Graceful fallback while the stats load (or if the fetch fails).
     return (
       <p className="text-cocoa text-base">
-        We hope Housemait's been useful for your household over the last 30 days.
+        We hope Housemait's been useful for your household during your trial.
       </p>
     );
   }

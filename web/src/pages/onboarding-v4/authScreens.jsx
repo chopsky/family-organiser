@@ -267,7 +267,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.okInk }} />
-              Free for 30 days, no card needed
+              Free for 14 days, no card needed
             </span>
           </div>
 

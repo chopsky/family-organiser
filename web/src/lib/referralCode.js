@@ -56,14 +56,15 @@ export function resolveReferralCode(now = Date.now()) {
 }
 
 /**
- * The one pre-written share message. "A couple of free months" = the
- * standard trial month plus the gift month, the honest arithmetic of what
- * the link gives a new family - said ONCE, with the link at the end only.
+ * The one pre-written share message. "Six weeks free" = the standard
+ * 14-day trial plus the 30-day gift, the honest arithmetic of what the
+ * link gives a new family (44 days, promised as six) - said ONCE, with
+ * the link at the end only.
  * Callers must NOT also pass `url` to share(): share targets (WhatsApp)
  * prepend that param as a second link above the text.
  */
 export function referralShareMessage(url) {
-  return `Hey, I've been using Housemait to keep our family calendar, lists and school dates in one place. Here's a link to claim two free months: ${url}`;
+  return `Hey, I've been using Housemait to keep our family calendar, lists and school dates in one place. Here's a link to claim six weeks free: ${url}`;
 }
 
 /** Consume once an account has been created with it. */

@@ -784,7 +784,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
         <p>Housemait runs the whole school year for the whole household: term dates and INSET days on a calendar
           everyone shares, party invites photographed straight into the diary on WhatsApp, clubs that pause
           themselves for half term — plus meals, shopping lists and chores the kids actually do.</p>
-        <p class="trial">Free for 30 days · no card needed</p>
+        <p class="trial">Free for 14 days · no card needed</p>
       </div>
       <a class="btn-white" href="https://housemait.com/gb?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>

@@ -160,7 +160,7 @@ export function SubscriptionProvider({ children }) {
   // The number the UI shows as "days left": the household's whole free
   // runway. Banked credit extends past trial_ends_at, so when a credit is
   // live the days-to-credit-end figure IS trial + gift combined ("60 days
-  // left", not the bare trial's 30 with a month invisibly banked).
+  // left", not the bare trial's days with a month invisibly banked).
   const effectiveDaysRemaining = complimentaryActive
     ? Math.max(daysRemaining ?? 0, complimentaryDays)
     : daysRemaining;

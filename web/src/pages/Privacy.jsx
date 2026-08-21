@@ -417,8 +417,8 @@ export default function Privacy() {
                 opt out of these while you have an active account.
               </li>
               <li>
-                <strong>Trial reminder emails</strong> - sent at days 20, 25 and 28 of your
-                30-day free trial. You can opt out in two ways:
+                <strong>Trial reminder emails</strong> - up to three during your free trial,
+                as it nears its end. You can opt out in two ways:
                 <ul className="list-disc pl-6 space-y-1.5 mt-1.5">
                   <li>Click the unsubscribe link in the email footer.</li>
                   <li>Toggle off <strong>Settings → Plan → “Trial reminder emails”</strong>.</li>

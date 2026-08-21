@@ -10,6 +10,7 @@ const cache = require('../services/cache');
 const stripeService = require('../services/stripe');
 const { validatePassword } = require('../utils/password-strength');
 const { publicHousehold } = require('../utils/publicHousehold');
+const { trialDaysForRequest } = require('../services/trial-length');
 
 const router = Router();
 
@@ -501,7 +502,11 @@ router.post('/create-household', requireAuth, async (req, res) => {
   const safeCountry = ALLOWED_COUNTRIES.includes(country) ? country : undefined;
 
   try {
-    const household = await db.createHousehold(name.trim(), timezone, safeCountry);
+    // Trial length follows the CLIENT: an app build whose bundled copy
+    // still promises 30 days must deliver 30 (services/trial-length.js).
+    const household = await db.createHousehold(name.trim(), timezone, safeCountry, undefined, {
+      trialDays: trialDaysForRequest(req),
+    });
     // Brand-new household has no members yet, so pickColorForNewMember
     // returns the first colour in the canonical list (red). Subsequent
     // members will fall through to the next unused colour.

@@ -117,11 +117,11 @@ export default function GiftLanding() {
   const [state, setState] = useState({ loading: true, valid: false });
 
   useEffect(() => {
-    document.title = 'Two free months of Housemait';
+    document.title = 'Six weeks of Housemait, free';
     // OG tags for link previews - WhatsApp is the main referrer and its
     // bot reads the prerendered /gift shell, which is this page snapshotted.
-    upsertMeta('property', 'og:title', 'Two free months of Housemait');
-    upsertMeta('property', 'og:description', "The calm home for your family's calendar, lists and meals. A friend gave you your first two months free.");
+    upsertMeta('property', 'og:title', 'Six weeks of Housemait, free');
+    upsertMeta('property', 'og:description', "The calm home for your family's calendar, lists and meals. A friend gave you your first six weeks free.");
     upsertMeta('property', 'og:url', 'https://housemait.com/gift');
     // Personal links between families - not for search engines.
     const robots = upsertMeta('name', 'robots', 'noindex');
@@ -169,7 +169,7 @@ export default function GiftLanding() {
               </span>
 
               {valid ? (
-                <h1 className="giftp-h1">A friend gave you <em>two free months</em> of Housemait.</h1>
+                <h1 className="giftp-h1">A friend gave you <em>six weeks free</em> on Housemait.</h1>
               ) : (
                 <h1 className="giftp-h1">This gift link isn&apos;t valid.</h1>
               )}
@@ -193,7 +193,7 @@ export default function GiftLanding() {
               </div>
 
               <Link className="giftp-cta" to={valid ? `/signup?gift=${encodeURIComponent(state.code)}` : '/signup'}>
-                {valid ? 'Claim your two free months' : 'Try Housemait free'}
+                {valid ? 'Claim your six weeks free' : 'Try Housemait free'}
               </Link>
               <div className="giftp-mini">Free trial, no card needed.</div>
             </>

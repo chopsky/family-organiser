@@ -167,7 +167,7 @@ export default function Terms() {
 
           <Section title="7. Pricing, billing, and refunds">
             <p>
-              New accounts get a <strong>30-day free trial</strong> with full access to every
+              New accounts get a <strong>14-day free trial</strong> with full access to every
               feature. No card details are required to start the trial. Towards the end of the
               trial we'll prompt you to choose a paid plan if you want to keep using the Service.
             </p>

@@ -30,15 +30,17 @@ const email = require('../services/email');
 //               signup-age windows told extended-trial households
 //               their trial was ending months early (The Schneiders,
 //               2026-08-08 — "5 days left" with 334 days to go).
-//               For the standard 30-day trial these map to the old
-//               day 20 / 25 / 28 sends exactly.
+//               On the 14-day trial these land on days 7, 9 and 12 -
+//               a halfway nudge, then two closing reminders. (The
+//               emailType keys still read day_20/25/28: they are frozen
+//               dedupe keys from the 30-day era, not day numbers.)
 //   emailType - dedupe key in sent_emails (names kept from the old
 //               day-count scheme so historical dedupe rows still hold)
 //   sender    - email.js function to invoke
 //   respectOptOut - nudge emails skip when trial_emails_enabled=false;
 //                   transactional (trial_expired) always sends.
 const NUDGE_SCHEDULE = [
-  { daysLeft: 10, emailType: 'trial_day_20', sender: email.sendTrialDay20Email, respectOptOut: true  },
+  { daysLeft: 7,  emailType: 'trial_day_20', sender: email.sendTrialDay20Email, respectOptOut: true  },
   { daysLeft: 5,  emailType: 'trial_day_25', sender: email.sendTrialDay25Email, respectOptOut: true  },
   { daysLeft: 2,  emailType: 'trial_day_28', sender: email.sendTrialDay28Email, respectOptOut: true  },
 ];
@@ -78,7 +80,7 @@ async function runTrialEmailCheck() {
 async function processAdminExpiryAlerts() {
   const households = await db.findHouseholdsWithTrialEndingInDays(1);
   if (households.length === 0) {
-    console.log('[trial-emails] No households at day 29 - no admin expiry alerts');
+    console.log('[trial-emails] No households with 1 day left - no admin expiry alerts');
     return;
   }
   const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

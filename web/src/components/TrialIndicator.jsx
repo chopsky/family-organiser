@@ -4,13 +4,19 @@
  * Three visual variants keyed off `daysRemaining` from SubscriptionContext.
  * Only renders for trialing households; active/expired/internal return null.
  *
- * Variants follow the spec's day-by-day rules (§4):
- *   • Days 1–20 of trial  = 11+ days remaining  → subtle text
- *   • Days 21–25 of trial = 6–10 days remaining → dismissible card
- *   • Days 26–30 of trial = 1–5 days remaining  → non-dismissible card with usage stats
+ * Three tiers, keyed on days REMAINING (never days elapsed, so extended
+ * and gifted trials behave sensibly too):
+ *   • 6+ days remaining  → subtle text in Settings only
+ *   • 3–5 days remaining → dismissible card
+ *   • 1–2 days remaining → non-dismissible card with usage stats
+ *
+ * Retuned for the 14-day trial (was 11+/6–10/1–5, built for 30 days).
+ * On a 14-day trial those old bands left the subtle tier covering just
+ * days 1–3 and put a subscription card in front of the household for 11
+ * of their 14 days, which reads as a nag campaign rather than a trial.
  *
  * We key the dismissal on today's date (YYYY-MM-DD). If the user dismisses
- * on day 22, we store "trial-dismissed:2026-05-13"; tomorrow that key no
+ * on day 10, we store "trial-dismissed:2026-05-13"; tomorrow that key no
  * longer matches today's date and the card reappears.
  */
 
@@ -108,10 +114,10 @@ export function TrialIndicatorCard() {
   // violate rules-of-hooks.
   if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no trial/plan UI
 
-  // Only show for the last 10 days of the trial. Days 1–20 of the trial
-  // (11+ remaining) use the subtle text in Settings only per the spec.
-  const inWarningWindow = isTrialing && daysRemaining != null && daysRemaining > 0 && daysRemaining <= 10;
-  const isFinalPush = isTrialing && daysRemaining != null && daysRemaining > 0 && daysRemaining <= 5;
+  // Only the closing stretch gets a card; before that the subtle text in
+  // Settings carries it. See the tier table above.
+  const inWarningWindow = isTrialing && daysRemaining != null && daysRemaining > 0 && daysRemaining <= 5;
+  const isFinalPush = isTrialing && daysRemaining != null && daysRemaining > 0 && daysRemaining <= 2;
 
   if (!inWarningWindow) return null;
   if (!isFinalPush && dismissed) return null; // final-push card can't be dismissed
