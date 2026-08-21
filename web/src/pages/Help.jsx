@@ -227,23 +227,50 @@ export default function Help() {
           id="billing-trial"
           question="How long is the free trial?"
         >
-          <p>
-            14 days from when you sign up - no card or payment details
-            required to start. We'll only ask for payment if you choose
-            to keep using Housemait at the end of the trial.
-          </p>
+          {/* The honest answer differs by platform now: the iPhone app
+              starts the trial as an Apple subscription (card on file,
+              cancel any time), while the web keeps the no-card trial.
+              Saying "no card required" to an iOS user who just handed
+              Apple their card would be plainly false. */}
+          {isIos() ? (
+            <p>
+              14 days from when you sign up. In the iPhone app the trial
+              starts through your Apple ID, so nothing is charged until
+              day 15 and you can cancel any time before then in Settings
+              &rsaquo; Apple ID &rsaquo; Subscriptions. We&apos;ll remind
+              you before it renews.
+            </p>
+          ) : (
+            <p>
+              14 days from when you sign up on the web - no card or payment
+              details required to start. We&apos;ll only ask for payment if
+              you choose to keep using Housemait at the end of the trial.
+              (Signing up in the iPhone app starts the trial through your
+              Apple ID instead.)
+            </p>
+          )}
         </FaqAccordion>
 
         <FaqAccordion
           id="billing-trial-end"
           question="What happens when my trial ends?"
         >
-          <p>
-            Your account stays read-only - you can still log in and see
-            everything you've built - but you can't add new items or use
-            the WhatsApp bot until you subscribe. Your data stays exactly
-            where it is.
-          </p>
+          {isIos() ? (
+            <p>
+              If you started your trial in the iPhone app, your
+              subscription simply continues - there&apos;s nothing to do.
+              Cancel before day 15 and your account goes read-only
+              instead: you can still log in and see everything you&apos;ve
+              built, and your data stays exactly where it is.
+            </p>
+          ) : (
+            <p>
+              Your account stays read-only - you can still log in and see
+              everything you&apos;ve built - but you can&apos;t add new
+              items or use the WhatsApp bot until you subscribe. Your data
+              stays exactly where it is.
+            </p>
+          )}
         </FaqAccordion>
 
         <FaqAccordion
