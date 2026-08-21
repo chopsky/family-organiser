@@ -24,6 +24,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { T, SHADOW, R } from './tokens';
 import { Lockup, Cta, TOP_GAP } from './ui';
 import {
@@ -58,8 +59,14 @@ export default function PaywallScreen({ householdId, onDone }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Not an IAP platform, or the app was built without the key: this
-      // screen has nothing to sell, so it must not stand in the way.
+      // iOS ONLY, explicitly (founder decision). Android is currently safe
+      // by accident - VITE_REVENUECAT_GOOGLE_KEY isn't in the build, so
+      // iapKeyPresent() is false there - but the day someone adds that key
+      // for Play Billing, Android families would walk into a hard paywall
+      // nobody decided to give them. Name the platform instead of relying
+      // on an env var to stay absent.
+      if (Capacitor.getPlatform() !== 'ios') { onDone(); return; }
+      // No IAP, or built without the key: nothing to sell, don't block.
       if (!isIapPlatform() || !iapKeyPresent()) { onDone(); return; }
       try {
         await configure();

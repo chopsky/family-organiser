@@ -7403,7 +7403,7 @@ async function getRevenueStats(db = supabase) {
 
   // 4. Net new this month: trial signups this calendar month (proxy for
   //    funnel-top growth - cleaner signal than active-conversions since
-  //    those depend on a full 30-day trial having elapsed).
+  //    those depend on a whole trial having elapsed first).
   const newTrialsRes = await db
     .from('households')
     .select('id', { count: 'exact', head: true })
