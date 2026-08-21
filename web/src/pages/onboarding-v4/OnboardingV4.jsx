@@ -27,6 +27,7 @@ import { CalendarList, CalendarConnect } from './calendarScreens';
 import { RemindersBody, RemindersFooter } from './remindersScreen';
 import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
+import PaywallScreen from './paywallScreen';
 import { setCalUrl } from '../../lib/onboardingDraft';
 import useSocialAuth from '../../hooks/useSocialAuth';
 import useV4Auth from './useV4Auth';
@@ -177,6 +178,15 @@ export default function OnboardingV4({ initialPhase }) {
           // on the same welcome screen rather than a second dead end.
           onVerified: () => f.finish(),
         }}
+      />
+    );
+  }
+
+  if (phase === 'paywall') {
+    return (
+      <PaywallScreen
+        householdId={auth.household?.id}
+        onDone={() => goPhase('done')}
       />
     );
   }

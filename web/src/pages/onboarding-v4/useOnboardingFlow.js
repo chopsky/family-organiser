@@ -97,11 +97,13 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
     timer.current = setTimeout(() => { timer.current = null; next(); }, AUTO_ADVANCE_MS);
   }, [update, next, clearTimer]);
 
-  /** Called once the account exists and queued connections have been replayed. */
+  /** Called once the account exists and queued connections have been replayed.
+   *  Lands on the subscription wall first (iOS); the wall sends everyone
+   *  on to 'done' itself, including when it has nothing to sell. */
   const finish = useCallback(() => {
     clearTimer();
     clearDraft();
-    setNav({ phase: 'done', i: 0 });
+    setNav({ phase: 'paywall', i: 0 });
   }, [clearTimer]);
 
   return {
