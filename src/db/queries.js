@@ -59,11 +59,27 @@ async function createHousehold(name, timezone, country, db = supabase, opts = {}
   // list). Only set if provided - otherwise the DB default 'GB' applies,
   // which is the right fallback for the dominant tenant.
   if (country) row.country = country;
-  const { data, error } = await db
+  let { data, error } = await db
     .from('households')
     .insert(row)
     .select()
     .single();
+  // Missing column (PostgREST schema cache: PGRST204; raw Postgres:
+  // 42703) means migration-paywall-required.sql hasn't run yet. Retry
+  // without the flag rather than failing the insert: this is the row
+  // that makes someone a household, and losing it leaves a signed-up
+  // user with no household at all, bounced back to the intro screen
+  // forever (exactly what happened on 2026-08-21). The wall simply
+  // doesn't apply until the column exists.
+  if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+    console.warn('[households] paywall_required column missing - creating without it');
+    delete row.paywall_required;
+    ({ data, error } = await db
+      .from('households')
+      .insert(row)
+      .select()
+      .single());
+  }
   if (error) throw error;
   return data;
 }
