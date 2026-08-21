@@ -24,7 +24,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
-import { isIos, isAndroid } from '../lib/platform';
+import { isAndroid } from '../lib/platform';
 
 const DISMISSED_KEY = 'trial-ended-overlay-dismissed';
 
@@ -64,12 +64,13 @@ export default function TrialEndedOverlay() {
   if (location.pathname.startsWith('/subscription') || location.pathname === '/subscribe') {
     return null;
   }
-  // App Store guideline 3.1.1: never surface a "trial has ended" prompt
-  // on iOS. The SubscriptionContext already forces isExpired=false on
-  // iOS so this guard is defence-in-depth - explicitly block here in
-  // case any future change to the context regresses that.
-  if (isIos()) return null;
-  // Google Play payments policy: same posture on Android - no subscribe
+  // iOS sees this now. The old guard predated StoreKit IAP, and its
+  // claim that SubscriptionContext forces isExpired=false on iOS was
+  // never true (the context has no platform special-casing at all), so
+  // an iOS household whose trial ended simply hit 402s with no
+  // explanation. The overlay's CTA goes to /subscribe, which on iOS is
+  // the Apple paywall.
+  // Google Play payments policy: Android stays suppressed - no subscribe
   // prompt, no external-purchase steering - until Play Billing ships.
   if (isAndroid()) return null;
   if (!isExpired || dismissed) return null;
@@ -102,34 +103,25 @@ export default function TrialEndedOverlay() {
         <UsageSummary usage={usage} />
 
         <p className="text-cocoa text-base mt-5">
-          {isIos()
-            ? 'Your data is safe - subscribe on housemait.com to pick up right where you left off.'
-            : 'Your data is safe - subscribe anytime to pick up right where you left off.'}
+          Your data is safe - subscribe anytime to pick up right where you left off.
         </p>
 
         <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
-          {/* iOS renders only the "Just browsing" dismiss - the Subscribe
-              button linked to an external payment flow which breaks App
-              Store rules. The URL is mentioned in the copy above as
-              plain text so users know where to go. */}
-          {!isIos() && (
-            <a
-              href="/subscribe"
-              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Subscribe
-            </a>
-          )}
+          {/* One button for every platform: /subscribe dispatches to the
+              Apple paywall on iOS and Stripe on web, so this is never an
+              external payment link. */}
+          <a
+            href="/subscribe"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
+          >
+            Subscribe
+          </a>
           <button
             type="button"
             onClick={handleDismiss}
-            className={
-              isIos()
-                ? 'mx-auto text-sm font-semibold text-plum hover:text-plum-pressed transition-colors px-4 py-2 rounded-xl border border-plum/20 hover:bg-plum-light'
-                : 'text-sm font-medium text-warm-grey hover:text-charcoal transition-colors px-2 py-1'
-            }
+            className="text-sm font-medium text-warm-grey hover:text-charcoal transition-colors px-2 py-1"
           >
-            {isIos() ? 'Got it' : 'Just browsing'}
+            Just browsing
           </button>
         </div>
       </div>

@@ -24,7 +24,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
-import { isIos, isNative } from '../lib/platform';
+import { isAndroid } from '../lib/platform';
 
 // ── localStorage helpers (mirror AuthContext's Safari-safe wrappers) ──
 function safeGetItem(key) {
@@ -62,11 +62,13 @@ function formatTrialEndDate(iso) {
  */
 export function TrialIndicatorSubtle({ className = '' }) {
   const { isTrialing, daysRemaining } = useSubscription();
-  // App Store guideline 3.1.1: no trial/plan UI on iOS. The context
-  // already short-circuits to isInternal=true on iOS so isTrialing
-  // would naturally be false, but a defensive check here prevents
-  // accidental regressions if the context behaviour ever changes.
-  if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no trial/plan UI
+  // iOS shows this now. The old blanket native guard dated from the
+  // reader-style 3.1.1 posture, before the app had StoreKit IAP: with a
+  // real in-app paywall there is nothing to hide, and suppressing it left
+  // a web-signed-up family using the app with no idea their trial was
+  // ending. Android stays quiet until Play Billing exists, because there
+  // it genuinely has nowhere legitimate to send anyone.
+  if (isAndroid()) return null;
   if (!isTrialing || daysRemaining == null) return null;
 
   const label = daysRemaining === 1
@@ -107,12 +109,10 @@ export function TrialIndicatorCard() {
     }
   }, [dismissedKey]);
 
-  // App Store guideline 3.1.1: no trial/plan UI on iOS. The context
-  // short-circuits isTrialing to false on iOS so the inWarningWindow
-  // check below would already return null, but the explicit guard here
-  // is defence-in-depth. Comes after the hook calls so we don't
-  // violate rules-of-hooks.
-  if (isNative()) return null; // iOS (3.1.1) and Android (Play Billing pending): no trial/plan UI
+  // See the note in TrialIndicatorSubtle: iOS renders these now that the
+  // app sells the subscription itself. Android only stays suppressed.
+  // Comes after the hook calls so we don't violate rules-of-hooks.
+  if (isAndroid()) return null;
 
   // Only the closing stretch gets a card; before that the subtle text in
   // Settings carries it. See the tier table above.
@@ -230,15 +230,12 @@ function FinalPushContent({ daysRemaining, trialEndsAt }) {
 }
 
 function SubscribeButton({ variant = 'plum' }) {
-  // iOS: render a plain-text note instead of a Subscribe button (App
-  // Store rules - no external payment entry points in the app).
-  if (isIos()) {
-    return (
-      <p className="text-xs text-warm-grey italic">
-        Subscribe on <span className="text-charcoal font-medium">housemait.com</span>
-      </p>
-    );
-  }
+  // This used to read "Subscribe on housemait.com" on iOS. That was
+  // correct when the app sold nothing; now that it has StoreKit IAP,
+  // pointing an iOS user at the website is exactly the steering Apple
+  // prohibits. /subscribe dispatches by platform, so on iOS this button
+  // opens the Apple paywall - the compliant destination and the one the
+  // user actually wants.
   const bg = variant === 'coral'
     ? 'bg-coral hover:bg-coral/90'
     : 'bg-plum hover:bg-plum-pressed';
