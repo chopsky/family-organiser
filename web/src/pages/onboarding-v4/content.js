@@ -23,6 +23,17 @@ export const PAINS = [
     ben: { t: 'A second brain for your home', d: 'Housemait remembers it so nobody has to.' } },
 ];
 
+/**
+ * Always the third row on the paywall, whatever the family picked. It is
+ * the one thing no rival family organiser has, and the likeliest single
+ * reason someone pays rather than shrugs - so it never rotates out.
+ */
+export const WHATSAPP_BEN = {
+  emoji: '💬',
+  t: 'Runs on WhatsApp',
+  d: 'Forward a school letter, the dates add themselves.',
+};
+
 /** Someone who skipped the picker still gets a plan - these two are the default. */
 export const PAINS_FALLBACK = ['calendar', 'mental'];
 

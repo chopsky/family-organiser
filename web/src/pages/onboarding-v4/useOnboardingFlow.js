@@ -102,7 +102,10 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
    *  on to 'done' itself, including when it has nothing to sell. */
   const finish = useCallback(() => {
     clearTimer();
-    clearDraft();
+    // NOT clearDraft() here: the paywall reads the picked pains and what
+    // they connected to build its case, and must still do so after a
+    // force-quit and reopen. PaywallScreen clears it once they're
+    // through, whether by paying or by the wall failing open.
     setNav({ phase: 'paywall', i: 0 });
   }, [clearTimer]);
 

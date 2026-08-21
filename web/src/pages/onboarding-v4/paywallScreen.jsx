@@ -27,6 +27,8 @@ import { Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { T, SHADOW, R } from './tokens';
 import { Lockup, Cta, TOP_GAP } from './ui';
+import { PAINS, PAINS_FALLBACK, WHATSAPP_BEN } from './content';
+import { clearDraft, loadDraft } from '../../lib/onboardingDraft';
 import {
   isIapPlatform, iapKeyPresent, configure, logIn,
   getCurrentOffering, purchasePackage, restorePurchases, hasActivePremium,
@@ -89,18 +91,61 @@ function PlanChoice({ label, price, per, badge, note, selected, onPick }) {
   );
 }
 
-const BENEFITS = [
-  'Everything in Housemait, for the whole household',
-  'School term dates and clubs on the family calendar',
-  'The WhatsApp assistant that does the typing',
-  'Kids get their own space, with chores and rewards',
-];
+/**
+ * Three reasons, in the family's own words. Screen 02 asked what hurts
+ * and screen 03 promised to take it off their hands; this is the same
+ * promise at the moment it costs money, which is when people actually
+ * weigh it. Two of their picked pains (a recap, not the full list -
+ * three rows still read as reasons, five read as a spec sheet), then
+ * WhatsApp, always.
+ */
+function benefitsFor(pains) {
+  const picked = (pains && pains.length ? pains : PAINS_FALLBACK)
+    .map((id) => PAINS.find((p) => p.id === id))
+    .filter(Boolean);
+  const rows = picked.slice(0, 2).map((p) => ({ emoji: p.emoji, ...p.ben }));
+  return [...rows, WHATSAPP_BEN];
+}
+
+/**
+ * One line, not a second checklist: what they've just built is already
+ * here. Degrades honestly - a family who skipped the optional steps is
+ * told their household is ready, never that a calendar is connected
+ * when it isn't.
+ */
+function setupLine(d) {
+  const hasCal = Object.keys(d?.cals || {}).length > 0;
+  if (hasCal && d?.wa) return 'Your calendar\u2019s connected and WhatsApp is set up. It\u2019s all waiting.';
+  if (hasCal) return 'Your calendar\u2019s connected and the family\u2019s in. It\u2019s all waiting.';
+  if (d?.wa) return 'WhatsApp is set up and the family\u2019s in. It\u2019s all waiting.';
+  return 'Your household\u2019s created and ready. It\u2019s all waiting.';
+}
+
+/** "4 September" for the day an intro offer starting today would end. */
+function trialEndLabel(introPeriod, introUnit) {
+  if (!introPeriod || !introUnit) return null;
+  const unit = String(introUnit).toUpperCase();
+  const days = unit.startsWith('DAY') ? introPeriod
+    : unit.startsWith('WEEK') ? introPeriod * 7
+      : unit.startsWith('MONTH') ? introPeriod * 30
+        : unit.startsWith('YEAR') ? introPeriod * 365 : 0;
+  if (!days) return null;
+  try {
+    return new Date(Date.now() + days * 86400000)
+      .toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  } catch {
+    return null;
+  }
+}
 
 /**
  * @param {string} householdId - identifies the purchase to RevenueCat.
  * @param {() => void} onDone - purchased, restored, or failed open.
  */
 export default function PaywallScreen({ householdId, onDone, onSignOut }) {
+  // Single exit: the onboarding draft has done its job by the time
+  // anyone leaves this screen, whichever way they leave.
+  const leave = () => { clearDraft(); onDone(); };
   // Both plans, monthly selected by default: leading with the annual
   // number alone made the first price anyone saw look like the only
   // price ("£59.99 sounds like a lot" - founder, first live test).
@@ -109,6 +154,10 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
   const [state, setState] = useState('loading'); // loading | ready | buying | restoring
   const [error, setError] = useState('');
   const pkg = pkgs[plan] || pkgs.monthly || pkgs.annual;
+  // Read once: the pains they picked and what they connected. Kept
+  // until they subscribe (see useOnboardingFlow.finish) so a
+  // force-quit-and-reopen still gets the personalised wall.
+  const [draft] = useState(() => loadDraft());
 
   useEffect(() => {
     let cancelled = false;
@@ -119,16 +168,16 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
       // for Play Billing, Android families would walk into a hard paywall
       // nobody decided to give them. Name the platform instead of relying
       // on an env var to stay absent.
-      if (Capacitor.getPlatform() !== 'ios') { onDone(); return; }
+      if (Capacitor.getPlatform() !== 'ios') { leave(); return; }
       // No IAP, or built without the key: nothing to sell, don't block.
-      if (!isIapPlatform() || !iapKeyPresent()) { onDone(); return; }
+      if (!isIapPlatform() || !iapKeyPresent()) { leave(); return; }
       try {
         await configure();
         if (householdId) await logIn(householdId);
         // Already subscribed - a resumed signup, a reinstall, or a second
         // device. Never show a wall to someone who is already paying.
         const existing = await getCustomerInfo();
-        if (hasActivePremium(existing)) { onDone(); return; }
+        if (hasActivePremium(existing)) { leave(); return; }
         const offering = await getCurrentOffering();
         const all = offering?.availablePackages || [];
         // Same matching as IosSubscribe - RevenueCat's canonical package
@@ -136,11 +185,11 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
         const monthly = all.find((p) => p.identifier === '$rc_monthly' || p.packageType === 'MONTHLY') || null;
         const annual = all.find((p) => p.identifier === '$rc_annual' || p.packageType === 'ANNUAL') || null;
         if (cancelled) return;
-        if (!monthly && !annual && !all[0]) { onDone(); return; } // nothing configured - fail open
+        if (!monthly && !annual && !all[0]) { leave(); return; } // nothing configured - fail open
         setPkgs({ monthly: monthly || all[0] || null, annual });
         setState('ready');
       } catch {
-        if (!cancelled) onDone(); // store unreachable - fail open
+        if (!cancelled) leave(); // store unreachable - fail open
       }
     })();
     return () => { cancelled = true; };
@@ -152,7 +201,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
     setState('buying');
     try {
       await purchasePackage(pkg);
-      onDone();
+      leave();
     } catch (err) {
       // A cancelled sheet is not an error to apologise for - the wall
       // simply stays put, which is what "hard" means.
@@ -168,7 +217,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
     setState('restoring');
     try {
       const info = await restorePurchases();
-      if (hasActivePremium(info)) { onDone(); return; }
+      if (hasActivePremium(info)) { leave(); return; }
       setError('No previous subscription found on this Apple ID.');
     } catch {
       setError('Couldn’t reach the App Store just then. Try again in a moment.');
@@ -195,6 +244,8 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
   const period = isAnnual ? 'a year' : 'a month';
   const introPeriod = product.introPrice?.periodNumberOfUnits;
   const introUnit = product.introPrice?.periodUnit;
+  const trialEnd = trialEndLabel(introPeriod, introUnit);
+  const benefits = benefitsFor(draft.pains);
   const trialLabel = introPeriod && introUnit
     ? `${introPeriod} ${String(introUnit).toLowerCase()}${introPeriod > 1 ? 's' : ''} free`
     : null;
@@ -217,12 +268,57 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
             {trialLabel}
           </span>
         )}
-        <h1 style={H1}>Your family, all in one place.</h1>
-        <p style={SUB}>
-          {trialLabel
-            ? `Start with ${trialLabel}. After that it’s ${price} ${period} for the whole household, and you can cancel any time.`
-            : `${price} ${period} for the whole household. Cancel any time.`}
+        <h1 style={H1}>That’s it all, <em style={{ fontStyle: 'normal', color: T.purple }}>out of your head.</em></h1>
+
+        {/* Benefits lead, because the question at the moment money is
+            involved is "what am I paying for?" - a recap of what they
+            just set up answers the wrong question (founder, 2026-08-21). */}
+        <div style={{ margin: '16px 0 0', textAlign: 'left' }}>
+          {benefits.map((b) => (
+            <div key={b.t} style={{ display: 'flex', gap: 11, alignItems: 'flex-start', padding: '7px 0' }}>
+              <span aria-hidden="true" style={{
+                width: 30, height: 30, borderRadius: 9, background: T.purpleSoft,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, flexShrink: 0,
+              }}>{b.emoji}</span>
+              <span>
+                <span style={{ display: 'block', font: '600 14px Inter, sans-serif', color: T.ink }}>{b.t}</span>
+                <span style={{ display: 'block', fontSize: 12.5, lineHeight: 1.35, color: T.ink3, marginTop: 1 }}>{b.d}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* One line, under a rule: what they built is already here. */}
+        <p style={{
+          margin: '13px 0 0', paddingTop: 12, borderTop: `1px solid ${T.line}`,
+          fontSize: 12.5, lineHeight: 1.4, color: T.ink2, textAlign: 'left',
+        }}>
+          <span aria-hidden="true" style={{ color: T.okInk }}>✓</span> {setupLine(draft)}
         </p>
+
+        {/* The fear that actually stops people at a hard wall is "will I
+            forget and get charged?" - so answer it, with a date. */}
+        {trialLabel && (
+          <p style={{
+            margin: '12px 0 0', padding: '8px 11px', borderRadius: 10,
+            background: '#FBF1DE', color: '#8A5F1E', fontSize: 11.5, lineHeight: 1.4,
+            textAlign: 'left',
+          }}>
+            {trialEnd ? `Free until ${trialEnd}. ` : `Free for ${trialLabel.replace(' free', '')}. `}
+            We’ll remind you before it renews.
+          </p>
+        )}
+
+        {/* Only one plan configured: the chooser can't render, so the
+            price must still be stated somewhere. Apple requires it on the
+            purchase screen, and without this the button would ask for
+            money without ever naming it. */}
+        {!(pkgs.monthly && pkgs.annual) && price && (
+          <p style={{ margin: '14px 0 0', fontSize: 13.5, color: T.ink2 }}>
+            {price} {period} for the whole household.
+          </p>
+        )}
 
         {pkgs.monthly && pkgs.annual && (
           <div style={{ display: 'flex', gap: 8, margin: '16px 0 0' }}>
@@ -244,19 +340,6 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
             />
           </div>
         )}
-
-        <div style={{ margin: '18px 0 0', textAlign: 'left' }}>
-          {BENEFITS.map((b) => (
-            <div key={b} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '7px 0' }}>
-              <span aria-hidden="true" style={{
-                width: 18, height: 18, borderRadius: '50%', background: T.okBg, color: T.okInk,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 1,
-              }}>✓</span>
-              <span style={{ fontSize: 14, lineHeight: 1.4, color: T.ink2 }}>{b}</span>
-            </div>
-          ))}
-        </div>
 
         {error && (
           <p role="alert" style={{ fontSize: 13, lineHeight: 1.4, color: T.danger, margin: '14px 0 0' }}>{error}</p>
