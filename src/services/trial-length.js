@@ -58,6 +58,22 @@ function trialDaysForRequest(req) {
   return gte(version, NEW_COPY_MIN_VERSION) ? TRIAL_DAYS : LEGACY_TRIAL_DAYS;
 }
 
+/**
+ * Must this household subscribe before it can use the app?
+ *
+ * True only for clients whose OWN onboarding presented a paywall - iOS
+ * from NEW_COPY_MIN_VERSION on. Web signups and older app builds were
+ * promised a card-free trial and must never be walled retrospectively,
+ * so anything unrecognised answers false.
+ */
+function paywallRequiredForRequest(req) {
+  const platform = String(req?.get?.('x-client-platform') || '').toLowerCase();
+  if (platform !== 'ios') return false;
+  const version = parseVersion(req?.get?.('x-app-version'));
+  if (!version) return false; // unknown build - never wall on a guess
+  return gte(version, NEW_COPY_MIN_VERSION);
+}
+
 /** ISO timestamp for when a trial starting now should end. */
 function trialEndsAtFor(days, now = Date.now()) {
   return new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
@@ -69,5 +85,6 @@ module.exports = {
   NEW_COPY_MIN_VERSION,
   parseVersion,
   trialDaysForRequest,
+  paywallRequiredForRequest,
   trialEndsAtFor,
 };

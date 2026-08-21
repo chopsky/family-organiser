@@ -94,6 +94,11 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       complimentary_until: complimentaryUntil,
       complimentary_active: complimentaryActive,
       complimentary_days_remaining: complimentaryDays,
+      // True when this household signed up through an app build whose
+      // onboarding presented a paywall - the client re-shows that wall on
+      // launch until they've actually subscribed, so closing the app on
+      // the payment screen no longer walks straight past it.
+      paywall_required: household.paywall_required === true,
       subscription_plan: household.subscription_plan || null,
       // Lowercase ISO-4217 code the household is billed in (gbp, usd,
       // eur, aud, cad, zar). NULL for trialing/never-subscribed

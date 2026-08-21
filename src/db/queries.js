@@ -53,6 +53,7 @@ async function createHousehold(name, timezone, country, db = supabase, opts = {}
     row.trial_started_at = new Date().toISOString();
     row.trial_ends_at = trialEndsAtFor(opts.trialDays);
   }
+  if (opts.paywallRequired) row.paywall_required = true;
   if (timezone) row.timezone = timezone;
   // Country is validated by the route layer (allowed values from a fixed
   // list). Only set if provided - otherwise the DB default 'GB' applies,

@@ -10,6 +10,7 @@ import { Capacitor } from '@capacitor/core';
 import { localeHomePath } from './hooks/useLocale';
 import { useUniversalLinks } from './hooks/useUniversalLinks';
 import Layout from './components/Layout';
+import PaywallGate from './components/PaywallGate';
 import AdminLayout from './components/AdminLayout';
 // File renamed from CookieConsent.jsx - many ad-blocker rules match on
 // the substring "CookieConsent" in URLs and `net::ERR_BLOCKED_BY_CLIENT`
@@ -130,7 +131,10 @@ function RequireAuth({ children }) {
   // legacy /setup + /onboarding routes stay mounted as a fallback (reachable by
   // direct URL) but the gates no longer point at them.
   if (needsHousehold || needsOnboarding) return <Navigate to="/signup" replace />;
-  return children;
+  // Households that signed up through a paywalled build must subscribe
+  // before the app opens. Deliberately NOT applied to RequireAuthOnly,
+  // which is what /subscribe uses - the way out must stay reachable.
+  return <PaywallGate>{children}</PaywallGate>;
 }
 
 function RequireAuthOnly({ children }) {

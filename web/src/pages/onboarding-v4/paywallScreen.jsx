@@ -100,7 +100,7 @@ const BENEFITS = [
  * @param {string} householdId - identifies the purchase to RevenueCat.
  * @param {() => void} onDone - purchased, restored, or failed open.
  */
-export default function PaywallScreen({ householdId, onDone }) {
+export default function PaywallScreen({ householdId, onDone, onSignOut }) {
   // Both plans, monthly selected by default: leading with the annual
   // number alone made the first price anyone saw look like the only
   // price ("£59.99 sounds like a lot" - founder, first live test).
@@ -279,6 +279,23 @@ export default function PaywallScreen({ householdId, onDone }) {
         >
           {state === 'restoring' ? 'Restoring…' : 'Restore purchases'}
         </button>
+
+        {/* Only when the wall is guarding the whole app (PaywallGate), not
+            during onboarding. Being stuck at a paywall on the WRONG
+            account with no way back is the one unforgivable version of
+            this screen. */}
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            style={{
+              width: '100%', minHeight: 36, marginTop: 2, border: 0, background: 'none',
+              color: T.ink3, font: '500 12.5px Inter, sans-serif', cursor: 'pointer',
+            }}
+          >
+            Sign out
+          </button>
+        )}
 
         {/* Apple requires the auto-renew terms and both policy links on the
             screen where the purchase is made. */}

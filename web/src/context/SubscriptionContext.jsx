@@ -31,6 +31,7 @@ export function SubscriptionProvider({ children }) {
   const [complimentaryDays, setComplimentaryDays] = useState(0); // days until complimentary_until, 0 if none
   const [daysRemaining, setDaysRemaining] = useState(null); // number | null
   const [trialEndsAt, setTrialEndsAt] = useState(null);     // ISO string | null
+  const [paywallRequired, setPaywallRequired] = useState(false); // must subscribe before using the app
   const [plan, setPlan] = useState(null);                   // 'monthly' | 'annual' | null
   const [currency, setCurrency] = useState(null);           // 'gbp' | 'usd' | … | null
   const [provider, setProvider] = useState(null);           // 'stripe' | 'apple' | null
@@ -80,6 +81,7 @@ export function SubscriptionProvider({ children }) {
       setPlan(data.subscription_plan || null);
       setCurrency(data.subscription_currency || null);
       setProvider(data.subscription_provider || null);
+      setPaywallRequired(data.paywall_required === true);
       setIsInternal(data.is_internal === true);
       loadedHouseholdRef.current = household.id;
     } catch (err) {
@@ -178,6 +180,9 @@ export function SubscriptionProvider({ children }) {
       isActive,
       isTrialing,
       isExpired,
+      // Signed up through a build whose onboarding showed a paywall, and
+      // hasn't subscribed: PaywallGate re-shows that wall on launch.
+      paywallRequired,
       loading,
       error,
       refresh: fetchStatus,
@@ -196,7 +201,7 @@ export function useSubscription() {
     return {
       status: null, rawStatus: null, daysRemaining: null, trialEndsAt: null,
       plan: null, provider: null, isInternal: false, isActive: false, isTrialing: false,
-      isExpired: false, loading: false, error: null, refresh: () => {},
+      isExpired: false, paywallRequired: false, loading: false, error: null, refresh: () => {},
     };
   }
   return ctx;
