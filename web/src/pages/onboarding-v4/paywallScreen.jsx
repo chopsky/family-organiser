@@ -354,6 +354,13 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
           </Cta>
         </div>
 
+        {/* Almost everyone who hesitates here has just spotted a typo in
+            their household name. Nothing they'd want to change is locked -
+            they simply can't know that from a screen with no way past it. */}
+        <p style={{ fontSize: 12, lineHeight: 1.4, color: T.ink3, margin: '8px 0 0' }}>
+          You can change any of this in Settings once you&rsquo;re in.
+        </p>
+
         <button
           type="button"
           onClick={restore}
@@ -366,10 +373,10 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
           {state === 'restoring' ? 'Restoring…' : 'Restore purchases'}
         </button>
 
-        {/* Only when the wall is guarding the whole app (PaywallGate), not
-            during onboarding. Being stuck at a paywall on the WRONG
-            account with no way back is the one unforgivable version of
-            this screen. */}
+        {/* Always offered, from both the onboarding flow and the launch
+            gate. A screen with literally no exit is hostile, and until
+            this was passed through from onboarding too, force-quitting
+            and reopening gave people MORE options than staying put. */}
         {onSignOut && (
           <button
             type="button"
@@ -386,7 +393,11 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
         {/* Apple requires the auto-renew terms and both policy links on the
             screen where the purchase is made. */}
         <p style={{ fontSize: 11.5, lineHeight: 1.5, color: T.ink3, margin: '12px 0 0' }}>
-          {isAnnual ? '1 year subscription, auto-renewing.' : '1 month subscription, auto-renewing.'}{' '}
+          {/* Guideline 3.1.2(c) wants the period length, the renewal terms
+              and both policy links. It does NOT want them said twice -
+              "auto-renewing" followed by "Renews automatically" was
+              belt-and-braces that read as padding. */}
+          {isAnnual ? '1 year subscription.' : '1 month subscription.'}{' '}
           Renews automatically unless cancelled at least 24 hours before the period
           ends. Manage or cancel in Settings &rsaquo; Apple ID &rsaquo; Subscriptions.{' '}
           <Link to="/terms" style={{ color: T.ink3, textDecoration: 'underline' }}>Terms of Use</Link>

@@ -187,6 +187,9 @@ export default function OnboardingV4({ initialPhase }) {
       <PaywallScreen
         householdId={auth.household?.id}
         onDone={() => goPhase('done')}
+        // An exit exists here too, not just from the launch gate: nobody
+        // should have to force-quit the app to get off this screen.
+        onSignOut={auth.logout}
       />
     );
   }
