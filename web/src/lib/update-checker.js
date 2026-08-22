@@ -63,6 +63,12 @@ export function compareVersions(a, b) {
  */
 export async function checkForUpdate() {
   if (!isNativeIOS()) return null;
+  // A dev/Simulator build is by definition not the App Store build, so
+  // "v1.11.0 is available" is noise there - and worse, it's confusing
+  // noise: a stale Simulator install genuinely IS older than the store,
+  // so the banner is correct and still useless. Same build-time flag as
+  // the paywall bypass; absent from any build that ships.
+  if (import.meta.env?.VITE_PAYWALL_BYPASS === '1') return null;
 
   let currentVersion = null;
   try {

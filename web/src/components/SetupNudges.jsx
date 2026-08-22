@@ -449,6 +449,9 @@ export default function SetupNudges({ members = [] }) {
   //
   // Desktop keeps its single row: it already fits, and there is no gutter
   // to bleed into.
+  // Must equal the page padding (Layout's px-4 = 16px on mobile) so the
+  // row bleeds to the true screen edge. Bleed too little and the peek is
+  // clipped by the gutter; too much and the tiles sit past the edge.
   const GUTTER = 16;
   return (
     <div
@@ -484,7 +487,16 @@ export default function SetupNudges({ members = [] }) {
               position: 'relative',
               // Fixed width so tiles keep their size as others leave, and
               // so the last one is reliably clipped by the screen edge.
-              ...(isMobile ? { flex: '0 0 116px', scrollSnapAlign: 'start' } : null),
+              // Proportional, not fixed px: at 116px three tiles plus their
+              // gaps almost exactly filled a 17 Pro, leaving a ~10px sliver
+              // that read as a rendering glitch rather than "there's more".
+              // 27% puts ~3.4 tiles in view on every size, so roughly half
+              // of the fourth is showing - unmistakably a partial card
+              // rather than the 20px sliver a wider tile leaves. minWidth
+              // stops the labels crushing on the narrowest phones.
+              ...(isMobile
+                ? { flex: '0 0 27%', minWidth: 94, scrollSnapAlign: 'start' }
+                : null),
               minHeight: isMobile ? 96 : 106,
               borderRadius: isMobile ? 22 : 20,
               padding: isMobile ? '14px 15px 13px' : '16px 18px 14px',
