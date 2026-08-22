@@ -490,13 +490,12 @@ export default function SetupNudges({ members = [] }) {
               // Proportional, not fixed px: at 116px three tiles plus their
               // gaps almost exactly filled a 17 Pro, leaving a ~10px sliver
               // that read as a rendering glitch rather than "there's more".
-              // 27% puts ~3.4 tiles in view on every size, so roughly half
-              // of the fourth is showing - unmistakably a partial card
-              // rather than the 20px sliver a wider tile leaves. minWidth
-              // stops the labels crushing on the narrowest phones.
-              ...(isMobile
-                ? { flex: '0 0 27%', minWidth: 94, scrollSnapAlign: 'start' }
-                : null),
+              // Fixed width, back from a proportional one: at 27% the tiles
+              // were narrow enough that "Invite your family" broke onto
+              // three lines and the row read as squashed. 110px keeps the
+              // roomier look of the original 116 while still leaving a
+              // visible slice of the next tile.
+              ...(isMobile ? { flex: '0 0 110px', scrollSnapAlign: 'start' } : null),
               minHeight: isMobile ? 96 : 106,
               borderRadius: isMobile ? 22 : 20,
               padding: isMobile ? '14px 15px 13px' : '16px 18px 14px',
@@ -517,7 +516,10 @@ export default function SetupNudges({ members = [] }) {
               <Glyph id={task.id} fg={tint.fg} size={isMobile ? 23 : 24} />
             </div>
             <div style={{
-              fontSize: isMobile ? 14.5 : 15,
+              // 13.5 on mobile: at 14.5 the longer labels needed a third
+              // line once the tiles narrowed, which is what made the row
+              // look cramped. Desktop is unchanged - it has the width.
+              fontSize: isMobile ? 13.5 : 15,
               fontWeight: 600,
               color: tint.fg,
               lineHeight: 1.3,
