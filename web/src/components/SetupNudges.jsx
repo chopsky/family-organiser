@@ -64,7 +64,7 @@ const TASKS = [
   // 'emails-to-ai' is the real Settings slug (IOS_SECTIONS). A made-up
   // one fails SILENTLY - the deep-link effect returns early and the
   // tile just lands on Settings with nothing open.
-  { id: 'inbox', label: 'Claim house inbox', to: '/settings?section=emails-to-ai' },
+  { id: 'inbox', label: 'Claim your inbox', to: '/settings?section=emails-to-ai' },
   { id: 'school', label: "Add their school", to: '/school', needsChild: true },
 ];
 
