@@ -34,7 +34,9 @@ export const WHATSAPP_BEN = {
   d: 'Forward a school letter, the dates add themselves.',
 };
 
-/** Someone who skipped the picker still gets a plan - these two are the default. */
+/** Defensive default only - the picker can no longer be skipped, but a
+ *  resumed draft or a corrupted store can still arrive with no pains,
+ *  and the plan and paywall screens must never render empty. */
 export const PAINS_FALLBACK = ['calendar', 'mental'];
 
 /** Screen 04 household shape. */

@@ -17,7 +17,10 @@ import { STEPS } from './flow';
 
 /** Per-step metadata. `skipLabel` null = the step cannot be skipped. */
 export const STEP_META = {
-  pains:     { required: false, autoAdvance: false, skipLabel: 'None of these, just looking' },
+  // No skip (founder call 2026-08-21): the picker is what personalises
+  // the plan screen AND the paywall, so an empty answer costs the two
+  // screens that do the most selling. canAdvance already requires one.
+  pains:     { required: true,  autoAdvance: false, skipLabel: null },
   plan:      { required: false, autoAdvance: false, skipLabel: null },  // nothing to skip; CTA only
   shape:     { required: false, autoAdvance: true,  skipLabel: 'Skip' },
   you:       { required: true,  autoAdvance: false, skipLabel: null },
