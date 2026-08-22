@@ -171,6 +171,21 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
       // for Play Billing, Android families would walk into a hard paywall
       // nobody decided to give them. Name the platform instead of relying
       // on an env var to stay absent.
+      // Simulator escape. Xcode's Simulator can't complete a real
+      // purchase without a StoreKit config, and a signed-out or
+      // unsubscribed Apple ID has no entitlement to be waved through on -
+      // so testing the FLOW meant being stuck at the wall every run.
+      //
+      // Build-time only, and never set in any build that ships: the flag
+      // lives in web/.env.local, which .gitignore excludes (.env.*), so
+      // it cannot be committed and a release build simply doesn't have
+      // it. Loud on purpose - if this line ever appears in a TestFlight
+      // console, the build was made wrong.
+      if (import.meta.env?.VITE_PAYWALL_BYPASS === '1') {
+        console.warn('[paywall] BYPASSED by VITE_PAYWALL_BYPASS - dev builds only');
+        leave();
+        return;
+      }
       if (Capacitor.getPlatform() !== 'ios') { leave(); return; }
       // No IAP, or built without the key: nothing to sell, don't block.
       if (!isIapPlatform() || !iapKeyPresent()) { leave(); return; }

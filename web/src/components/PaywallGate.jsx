@@ -35,6 +35,9 @@ export default function PaywallGate({ children }) {
 
   // Never flash a paywall at someone while we still don't know: an
   // unresolved status must read as "let them in", not "make them pay".
+  // Same build-time escape as the onboarding wall, so a bypassed dev
+  // build isn't stopped on relaunch by the gate instead.
+  if (import.meta.env?.VITE_PAYWALL_BYPASS === '1') return children;
   if (loading || unlocked || isInternal) return children;
   if (!paywallRequired || isActive) return children;
 
