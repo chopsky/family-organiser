@@ -58,6 +58,13 @@ const TASKS = [
   // Only offered once the household has a CHILD dependent - a school nudge
   // for a couple with no kids is noise, and the tile appearing right after
   // they add their first child is the moment it is most likely to land.
+  // Placed after the connect tiles, before reminders: the "get things in"
+  // tasks belong together. NOT gated on children - forwarding is just as
+  // useful for bookings, orders and appointments.
+  // 'emails-to-ai' is the real Settings slug (IOS_SECTIONS). A made-up
+  // one fails SILENTLY - the deep-link effect returns early and the
+  // tile just lands on Settings with nothing open.
+  { id: 'inbox', label: 'Claim house inbox', to: '/settings?section=emails-to-ai' },
   { id: 'school', label: "Add their school", to: '/school', needsChild: true },
 ];
 
@@ -68,6 +75,7 @@ const TINT = {
   cal: { bg: '#E2ECFA', fg: '#2E5799' },
   rem: { bg: '#FBF1DE', fg: '#8A5F1E' },
   school: { bg: '#F3EDFC', fg: '#5A3488' },
+  inbox: { bg: '#FAECE7', fg: '#993C1D' },
 };
 
 const CELEBRATION_HOLD_MS = 1600;
@@ -96,6 +104,10 @@ function Glyph({ id, fg, size }) {
         <path d="M13.7 20a2 2 0 0 1-3.4 0" />
       </svg>
     );
+  }
+  if (id === 'inbox') {
+    // Envelope, matching the onboarding step's demo card.
+    return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M4 7l8 6 8-6" /></svg>;
   }
   if (id === 'school') {
     return (
@@ -227,6 +239,13 @@ function useDerivedCompletion(members) {
     return () => { cancelled = true; };
   }, []);
 
+  // Claimed = the household holds a memorable alias. Derived, never from
+  // tapping the tile: claiming in Settings or during onboarding must tick
+  // it off too. A household with only the hex token counts as unclaimed -
+  // that token is exactly what nobody can dictate over the phone.
+  const { household } = useAuth();
+  const inboxClaimed = Boolean(household?.email_alias);
+
   const me = members.find((m) => m.id === user?.id) || null;
 
   // A second ADULT, not a second row. getHouseholdMembers returns dependents
@@ -241,6 +260,7 @@ function useDerivedCompletion(members) {
     cal: calConnected,
     rem: notifGranted,
     school: schoolAdded,
+    inbox: inboxClaimed,
     hasChild,
     // Null anywhere means "not known yet" - hold the whole component back
     // rather than flash a tile that is about to vanish. The school answer
@@ -412,16 +432,40 @@ export default function SetupNudges({ members = [] }) {
     );
   }
 
-  // ── Grid ──────────────────────────────────────────────────────────────
-  // Phone: 2 columns. Desktop: one row, one column per task in the platform's
-  // set — three here, since reminders is phone-only. Columns are fixed at that
-  // count so tiles keep their width as others leave rather than stretching.
+  // ── Tiles ─────────────────────────────────────────────────────────────
+  // Phone: ONE side-scrolling row (founder call 2026-08-21, the Ring
+  // pattern). Six tiles in two columns ran to three rows and pushed the
+  // whole dashboard below the fold; a single row gives ~230px back.
+  //
+  // The row deliberately BLEEDS to the screen edge: the half-visible tile
+  // at the right is the only thing telling anyone it scrolls. Hence the
+  // negative right margin cancelling the page gutter, with the padding
+  // restored inside so the last tile can sit under the edge.
+  //
+  // The trade, stated plainly: a grid shows every remaining task at once,
+  // a scroller hides everything past the second. Acceptable because these
+  // are a gentle nudge, not a checklist someone is working through - but
+  // it IS the reason to watch whether later tiles get tapped less.
+  //
+  // Desktop keeps its single row: it already fits, and there is no gutter
+  // to bleed into.
+  const GUTTER = 16;
   return (
     <div
-      style={{
+      style={isMobile ? {
+        display: 'flex',
+        gap: 10,
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollSnapType: 'x proximity',
+        marginRight: -GUTTER,
+        paddingRight: GUTTER,
+        paddingBottom: 2,
+        scrollbarWidth: 'none',
+      } : {
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${tasks.length}, 1fr)`,
-        gap: isMobile ? 10 : 14,
+        gridTemplateColumns: `repeat(${tasks.length}, 1fr)`,
+        gap: 14,
       }}
     >
       {remaining.map((task) => {
@@ -438,7 +482,10 @@ export default function SetupNudges({ members = [] }) {
             }}
             style={{
               position: 'relative',
-              minHeight: isMobile ? 104 : 106,
+              // Fixed width so tiles keep their size as others leave, and
+              // so the last one is reliably clipped by the screen edge.
+              ...(isMobile ? { flex: '0 0 116px', scrollSnapAlign: 'start' } : null),
+              minHeight: isMobile ? 96 : 106,
               borderRadius: isMobile ? 22 : 20,
               padding: isMobile ? '14px 15px 13px' : '16px 18px 14px',
               background: tint.bg,
