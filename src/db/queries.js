@@ -7930,6 +7930,40 @@ async function isInboundSenderAllowed(householdId, email, db = supabase) {
 // Best-effort: stamp last_used_at on a sender after we successfully
 // processed mail from them. Used by the admin page to show "active"
 // addresses vs ones added once and never used.
+/**
+ * Has this household already been told about this sender being blocked,
+ * in the last 24 hours?
+ *
+ * Derived from the rejection log rather than a new "notified" column:
+ * the log row is written immediately before the notification, so a
+ * SECOND rejection from the same sender within a day means we already
+ * nudged them. Cheap, and it can't drift out of sync with the thing it
+ * describes. Fails OPEN (returns false) so a query wobble sends the
+ * notification rather than swallowing it - being told twice is a far
+ * smaller problem than never being told at all.
+ */
+async function wasSenderRejectionNotified(householdId, email, db = supabase) {
+  const normalised = String(email || '').trim().toLowerCase();
+  if (!normalised) return true; // nothing to notify about
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const { data, error } = await db
+      .from('inbound_email_log')
+      .select('id')
+      .eq('household_id', householdId)
+      .eq('status', 'rejected')
+      .ilike('from_email', `%${normalised}%`)
+      .gte('created_at', since)
+      .limit(2);
+    if (error) throw error;
+    // The row for THIS rejection is already written, so one row means
+    // this is the first; two or more means we've nudged them already.
+    return (data || []).length > 1;
+  } catch {
+    return false;
+  }
+}
+
 async function touchInboundSender(householdId, email, db = supabase) {
   const normalised = String(email || '').trim().toLowerCase();
   if (!normalised) return;
@@ -10774,6 +10808,7 @@ module.exports = {
   deleteInboundSender,
   isInboundSenderAllowed,
   touchInboundSender,
+  wasSenderRejectionNotified,
   createInboundEmailLog,
   updateInboundEmailLog,
   getInboundEmailLogByUndoToken,

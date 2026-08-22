@@ -7,6 +7,7 @@ const { extractEmailContent, extractAttachmentText } = require('../services/emai
 const { localToUTC } = require('../utils/local-time');
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation, sendInboundEmailNoResults } = require('../services/email');
+const push = require('../services/push');
 
 // Don't auto-reply to automated/no-reply senders even if they're somehow
 // on the allowlist - replying risks a mail loop and the bounce is noise.
@@ -125,6 +126,29 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
           });
         } catch (e) {
           console.warn('[inbound-email] could not log rejection:', e.message);
+        }
+        // Tell them. A silent rejection is why this feature looks broken:
+        // someone forwards a school letter, nothing happens, and the
+        // recovery UI (Settings -> "We blocked some forwarded mail") is
+        // somewhere they have no reason to look. It matters most for the
+        // 19% of accounts signed in with Apple private relay, whose
+        // account address can NEVER match the one they forward from -
+        // for them the allowlist is unusable until someone tells them.
+        //
+        // Throttled to one notification per sender per household per day:
+        // a parent re-forwarding three letters in a row should be nudged
+        // once, not three times.
+        try {
+          const already = await db.wasSenderRejectionNotified(householdId, fromAddress);
+          if (!already) {
+            await push.sendToHousehold(householdId, null, {
+              title: 'We blocked a forwarded email',
+              body: `${fromAddress} isn't on your list yet. Tap to allow it and re-forward.`,
+              data: { type: 'inbound_rejected', email: fromAddress },
+            });
+          }
+        } catch (e) {
+          console.warn('[inbound-email] rejection notify skipped:', e.message);
         }
         return;
       }

@@ -2329,6 +2329,23 @@ export default function Settings() {
               {senderError && <p className="text-xs text-coral mt-1">{senderError}</p>}
             </div>
 
+            {/* Apple private relay: their ACCOUNT address can never be the
+                one they forward from, so the members-are-allowed default
+                does nothing for them and every forward is rejected until
+                they add a real address. 19% of accounts are in this
+                position, so say it plainly rather than letting them find
+                out by being ignored. */}
+            {(accountInfo?.email || '').includes('privaterelay.appleid.com') && (
+              <div className="rounded-xl border border-plum/25 bg-plum-light/50 p-3.5 mb-3">
+                <p className="text-sm font-semibold text-bark mb-1">Add the address you'll forward from</p>
+                <p className="text-xs text-cocoa">
+                  You signed in with Apple, so your account uses a private relay address.
+                  Add the email address you actually send from below, or forwarded mail
+                  won't get through.
+                </p>
+              </div>
+            )}
+
             {/* Rejected-sender nudge: mail we blocked because the sender
                 wasn't on the allowlist. Admin-only, since only admins can
                 allow. Surfacing this turns a silent failure ("I forwarded
