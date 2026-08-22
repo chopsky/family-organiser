@@ -25,6 +25,7 @@ import {
 import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
 import { CalendarList, CalendarConnect } from './calendarScreens';
 import { RemindersBody, RemindersFooter } from './remindersScreen';
+import InboxStep, { InboxFooter } from './inboxScreen';
 import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import PaywallScreen from './paywallScreen';
@@ -66,6 +67,12 @@ export default function OnboardingV4({ initialPhase }) {
   // flag and an explanation line rather than silently doing nothing.
   const [remBusy, setRemBusy] = useState(false);
   const [remNote, setRemNote] = useState('');
+
+  // Step 10's footer lives in the Step frame but its state (typed slug,
+  // claim progress) lives in the step body - so the body publishes both
+  // upward and hands back the claim action for the footer to fire.
+  const [{ value: inboxValue, claim: inboxClaim }, setInboxState] = useState({ value: '', claim: 'idle' });
+  const inboxClaimRef = useRef(null);
 
   // Arriving from the verification LINK. Verify.jsx redeems the token, logs
   // the user in and sends them to /signup - so v4 remounts with a live session
@@ -227,6 +234,13 @@ export default function OnboardingV4({ initialPhase }) {
           // Screen 09 owns its footer entirely - a green WhatsApp button, not
           // the standard CTA, and no skip once the answer is in.
           <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} onContinue={next} />
+        ) : step === 'inbox' ? (
+          // Step 10 owns its footer: the CTA becomes a green confirmation
+          // box on success, and the skip disappears once claiming starts.
+          <>
+            <InboxFooter value={inboxValue} claim={inboxClaim} onClaim={() => inboxClaimRef.current && inboxClaimRef.current()} />
+            {inboxClaim === 'idle' && <Ghost onClick={skip}>Skip for now</Ghost>}
+          </>
         ) : step === 'reminders' ? (
           // Screen 10's CTA triggers a one-shot OS prompt, so it is its own
           // control rather than the standard advance button.
@@ -274,6 +288,16 @@ export default function OnboardingV4({ initialPhase }) {
         ) : (
           <CalendarList d={d} onConnect={setConnecting} />
         ))}
+
+        {step === 'inbox' && (
+          <InboxStep
+            d={d}
+            update={update}
+            onNext={next}
+            onState={setInboxState}
+            claimRef={inboxClaimRef}
+          />
+        )}
 
         {step === 'reminders' && <RemindersBody d={d} reduced={reduced} note={remNote} />}
       </Step>

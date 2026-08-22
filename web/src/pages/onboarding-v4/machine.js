@@ -25,6 +25,7 @@ export const STEP_META = {
   house:     { required: true,  autoAdvance: false, skipLabel: null },
   cals:      { required: false, autoAdvance: false, skipLabel: "I'll do this later" },
   ask:       { required: false, autoAdvance: false, skipLabel: "I don't use WhatsApp" },
+  inbox:     { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
   reminders: { required: false, autoAdvance: false, skipLabel: 'Maybe later' },
 };
 

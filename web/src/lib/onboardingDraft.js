@@ -37,6 +37,7 @@ export const emptyDraft = () => ({
   role: '',
   house: '',      // household name -> screens 11, 12
   cals: {},       // { providerId: true } - CONNECTED INTENT ONLY, never the URL
+  inbox: '',      // claimed house-inbox slug; the alias is set after sign-up
   wa: false,      // wants WhatsApp; the real pairing happens after sign-up
   rem: false,     // notification permission granted
 });
@@ -112,6 +113,12 @@ export function completedRecap(d) {
     });
   }
   if (d.wa) rows.push({ key: 'wa', icon: '💬', label: 'WhatsApp', value: 'Connected' });
+  if (d.inbox) {
+    rows.push({
+      key: 'inbox', icon: '✉️', label: 'House inbox',
+      value: `${d.inbox}@inbox.housemait.com`,
+    });
+  }
   if (d.rem) rows.push({ key: 'rem', icon: '🔔', label: 'Nudges', value: 'On' });
   return rows;
 }

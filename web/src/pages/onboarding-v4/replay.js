@@ -102,8 +102,37 @@ export async function startWhatsAppPairing() {
  * Everything queued, replayed in one call. Returns a summary the welcome screen
  * can speak to honestly.
  */
+/**
+ * Claim the house-inbox alias the user picked at step 10.
+ *
+ * Availability was checked when they claimed it, but nothing was
+ * reserved - a real reservation would need an anonymous-session table
+ * and a TTL sweep to guard a window of minutes at a handful of signups
+ * a day. So this is where it becomes real, and the ONE outcome that
+ * matters is losing the race: 409 means somebody else took it while
+ * this person was signing up. Report that (the welcome screen says so
+ * and points at Settings) rather than leaving them believing they hold
+ * an address they don't - the same rule replayCalendars follows.
+ *
+ * Resolves { claimed: string|null, conflict: boolean }. Never throws.
+ */
+export async function replayInbox(slug) {
+  if (!slug) return { claimed: null, conflict: false };
+  try {
+    await api.patch('/household/email-alias', { alias: slug });
+    return { claimed: slug, conflict: false };
+  } catch (err) {
+    const status = err?.response?.status;
+    // 409 = taken in the meantime. Anything else (network, 500) is not
+    // worth alarming someone about: the address simply isn't set, and
+    // Settings offers it again with the same picker.
+    return { claimed: null, conflict: status === 409 };
+  }
+}
+
 export async function replayQueued(d) {
   const calendars = await replayCalendars(d?.cals || {});
   const whatsapp = d?.wa ? await startWhatsAppPairing() : null;
-  return { calendars, whatsapp };
+  const inbox = await replayInbox(d?.inbox);
+  return { calendars, whatsapp, inbox };
 }
