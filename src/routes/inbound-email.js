@@ -31,13 +31,17 @@ const inboundLimiter = rateLimit({
 
 /**
  * Parse the local part of the To address. Could be either:
- *   - A 12-char hex token (legacy/backup): "74e142d0586a@inbound.housemait.com"
- *   - A memorable alias: "shapiro@inbound.housemait.com"
+ *   - A 12-char hex token (legacy/backup): "74e142d0586a@inbox.housemait.com"
+ *   - A memorable alias: "shapiro@inbox.housemait.com"
  * We don't decide here which one it is - return both candidates and
  * let the household lookup try each. (No alias-format check at parse
  * time so a typo'd alias still resolves to "household not found"
  * instead of "couldn't parse address".)
  */
+// Domain-agnostic ON PURPOSE: we match on the local part alone, so mail
+// to any domain Postmark routes here (inbox.housemait.com today, the
+// older inbound.housemait.com for anyone who saved it) resolves to the
+// right household with no code change.
 function parseLocalPart(toAddress) {
   if (!toAddress) return null;
   const emailMatch = toAddress.match(/<([^>]+)>/) || [null, toAddress];

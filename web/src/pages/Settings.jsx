@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext';
 import api from '../lib/api';
+import { INBOUND_EMAIL_DOMAIN, inboundEmailAddress } from '../lib/inboundEmail';
 import ErrorBanner from '../components/ErrorBanner';
 import ProviderLogo from '../components/ProviderLogo';
 import Spinner from '../components/Spinner';
@@ -1400,12 +1401,12 @@ export default function Settings() {
   useEffect(() => {
     const local = household?.email_alias || household?.inbound_email_token;
     if (local) {
-      setReceiptEmail(`${local}@inbound.housemait.com`);
+      setReceiptEmail(inboundEmailAddress(local));
     } else {
       // Cache might not have the household with these fields yet - fetch fresh.
       api.get('/household').then(({ data }) => {
         const fallback = data.household?.email_alias || data.household?.inbound_email_token;
-        if (fallback) setReceiptEmail(`${fallback}@inbound.housemait.com`);
+        if (fallback) setReceiptEmail(inboundEmailAddress(fallback));
       }).catch(() => {});
     }
   }, [household?.email_alias, household?.inbound_email_token]);
@@ -2249,7 +2250,7 @@ export default function Settings() {
                     className="flex-1 min-w-0 border border-cream-border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                   <span className="shrink-0 flex items-center text-sm text-cocoa whitespace-nowrap">
-                    @inbound.housemait.com
+                    @{INBOUND_EMAIL_DOMAIN}
                   </span>
                 </div>
                 {aliasAvailability && aliasInput.trim() && (

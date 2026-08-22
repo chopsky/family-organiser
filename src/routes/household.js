@@ -866,7 +866,7 @@ router.post('/regenerate-email-address', requireAuth, requireHousehold, requireA
 // ─── Inbound email alias + sender allowlist ─────────────────────────
 //
 // The alias replaces the hard-to-remember hex token with a memorable
-// "<slug>@inbound.housemait.com" address. The sender allowlist gates
+// "<slug>@inbox.housemait.com" address. The sender allowlist gates
 // who is allowed to send mail to that address (or to the long token)
 // - prevents the inbound channel becoming a spam vector if either
 // address leaks. See migration-inbound-email-alias-senders.sql for

@@ -1,7 +1,7 @@
 /**
  * Email-alias validation for the inbound webhook.
  *
- * Aliases form the user-facing local part of "<alias>@inbound.housemait.com".
+ * Aliases form the user-facing local part of "<alias>@inbox.housemait.com".
  * They need to be safe for email systems and for humans to remember.
  *
  * Rules:
