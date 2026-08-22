@@ -2306,7 +2306,7 @@ export default function Settings() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-cocoa italic">No senders on the allowlist yet - anyone trying to forward to your inbound address will be blocked. Add an email below to get started.</p>
+                <p className="text-xs text-cocoa italic">Everyone in your household can forward already, using the email address on their account. Add another address below if you want mail from somewhere else to get through - a work address, or the school office.</p>
               )}
               {isAdmin && (
                 <form onSubmit={handleAddSender} className="mt-3 flex gap-2">

@@ -7884,9 +7884,39 @@ async function deleteInboundSender(senderId, householdId, db = supabase) {
   if (error) throw error;
 }
 
+/**
+ * Is this sender allowed to forward mail into the household?
+ *
+ * Two ways to qualify:
+ *   1. An explicit allowlist row (a partner's work address, the school
+ *      office, a grandparent) - added in Settings.
+ *   2. Being a MEMBER of the household. Implicit, because requiring
+ *      someone to allowlist their own verified address before the
+ *      feature works is a hoop with no security value - they can
+ *      already add anything through the app - and it was the actual
+ *      reason forwarding failed on first use: a new household starts
+ *      with an empty allowlist, so the most likely first attempt was
+ *      silently rejected. (Strawberry Hayes's ONLY ever attempt, and 7
+ *      of Parry House's 29, died this way.)
+ *
+ * Doing it here rather than seeding rows at signup covers every route
+ * into a household - created, invited, joined by code - including ones
+ * added later, and fixes existing households with no migration.
+ */
 async function isInboundSenderAllowed(householdId, email, db = supabase) {
   const normalised = String(email || '').trim().toLowerCase();
   if (!normalised) return false;
+
+  // Members are always allowed, on their verified account address.
+  try {
+    const { data: member } = await db
+      .from('users')
+      .select('id')
+      .eq('household_id', householdId)
+      .ilike('email', normalised)
+      .limit(1);
+    if ((member || []).length > 0) return true;
+  } catch { /* fall through to the explicit list */ }
   const { data, error } = await db
     .from('household_inbound_senders')
     .select('id')
