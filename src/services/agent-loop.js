@@ -106,12 +106,26 @@ function titleMatches(topic, title) {
   return words.some((w) => t.includes(w) || t.split(/\s+/).some((tw) => tw.startsWith(w.slice(0, 4))));
 }
 
-function compactRow(ev) {
+function compactRow(ev, tz = 'Europe/London') {
+  // Local wall-clock strings, NEVER raw UTC ISO: handing the model
+  // "2026-08-23T20:00:00Z" plus a "timezone: Europe/London" note makes it
+  // do +1 arithmetic on every time it prints - and it doesn't (real
+  // 2026-08-23 transcript: a 9pm BST padel answered as "8:00pm"). The
+  // conversion happens HERE, in code, so there is nothing left to convert.
+  const local = (iso, dateOnly) => {
+    if (!iso) return undefined;
+    if (dateOnly) return String(iso).slice(0, 10); // all-day sentinels are date-anchored
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    const date = d.toLocaleDateString('en-CA', { timeZone: tz }); // YYYY-MM-DD, sortable
+    const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+    return `${date} ${time}`;
+  };
   return {
     id: ev.id || undefined,
     title: ev.title,
-    start: ev.start_time,
-    end: ev.end_time || undefined,
+    start: local(ev.start_time, !!ev.all_day),
+    end: ev.end_time ? local(ev.end_time, !!ev.all_day) : undefined,
     all_day: !!ev.all_day || undefined,
     who: (ev.assigned_to_names || []).length ? ev.assigned_to_names : undefined,
     weekly_activity: ev.activity_id ? true : undefined,
@@ -158,7 +172,8 @@ async function agentCalendarAnswer({ text, topic, user, household, userTz }, dep
   const messages = [{
     role: 'user',
     content:
-      `Today is ${todayStr}. Household timezone: ${userTz}. Household members: ${memberNames || 'unknown'}.\n` +
+      `Today is ${todayStr}. Household members: ${memberNames || 'unknown'}.\n` +
+      `All event times in tool results are ALREADY in the household's local time (${userTz}) - repeat them as given, never convert or shift them.\n` +
       `Question: ${String(text).slice(0, 400)}` +
       // A terse follow-up ("And the week after?") arrives here without the
       // question it continues - the classifier resolved that from history
@@ -230,7 +245,7 @@ async function agentCalendarAnswer({ text, topic, user, household, userTz }, dep
             for (const ev of rows) {
               if (ev.id && !ev.activity_id) seenReferents.push({ kind: 'event', id: ev.id, label: ev.title });
             }
-            payload = { count: rows.length, truncated: truncated || undefined, results: rows.map(compactRow) };
+            payload = { count: rows.length, truncated: truncated || undefined, results: rows.map((r) => compactRow(r, userTz)) };
           }
         } catch (err) {
           console.error('[agent-loop] search_calendar failed:', err.message);

@@ -84,6 +84,31 @@ describe('agentCalendarAnswer', () => {
     expect(client.calls[0].messages[0].content).toMatch(/Today is \d{4}-\d{2}-\d{2}/);
   });
 
+  test('tool results carry LOCAL wall-clock times, never raw UTC (padel 8pm/9pm bug, 2026-08-23)', async () => {
+    const padel = {
+      id: 'ev-padel',
+      title: 'Padel',
+      start_time: '2026-08-23T20:00:00Z', // 9pm BST
+      end_time: '2026-08-23T21:00:00Z',
+      all_day: false,
+      assigned_to_names: [],
+    };
+    const client = scriptedClient([
+      toolUse('t1', { start_date: '2026-08-23', end_date: '2026-08-23', topic: 'padel' }),
+      finalText('Padel is at 9pm tonight.'),
+    ]);
+    const fetchCalendar = jest.fn(async () => [padel]);
+    await agentCalendarAnswer(
+      { text: 'what padel do I have tonight?', user, household, userTz: TZ },
+      { client, fetchCalendar },
+    );
+    const toolResult = client.calls[1].messages.at(-1).content[0];
+    expect(toolResult.content).toContain('2026-08-23 21:00'); // local, converted in code
+    expect(toolResult.content).not.toContain('20:00'); // the raw UTC clock must not reach the model
+    // ...and the prompt says times are already local.
+    expect(client.calls[0].messages[0].content).toMatch(/ALREADY in the household's local time/);
+  });
+
   test('turn cap exhausted → null (caller falls back)', async () => {
     const endless = Array.from({ length: MAX_TURNS + 2 }, (_, i) =>
       toolUse(`t${i}`, { start_date: '2026-01-01', end_date: '2026-01-02' }));
