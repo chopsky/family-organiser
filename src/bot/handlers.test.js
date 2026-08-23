@@ -1478,6 +1478,68 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(ans.response).toMatch(/2 hours before/i);
   });
 
+  test('moving a start past its end rolls the end over midnight, not back a day (padel 11PM bug)', () => {
+    // Sun 21:00-22:00 BST moved to 23:00 with end "00:00": the end belongs
+    // to Monday, not 23 hours before the start.
+    const existing = { start_time: '2026-08-23T20:00:00Z', end_time: '2026-08-23T21:00:00Z', all_day: false };
+    const patch = handlers.buildEventUpdates(
+      { start_time: '23:00', end_time: '00:00' },
+      existing,
+      { timezone: 'Europe/London', members: [] },
+      { timezone: 'Europe/London' },
+    );
+    expect(Date.parse(patch.end_time)).toBeGreaterThan(Date.parse(patch.start_time));
+    expect(Date.parse(patch.end_time) - Date.parse(patch.start_time)).toBe(3600000); // 23:00 → 00:00 = 1h
+  });
+
+  test('a start moved late keeps a stale earlier end from going backwards', () => {
+    const existing = { start_time: '2026-08-23T20:00:00Z', end_time: '2026-08-23T21:00:00Z', all_day: false };
+    const patch = handlers.buildEventUpdates(
+      { start_time: '23:00' }, // end not mentioned - stays 22:00 BST, now before the start
+      existing,
+      { timezone: 'Europe/London', members: [] },
+      { timezone: 'Europe/London' },
+    );
+    expect(Date.parse(patch.end_time)).toBeGreaterThan(Date.parse(patch.start_time));
+  });
+
+  test('a reminder offer displaced by another question comes back on the next quiet turn', async () => {
+    const u = { id: 'u-loop-deferred', name: 'Grant' };
+    // The model spent this turn's question on a duplicate check - no
+    // reminder question in the reply, so nothing armed... but the offer is
+    // owed, not dropped (padel transcript 2026-08-23).
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Is this a genuine second session, or shall I double check for a duplicate?');
+    expect(handlers.popReminderTarget(u.id)).toBeNull();
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Got it, keeping both sessions.' });
+    const quiet = await handlers.handleTextMessage('genuine', u, hh, {});
+    expect(quiet.response).toMatch(/keeping both sessions/);
+    expect(quiet.response).toMatch(/Want me to add a reminder for \*\*Logan eye appointment\*\*, say 30 minutes before\?/);
+    // ...and the offer is armed: "Yes" completes in one turn.
+    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
+    expect(yes.response).toMatch(/30 minutes before/i);
+  });
+
+  test('a deferred offer waits again if the next turn also asks a question', async () => {
+    const u = { id: 'u-loop-deferred2', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment. Is this a genuine second session?');
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Shall I invite Lynn too?' });
+    const busy = await handlers.handleTextMessage('genuine', u, hh, {});
+    expect(busy.response).not.toMatch(/add a reminder/i); // one question per turn
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'No problem.' });
+    const quiet = await handlers.handleTextMessage('no', u, hh, {});
+    expect(quiet.response).toMatch(/Want me to add a reminder/i);
+  });
+
+  test('undoing the add kills the deferred offer with it', async () => {
+    const u = { id: 'u-loop-deferred3', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment. Is this a genuine second session?');
+    await handlers.handleTextMessage('undo', u, hh, {});
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'All quiet.' });
+    const quiet = await handlers.handleTextMessage('thanks anyway', u, hh, {});
+    expect(quiet.response).not.toMatch(/add a reminder/i); // the event is gone
+  });
+
   test('never asks the same question twice: second failure lets go gracefully', async () => {
     const u = { id: 'u-loop-giveup', name: 'Grant' };
     await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');

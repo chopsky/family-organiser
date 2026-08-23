@@ -42,6 +42,7 @@ const SYSTEM_STATIC = [
   '- Keep any bullet list in the template as a bullet list; only rewrite the words around it.',
   "- British English, first person (\"I've moved…\"), at most one emoji, no exclamation overload.",
   '- Dates read like "Sun 23 Aug", times like "4:30pm". Never ISO formats.',
+  '- Plain hyphens only. Never em dashes or en dashes (— –).',
   '- Output ONLY the rewritten reply text.',
 ].join('\n');
 

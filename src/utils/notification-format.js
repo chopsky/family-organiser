@@ -131,6 +131,21 @@ function summariseEventChanges(prev, updates, tz = 'Europe/London') {
   if (!prev || !updates) return '';
   const parts = [];
 
+  // Calendar date of an instant IN THE HOUSEHOLD'S TIMEZONE. Slicing the
+  // raw ISO string reads the UTC date, which is a day off for late-evening
+  // times in BST (a Sunday-midnight end displayed as "until Sat 22 Aug",
+  // real 2026-08-23 transcript). All-day events keep the raw slice: they
+  // are stored as date-anchored ...T00:00:00Z/...T23:59:59Z sentinels and
+  // timezone-shifting the 23:59 end bumps it into the next day.
+  const ymdOf = (iso) => {
+    if (!iso) return null;
+    if (prev.all_day) return String(iso).slice(0, 10);
+    const d = new Date(iso);
+    return isNaN(d.getTime())
+      ? String(iso).slice(0, 10)
+      : new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+  };
+
   if (updates.title !== undefined && updates.title !== prev.title) {
     parts.push(`renamed to "${updates.title}"`);
   }
@@ -138,8 +153,8 @@ function summariseEventChanges(prev, updates, tz = 'Europe/London') {
   // separately so 'moved to Tuesday' and 'moved to 14:00' read
   // naturally rather than one merged 'moved to 2026-05-26T14:00' blob.
   if (updates.start_time !== undefined && updates.start_time !== prev.start_time) {
-    const prevDate = prev.start_time ? String(prev.start_time).slice(0, 10) : null;
-    const nextDate = String(updates.start_time).slice(0, 10);
+    const prevDate = ymdOf(prev.start_time);
+    const nextDate = ymdOf(updates.start_time);
     const prevHHMM = formatHHMM(prev.start_time, tz);
     const nextHHMM = formatHHMM(updates.start_time, tz);
     if (prevDate !== nextDate) {
@@ -153,10 +168,10 @@ function summariseEventChanges(prev, updates, tz = 'Europe/London') {
   // and the user saw a bare '✏️ Updated "X".' with no idea what changed
   // (real 2026-07-22 Nici Bournemouth transcript).
   if (updates.end_time !== undefined && updates.end_time !== prev.end_time) {
-    const prevEndDate = prev.end_time ? String(prev.end_time).slice(0, 10) : null;
-    const nextEndDate = String(updates.end_time).slice(0, 10);
+    const prevEndDate = ymdOf(prev.end_time);
+    const nextEndDate = ymdOf(updates.end_time);
     const startIso = updates.start_time !== undefined ? updates.start_time : prev.start_time;
-    const startDate = startIso ? String(startIso).slice(0, 10) : null;
+    const startDate = ymdOf(startIso);
     const nextEndHHMM = formatHHMM(updates.end_time, tz);
     if (prevEndDate !== nextEndDate && nextEndDate !== startDate) {
       parts.push(`now until ${formatDateLabel(nextEndDate, tz)}`);

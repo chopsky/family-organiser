@@ -516,6 +516,63 @@ function popReminderTarget(userId) {
   return entry;
 }
 
+// A reminder offer that lost its turn to a more urgent question (duplicate
+// check, party-invite ask) is deferred here instead of dropped - one
+// question per turn, but never forgotten. Consumed on the next turn whose
+// reply isn't asking anything (real 2026-08-23 padel transcript: the
+// duplicate question won the turn and the offer evaporated).
+const deferredReminderOffer = new Map(); // userId → { target, householdId, timestamp }
+const DEFERRED_OFFER_TTL_MS = 10 * 60 * 1000;
+
+function rememberDeferredReminderOffer(userId, entry) {
+  deferredReminderOffer.set(userId, { ...entry, timestamp: Date.now() });
+}
+
+function popDeferredReminderOffer(userId) {
+  const entry = deferredReminderOffer.get(userId);
+  if (!entry) return null;
+  deferredReminderOffer.delete(userId);
+  if (Date.now() - entry.timestamp > DEFERRED_OFFER_TTL_MS) return null;
+  return entry;
+}
+
+// Append a deferred reminder offer to a quiet outgoing reply and arm the
+// pending store so "yes" completes in one turn. `owed` is the entry the
+// caller already popped (the reconciliation tail pops BEFORE writing any
+// new deferral, so an offer deferred on a turn can't bounce straight back
+// onto that same reply). Returns the possibly-extended response.
+function settleDeferredReminderOffer(owed, user, household, ctx, response, actions) {
+  if (!owed || owed.householdId !== household.id || ctx._reminderRemainder) return response;
+  const trail = response.replace(/[\s)*_~`.!]+$/g, '');
+  const remindersSortedNow = (actions?.remindersSaved || 0) > 0 || actions?.notificationSnap;
+  if (!/\?$/.test(trail) && !remindersSortedNow) {
+    const t = owed.target;
+    const timed = t.itemType === 'event' && t.startTime && !t.allDay;
+    rememberReminderTarget(user.id, {
+      ...t,
+      householdId: household.id,
+      suggestedOffsets: timed ? [{ time: 30, unit: 'minutes' }] : [],
+    });
+    return `${response}\n\nWant me to add a reminder for **${t.label}**${timed ? ', say 30 minutes before' : ''}?`;
+  }
+  // This turn is busy too (it asks its own question) - keep waiting, unless
+  // the user sorted a reminder in the meantime or a newer offer took the slot.
+  if (!remindersSortedNow && !deferredReminderOffer.has(user.id)) {
+    rememberDeferredReminderOffer(user.id, owed);
+  }
+  return response;
+}
+
+// When an add is undone, any reminder offer or pending question about the
+// removed rows must die with them - otherwise "yes" a moment later saves a
+// reminder onto a deleted event.
+function clearReminderStoresFor(userId, removedIds) {
+  const pending = pendingReminderTarget.get(userId);
+  if (pending && removedIds.has(pending.itemId)) pendingReminderTarget.delete(userId);
+  const deferred = deferredReminderOffer.get(userId);
+  if (deferred && removedIds.has(deferred.target?.itemId)) deferredReminderOffer.delete(userId);
+}
+
 // Merge a recursively-handled message's actions into the current turn's,
 // so a compound reply's second request still drives broadcasts correctly.
 function mergeBotActions(base, extra) {
@@ -1082,6 +1139,7 @@ async function runUndo(user, household) {
     } else if (add.kind === 'shopping') {
       for (const id of add.ids) await db.deleteShoppingItem(id, household.id);
     }
+    clearReminderStoresFor(user.id, new Set(add.ids));
     return { response: `↩️ Undone - removed ${add.label}.`, actions };
   } catch (err) {
     console.error('[handlers] undo failed:', err.message);
@@ -1825,6 +1883,16 @@ function buildEventUpdates(updates, existing, household, user) {
     } else {
       patch.start_time = localToUTC(nextStartDate, nextStart, tz);
       patch.end_time   = localToUTC(nextEndDate,   nextEnd,   tz);
+      // "Padel tonight at 11PM" → start 23:00, end 00:00: an end at or
+      // before the start within a day means the finish rolled past
+      // midnight - it belongs to the NEXT day, not 23 hours in the past
+      // (real 2026-08-23 transcript: a Sunday event "now until Sat 22
+      // Aug"). Bigger gaps are left alone - repairing those would be
+      // guessing.
+      const gap = Date.parse(patch.start_time) - Date.parse(patch.end_time);
+      if (gap > 0 && gap < 24 * 3600000) {
+        patch.end_time = new Date(Date.parse(patch.end_time) + 24 * 3600000).toISOString();
+      }
     }
   }
 
@@ -3554,6 +3622,12 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           householdId: household.id,
           title: createdEv.title,
         });
+        // The invite ask owns this turn - the reminder offer waits for the
+        // first quiet turn instead of being dropped.
+        rememberDeferredReminderOffer(user.id, {
+          target: { itemId: createdEv.id, itemType: 'event', label: createdEv.title, startTime: createdEv.start_time, allDay: !!createdEv.all_day },
+          householdId: household.id,
+        });
       } else {
         const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
         if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
@@ -3587,6 +3661,16 @@ async function handleTextMessage(text, user, household, ctx = {}) {
               suggestedOffsets: proposed.length > 0
                 ? proposed
                 : (timedEvent ? [{ time: 30, unit: 'minutes' }] : []),
+            });
+          } else {
+            // The model's own question owns this turn (a duplicate check,
+            // "shall I invite Lynn?"). One question per turn - but the
+            // reminder offer is deferred to the first quiet turn, not
+            // dropped (real 2026-08-23 padel transcript: "genuine" settled
+            // the duplicate and the offer evaporated).
+            rememberDeferredReminderOffer(user.id, {
+              target: { itemId: createdEv.id, itemType: 'event', label: createdEv.title, startTime: createdEv.start_time, allDay: !!createdEv.all_day },
+              householdId: household.id,
             });
           }
         }
@@ -3886,9 +3970,13 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
   }
 
-  // Handle general chat - just return the AI's conversational response
+  // Handle general chat - just return the AI's conversational response.
+  // Chat turns are the most common "first quiet turn" after a create whose
+  // reminder offer was displaced by another question - pay the offer back
+  // here (this branch never reaches the reconciliation tail).
   if (result.intent === 'chat') {
-    return { response: result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!", actions };
+    const chatReply = result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!";
+    return { response: settleDeferredReminderOffer(popDeferredReminderOffer(user.id), user, household, ctx, chatReply, actions), actions };
   }
 
   // Handle shopping items
@@ -4188,6 +4276,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   const eventAdded = actions.eventsAdded?.length > 0;
   const taskAdded = actions.tasksAdded.length > 0;
   const reminderSaved = (actions.remindersSaved || 0) > 0 || actions.notificationSnap;
+  // Popped BEFORE any new deferral is written below, so an offer deferred
+  // on THIS turn can't bounce straight back onto the same reply.
+  const owedReminderOffer = popDeferredReminderOffer(user.id);
   // Strip trailing markdown / whitespace / closing parens / periods to
   // get at the actual final character. A response ending in "...time?)"
   // should count as already-asking, even though the literal last char
@@ -4275,8 +4366,8 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // The reply flow at the top of handleTextMessage handles the answer
   // deterministically either way. Never arm for a party turn - the invite
   // offer already owns the "yes".
-  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent && !partyEvent
-      && /remind[^.!\n]*\?/i.test(response)) {
+  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent) {
+    const remindQuestionOut = /remind[^.!\n]*\?/i.test(response);
     const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
     const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
     const target = ev
@@ -4284,19 +4375,30 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       : tk
         ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
         : null;
-    // Capture any lead the question proposed ("...the day before?") so a
-    // bare "yes" applies it instead of re-asking. When the offer proposed
-    // nothing (model-authored questions usually don't) a timed event still
-    // gets a 30-minute default: the confirmation names the lead AND the
-    // clock time, so "yes" completes in one turn and stays correctable.
-    if (target?.itemId) {
+    if (target?.itemId && remindQuestionOut && !partyEvent) {
+      // Capture any lead the question proposed ("...the day before?") so a
+      // bare "yes" applies it instead of re-asking. When the offer proposed
+      // nothing (model-authored questions usually don't) a timed event still
+      // gets a 30-minute default: the confirmation names the lead AND the
+      // clock time, so "yes" completes in one turn and stays correctable.
       const proposed = parseRemindersFromMessage(response);
       const suggestedOffsets = proposed.length > 0
         ? proposed
         : (target.itemType === 'event' && target.startTime && !target.allDay ? [{ time: 30, unit: 'minutes' }] : []);
       rememberReminderTarget(user.id, { ...target, householdId: household.id, suggestedOffsets });
+    } else if (target?.itemId && !remindQuestionOut) {
+      // The reminder offer lost this turn to a more urgent question (a
+      // duplicate check, the party-invite ask). Defer it - it comes back
+      // on the first quiet turn instead of being dropped (real 2026-08-23
+      // padel transcript).
+      rememberDeferredReminderOffer(user.id, { target, householdId: household.id });
     }
   }
+
+  // Pay back a deferred reminder offer once the turn that displaced it is
+  // settled - but only on a reply that isn't asking anything itself (one
+  // question per turn), and not if the user sorted a reminder in between.
+  response = settleDeferredReminderOffer(owedReminderOffer, user, household, ctx, response, actions);
 
   // The reply is about to NAME the created rows - remember them so an
   // immediate follow-up modify ("actually make it 5pm") is conversationally
