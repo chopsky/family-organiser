@@ -147,7 +147,7 @@ function logAgentUsage({ householdId, userId, turns, usage }) {
  * deps is a test seam: { client, fetchCalendar } override the Anthropic
  * client and the calendar fetcher.
  */
-async function agentCalendarAnswer({ text, user, household, userTz }, deps = {}) {
+async function agentCalendarAnswer({ text, topic, user, household, userTz }, deps = {}) {
   const startedAt = Date.now();
   const client = deps.client
     || new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -159,7 +159,14 @@ async function agentCalendarAnswer({ text, user, household, userTz }, deps = {})
     role: 'user',
     content:
       `Today is ${todayStr}. Household timezone: ${userTz}. Household members: ${memberNames || 'unknown'}.\n` +
-      `Question: ${String(text).slice(0, 400)}`,
+      `Question: ${String(text).slice(0, 400)}` +
+      // A terse follow-up ("And the week after?") arrives here without the
+      // question it continues - the classifier resolved that from history
+      // into query_topic, so pass its reading along. The agent still sees
+      // the user's actual words first; this is context, not a rewrite.
+      (topic && topic.length > 3
+        ? `\n(Resolved from the conversation: the user is asking about "${String(topic).slice(0, 200)}".)`
+        : ''),
   }];
 
   const seenReferents = [];

@@ -420,6 +420,35 @@ module.exports = [
     },
   },
   {
+    name: 'follow-up continues the QUESTION: "and the week after?" keeps the vacation frame (real transcript 2026-08-23)',
+    message: 'And the week after ?',
+    ctx: {
+      sender: 'Grant',
+      memberNames: ['Grant', 'Lynn', 'Mason', 'Logan'],
+      history: [
+        { role: 'user', content: 'What dates next week would be good for a quick two day vacation?' },
+        { role: 'assistant', content: 'Looking at next week (Mon 24 - Sun 30 Aug), the lightest days are Wed 26 - Thu 27 Aug. I\'d pencil in Wed 26-Thu 27 Aug for your quick two-day break.' },
+      ],
+    },
+    check: (r) => {
+      if (r.intent !== 'query_calendar' && r.intent !== 'chat') {
+        return `expected query_calendar or chat, got ${r.intent}`;
+      }
+      // The regression: the classifier kept the timeframe but dropped the
+      // question, so the deterministic handler dumped a bare event list.
+      // A calendar query here MUST carry the analytical frame in
+      // query_topic, phrased self-contained (resolvable without history).
+      if (r.intent === 'query_calendar') {
+        const topic = r.query_topic || '';
+        if (!topic.trim()) return 'query_topic empty - the vacation question was dropped, this becomes a bare listing';
+        if (!/vacation|holiday|break|getaway|days|nights|away|free|light/i.test(topic)) {
+          return `query_topic "${topic}" does not carry the vacation frame`;
+        }
+      }
+      return null;
+    },
+  },
+  {
     name: 'duplicate principle: teacher-call reschedule of an EXISTING activity is a one-date change, not a second series (real failure 2026-08-20)',
     message: 'Mason has piano on Thursday at 13:00',
     ctx: {

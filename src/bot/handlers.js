@@ -2049,6 +2049,7 @@ async function handleCalendarQuery(result, household, user, userTz, actions, ori
     if (agentEnabled()) {
       const agent = await agentCalendarAnswer({
         text: originalText || `When is ${topic}?`,
+        topic,
         user, household, userTz,
       });
       if (agent?.response) {
