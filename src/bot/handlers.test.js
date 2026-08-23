@@ -1540,6 +1540,16 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(quiet.response).not.toMatch(/add a reminder/i); // the event is gone
   });
 
+  test('"Actually undo that" is an undo, not a which-one interrogation', async () => {
+    const u = { id: 'u-undo-lead', name: 'Grant' };
+    ai.classify.mockResolvedValue({ intent: 'create_event', calendar_event: { title: 'Padel', date: '2026-08-23', start_time: '23:00' }, response_message: 'Added!' });
+    await handlers.handleTextMessage('padel again tonight at 11', u, hh, {});
+    ai.classify.mockClear();
+    const ans = await handlers.handleTextMessage('Actually undo that', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled(); // pre-classified, never reaches the LLM
+    expect(ans.response).toMatch(/Undone - removed/);
+  });
+
   test('never asks the same question twice: second failure lets go gracefully', async () => {
     const u = { id: 'u-loop-giveup', name: 'Grant' };
     await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
@@ -1553,6 +1563,42 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     ai.classify.mockResolvedValue({ intent: 'general', response_message: 'ok' });
     await handlers.handleTextMessage('remind me at whatever works', u, hh, {});
     expect(ai.classify).toHaveBeenCalled();
+  });
+});
+
+// ─── Modify disambiguation: referents + timezone (2026-08-23 padel) ────────
+describe('modify disambiguation', () => {
+  const ai = require('../services/ai');
+  const hh = { id: 'h1', timezone: 'Europe/London', members: [] };
+  const twoPadels = [
+    { id: 'ev-9pm', title: 'Padel', start_time: '2026-08-23T20:00:00Z', end_time: '2026-08-23T21:00:00Z' },
+    { id: 'ev-11pm', title: 'Padel', start_time: '2026-08-23T22:00:00Z', end_time: '2026-08-23T23:00:00Z' },
+  ];
+  beforeEach(() => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.findEventsByFuzzyTitle.mockResolvedValue(twoPadels);
+    db.getAllIncompleteTasks.mockResolvedValue([]);
+    db.getHouseholdSchools.mockResolvedValue([]);
+    db.getHouseholdPreferences.mockResolvedValue([]);
+  });
+
+  test('the which-one list shows household local times, not server UTC', async () => {
+    const u = { id: 'u-disamb-tz', name: 'Grant' };
+    ai.classify.mockResolvedValue({ intent: 'delete_event', target: { title: 'Padel' }, response_message: '' });
+    const ans = await handlers.handleTextMessage('cancel padel', u, hh, {});
+    expect(ans.response).toMatch(/which one/i);
+    expect(ans.response).toMatch(/21:00/); // 20:00Z is 9pm BST
+    expect(ans.response).toMatch(/23:00/);
+    expect(ans.response).not.toMatch(/20:00/);
+  });
+
+  test('a bare deictic resolves to the recent referent instead of asking which one', async () => {
+    const u = { id: 'u-disamb-ref', name: 'Grant' };
+    handlers.rememberReferents(u.id, [{ kind: 'event', id: 'ev-11pm', label: 'Padel' }]);
+    ai.classify.mockResolvedValue({ intent: 'delete_event', target: { title: 'Padel' }, response_message: '' });
+    const ans = await handlers.handleTextMessage('cancel that one', u, hh, {});
+    expect(db.softDeleteCalendarEvent).toHaveBeenCalledWith('ev-11pm', 'h1');
+    expect(ans.response).not.toMatch(/which one/i);
   });
 });
 

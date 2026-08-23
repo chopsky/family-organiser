@@ -239,7 +239,11 @@ function popModifyConfirm(userId) {
 }
 
 function isUndoRequest(text) {
-  const t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  let t = String(text || '').trim().toLowerCase().replace(/[!.?]+$/, '').trim();
+  // Natural lead-ins don't change the meaning: "Actually undo that" is an
+  // undo (real 2026-08-23 transcript - it fell through to the classifier
+  // and turned into a which-one-to-cancel interrogation instead).
+  t = t.replace(/^(?:(?:actually|ok|okay|oh|ah|no|wait|please|sorry|hmm)[,\s]+)+/, '');
   return /^(undo|revert|scrap that|scrap it|nevermind|never mind|forget it|cancel that|oops|nope scrap that|wait no|undo that|take that back)$/i.test(t);
 }
 
@@ -1260,12 +1264,15 @@ function formatTaskList(tasks, heading = 'Tasks', timezone = null) {
  * Format a candidate into a short human-readable line for the "which one?"
  * disambiguation message.
  */
-function formatCandidate(kind, row) {
+function formatCandidate(kind, row, tz = 'Europe/London') {
   if (kind === 'event') {
+    // Without an explicit timeZone these render in the SERVER's zone (UTC
+    // on Railway) - a 9pm BST event listed as "20:00" in the which-one
+    // picker (real 2026-08-23 transcript).
     const date = row.start_time
-      ? new Date(row.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+      ? new Date(row.start_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz })
       : '';
-    const time = row.all_day ? 'all day' : (row.start_time ? new Date(row.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
+    const time = row.all_day ? 'all day' : (row.start_time ? new Date(row.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz }) : '');
     return `${row.title}${date ? ` (${date}${time ? ` ${time}` : ''})` : ''}`;
   }
   if (kind === 'task') {
@@ -1370,7 +1377,19 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     if (target.all_matching) {
       return await executeBulkModify({ intent: result.intent, kind, candidates, updates, user, household, actions });
     }
-    const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c)}`);
+    // "cancel that" / "move it" just after the bot named one of these:
+    // the conversational referent IS the answer - asking "which one?"
+    // about the thing we just confirmed reads as amnesia (real 2026-08-23
+    // transcript: "Actually undo that" straight after an add got a
+    // two-item interrogation). Only a bare deictic triggers this; a reply
+    // with its own distinguishing detail still gets the list.
+    if (/\b(that|it)\b/i.test(originalText || '')) {
+      const referent = candidates.find((c) => isRecentReferent(user.id, kind, c.id));
+      if (referent) {
+        return await executeModifyAction({ intent: result.intent, kind, hit: referent, updates, user, household, actions, originalText });
+      }
+    }
+    const lines = candidates.slice(0, 5).map((c, i) => `${i + 1}. ${formatCandidate(kind, c, household.timezone || 'Europe/London')}`);
     const more = candidates.length > 5 ? `\n  … and ${candidates.length - 5} more` : '';
     const verb = isDelete ? (kind === 'shopping' ? 'remove' : 'cancel') : 'change';
     rememberDisambiguation(user.id, {
