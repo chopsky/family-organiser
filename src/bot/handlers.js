@@ -548,6 +548,30 @@ function formatTime12(hhmm) {
   return `${h}:${m} ${ap}`;
 }
 
+// The actual clock time a reminder will fire ("8:30 pm", or "Wed 8:30 am"
+// when it lands on a different day than the event), so confirmations state
+// the outcome instead of leaving the user to do the maths. Returns null
+// whenever it can't be stated honestly: multiple offsets, no start time,
+// or a remind-at that has already passed.
+const REMINDER_OFFSET_MS = { minutes: 60 * 1000, hours: 60 * 60 * 1000, days: 24 * 60 * 60 * 1000 };
+function describeRemindAt(startTime, offsets, timezone) {
+  if (!startTime || !Array.isArray(offsets) || offsets.length !== 1) return null;
+  const { time, unit } = offsets[0] || {};
+  const startMs = Date.parse(startTime);
+  if (!Number.isFinite(startMs) || !REMINDER_OFFSET_MS[unit] || !(time > 0)) return null;
+  const remindAt = new Date(startMs - time * REMINDER_OFFSET_MS[unit]);
+  if (remindAt.getTime() <= Date.now()) return null;
+  try {
+    const tz = timezone || 'Europe/London';
+    const fmt = (d, opts) => new Intl.DateTimeFormat('en-GB', { timeZone: tz, ...opts }).format(d);
+    const clock = fmt(remindAt, { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+    const sameDay = fmt(remindAt, { dateStyle: 'short' }) === fmt(new Date(startMs), { dateStyle: 'short' });
+    return sameDay ? clock : `${fmt(remindAt, { weekday: 'short' })} ${clock}`;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Pending "you already have this - add another?" duplicate-to-do follow-up ──
 // When asked to add a to-do the household already has open, the bot asks before
 // adding a duplicate (instead of silently double-adding - or, the bug this
@@ -1425,7 +1449,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         if (droppedSubstantive) {
           const { formatEventWhen } = require('../utils/event-when');
           const when = formatEventWhen(hit, household.timezone || 'Europe/London');
-          const alreadyTemplate = `👍 "${hit.title}" is already set to that${when ? ` — ${when}` : ''}. Nothing to change.`;
+          const alreadyTemplate = `👍 "${hit.title}" is already set to that${when ? ` - ${when}` : ''}. Nothing to change.`;
           return {
             response: await voicedOrTemplate(alreadyTemplate,
               { action: 'no change needed - the event already matches the request', item: hit.title, current_schedule: when || 'unchanged' }, hit.title),
@@ -1449,12 +1473,29 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
           console.error('[handlers] saveEventReminders failed for update:', err.message);
         }
       }
+      // A reminder-only change gets its own confirmation naming the lead and
+      // the actual fire time, no household broadcast (a personal reminder
+      // tweak is nobody else's notification), and NO undo hint: reminder
+      // changes aren't captured by either undo store, so "reply undo" here
+      // would revert the wrong thing - within the 2-minute add window it
+      // deletes the event the reminder was just set on (real 2026-08-23
+      // padel transcript).
+      if (hasReminderUpdate && Object.keys(eventUpdates).length === 0) {
+        if (reminderSet.length === 0) {
+          return { response: `Done - removed the reminder for **${updated.title}**.`, actions };
+        }
+        const remindAt = describeRemindAt(updated.start_time, reminderSet, household.timezone);
+        return { response: `Done - I'll remind you ${describeOffsets(reminderSet)} about **${updated.title}**${remindAt ? ` (${remindAt})` : ''}.`, actions };
+      }
       // Describe what changed in the broadcast so receivers see, at a
       // glance, what the update actually was - e.g. "moved to tomorrow,
       // reassigned to Grant" - rather than an opaque "updated: X".
       const { summariseEventChanges, summariseTaskChanges } = require('../utils/notification-format');
       const eventDiff = summariseEventChanges(hit, eventUpdates, household.timezone || 'Europe/London');
-      const eventTail = eventDiff ? ` - ${eventDiff}` : '';
+      const diffBits = [];
+      if (eventDiff) diffBits.push(eventDiff);
+      if (hasReminderUpdate) diffBits.push(reminderSet.length > 0 ? `reminder ${describeOffsets(reminderSet)}` : 'reminder removed');
+      const eventTail = diffBits.length > 0 ? ` - ${diffBits.join(', ')}` : '';
       broadcast.toHousehold(user.id, household.members, `📅 ${user.name} updated: ${updated.title}${eventTail}`, {
         title: 'Event updated',
         body: `${user.name} updated "${updated.title}"${eventTail}`,
@@ -1463,7 +1504,7 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
       // Tell the user exactly what changed, not just "updated" - e.g.
       // 'Updated "Mason Piano" - moved to Thu 18 Jun at 16:00.'
       const updTemplate = `✏️ Updated "${updated.title}"${eventTail}.`;
-      return { response: await voicedOrTemplate(updTemplate, { action: 'updated calendar event', item: updated.title, what_changed: eventDiff || 'details', undo_hint: 'reply undo to revert' }, updated.title), actions };
+      return { response: await voicedOrTemplate(updTemplate, { action: 'updated calendar event', item: updated.title, what_changed: diffBits.join(', ') || 'details', undo_hint: 'reply undo to revert' }, updated.title), actions };
     }
 
     if (isTask) {
@@ -2245,7 +2286,8 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         if (pendingRem.itemType === 'event') {
           if (offsets.length > 0) {
             await db.saveEventReminders(pendingRem.itemId, household.id, offsets, pendingRem.startTime);
-            return { response: `Done - I'll remind you ${describeOffsets(offsets)} about **${pendingRem.label}**.`, actions: remActions };
+            const remindAt = describeRemindAt(pendingRem.startTime, offsets, household.timezone);
+            return { response: `Done - I'll remind you ${describeOffsets(offsets)} about **${pendingRem.label}**${remindAt ? ` (${remindAt})` : ''}.`, actions: remActions };
           }
           // A bare "yes" is a normal handoff to the question, not a failed
           // answer - only unparseable ANSWERS burn attempts. Two failures →
@@ -3449,24 +3491,36 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       } else {
         const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
         if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
+          // A timed event proposes a concrete lead so a bare "yes" finishes
+          // in one turn; all-day rows still carry a midnight start_time, so
+          // gate on all_day too ("30 minutes before" would fire at 23:30).
+          const timedEvent = createdEv.start_time && !createdEv.all_day;
           // Deterministic offer backstop when the model didn't ask anything
           // (same trailing-question test as the reconciliation tail's
           // alreadyAsks - "...time?)" counts as already-asking).
           if (!/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
-            eventReply += `\n\nWant me to add a reminder for it?`;
+            eventReply += timedEvent
+              ? `\n\nWant me to add a reminder, say 30 minutes before?`
+              : `\n\nWant me to add a reminder for it?`;
           }
           // Arm the pending store whenever the outgoing reply asks a reminder
           // question - ours or the model's - so "Yes" resolves deterministically.
           if (/remind[^.!\n]*\?/i.test(eventReply)) {
+            // If the outgoing question itself names a lead ("...reminder the
+            // day before?"), a bare "yes" applies it directly; when nothing
+            // is proposed, a timed event falls back to a 30-minute default -
+            // the confirmation names the lead and the fire time, so "yes"
+            // completes in one turn and stays correctable.
+            const proposed = parseRemindersFromMessage(eventReply);
             rememberReminderTarget(user.id, {
               itemId: createdEv.id,
               itemType: 'event',
               label: createdEv.title,
               startTime: createdEv.start_time,
               householdId: household.id,
-              // If the outgoing question itself names a lead ("...reminder
-              // the day before?"), a bare "yes" applies it directly.
-              suggestedOffsets: parseRemindersFromMessage(eventReply),
+              suggestedOffsets: proposed.length > 0
+                ? proposed
+                : (timedEvent ? [{ time: 30, unit: 'minutes' }] : []),
             });
           }
         }
@@ -4049,7 +4103,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // silent surprise when the nudge fires.
   if (actions.notificationSnap && actions.tasksAdded.length > 0) {
     const { requestedLabel, chosenLabel } = actions.notificationSnap;
-    response += `\n\n(I'll nudge you **${chosenLabel}** before — closest to the ${requestedLabel} you asked for. Reply with "make it 30 min" or "make it 1 hour" to change.)`;
+    response += `\n\n(I'll nudge you **${chosenLabel}** before - closest to the ${requestedLabel} you asked for. Reply with "make it 30 min" or "make it 1 hour" to change.)`;
   }
 
   // ── Follow-up consistency reconciliation ───────────────────────────────
@@ -4128,8 +4182,16 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         label: birthdayEvent.title,
       });
     } else if ((eventAdded || taskAdded) && !reminderSaved) {
+      // For a timed event, propose a concrete lead: the offer text itself is
+      // parsed at the arming site below, so naming "30 minutes before" here
+      // is what lets a bare "yes" finish the job in one turn instead of
+      // opening a "how long before?" round trip.
+      // (all-day rows still carry a midnight start_time, so gate on all_day
+      // too - "30 minutes before" an all-day event would fire at 23:30.)
+      const firstEvent = (actions.eventsAdded || [])[0];
+      const timedEvent = eventAdded && firstEvent?.start_time && !firstEvent?.all_day;
       followUp = eventAdded
-        ? 'Want me to add a reminder for it?'
+        ? (timedEvent ? 'Want me to add a reminder, say 30 minutes before?' : 'Want me to add a reminder for it?')
         : 'Want me to set a reminder time?';
     }
     if (followUp) {
@@ -4152,13 +4214,22 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
     const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
     const target = ev
-      ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time }
+      ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time, allDay: !!ev.all_day }
       : tk
         ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
         : null;
-    // Capture any lead the model's own question proposed ("...the day
-    // before?") so a bare "yes" applies it instead of re-asking.
-    if (target?.itemId) rememberReminderTarget(user.id, { ...target, householdId: household.id, suggestedOffsets: parseRemindersFromMessage(response) });
+    // Capture any lead the question proposed ("...the day before?") so a
+    // bare "yes" applies it instead of re-asking. When the offer proposed
+    // nothing (model-authored questions usually don't) a timed event still
+    // gets a 30-minute default: the confirmation names the lead AND the
+    // clock time, so "yes" completes in one turn and stays correctable.
+    if (target?.itemId) {
+      const proposed = parseRemindersFromMessage(response);
+      const suggestedOffsets = proposed.length > 0
+        ? proposed
+        : (target.itemType === 'event' && target.startTime && !target.allDay ? [{ time: 30, unit: 'minutes' }] : []);
+      rememberReminderTarget(user.id, { ...target, householdId: household.id, suggestedOffsets });
+    }
   }
 
   // The reply is about to NAME the created rows - remember them so an

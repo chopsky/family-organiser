@@ -82,7 +82,9 @@ const PATTERNS = [
 // consumed before the numeric PATTERNS run so "half an hour before" can't
 // ALSO match "an hour before" and save a second, wrong reminder.
 const SPECIAL_PHRASES = [
-  { re: /\bhalf\s+an?\s+hour\s+(?:before|earlier|prior|ahead)\b/gi, offsets: [{ time: 30, unit: 'minutes' }] },
+  // Article optional: "half hour before" must land here, not fall through
+  // to the "hour before" phrase below and save a 1-hour reminder.
+  { re: /\bhalf\s+(?:an?\s+)?hour\s+(?:before|earlier|prior|ahead)\b/gi, offsets: [{ time: 30, unit: 'minutes' }] },
   { re: /\b(?:the\s+)?(?:day|night|evening|morning)\s+before\b/gi, offsets: [{ time: 1, unit: 'days' }] },
   { re: /\b(?:the\s+)?hour\s+before\b/gi, offsets: [{ time: 1, unit: 'hours' }] },
 ];
@@ -119,11 +121,11 @@ function parseRemindersFromMessage(text) {
 
 // Whole-message bare duration - ONLY safe when we just asked "how long
 // before?" and the reply is nothing but a lead time: "2 hours", "30 mins",
-// "1 hr", "a day", "half an hour", "in 20 minutes". Deliberately anchored to
+// "1 hr", "a day", "half (an) hour", "in 20 minutes". Deliberately anchored to
 // the full string so it can never misread durations inside longer messages
 // ("book the court for 2 hours"); callers use it exclusively on pending
 // reminder replies.
-const BARE_DURATION_RE = /^\s*(?:in\s+)?(?:(half)\s+an?\s+|(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s*)(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s*(?:before|earlier|prior|ahead)?\s*[.!?\s]*$/i;
+const BARE_DURATION_RE = /^\s*(?:in\s+)?(?:(half)\s+(?:an?\s+)?|(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s*)(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s*(?:before|earlier|prior|ahead)?\s*[.!?\s]*$/i;
 
 function parseBareDuration(text) {
   if (typeof text !== 'string') return [];

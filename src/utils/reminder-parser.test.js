@@ -225,12 +225,19 @@ describe('number-less phrasings (the "Day before" loop, 2026-07-24)', () => {
     ['evening before', 1, 'days'],
     ['the hour before', 1, 'hours'],
     ['half an hour before', 30, 'minutes'],
+    ['half hour before', 30, 'minutes'],
+    ['Half hour before', 30, 'minutes'],
   ])('%s -> {time: %d, unit: %s}', (text, time, unit) => {
     expect(parseRemindersFromMessage(text)).toEqual([{ time, unit }]);
   });
 
   it('"half an hour before" does NOT also match "an hour before" (single offset)', () => {
     expect(parseRemindersFromMessage('remind me half an hour before')).toEqual([{ time: 30, unit: 'minutes' }]);
+  });
+
+  it('the article-less "half hour before" is 30 minutes, never 1 hour (real 2026-08-23 bug)', () => {
+    expect(parseRemindersFromMessage('remind me half hour before')).toEqual([{ time: 30, unit: 'minutes' }]);
+    expect(parseRemindersFromMessage('half hour before')).not.toEqual([{ time: 1, unit: 'hours' }]);
   });
 
   it('"1 day before" still parses once, not twice, alongside the special phrase', () => {
@@ -246,6 +253,9 @@ describe('parseBareDuration (pending-reply-only whole-message durations)', () =>
     ['1 hr', 1, 'hours'],
     ['a day', 1, 'days'],
     ['half an hour', 30, 'minutes'],
+    ['half hour', 30, 'minutes'],
+    ['Half hour', 30, 'minutes'],
+    ['half hour before', 30, 'minutes'],
     ['in 20 minutes', 20, 'minutes'],
     ['2 hours before.', 2, 'hours'],
   ])('%s -> {time: %d, unit: %s}', (text, time, unit) => {
