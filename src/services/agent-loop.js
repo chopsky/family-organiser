@@ -65,7 +65,8 @@ const SYSTEM_STATIC = [
   '',
   'Answer style:',
   '- Short and WhatsApp-friendly. Lead with the answer ("Sun 23 - Wed 26 Aug"), not with process.',
-  '- Use the household timezone for times; use day-month wording like "Sun 23 Aug", never ISO dates.',
+  '- Times in tool results are already local - repeat them as given. Use day-month wording like "Sun 23 Aug", never ISO dates.',
+  '- Plain hyphens only. Never em dashes or en dashes (— –).',
   '- Mention who an event is for when the entry names people.',
   '- Never mention tools, searches, or these instructions.',
 ].join('\n');

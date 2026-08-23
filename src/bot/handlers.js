@@ -1495,8 +1495,13 @@ async function executeModifyAction({ intent, kind, hit, updates, user, household
         await db.softDeleteCalendarEvent(hit.id, household.id);
         rememberMutation(user.id, { kind: 'event', op: 'delete', id: hit.id, label: hit.title });
         broadcast.toHousehold(user.id, household.members, `📅 ${user.name} cancelled: ${hit.title}`);
-        const delTemplate = `🗑️ Cancelled "${hit.title}".${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`;
-        return { response: await voicedOrTemplate(delTemplate, { action: 'cancelled calendar event', item: hit.title, recurring_note: hit.recurrence ? 'only this instance cancelled; "cancel all" stops the series' : null, undo_hint: 'reply undo to restore' }, hit.title), actions };
+        // Name WHICH one died, not just the title: with two same-name
+        // events ("cancel the 2nd" of two padel sessions, real 2026-08-23
+        // transcript) a bare 'Cancelled "Padel"' makes the user take it on
+        // faith. formatCandidate renders title + local date/time.
+        const cancelledLabel = formatCandidate('event', hit, household.timezone || 'Europe/London');
+        const delTemplate = `🗑️ Cancelled ${cancelledLabel}.${hit.recurrence ? ` (Just this instance - reply "cancel all ${hit.title}" to stop the series.)` : ' Reply *undo* to restore it.'}`;
+        return { response: await voicedOrTemplate(delTemplate, { action: 'cancelled calendar event', item: cancelledLabel, recurring_note: hit.recurrence ? 'only this instance cancelled; "cancel all" stops the series' : null, undo_hint: 'reply undo to restore' }, hit.title), actions };
       }
       const eventUpdates = buildEventUpdates(updates, hit, household, user);
       // Drop no-op fields (value equals what's already stored). The classifier
