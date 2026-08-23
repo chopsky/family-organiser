@@ -516,6 +516,17 @@ function popReminderTarget(userId) {
   return entry;
 }
 
+// Merge a recursively-handled message's actions into the current turn's,
+// so a compound reply's second request still drives broadcasts correctly.
+function mergeBotActions(base, extra) {
+  if (!extra) return base;
+  for (const [k, v] of Object.entries(extra)) {
+    if (Array.isArray(v)) base[k] = [...(base[k] || []), ...v];
+    else if (base[k] === undefined || base[k] === null) base[k] = v;
+  }
+  return base;
+}
+
 // Parse a clock time of day out of a short reply ("9am", "9:30 pm", "15:00",
 // "noon"). Returns "HH:MM" (24h) or null. Deliberately conservative: a bare
 // number with no am/pm and no ":mm" (e.g. "9", or the "1" in "1 hour before")
@@ -2261,7 +2272,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     // We just asked "how long before?" - a reply that is NOTHING but a
     // duration ("2 hours", "30 mins") answers it, even without "before".
     if (offsets.length === 0) offsets = parseBareDuration(text);
-    const timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
+    let timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
     const bareYes = parseAffirmative(text) === 'yes';
     // A bare "yes" accepts whatever lead time the offer itself suggested
     // ("Want me to add a reminder the day before?" → yes → day before).
@@ -2270,16 +2281,41 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (offsets.length === 0 && bareYes && pendingRem.suggestedOffsets?.length) {
       offsets = pendingRem.suggestedOffsets;
     }
-    const isReminderReply = offsets.length > 0 || timeOfDay || bareYes || messageMentionsReminder(text);
-    // Reminder-ish but unparseable ("make it a couple of hours ahead") →
-    // one cheap Haiku extraction instead of re-asking. A miss returns []
-    // and falls into the ask-once-then-let-go flow below - the bot must
-    // NEVER repeat the same question verbatim (a real user got the
-    // identical "how long before?" four times).
-    if (isReminderReply && offsets.length === 0 && !timeOfDay && !bareYes) {
-      const llm = await extractReminderOffsets(text, { label: pendingRem.label, householdId: household.id, userId: user.id });
-      if (llm?.offsets?.length) offsets = llm.offsets;
+    // The reply is to OUR question, so when every deterministic parse
+    // shrugs, the tiny model ALWAYS gets one look before the message may
+    // leak to full classification. The old keyword gate here was the bug
+    // class: leaked answers became phantom updates ("Half hour", padel
+    // 2026-08-23) or errors ("A week before and also...", 2026-08-02).
+    // Long parseable replies also get a look, remainder-only, so a second
+    // request riding along with the answer isn't silently dropped. A null
+    // verdict (LLM down) falls back to the keyword heuristics - fail-open.
+    const deterministicHit = offsets.length > 0 || timeOfDay || bareYes;
+    const wordy = text.trim().split(/\s+/).length > 5;
+    let verdict = null;
+    if (!deterministicHit || (offsets.length > 0 && wordy)) {
+      verdict = await extractReminderOffsets(text, { label: pendingRem.label, itemType: pendingRem.itemType, householdId: household.id, userId: user.id });
+      if (offsets.length === 0 && verdict?.offsets?.length) offsets = verdict.offsets;
+      if (!timeOfDay && pendingRem.itemType === 'task' && verdict?.timeOfDay) timeOfDay = verdict.timeOfDay;
+      // "At that time is fine" - an acceptance of whatever lead the offer
+      // proposed, phrased in a way no affirmative regex knows (real user,
+      // 2026-08-14).
+      if (offsets.length === 0 && !timeOfDay && verdict?.verdict === 'answer' && pendingRem.suggestedOffsets?.length) {
+        offsets = pendingRem.suggestedOffsets;
+      }
     }
+    if (!deterministicHit && verdict?.verdict === 'decline') {
+      // Deterministic goodbye: the item is safe, no reminder wanted. The
+      // target stays popped - the question is settled.
+      ctx.intent = 'reminder_declined';
+      return { response: `No problem - **${pendingRem.label}** is saved without a reminder. 👍`, actions: remActions };
+    }
+    if (!deterministicHit && offsets.length === 0 && verdict?.verdict === 'unrelated') {
+      // A new request that ignores our question ("add milk"). Let
+      // classification handle it, but re-arm the target so a late answer
+      // still lands (bounded by the pending store's TTL).
+      rememberReminderTarget(user.id, pendingRem);
+    } else {
+    const isReminderReply = offsets.length > 0 || timeOfDay || bareYes || verdict?.verdict === 'answer' || messageMentionsReminder(text);
     if (isReminderReply) {
       ctx.intent = 'reminder_followup';
       try {
@@ -2287,7 +2323,24 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           if (offsets.length > 0) {
             await db.saveEventReminders(pendingRem.itemId, household.id, offsets, pendingRem.startTime);
             const remindAt = describeRemindAt(pendingRem.startTime, offsets, household.timezone);
-            return { response: `Done - I'll remind you ${describeOffsets(offsets)} about **${pendingRem.label}**${remindAt ? ` (${remindAt})` : ''}.`, actions: remActions };
+            let response = `Done - I'll remind you ${describeOffsets(offsets)} about **${pendingRem.label}**${remindAt ? ` (${remindAt})` : ''}.`;
+            // The answer carried a second request riding along ("A week
+            // before and also add it to the school calendar", real
+            // 2026-08-02 transcript) - handle it as its own message and
+            // stitch the replies. The ctx flag caps recursion at one hop,
+            // and a remainder failure must never cost the saved reminder
+            // its confirmation.
+            if (verdict?.remainder && verdict.remainder.length > 2 && !ctx._reminderRemainder) {
+              try {
+                const rest = await handleTextMessage(verdict.remainder, user, household, { ...ctx, _reminderRemainder: true });
+                if (rest?.response) response += `\n\n${rest.response}`;
+                mergeBotActions(remActions, rest?.actions);
+              } catch (err) {
+                console.error('[handlers] reminder remainder failed:', err.message);
+                response += `\n\n(I couldn't action the rest of that message - mind sending it again on its own?)`;
+              }
+            }
+            return { response, actions: remActions };
           }
           // A bare "yes" is a normal handoff to the question, not a failed
           // answer - only unparseable ANSWERS burn attempts. Two failures →
@@ -2312,7 +2365,18 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         if (dueTime) {
           await db.updateTask(pendingRem.itemId, household.id, { due_time: dueTime, notification: snap?.value || 'at_time' });
           const lead = snap?.value && snap.value !== 'at_time' ? `${snap.chosenLabel} before ` : 'at ';
-          return { response: `Done - I'll remind you ${lead}${formatTime12(dueTime)} about **${pendingRem.label}**.`, actions: remActions };
+          let response = `Done - I'll remind you ${lead}${formatTime12(dueTime)} about **${pendingRem.label}**.`;
+          if (verdict?.remainder && verdict.remainder.length > 2 && !ctx._reminderRemainder) {
+            try {
+              const rest = await handleTextMessage(verdict.remainder, user, household, { ...ctx, _reminderRemainder: true });
+              if (rest?.response) response += `\n\n${rest.response}`;
+              mergeBotActions(remActions, rest?.actions);
+            } catch (err) {
+              console.error('[handlers] reminder remainder failed:', err.message);
+              response += `\n\n(I couldn't action the rest of that message - mind sending it again on its own?)`;
+            }
+          }
+          return { response, actions: remActions };
         }
         if (snap?.value) {
           // Offset but no time to anchor to - ask for a time, keep the target.
@@ -2327,8 +2391,10 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         return { response: "I couldn't set that reminder just now - try again in a moment.", actions: remActions };
       }
     }
-    // Not a reminder reply (e.g. "no thanks", or an unrelated request) - the
-    // target is already popped; fall through to normal classification.
+    }
+    // Not an answer - fall through to normal classification (an "unrelated"
+    // verdict re-armed the target above, so a late answer still lands
+    // within the pending store's TTL).
   }
 
   // Pending "you already have this - add another?" reply for a duplicate to-do.

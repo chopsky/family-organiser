@@ -1307,6 +1307,21 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
   const { extractReminderOffsets } = require('../services/reminder-extract');
   const hh = { id: 'h1', timezone: 'Europe/London', members: [] };
 
+  // Some replies in these tests legitimately fall through to full
+  // classification (unrelated interjections, compound remainders) - give
+  // the classifier's context fetches real promises to chew on.
+  beforeEach(() => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.getAllIncompleteTasks.mockResolvedValue([]);
+    db.getHouseholdSchools.mockResolvedValue([]);
+    db.getHouseholdPreferences.mockResolvedValue([]);
+    // Fns the compound-remainder recursion can reach but the factory omits.
+    if (!db.getShoppingList) db.getShoppingList = jest.fn();
+    db.getShoppingList.mockResolvedValue([]);
+    if (!db.findTasksByFuzzyTitle) db.findTasksByFuzzyTitle = jest.fn();
+    db.findTasksByFuzzyTitle.mockResolvedValue([]);
+  });
+
   async function createLoganEvent(u, offerText) {
     ai.classify.mockResolvedValue({
       intent: 'create_event',
@@ -1390,6 +1405,65 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     ai.classify.mockClear();
     const ans = await handlers.handleTextMessage('Half hour', u, hh, {});
     expect(ai.classify).not.toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
+    expect(ans.response).toMatch(/30 minutes before/i);
+  });
+
+  test('unrelated interjection routes to classification AND keeps the question alive', async () => {
+    const u = { id: 'u-loop-unrel', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    extractReminderOffsets.mockResolvedValueOnce({ verdict: 'unrelated', offsets: [], timeOfDay: null, remainder: '' });
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Anything else?' });
+    await handlers.handleTextMessage('what school events are on this month?', u, hh, {});
+    expect(ai.classify).toHaveBeenCalled(); // the interjection was classified normally
+    // ...and a late answer still lands, deterministically.
+    ai.classify.mockClear();
+    const ans = await handlers.handleTextMessage('Half hour', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
+    expect(ans.response).toMatch(/30 minutes before/i);
+  });
+
+  test('a decline settles the question deterministically - no classifier, no re-ask', async () => {
+    const u = { id: 'u-loop-decline', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    extractReminderOffsets.mockResolvedValueOnce({ verdict: 'decline', offsets: [], timeOfDay: null, remainder: '' });
+    ai.classify.mockClear();
+    const no = await handlers.handleTextMessage('nah all good', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(no.response).toMatch(/saved without a reminder/i);
+    expect(db.saveEventReminders).not.toHaveBeenCalled();
+  });
+
+  test('a compound answer saves the reminder AND handles the second request (2026-08-02 transcript)', async () => {
+    const u = { id: 'u-loop-compound', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    // "A week before" parses deterministically; the message is wordy, so the
+    // extractor still gets a remainder-only look.
+    extractReminderOffsets.mockResolvedValueOnce({ verdict: 'answer', offsets: [{ time: 7, unit: 'days' }], timeOfDay: null, remainder: 'is Logan free that morning?' });
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Nothing on his calendar that morning.' });
+    const ans = await handlers.handleTextMessage('A week before and also is Logan free that morning?', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 7, unit: 'days' }], expect.anything());
+    expect(ans.response).toMatch(/7 days before/i);
+    expect(ans.response).toMatch(/Nothing on his calendar/); // remainder stitched in
+    expect(ai.classify).toHaveBeenCalled(); // ...via the normal pipeline
+  });
+
+  test('a remainder failure never costs the saved reminder its confirmation', async () => {
+    const u = { id: 'u-loop-remfail', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    extractReminderOffsets.mockResolvedValueOnce({ verdict: 'answer', offsets: [{ time: 7, unit: 'days' }], timeOfDay: null, remainder: 'and the other thing too' });
+    ai.classify.mockRejectedValue(new Error('LLM down'));
+    const ans = await handlers.handleTextMessage('A week before and the other thing too', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 7, unit: 'days' }], expect.anything());
+    expect(ans.response).toMatch(/7 days before/i); // the reminder still confirmed
+  });
+
+  test('"at that time is fine" accepts the proposed lead (2026-08-14 transcript)', async () => {
+    const u = { id: 'u-loop-accept', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Want me to add a reminder, say 30 minutes before?');
+    extractReminderOffsets.mockResolvedValueOnce({ verdict: 'answer', offsets: [], timeOfDay: null, remainder: '' });
+    const ans = await handlers.handleTextMessage('At that time is fine', u, hh, {});
     expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
     expect(ans.response).toMatch(/30 minutes before/i);
   });

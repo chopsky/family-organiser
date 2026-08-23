@@ -452,7 +452,7 @@ router.get('/analytics', async (req, res) => {
   try {
     const days = parseInt(req.query.days, 10) || 30;
     const cohortWeeks = Math.min(parseInt(req.query.cohortWeeks, 10) || 12, 26);
-    const [analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAdsUsers, referrals, signupSources] = await Promise.all([
+    const [analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAdsUsers, referrals, signupSources, pendingReplyLeaks] = await Promise.all([
       db.getAnalytics({ days }),
       db.getRetentionCohorts({ weeks: cohortWeeks }),
       db.getChannelCohortStats(),
@@ -463,6 +463,10 @@ router.get('/analytics', async (req, res) => {
       db.getAppleAdsAttributedUsers().catch(() => []),
       db.getReferralFunnel({ days: Math.min(days, 30) }).catch(() => null),
       db.getSignupSourceBreakdown({ days: Math.min(days, 30) }).catch(() => null),
+      // Deterministic-reply radar: replies to pending bot questions that
+      // leaked to the classifier. Derived from the message log - a failure
+      // here must not take the analytics page down.
+      db.getPendingReplyLeaks({ days: Math.min(days, 30) }).catch(() => null),
     ]);
 
     // Apple Ads: users whose install Apple attributed to a campaign, rolled
@@ -484,7 +488,7 @@ router.get('/analytics', async (req, res) => {
     };
 
     return res.json({
-      ...analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAds, referrals, signupSources,
+      ...analytics, retention, channelCohorts, calendarConnection, acquisition, inviteLoop, appleAds, referrals, signupSources, pendingReplyLeaks,
     });
   } catch (err) {
     console.error('GET /api/admin/analytics error:', err);

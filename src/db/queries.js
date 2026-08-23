@@ -6966,6 +6966,86 @@ async function getInviteLoopFunnel({ days = 30 } = {}, db = supabase) {
   return out;
 }
 
+// The bot questions whose replies SHOULD resolve deterministically, and the
+// intents that prove they did. Used by getPendingReplyLeaks to spot replies
+// that leaked to the full classifier instead - each leak is a phrasing the
+// deterministic layer couldn't read (the "Half hour" padel class of bug).
+// Extend this list when a new pending flow ships.
+const PENDING_ASK_PATTERNS = [
+  {
+    ask: /how long before|how far ahead|want me to (add|set) a reminder/i,
+    resolvedIntents: ['reminder_followup', 'reminder_declined'],
+    flow: 'reminder',
+  },
+  {
+    // To-do dupes only: the EVENT dupe prompt ("add a second one anyway")
+    // resolves through the classifier by design (force-add), so listing it
+    // here would flood the radar with false leaks.
+    ask: /add another\?/i,
+    resolvedIntents: ['duplicate_todo_confirm', 'duplicate_todo_decline', 'duplicate_todo_ask'],
+    flow: 'duplicate',
+  },
+  {
+    ask: /repeat every year/i,
+    resolvedIntents: ['birthday_recurrence_reply'],
+    flow: 'birthday',
+  },
+];
+
+/**
+ * Radar for the deterministic reply layer: pairs each bot question from a
+ * pending flow with the user's next message and reports the ones that did
+ * NOT resolve deterministically. Some leaks are correct (the user ignored
+ * the question and asked something new) - the list exists so a human can
+ * eyeball the `said` column for answers the parsers failed to read, instead
+ * of finding out from a confused user's screenshot. Derived entirely from
+ * whatsapp_message_log: no migration, works retroactively.
+ */
+async function getPendingReplyLeaks({ days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  // Paginate: an unpaginated select silently caps at 1000 rows and busy
+  // windows exceed that (it's how this table bit us before).
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('whatsapp_message_log')
+      .select('user_id, created_at, intent, body, response')
+      .eq('direction', 'inbound')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  const byUser = new Map();
+  for (const r of rows) {
+    if (!byUser.has(r.user_id)) byUser.set(r.user_id, []);
+    byUser.get(r.user_id).push(r);
+  }
+  const out = { days, asked: 0, resolved: 0, leaks: [] };
+  for (const turns of byUser.values()) {
+    for (let i = 0; i < turns.length - 1; i++) {
+      const pattern = PENDING_ASK_PATTERNS.find((p) => p.ask.test(turns[i].response || ''));
+      if (!pattern) continue;
+      const next = turns[i + 1];
+      // The pending stores expire after minutes; a reply half an hour later
+      // was never going to resolve deterministically and isn't a leak.
+      if (Date.parse(next.created_at) - Date.parse(turns[i].created_at) > 30 * 60000) continue;
+      out.asked += 1;
+      if (pattern.resolvedIntents.includes(next.intent)) { out.resolved += 1; continue; }
+      out.leaks.push({
+        at: next.created_at,
+        flow: pattern.flow,
+        said: (next.body || '').slice(0, 80),
+        became: next.intent || 'unknown',
+      });
+    }
+  }
+  out.leaks = out.leaks.slice(-20).reverse(); // newest first, capped for the panel
+  return out;
+}
+
 /**
  * Acquisition funnel for a recent window, SEGMENTED BY PLATFORM - the cut
  * that maps to ad channels. Apple Search Ads drives iOS installs only, so the
@@ -10927,5 +11007,6 @@ module.exports = {
   getEventRsvps,
   getUpcomingInviteEvents,
   getInviteLoopFunnel,
+  getPendingReplyLeaks,
   getReferralFunnel,
 };

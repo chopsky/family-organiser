@@ -33,6 +33,10 @@ const UNIT_WORDS = {
   min: 'minutes', mins: 'minutes', minute: 'minutes', minutes: 'minutes',
   hr: 'hours', hrs: 'hours', hour: 'hours', hours: 'hours',
   day: 'days', days: 'days',
+  // Weeks are normalised to days on the way out (see normaliseOffset) -
+  // the reminder schema only speaks minutes/hours/days. A real user asked
+  // for "A week before" (2026-08-02) and got nothing.
+  wk: 'weeks', wks: 'weeks', week: 'weeks', weeks: 'weeks',
 };
 
 // Numeric words for "an hour" / "a day" / "a minute" style phrasing.
@@ -58,21 +62,26 @@ function unitFromWord(word) {
   return UNIT_WORDS[String(word).trim().toLowerCase()] || null;
 }
 
+// Weeks → days so callers only ever see the schema's units.
+function normaliseOffset({ time, unit }) {
+  return unit === 'weeks' ? { time: time * 7, unit: 'days' } : { time, unit };
+}
+
 // Source of the patterns. Order matters - more specific phrasings come
 // first so the broader catch-alls don't shadow them. Each entry's regex
 // uses two capture groups: (number, unit). The number can be a digit
 // ("10"), an article ("a"/"an"), or a word ("ten").
 const PATTERNS = [
   // "remind me 10 minutes before" / "nudge me 30 mins prior"
-  /\b(?:remind|nudge|ping|notify|alert)\s+(?:me|us)\s+(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/gi,
+  /\b(?:remind|nudge|ping|notify|alert)\s+(?:me|us)\s+(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s+(?:before|earlier|prior|ahead)\b/gi,
   // "with a 30 minute reminder" / "with an hour alert"
-  /\bwith\s+(?:a|an|one)\s+(\d+|\w+)?\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
+  /\bwith\s+(?:a|an|one)\s+(\d+|\w+)?\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
   // "with a 30 min" form when only the number + unit are given
-  /\bwith\s+(?:a|an)\s+(\d+)\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\b/gi,
+  /\bwith\s+(?:a|an)\s+(\d+)\s*(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\b/gi,
   // "10 minute reminder" / "1 hour alert" (no "with a")
-  /\b(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
+  /\b(\d+|\w+)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s+(?:reminder|alert|notice|notification|warning)\b/gi,
   // "10 minutes before" / "a day before" - generic fallback
-  /\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/gi,
+  /\b(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s+(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s+(?:before|earlier|prior|ahead)\b/gi,
 ];
 
 // Number-less phrasings people actually type, mapped straight to offsets.
@@ -93,7 +102,8 @@ function parseRemindersFromMessage(text) {
   if (typeof text !== 'string' || !text.trim()) return [];
   const out = [];
   const seen = new Set();
-  const push = ({ time, unit }) => {
+  const push = (offset) => {
+    const { time, unit } = normaliseOffset(offset);
     const key = `${time}:${unit}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -125,7 +135,7 @@ function parseRemindersFromMessage(text) {
 // the full string so it can never misread durations inside longer messages
 // ("book the court for 2 hours"); callers use it exclusively on pending
 // reminder replies.
-const BARE_DURATION_RE = /^\s*(?:in\s+)?(?:(half)\s+(?:an?\s+)?|(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s*)(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s*(?:before|earlier|prior|ahead)?\s*[.!?\s]*$/i;
+const BARE_DURATION_RE = /^\s*(?:in\s+)?(?:(half)\s+(?:an?\s+)?|(\d+|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|sixty)\s*)(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s*(?:before|earlier|prior|ahead)?\s*[.!?\s]*$/i;
 
 function parseBareDuration(text) {
   if (typeof text !== 'string') return [];
@@ -137,7 +147,7 @@ function parseBareDuration(text) {
   }
   const time = parseNumber(m[2]);
   const unit = unitFromWord(m[3]);
-  return time && unit ? [{ time, unit }] : [];
+  return time && unit ? [normaliseOffset({ time, unit })] : [];
 }
 
 // Human phrasing for a saved offset list, for confirmation copy:
@@ -167,7 +177,7 @@ function messageMentionsReminder(text) {
     t.includes('alert') ||
     t.includes('notify') ||
     t.includes('notification') ||
-    /\b(min|mins|minute|minutes|hr|hrs|hour|hours|day|days)\s+(?:before|earlier|prior|ahead)\b/i.test(t)
+    /\b(min|mins|minute|minutes|hr|hrs|hour|hours|day|days|wk|wks|week|weeks)\s+(?:before|earlier|prior|ahead)\b/i.test(t)
   );
 }
 

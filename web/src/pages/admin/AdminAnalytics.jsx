@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
-    acquisition = null, inviteLoop = null, referrals = null, signupSources = null,
+    acquisition = null, inviteLoop = null, referrals = null, signupSources = null, pendingReplyLeaks = null,
   } = data || {};
 
   // Calculate DAU average
@@ -237,6 +237,54 @@ export default function AdminAnalytics() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Deterministic-reply radar: replies to pending bot questions that leaked to the classifier */}
+      {pendingReplyLeaks && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Bot reply leaks (last {pendingReplyLeaks.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            Replies to a pending bot question ("how long before?") that the deterministic layer
+            couldn't read and handed to the classifier. Some are fine (the user changed the
+            subject) - scan <strong>said</strong> for answers the parsers missed.
+          </p>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            {[
+              ['Questions asked', pendingReplyLeaks.asked],
+              ['Resolved deterministically', pendingReplyLeaks.resolved],
+              ['Leaked to classifier', pendingReplyLeaks.leaks.length],
+            ].map(([label, val]) => (
+              <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
+                <div className="text-2xl font-bold text-plum">{val}</div>
+                <div className="text-xs text-warm-grey mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+          {pendingReplyLeaks.leaks.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-warm-grey">
+                    <th className="pb-2 pr-4 font-medium">When</th>
+                    <th className="pb-2 pr-4 font-medium">Flow</th>
+                    <th className="pb-2 pr-4 font-medium">They said</th>
+                    <th className="pb-2 font-medium">Became</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingReplyLeaks.leaks.map((l, i) => (
+                    <tr key={i} className="border-t border-light-grey">
+                      <td className="py-2 pr-4 whitespace-nowrap text-warm-grey">{new Date(l.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</td>
+                      <td className="py-2 pr-4">{l.flow}</td>
+                      <td className="py-2 pr-4 text-charcoal">"{l.said}"</td>
+                      <td className="py-2"><code className="text-xs">{l.became}</code></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
