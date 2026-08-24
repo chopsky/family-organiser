@@ -2191,10 +2191,26 @@ async function handleCalendarQuery(result, household, user, userTz, actions, ori
   if (topic) {
     const { agentEnabled, agentCalendarAnswer } = require('../services/agent-loop');
     if (agentEnabled()) {
+      // The household's term dates ride along as authoritative context.
+      // Without them the agent guessed school starts from calendar scraps -
+      // a real user asking "when is the first day of school" was told to
+      // infer it from a "Meet the teacher" event while the actual term
+      // dates (school linked, directory-sourced) sat unread in the DB
+      // (2026-08-24 transcript). Fetched here, not threaded from the
+      // caller: the router fast-path reaches this point before the full
+      // classify context (incl. term dates) is ever built.
+      let schoolTermDates = '';
+      try {
+        const schools = (await db.getHouseholdSchools(household.id)) || [];
+        if (schools.length) {
+          const terms = (await db.getTermDatesBySchoolIds(schools.map((s) => s.id))) || [];
+          schoolTermDates = summariseSchoolTermDates(schools, terms);
+        }
+      } catch { /* garnish - the agent still answers from the calendar */ }
       const agent = await agentCalendarAnswer({
         text: originalText || `When is ${topic}?`,
         topic,
-        user, household, userTz,
+        user, household, userTz, schoolTermDates,
       });
       if (agent?.response) {
         // The agent NAMED these events - same referent contract as below.

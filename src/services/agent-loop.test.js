@@ -109,6 +109,30 @@ describe('agentCalendarAnswer', () => {
     expect(client.calls[0].messages[0].content).toMatch(/ALREADY in the household's local time/);
   });
 
+  test('school term dates ride the prompt as authoritative context ("first day of school" bug, 2026-08-24)', async () => {
+    const client = scriptedClient([
+      finalText('Term starts Tue 1 Sep - INSET day, so first day for pupils is Wed 2 Sep.'),
+    ]);
+    await agentCalendarAnswer(
+      {
+        text: 'when is the first day of school',
+        user, household, userTz: TZ,
+        schoolTermDates: 'Rosh Pinah Primary School: Autumn Term begins Tue 1 Sep 2026 (INSET, no pupils)',
+      },
+      { client, fetchCalendar: jest.fn(async () => []) },
+    );
+    const prompt = client.calls[0].messages[0].content;
+    expect(prompt).toMatch(/AUTHORITATIVE/);
+    expect(prompt).toContain('Rosh Pinah Primary School');
+    // ...and without term dates the section is absent entirely.
+    const client2 = scriptedClient([finalText('ok')]);
+    await agentCalendarAnswer(
+      { text: 'when is padel', user, household, userTz: TZ },
+      { client: client2, fetchCalendar: jest.fn(async () => []) },
+    );
+    expect(client2.calls[0].messages[0].content).not.toMatch(/AUTHORITATIVE/);
+  });
+
   test('turn cap exhausted → null (caller falls back)', async () => {
     const endless = Array.from({ length: MAX_TURNS + 2 }, (_, i) =>
       toolUse(`t${i}`, { start_date: '2026-01-01', end_date: '2026-01-02' }));

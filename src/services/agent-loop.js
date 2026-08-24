@@ -162,7 +162,7 @@ function logAgentUsage({ householdId, userId, turns, usage }) {
  * deps is a test seam: { client, fetchCalendar } override the Anthropic
  * client and the calendar fetcher.
  */
-async function agentCalendarAnswer({ text, topic, user, household, userTz }, deps = {}) {
+async function agentCalendarAnswer({ text, topic, user, household, userTz, schoolTermDates }, deps = {}) {
   const startedAt = Date.now();
   const client = deps.client
     || new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -182,6 +182,12 @@ async function agentCalendarAnswer({ text, topic, user, household, userTz }, dep
       // the user's actual words first; this is context, not a rewrite.
       (topic && topic.length > 3
         ? `\n(Resolved from the conversation: the user is asking about "${String(topic).slice(0, 200)}".)`
+        : '') +
+      // Term dates outrank calendar events for school questions: guessing
+      // "first day of school" from a "Meet the teacher" event while the
+      // real dates sat in the DB is exactly the failure this line ended.
+      (schoolTermDates
+        ? `\n\nSchool term dates for this household (AUTHORITATIVE for any school term, first/last day, half-term, holiday or INSET question - answer from these, never infer school dates from calendar events; remember an INSET day means no pupils, so the children's first day is the next school day):\n${schoolTermDates}`
         : ''),
   }];
 
