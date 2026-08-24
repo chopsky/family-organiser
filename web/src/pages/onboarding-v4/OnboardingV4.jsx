@@ -16,7 +16,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import usePrefersReducedMotion from '../../hooks/usePrefersReducedMotion';
 import { T } from './tokens';
-import { skipLabelAt, autoAdvances } from './machine';
+import { skipLabelAt, autoAdvances, forwardFrom } from './machine';
+import InviteCodeOverlay from './inviteCodeScreen';
 import useOnboardingFlow from './useOnboardingFlow';
 import { Step, Cta, Ghost, ResumeNotice } from './ui';
 import {
@@ -45,6 +46,10 @@ export default function OnboardingV4({ initialPhase }) {
   // The house-sign reward sits between submitting the name and advancing, so
   // it's local to the shell rather than a step in its own right.
   const [sign, setSign] = useState(false);
+  // The "join an existing home" code overlay - reachable from the first
+  // step and the house step, the two places a second adult realises the
+  // flow is about to found a household they already have.
+  const [joinEntry, setJoinEntry] = useState(false);
   // The plan screen's CTA stays disabled until its scripted reply finishes -
   // letting someone skip past the payback would waste the screen's whole job.
   const [planDone, setPlanDone] = useState(false);
@@ -221,6 +226,30 @@ export default function OnboardingV4({ initialPhase }) {
           onDone={() => { setSign(false); next(); }}
         />
       )}
+      {joinEntry && (
+        <InviteCodeOverlay
+          onCancel={() => setJoinEntry(false)}
+          onJoined={(info) => {
+            // The draft flips to joiner mode: navigation now hops the
+            // founder-only steps, the paywall is skipped, and signup will
+            // carry the invite token. Name/role prefill from the invite
+            // (the founder typed them when inviting) but never overwrite
+            // anything already answered. next() would read the PREVIOUS
+            // draft from its closure, so the hop is computed here against
+            // the new one.
+            const nd = {
+              ...d,
+              joining: { token: info.token, householdName: info.householdName || null, inviterName: info.inviterName || null },
+              you: d.you || info.invitee?.name || '',
+              role: d.role || info.invitee?.family_role || '',
+            };
+            update(() => nd);
+            setJoinEntry(false);
+            const target = forwardFrom(f.i - 1, nd); // "-1 then forward" = first live step at or after here
+            goPhase(target.phase, target.i);
+          }}
+        />
+      )}
       <Step
         pct={pct}
         reduced={reduced}
@@ -300,6 +329,22 @@ export default function OnboardingV4({ initialPhase }) {
         )}
 
         {step === 'reminders' && <RemindersBody d={d} reduced={reduced} note={remNote} />}
+
+        {(step === 'pains' || step === 'house') && !d.joining && (
+          <button
+            type="button"
+            onClick={() => setJoinEntry(true)}
+            style={{
+              marginTop: 18, padding: '10px 0', border: 0, background: 'transparent',
+              cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,
+              textDecoration: 'underline', textUnderlineOffset: 3, textAlign: 'left',
+            }}
+          >
+            {step === 'pains'
+              ? 'Someone already set up your home? Enter your invite code'
+              : 'Joining a home that’s already set up? Enter your invite code'}
+          </button>
+        )}
       </Step>
     </>
   );

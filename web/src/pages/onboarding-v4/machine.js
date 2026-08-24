@@ -42,20 +42,39 @@ export const skipLabelAt = (i) => metaAt(i)?.skipLabel ?? null;
 export const autoAdvances = (i) => Boolean(metaAt(i)?.autoAdvance);
 
 /**
+ * Steps that only make sense for someone FOUNDING a household. A joiner
+ * (arrived with an invite code - `d.joining` set) skips them: pains/plan
+ * personalise a paywall joiners never see, shape would duplicate members the
+ * founder already created, and house naming + inbox claiming are founder
+ * acts. Navigation hops over them; the joiner walks you → role → cals →
+ * ask → reminders.
+ */
+const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'house', 'inbox']);
+const isSkipped = (i, d) => Boolean(d?.joining) && FOUNDER_ONLY_STEPS.has(stepAt(i));
+const activeSteps = (d) => (d?.joining ? STEPS.filter((s) => !FOUNDER_ONLY_STEPS.has(s)) : STEPS);
+
+/**
  * Progress percentage. Spec: `pct = round(i / 9 * 100)` - denominator is the
  * number of steps, so the last step reads 8/9 and the sign-up card shows a full
  * bar of its own. The calendar sub-screen deliberately does not advance `i`, so
  * the bar holds at the calendar step's value rather than jumping to 100%.
+ * For a joiner both position and denominator count only their five steps.
  */
-export const progressPct = (i) => Math.round((i / STEPS.length) * 100);
+export const progressPct = (i, d) => {
+  const list = activeSteps(d);
+  const pos = Math.max(0, list.indexOf(stepAt(i)));
+  return Math.round((pos / list.length) * 100);
+};
 
 /**
  * Where "forward" goes from step i. Past the last step the flow leaves the
- * step frame entirely and becomes the sign-up card.
+ * step frame entirely and becomes the sign-up card. Founder-only steps are
+ * hopped over for joiners.
  * @returns {{phase: string, i: number}}
  */
-export function forwardFrom(i) {
-  const next = i + 1;
+export function forwardFrom(i, d) {
+  let next = i + 1;
+  while (next < STEPS.length && isSkipped(next, d)) next++;
   if (next >= STEPS.length) return { phase: 'signup', i };
   return { phase: 'flow', i: next };
 }
@@ -65,17 +84,21 @@ export function forwardFrom(i) {
  * splash - the flow must never strand someone on an empty screen.
  * @returns {{phase: string, i: number}}
  */
-export function backFrom(i) {
-  if (i <= 0) return { phase: 'splash', i: 0 };
-  return { phase: 'flow', i: i - 1 };
+export function backFrom(i, d) {
+  let prev = i - 1;
+  while (prev >= 0 && isSkipped(prev, d)) prev--;
+  if (prev < 0) return { phase: 'splash', i: 0 };
+  return { phase: 'flow', i: prev };
 }
 
 /**
  * Back out of the sign-up card returns to the LAST step, so someone who wants
  * to change an answer before creating an account can.
  */
-export function backFromSignup() {
-  return { phase: 'flow', i: STEPS.length - 1 };
+export function backFromSignup(d) {
+  let last = STEPS.length - 1;
+  while (last > 0 && isSkipped(last, d)) last--;
+  return { phase: 'flow', i: last };
 }
 
 /**

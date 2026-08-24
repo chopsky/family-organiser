@@ -1991,20 +1991,45 @@ async function markUserOnboarded(userId, db = supabase) {
 
 // ─── Invites ────────────────────────────────────────────────────────────────
 
-async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme, school_id }, db = supabase) {
+async function createInvite({ householdId, email, token, invitedBy, expiresAt, name, family_role, birthday, color_theme, school_id, code }, db = supabase) {
   const row = { household_id: householdId, email, token, invited_by: invitedBy, expires_at: expiresAt };
   if (name) row.name = name;
   if (family_role) row.family_role = family_role;
   if (birthday) row.birthday = birthday;
   if (color_theme) row.color_theme = color_theme;
   if (school_id) row.school_id = school_id;
-  const { data, error } = await db
+  if (code) row.code = code;
+  let { data, error } = await db
     .from('invites')
     .insert(row)
     .select()
     .single();
+  // Missing column (PostgREST: PGRST204; raw Postgres: 42703) means
+  // migration-invite-codes.sql hasn't run yet. Retry without the code -
+  // the invite still works link-only, nothing breaks pre-migration.
+  if (error && (error.code === 'PGRST204' || error.code === '42703') && row.code) {
+    delete row.code;
+    ({ data, error } = await db.from('invites').insert(row).select().single());
+  }
   if (error) throw error;
   return data;
+}
+
+/**
+ * Look up an open invite by its short code: unaccepted, unexpired. Returns
+ * null for anything else - the public lookup deliberately doesn't
+ * distinguish "wrong code" from "expired" (no enumeration oracle).
+ */
+async function getInviteByCode(code, db = supabase) {
+  const { data, error } = await db
+    .from('invites')
+    .select()
+    .eq('code', code)
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
 }
 
 async function getInviteByToken(token, db = supabase) {
@@ -10654,6 +10679,7 @@ module.exports = {
   markUserOnboarded,
   createInvite,
   getInviteByToken,
+  getInviteByCode,
   getInviteByEmail,
   markInviteAccepted,
   deleteInvite,

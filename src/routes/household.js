@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('../db/queries');
 const { supabaseAdmin } = require('../db/client');
+const { generateInviteCode } = require('../utils/invite-code');
 const { requireAuth, requireAdmin, requireHousehold } = require('../middleware/auth');
 const email = require('../services/email');
 const cache = require('../services/cache');
@@ -697,6 +698,10 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
   try {
     const household = await db.getHouseholdById(req.householdId);
     const token = crypto.randomBytes(32).toString('hex');
+    // Typeable companion to the link's token: survives the App Store gap
+    // (installed the app directly, so no link to tap). createInvite drops
+    // it gracefully if the migration hasn't run.
+    const code = generateInviteCode();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
     // school_id, if supplied, must be a household_schools row owned by THIS
@@ -709,7 +714,7 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
       }
     }
 
-    await db.createInvite({
+    const created = await db.createInvite({
       householdId: req.householdId,
       email: inviteEmail.trim().toLowerCase(),
       token,
@@ -720,10 +725,13 @@ router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, 
       birthday: birthday || null,
       color_theme: color_theme || null,
       school_id: safeSchoolId,
+      code,
     });
 
     try {
-      await email.sendInviteEmail(inviteEmail.trim(), req.user.name, household.name, token);
+      // created.code is absent when the migration hasn't run - the email
+      // template hides its code line in that case.
+      await email.sendInviteEmail(inviteEmail.trim(), req.user.name, household.name, token, created?.code || null);
     } catch (emailErr) {
       console.error('Failed to send invite email:', emailErr);
     }

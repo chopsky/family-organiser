@@ -1296,11 +1296,23 @@ export default function FamilySetup() {
                 const inviteUrl = `https://housemait.com/signup?invite=${inv.token}`;
                 const inviteeName = (inv.name || '').trim();
                 const greeting = inviteeName ? `Hi ${inviteeName.split(' ')[0]}` : 'Hey';
-                const waText = `${greeting} - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}`;
+                // The typed-code fallback covers the App Store gap: someone
+                // who installs the app directly (no link tapped) enters this
+                // during onboarding and joins THIS household instead of
+                // accidentally founding a second one.
+                const codeShown = inv.code ? `${inv.code.slice(0, 3)}-${inv.code.slice(3)}` : null;
+                const waText = `${greeting} - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${inviteUrl}${codeShown ? ` (or download the app and enter invite code ${codeShown})` : ''}`;
                 const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
                 return (
                   <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                    <span className="text-charcoal truncate">{inv.name || inv.email}</span>
+                    <span className="text-charcoal truncate">
+                      {inv.name || inv.email}
+                      {codeShown && (
+                        <span className="block text-[11px] text-warm-grey mt-0.5">
+                          Invite code: <span className="font-semibold tracking-wider text-charcoal">{codeShown}</span>
+                        </span>
+                      )}
+                    </span>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs text-warm-grey hidden sm:inline">
                         {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}

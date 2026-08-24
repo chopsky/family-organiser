@@ -133,6 +133,8 @@ export async function replayInbox(slug) {
 export async function replayQueued(d) {
   const calendars = await replayCalendars(d?.cals || {});
   const whatsapp = d?.wa ? await startWhatsAppPairing() : null;
-  const inbox = await replayInbox(d?.inbox);
+  // A joiner skipped the inbox step, and the house inbox belongs to the
+  // household they joined - never try to (re)claim it on their behalf.
+  const inbox = d?.joining ? { claimed: false, conflict: false } : await replayInbox(d?.inbox);
   return { calendars, whatsapp, inbox };
 }

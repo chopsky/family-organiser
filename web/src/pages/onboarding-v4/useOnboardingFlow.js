@@ -50,6 +50,16 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
   // screens. Calendar URLs are deliberately excluded (see onboardingDraft.js).
   useEffect(() => { saveDraft(d); }, [d]);
 
+  // A joiner's nav can point at a founder-only step (a resumed draft always
+  // reopens at raw index 0, which is 'pains'). Rather than patching nav in
+  // an effect, the EFFECTIVE index is derived at read time: the first
+  // non-skipped step at or after the raw one. No-op for founders - nothing
+  // is skipped, so it returns the index it was given.
+  const effectiveI = useCallback((i) => {
+    const hop = forwardFrom(i - 1, d);
+    return hop.phase === 'flow' ? hop.i : i;
+  }, [d]);
+
   // One shared timer: a fast double-tap on an auto-advance step must not queue
   // two jumps, and unmounting mid-delay must not advance a dead screen.
   const timer = useRef(null);
@@ -65,18 +75,18 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
 
   const next = useCallback(() => {
     clearTimer();
-    setNav((cur) => (cur.phase === 'flow' ? forwardFrom(cur.i) : cur));
-  }, [clearTimer]);
+    setNav((cur) => (cur.phase === 'flow' ? forwardFrom(effectiveI(cur.i), d) : cur));
+  }, [clearTimer, d, effectiveI]);
 
   const back = useCallback(() => {
     clearTimer();
     setNav((cur) => {
-      if (cur.phase === 'signup') return backFromSignup();
+      if (cur.phase === 'signup') return backFromSignup(d);
       if (cur.phase === 'login') return { phase: 'splash', i: 0 };
-      if (cur.phase === 'flow') return backFrom(cur.i);
+      if (cur.phase === 'flow') return backFrom(effectiveI(cur.i), d);
       return cur; // splash/done have nowhere back to go
     });
-  }, [clearTimer]);
+  }, [clearTimer, d, effectiveI]);
 
   /** Skip is just "forward without answering" - the answer stays unset. */
   const skip = next;
@@ -102,21 +112,33 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
    *  on to 'done' itself, including when it has nothing to sell. */
   const finish = useCallback(() => {
     clearTimer();
+    // A joiner never sees the wall: billing is owner-only, and the
+    // household they just joined already carries its own trial or
+    // subscription. Offering them their OWN Apple trial on top would be
+    // double-billing bait. Their draft has nothing the wall needs, so it
+    // can be cleared here.
+    if (d?.joining) {
+      clearDraft();
+      setNav({ phase: 'done', i: 0 });
+      return;
+    }
     // NOT clearDraft() here: the paywall reads the picked pains and what
     // they connected to build its case, and must still do so after a
     // force-quit and reopen. PaywallScreen clears it once they're
     // through, whether by paying or by the wall failing open.
     setNav({ phase: 'paywall', i: 0 });
-  }, [clearTimer]);
+  }, [clearTimer, d]);
 
+  // Every consumer sees the effective index, never a skipped one.
+  const shownI = nav.phase === 'flow' ? effectiveI(nav.i) : nav.i;
   return {
     phase: nav.phase,
-    i: nav.i,
-    step: stepAt(nav.i),
-    pct: progressPct(nav.i),
+    i: shownI,
+    step: stepAt(shownI),
+    pct: progressPct(shownI, d),
     d, update,
     resumed, startFresh, dismissResume: () => setResumed(false),
     next, back, skip, goPhase, pickAndAdvance, finish,
-    canAdvance: canAdvance(nav.i, d),
+    canAdvance: canAdvance(shownI, d),
   };
 }

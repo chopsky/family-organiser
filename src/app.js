@@ -195,6 +195,7 @@ app.use('/la-term-dates', (req, res) => res.redirect(301, `/school-term-dates${r
 // Inbound webhooks (no auth - must be before authenticated routes)
 app.use('/api/inbound-email', require('./routes/inbound-email'));
 app.use('/api/inbox', require('./routes/inbox'));
+app.use('/api/invites', require('./routes/invites'));
 
 // RevenueCat webhook (Bearer-token auth, JSON body - safe to mount after
 // the global JSON parser because RevenueCat doesn't sign body bytes).

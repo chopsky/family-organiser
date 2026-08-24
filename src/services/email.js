@@ -326,13 +326,21 @@ async function sendInboundEmailNoResults(to, originalSubject) {
   await sendEmail(to, 'Housemait: nothing to add from that email', html);
 }
 
-async function sendInviteEmail(to, inviterName, householdName, token) {
+async function sendInviteEmail(to, inviterName, householdName, token, code = null) {
   const url = `${BASE_URL}/signup?invite=${token}`;
+  // The code line covers the App Store gap: someone who installs the app
+  // directly (no link tapped, so no token) types this during onboarding
+  // and joins the existing household instead of founding a second one.
+  const { displayInviteCode } = require('../utils/invite-code');
+  const codeLine = code
+    ? `<p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Already got the app? Choose <strong>"Enter your invite code"</strong> when you sign up and type <strong style="letter-spacing:2px;">${displayInviteCode(code)}</strong>.</p>`
+    : '';
   const html = emailTemplate(`You're invited!`, `
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">${inviterName} has invited you to join <strong>${householdName}</strong> on Housemait.</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Housemait keeps your family's calendar, shopping lists, meals and tasks in one place - with a WhatsApp assistant that does the typing for you.</p>
     <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Click below to create your account and join the household.</p>
     <div style="text-align:center;">${button('Join household', url)}</div>
+    ${codeLine}
     <p style="color:${BRAND.inkLight};font-size:13px;">This invite expires in 7 days.</p>
   `);
   await sendEmail(to, `Join ${householdName} on Housemait`, html);

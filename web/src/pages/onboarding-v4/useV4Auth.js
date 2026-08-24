@@ -179,9 +179,11 @@ export default function useV4Auth(d) {
         password,
         // Collected at step 05 — v4 never asks for a name twice.
         name: (d.you || '').trim() || email.trim().split('@')[0],
-        inviteToken: searchParams.get('invite') || undefined,
+        // A tapped invite link (URL param) or a typed invite code (draft) -
+        // same backend path either way; the URL wins if both exist.
+        inviteToken: searchParams.get('invite') || d.joining?.token || undefined,
         promoCode: resolveSignupPromo(searchParams) || undefined,
-        source: resolveSignupSource(searchParams) || undefined,
+        source: resolveSignupSource(searchParams) || (d.joining ? 'invite_code' : undefined),
         referralCode: resolveReferralCode() || undefined,
         client: CLIENT,
         // No turnstile_token: the middleware bypasses native clients entirely
