@@ -208,11 +208,15 @@ export function RoleStep({ d, pick }) {
 }
 
 /* ── 07 Household name ─ the first thing they CREATE, hence the reward. */
-export function HouseStep({ d, update, onEnter }) {
+export function HouseStep({ d, update, onEnter, joinLink }) {
   return (
     <>
       <p style={EYEBROW}>Step 5 of 6</p>
       <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Every home needs a name.</h1>
+      {/* Above the field, not below it: the keyboard opens with the screen
+          and swallows anything under the input - the join escape hatch has
+          to be visible before typing starts. */}
+      {joinLink}
       <div style={{ marginTop: 18 }}>
         <Field
           value={d.house}

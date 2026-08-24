@@ -303,7 +303,26 @@ export default function OnboardingV4({ initialPhase }) {
         {step === 'shape' && <ShapePicker d={d} pick={pickAndAdvance} />}
         {step === 'you' && <NameStep d={d} update={update} onEnter={() => canAdvance && next()} />}
         {step === 'role' && <RoleStep d={d} pick={pickAndAdvance} />}
-        {step === 'house' && <HouseStep d={d} update={update} onEnter={() => canAdvance && advance()} />}
+        {step === 'house' && (
+          <HouseStep
+            d={d}
+            update={update}
+            onEnter={() => canAdvance && advance()}
+            joinLink={!d.joining ? (
+              <button
+                type="button"
+                onClick={() => setJoinEntry(true)}
+                style={{
+                  marginTop: 12, padding: '6px 0', border: 0, background: 'transparent',
+                  cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,
+                  textDecoration: 'underline', textUnderlineOffset: 3, textAlign: 'left',
+                }}
+              >
+                Joining an existing home? Enter your invite code
+              </button>
+            ) : null}
+          />
+        )}
 
         {step === 'plan' && <PlanBeat d={d} reduced={reduced} onDone={() => setPlanDone(true)} />}
         {step === 'ask' && <AskBeat d={d} reduced={reduced} />}
@@ -330,7 +349,7 @@ export default function OnboardingV4({ initialPhase }) {
 
         {step === 'reminders' && <RemindersBody d={d} reduced={reduced} note={remNote} />}
 
-        {(step === 'pains' || step === 'house') && !d.joining && (
+        {step === 'pains' && !d.joining && (
           <button
             type="button"
             onClick={() => setJoinEntry(true)}
@@ -340,9 +359,7 @@ export default function OnboardingV4({ initialPhase }) {
               textDecoration: 'underline', textUnderlineOffset: 3, textAlign: 'left',
             }}
           >
-            {step === 'pains'
-              ? 'Someone already set up your home? Enter your invite code'
-              : 'Joining a home that’s already set up? Enter your invite code'}
+            Someone already set up your home? Enter your invite code
           </button>
         )}
       </Step>
