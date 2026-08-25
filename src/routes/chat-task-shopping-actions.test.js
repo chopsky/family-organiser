@@ -147,6 +147,39 @@ describe('chat shopping management actions', () => {
     await request(app()).post('/api/chat').send({ message: 'clear the whole list' });
     expect(db.clearShoppingItems).toHaveBeenCalledWith('h1', { mode: 'all' });
   });
+
+  test('create_list makes the named list and puts the items on it (app-chat parity)', async () => {
+    callWithFailover.mockResolvedValue(reply({
+      action: 'create_list', name: 'Holiday',
+      items: [{ item: 'baggage', category: 'Other', list_name: 'Holiday' }],
+    }));
+    db.findShoppingListByName.mockResolvedValue(null);
+    db.createShoppingList.mockResolvedValue({ id: 'list-new', name: 'Holiday' });
+    db.addShoppingItemsWithDedupe.mockResolvedValue({ created: [{ id: 's9', item: 'baggage' }], duplicates: [], updated: [] });
+    const res = await request(app()).post('/api/chat').send({ message: 'create a holiday list and add baggage' });
+    expect(db.createShoppingList).toHaveBeenCalledWith('h1', 'Holiday');
+    const [, items] = db.addShoppingItemsWithDedupe.mock.calls[0];
+    expect(items[0]).toMatchObject({ item: 'baggage', list_id: 'list-new' });
+    expect(items[0].list_name).toBeUndefined(); // stripped before insert
+    expect(res.body.actions.find((a) => a.type === 'create_list')).toEqual({ type: 'create_list', name: 'Holiday', count: 1 });
+  });
+
+  test('add_shopping with list_name lands on that list; unnamed items keep the default', async () => {
+    callWithFailover.mockResolvedValue(reply({
+      action: 'add_shopping',
+      items: [
+        { item: 'sunscreen', category: 'Personal Care', list_name: 'Holiday' },
+        { item: 'milk', category: 'Dairy & Eggs' },
+      ],
+    }));
+    db.getDefaultShoppingList.mockResolvedValue({ id: 'list-default', name: 'Default' });
+    db.findShoppingListByName.mockResolvedValue({ id: 'list-hol', name: 'Holiday' });
+    db.addShoppingItemsWithDedupe.mockResolvedValue({ created: [], duplicates: [], updated: [] });
+    await request(app()).post('/api/chat').send({ message: 'add sunscreen to the holiday list and milk' });
+    const [, items] = db.addShoppingItemsWithDedupe.mock.calls[0];
+    expect(items.find((i) => i.item === 'sunscreen').list_id).toBe('list-hol');
+    expect(items.find((i) => i.item === 'milk').list_id).toBe('list-default');
+  });
 });
 
 describe('chat event recurrence + bulk updates', () => {

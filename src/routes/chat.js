@@ -890,16 +890,52 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
             cache.invalidate(`schools:${req.householdId}`);
           }
 
+        } else if (act.action === 'create_list' && act.name) {
+          // Named list on the Lists screen ("create a holiday list and add
+          // baggage") - app-chat parity with the WhatsApp create_list
+          // intent. Find-or-create, then put any items straight on it.
+          const wanted = String(act.name).trim();
+          const list = (await db.findShoppingListByName(req.householdId, wanted))
+            || (await db.createShoppingList(req.householdId, wanted));
+          if (act.items?.length) {
+            const enriched = act.items.map(({ list_name: _stripped, ...i }) => ({
+              ...i,
+              list_id: list.id,
+              aisle_category: i.aisle_category || i.category || 'Other',
+            }));
+            await db.addShoppingItemsWithDedupe(req.householdId, enriched, req.user.id, {});
+          }
+          executedActions.push({ type: 'create_list', name: list.name, count: act.items?.length || 0 });
+
         } else if (act.action === 'add_shopping' && act.items?.length) {
           // shopping_items.list_id is NOT NULL since multi-list support
-          // landed - attach the default list + aisle_category before
+          // landed - attach the target list + aisle_category before
           // insert, matching the classify.js / shopping.js pattern.
+          // Items carrying list_name go to that named list (found or
+          // created); everything else keeps the default list.
           const defaultList = await db.getDefaultShoppingList(req.householdId);
-          const enriched = act.items.map((i) => ({
-            ...i,
-            list_id: defaultList.id,
-            aisle_category: i.aisle_category || i.category || 'Other',
-          }));
+          const listCache = new Map();
+          const listFor = async (rawName) => {
+            const name = String(rawName || '').trim();
+            if (!name) return defaultList;
+            const key = name.toLowerCase();
+            if (!listCache.has(key)) {
+              listCache.set(key,
+                (await db.findShoppingListByName(req.householdId, name))
+                || (await db.createShoppingList(req.householdId, name)));
+            }
+            return listCache.get(key);
+          };
+          const enriched = [];
+          for (const i of act.items) {
+            const target = await listFor(i.list_name);
+            const { list_name: _stripped, ...rest } = i;
+            enriched.push({
+              ...rest,
+              list_id: target.id,
+              aisle_category: i.aisle_category || i.category || 'Other',
+            });
+          }
           const { detectOverrideHint } = require('../utils/shoppingDedupe');
           const overrideHint = detectOverrideHint(message || '');
           await db.addShoppingItemsWithDedupe(req.householdId, enriched, req.user.id, { overrideHint });
