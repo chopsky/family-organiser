@@ -64,7 +64,7 @@ const obj = (properties) => {
 
 // ── shared enums (mirror prompts.js exactly) ─────────────────────────────────
 const INTENTS = [
-  'add', 'remove', 'query_list', 'query_tasks', 'query_calendar', 'mixed',
+  'add', 'remove', 'create_list', 'query_list', 'query_tasks', 'query_calendar', 'mixed',
   'note_save', 'note_recall', 'subscription_add', 'subscription_remove',
   'subscription_list', 'create_event', 'update_event', 'delete_event',
   'update_task', 'delete_task', 'update_shopping_item', 'delete_shopping_item',
@@ -110,7 +110,13 @@ const CLASSIFY_SCHEMA = obj({
     category: en(SHOPPING_CATEGORIES),
     quantity: opt(str),
     action: en(['add', 'remove']),
+    // Named-list targeting ("add sunscreen to the holiday list"). Absent =
+    // the main shopping list. The handler finds or creates the named list.
+    list_name: opt(str),
   })),
+  // create_list intent: the new list's name. Items travel in shopping_items
+  // with matching list_name.
+  list: opt(obj({ name: str })),
   tasks: arr(obj({
     title: str,
     action: en(['add', 'complete']),

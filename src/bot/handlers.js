@@ -69,9 +69,9 @@ function matchTrivialMessage(text) {
 const recentAdds = new Map(); // userId → { kind, ids: uuid[], label: string, timestamp }
 const UNDO_WINDOW_MS = 2 * 60 * 1000;
 
-function rememberAdd(userId, kind, ids, label) {
+function rememberAdd(userId, kind, ids, label, extra = {}) {
   if (!userId || !ids?.length) return;
-  recentAdds.set(userId, { kind, ids: Array.isArray(ids) ? ids : [ids], label, timestamp: Date.now() });
+  recentAdds.set(userId, { kind, ids: Array.isArray(ids) ? ids : [ids], label, timestamp: Date.now(), ...extra });
 }
 
 // Peek an entry if it's still inside its undo window (expired entries are
@@ -1142,6 +1142,11 @@ async function runUndo(user, household) {
       for (const id of add.ids) await db.deleteTask(id, household.id);
     } else if (add.kind === 'shopping') {
       for (const id of add.ids) await db.deleteShoppingItem(id, household.id);
+      // A list the bot itself created rides out with its items - but only
+      // if it's now empty, so an undo can never take real data along.
+      if (add.createdListId) {
+        await db.deleteShoppingListIfEmpty(add.createdListId, household.id).catch(() => {});
+      }
     }
     clearReminderStoresFor(user.id, new Set(add.ids));
     return { response: `↩️ Undone - removed ${add.label}.`, actions };
@@ -1198,8 +1203,8 @@ function capitalise(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function formatShoppingList(items) {
-  if (!items.length) return '✅ Shopping list is empty!';
+function formatShoppingList(items, listName = null) {
+  if (!items.length) return listName ? `✅ The *${listName}* list is empty!` : '✅ Shopping list is empty!';
 
   const grouped = {};
   for (const item of items) {
@@ -1207,7 +1212,7 @@ function formatShoppingList(items) {
     grouped[item.category].push(item);
   }
 
-  const lines = [];
+  const lines = listName ? [`*${listName} list*`] : [];
   for (const [cat, catItems] of Object.entries(grouped)) {
     const emoji = CATEGORY_EMOJI[cat] || '📦';
     lines.push(`\n${emoji} *${capitalise(cat)}*`);
@@ -2959,7 +2964,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     const actions = { shoppingAdded: [], shoppingCompleted: [], tasksAdded: [], tasksCompleted: [] };
     switch (slashCmd) {
       case 'shopping':
-        return { response: await handleList(user, household), actions };
+        return { response: await handleList(user, household, text), actions };
       case 'tasks':
         return { response: await handleTasks(user, household), actions };
       case 'mytasks':
@@ -3108,7 +3113,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         return { response: taskResponse, actions };
       }
       if (routed.route === 'query_list') {
-        return { response: await handleList(user, household), actions };
+        return { response: await handleList(user, household, text), actions };
       }
       if (routed.route === 'query_calendar') {
         const answer = await handleCalendarQuery(
@@ -3274,7 +3279,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
 
   // Handle specific query intents
   if (result.intent === 'query_list') {
-    const listResponse = await handleList(user, household);
+    const listResponse = await handleList(user, household, text);
     return { response: listResponse, actions };
   }
   if (result.intent === 'query_tasks') {
@@ -4020,6 +4025,51 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
 
   // Handle shopping items
+  // Create a NAMED list on the Lists screen ("create a holiday list and
+  // add baggage"). A real user asked for exactly this and got a bare
+  // to-do titled "Baggage" instead (2026-08-25 transcript). Items ride
+  // shopping_items and are added straight onto the new list.
+  if (result.intent === 'create_list') {
+    const wanted = String(result.list?.name || '').trim();
+    if (!wanted) {
+      return { response: 'Happy to - what should the list be called? (e.g. "create a packing list")', actions };
+    }
+    try {
+      const existing = await db.findShoppingListByName(household.id, wanted);
+      const list = existing || await db.createShoppingList(household.id, wanted);
+      const toAdd = (result.shopping_items || []).filter((i) => i.action === 'add');
+      let savedNames = [];
+      if (toAdd.length) {
+        const enriched = toAdd.map(({ list_name: _stripped, ...i }) => ({
+          ...i, list_id: list.id, aisle_category: i.category || 'Other',
+        }));
+        const { created: rows, updated } = await db.addShoppingItemsWithDedupe(household.id, enriched, user.id, {});
+        const saved = [...rows, ...(updated || [])];
+        savedNames = saved.map((i) => i.item);
+        actions.shoppingAdded = savedNames;
+        const ids = saved.map((s) => s?.id).filter(Boolean);
+        // Undo removes the items AND the list itself if the bot created it
+        // and it ends up empty - never a list that already existed.
+        if (ids.length) rememberAdd(user.id, 'shopping', ids, savedNames.join(', '), existing ? {} : { createdListId: list.id });
+      }
+      const itemsBit = savedNames.length ? ` and added ${savedNames.join(', ')}` : '';
+      if (savedNames.length || !existing) {
+        broadcast.toHousehold(user.id, household.members,
+          `📝 ${user.name} ${existing ? 'added to' : 'created'} the ${list.name} list${savedNames.length ? `: ${savedNames.join(', ')}` : ''}`,
+          { title: existing ? 'List updated' : 'New list', body: `${user.name} ${existing ? 'updated' : 'created'} "${list.name}"`, category: 'shopping_updated' });
+      }
+      const response = existing
+        ? (savedNames.length
+          ? `Added ${savedNames.join(', ')} to your existing *${list.name}* list. 👍`
+          : `You've already got a *${list.name}* list - it's in the Lists tab. 👍`)
+        : `📝 Created the *${list.name}* list${itemsBit}. Find it in the Lists tab.`;
+      return { response, actions };
+    } catch (err) {
+      console.error('[handlers] create_list failed:', err.message);
+      return { response: "I couldn't create that list just now - try again in a moment.", actions };
+    }
+  }
+
   if (result.shopping_items?.length) {
     const toAdd = result.shopping_items.filter((i) => i.action === 'add');
     const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
@@ -4031,12 +4081,31 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       // landed without list_id and Postgres rejected the insert. Match the
       // /api/classify behaviour: look up (or lazy-create) the default list
       // and attach list_id + aisle_category to each row.
+      // Items carrying list_name ("add sunscreen to the holiday list") go
+      // to that list instead, found or created on the spot.
       const defaultList = await db.getDefaultShoppingList(household.id);
-      const enriched = toAdd.map((i) => ({
-        ...i,
-        list_id: defaultList.id,
-        aisle_category: i.category || 'Other',
-      }));
+      const listCache = new Map();
+      const listFor = async (rawName) => {
+        const name = String(rawName || '').trim();
+        if (!name) return defaultList;
+        const key = name.toLowerCase();
+        if (!listCache.has(key)) {
+          listCache.set(key,
+            (await db.findShoppingListByName(household.id, name))
+            || (await db.createShoppingList(household.id, name)));
+        }
+        return listCache.get(key);
+      };
+      const enriched = [];
+      for (const i of toAdd) {
+        const target = await listFor(i.list_name);
+        const { list_name: _stripped, ...rest } = i;
+        enriched.push({
+          ...rest,
+          list_id: target.id,
+          aisle_category: i.category || 'Other',
+        });
+      }
       // Detect override hint from the user's original message - words
       // like "another"/"more"/"extra" mean the user wants the duplicate
       // even if the item is already on the list.
@@ -4877,7 +4946,21 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
 /**
  * Handle a "list" command - show shopping list.
  */
-async function handleList(user, household) {
+async function handleList(user, household, text = '') {
+  // "what's on the holiday list" - when the message names one of the
+  // household's lists, show THAT list. Default behaviour otherwise.
+  try {
+    const t = String(text).toLowerCase();
+    if (t) {
+      const lists = await db.getShoppingLists(household.id);
+      const named = (lists || []).find((l) => l?.name && l.name.toLowerCase() !== 'default'
+        && t.includes(l.name.toLowerCase()));
+      if (named) {
+        const items = await db.getShoppingList(household.id, { listId: named.id });
+        return formatShoppingList(items, named.name);
+      }
+    }
+  } catch { /* fall through to the default list */ }
   const items = await db.getShoppingList(household.id);
   return formatShoppingList(items);
 }

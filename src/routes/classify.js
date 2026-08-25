@@ -113,17 +113,46 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         const ops = [];
 
         // Shopping items
+        // Named-list support (create_list intent + per-item list_name), same
+        // semantics as the WhatsApp handler: find or create the named list,
+        // default list otherwise. list_name MUST be stripped before insert -
+        // it's a classifier field, not a column.
+        const listCache = new Map();
+        const listFor = async (rawName) => {
+          const name = String(rawName || '').trim();
+          if (!name) {
+            if (!listCache.has('')) listCache.set('', await db.getDefaultShoppingList(req.householdId));
+            return listCache.get('');
+          }
+          const key = name.toLowerCase();
+          if (!listCache.has(key)) {
+            listCache.set(key,
+              (await db.findShoppingListByName(req.householdId, name))
+              || (await db.createShoppingList(req.householdId, name)));
+          }
+          return listCache.get(key);
+        };
+        // "create a party list" with no items still creates the list - the
+        // model's reply says it did, so it must be true.
+        if (result.intent === 'create_list' && result.list?.name) {
+          ops.push(listFor(result.list.name));
+        }
+
         if (result.shopping_items?.length) {
           const toAdd    = result.shopping_items.filter((i) => i.action === 'add');
           const toRemove = result.shopping_items.filter((i) => i.action === 'remove');
           if (toAdd.length) {
-            // Get Default list for this household
-            const defaultList = await db.getDefaultShoppingList(req.householdId);
-            const enriched = toAdd.map(i => ({
-              ...i,
-              list_id: defaultList.id,
-              aisle_category: i.category || 'Other',
-            }));
+            const fallbackName = result.intent === 'create_list' ? result.list?.name : null;
+            const enriched = [];
+            for (const i of toAdd) {
+              const target = await listFor(i.list_name || fallbackName);
+              const { list_name: _stripped, ...rest } = i;
+              enriched.push({
+                ...rest,
+                list_id: target.id,
+                aisle_category: i.category || 'Other',
+              });
+            }
             // Use deduped insert. classify is called from the in-app text bar;
             // detect override hint from the same text the AI just classified.
             const { detectOverrideHint } = require('../utils/shoppingDedupe');

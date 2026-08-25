@@ -3274,6 +3274,40 @@ async function getShoppingLists(householdId, db = supabase) {
   return data;
 }
 
+/** Case-insensitive exact-name lookup ("holiday" finds "Holiday"). */
+async function findShoppingListByName(householdId, name, db = supabase) {
+  const wanted = String(name || '').trim();
+  if (!wanted) return null;
+  const { data, error } = await db
+    .from('shopping_lists')
+    .select('*')
+    .eq('household_id', householdId)
+    .ilike('name', wanted)
+    .limit(1);
+  if (error) throw error;
+  return data?.[0] || null;
+}
+
+/**
+ * Undo helper: remove a list the bot just created, but only if nothing is
+ * on it any more - never take user data down with an undo.
+ */
+async function deleteShoppingListIfEmpty(listId, householdId, db = supabase) {
+  const { count, error } = await db
+    .from('shopping_items')
+    .select('*', { count: 'exact', head: true })
+    .eq('list_id', listId);
+  if (error) throw error;
+  if (count > 0) return false;
+  const { error: delErr } = await db
+    .from('shopping_lists')
+    .delete()
+    .eq('id', listId)
+    .eq('household_id', householdId);
+  if (delErr) throw delErr;
+  return true;
+}
+
 async function createShoppingList(householdId, name, opts = {}, db = supabase) {
   const row = { household_id: householdId, name };
   if (opts.emoji) row.emoji = opts.emoji;
@@ -10689,6 +10723,8 @@ module.exports = {
   getShoppingList,
   getShoppingLists,
   createShoppingList,
+  findShoppingListByName,
+  deleteShoppingListIfEmpty,
   updateShoppingList,
   ensureShoppingList,
   deleteShoppingList,

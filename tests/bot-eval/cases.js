@@ -960,4 +960,40 @@ module.exports = [
       return null;
     },
   },
+  {
+    name: 'create_list: "holiday to-do list with baggage" is a named LIST, not a bare to-do (real transcript 2026-08-25)',
+    message: 'Create a holiday to-do list for me and add baggage',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [], calendarEvents: [] },
+    check: (r) => {
+      if (r.intent !== 'create_list') return `intent ${r.intent} (want create_list)`;
+      if (!/holiday/i.test(r.list?.name || '')) return `list.name ${JSON.stringify(r.list)}`;
+      const items = (r.shopping_items || []).filter((i) => i.action === 'add');
+      if (!items.some((i) => /baggage|luggage/i.test(i.item || ''))) return `items ${JSON.stringify(items)}`;
+      return null;
+    },
+  },
+  {
+    name: 'list_name targeting: "add sunscreen to the holiday list" names the list',
+    message: 'Add sunscreen to the holiday list',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [], calendarEvents: [] },
+    check: (r) => {
+      if (r.intent !== 'add' && r.intent !== 'create_list') return `intent ${r.intent}`;
+      const item = (r.shopping_items || []).find((i) => /sunscreen/i.test(i.item || ''));
+      if (!item) return `no sunscreen item: ${JSON.stringify(r.shopping_items)}`;
+      if (!/holiday/i.test(item.list_name || r.list?.name || '')) return `list_name ${item.list_name}`;
+      return null;
+    },
+  },
+  {
+    name: 'list_name guard: a plain "add milk to the shopping list" stays on the main list',
+    message: 'Add milk to the shopping list',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [], calendarEvents: [] },
+    check: (r) => {
+      if (r.intent !== 'add') return `intent ${r.intent}`;
+      const item = (r.shopping_items || []).find((i) => /milk/i.test(i.item || ''));
+      if (!item) return 'no milk item';
+      if (item.list_name && !/shopping|default|grocer/i.test(item.list_name)) return `unexpected list_name ${item.list_name}`;
+      return null;
+    },
+  },
 ];

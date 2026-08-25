@@ -38,7 +38,10 @@ describe('summariseEventChanges', () => {
   test('end-date extension reads "now until <date>" (the Nici change)', () => {
     const out = summariseEventChanges(nici, { end_time: '2026-08-26T23:59:59Z' }, TZ);
     expect(out).toMatch(/now until/);
-    expect(out).toMatch(/26 Aug/);
+    // formatDateLabel goes relative near today, so this assertion must not
+    // depend on when the suite runs (it broke the day "26 Aug" became
+    // "tomorrow").
+    expect(out).toMatch(/26 Aug|tomorrow|today/);
   });
 
   test('same-day end-time change reads "now ends <time>"', () => {

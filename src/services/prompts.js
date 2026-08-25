@@ -22,7 +22,8 @@ FEATURES THAT EXIST (never tell a user these don't exist):
 
 APP NAVIGATION (the real screens - never invent others):
 - Mobile tabs: Home, Calendar, Tasks, Lists, Meals, plus a More button opening: Rewards, Documents, Kids' Notes, Family Setup, School, Settings.
-- Tasks screen = chores, routines and stars. Lists screen = To-dos (Today / This week / Someday) and Shopping lists. They are different screens.
+- Tasks screen = chores, routines and stars. Lists screen = To-dos (Today / This week / Someday) and Shopping lists, including custom named lists (packing, party, holiday...). They are different screens.
+- The assistant CAN create new named lists and add items to a named list, from WhatsApp and app chat alike ("create a holiday list", "add sunscreen to the holiday list").
 - Settings sections: Connected services (Connect WhatsApp, Connect Calendars, Send Emails to AI), Notifications (morning briefing on/off AND a "Briefing time" picker, evening heads-up, per-device push), Location, Active sessions, and Account (data export, subscription, delete).
 - NEVER give directions to a screen, toggle, or setting that is not listed above. If you are not certain where something lives in the app, say you're not certain instead of guessing a path - wrong directions are worse than none.`;
 
@@ -64,7 +65,9 @@ CONVERSATION CONTEXT:
 INTENT DETECTION:
 - "add": User is adding new items or tasks
 - "remove": User is marking items/tasks as done or removing them
-- "query_list": User is specifically asking to see or about the shopping list (e.g. "show me the list", "what's on the shopping list?", "what do we need to buy?")
+- "create_list": User wants a NEW named list on the Lists screen (e.g. "create a holiday list", "make a packing list for France", "start a list for the party"). Set list.name to a short name ("Holiday", "France packing") and put any items mentioned into shopping_items (action "add", list_name matching list.name). A named collection of THINGS is create_list even when the user says "to-do list" or "checklist" ("create a holiday to-do list and add baggage" → create_list "Holiday" + item "baggage") - the tasks array is only for actual errands to do, not for containers. Adding to a list that plainly already exists is NOT create_list - it's "add" with list_name.
+- list_name (on shopping_items entries): set it ONLY when the user names a specific list ("add sunscreen to the holiday list" → item "sunscreen", list_name "Holiday"). No list named = leave it out and the item goes to the main shopping list. The handler finds or creates the named list, so never refuse or warn that a list might not exist.
+- "query_list": User is specifically asking to see or about the shopping list OR a named list (e.g. "show me the list", "what's on the shopping list?", "what do we need to buy?", "what's on the holiday list?")
 - "query_tasks": User is specifically asking to see or about tasks (e.g. "what tasks are there?", "what's on my to-do?")
 - "mixed": A combination of add/remove operations
 - "note_save": User wants you to remember/save something (e.g. "remember our wifi password is ABC123", "save the alarm code as 4567", "our vet's number is 012 345 6789"). Extract the key (what it is) and value (the info to save).
@@ -420,15 +423,17 @@ CRITICAL OUTPUT FORMAT:
 
 Respond only with valid JSON matching this schema:
 {
-  "intent": "add" | "remove" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "school_add" | "meal_plan_add" | "meal_plan_remove" | "web_search" | "chat",
+  "intent": "add" | "remove" | "create_list" | "query_list" | "query_tasks" | "query_calendar" | "mixed" | "note_save" | "note_recall" | "subscription_add" | "subscription_remove" | "subscription_list" | "create_event" | "update_event" | "delete_event" | "update_task" | "delete_task" | "update_shopping_item" | "delete_shopping_item" | "recipe" | "recipe_followup" | "weather" | "school_activity" | "school_event" | "school_add" | "meal_plan_add" | "meal_plan_remove" | "web_search" | "chat",
   "shopping_items": [
     {
       "item": string,
       "category": "Dairy & Eggs" | "Produce" | "Meat & Seafood" | "Pantry & Grains" | "Bakery" | "Frozen Foods" | "Beverages" | "Household & Cleaning" | "Personal Care" | "Other",
       "quantity": string | null,
-      "action": "add" | "remove"
+      "action": "add" | "remove",
+      "list_name": string | null
     }
   ],
+  "list": { "name": string } | null,
   "tasks": [
     {
       "title": string,

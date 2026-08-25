@@ -34,6 +34,16 @@ jest.mock('../db/queries', () => ({
   updateUser: jest.fn(() => Promise.resolve({})),
   upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
   getNotificationPreferences: jest.fn(() => Promise.resolve(null)),
+  // Named lists (create_list intent + list_name targeting)
+  getDefaultShoppingList: jest.fn(() => Promise.resolve({ id: 'list-default', name: 'Default' })),
+  findShoppingListByName: jest.fn(() => Promise.resolve(null)),
+  createShoppingList: jest.fn((hid, name) => Promise.resolve({ id: 'list-new', name })),
+  getShoppingLists: jest.fn(() => Promise.resolve([])),
+  addShoppingItemsWithDedupe: jest.fn((hid, items) => Promise.resolve({
+    created: items.map((i, n) => ({ id: `s-${n}`, ...i })), duplicates: [], updated: [],
+  })),
+  deleteShoppingItem: jest.fn(() => Promise.resolve()),
+  deleteShoppingListIfEmpty: jest.fn(() => Promise.resolve(true)),
   // Runs before classify on every inbound message - default to "no offer
   // pending" so it stays out of the way of unrelated tests.
   takeEveningBriefOffer: jest.fn(() => Promise.resolve(false)),
@@ -1563,6 +1573,96 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     ai.classify.mockResolvedValue({ intent: 'general', response_message: 'ok' });
     await handlers.handleTextMessage('remind me at whatever works', u, hh, {});
     expect(ai.classify).toHaveBeenCalled();
+  });
+});
+
+// ─── Named lists: create_list + list_name targeting (2026-08-25) ───────────
+describe('named lists', () => {
+  const ai = require('../services/ai');
+  const hh = { id: 'h1', timezone: 'Europe/London', members: [] };
+  beforeEach(() => {
+    db.getCalendarEvents.mockResolvedValue([]);
+    db.getAllIncompleteTasks.mockResolvedValue([]);
+    db.getHouseholdSchools.mockResolvedValue([]);
+    db.getHouseholdPreferences.mockResolvedValue([]);
+    db.findShoppingListByName.mockResolvedValue(null);
+    db.createShoppingList.mockImplementation((hid, name) => Promise.resolve({ id: 'list-new', name }));
+    db.addShoppingItemsWithDedupe.mockImplementation((hid, items) => Promise.resolve({
+      created: items.map((i, n) => ({ id: `s-${n}`, ...i })), duplicates: [], updated: [],
+    }));
+  });
+
+  test('create_list makes the list and puts the items ON it (the "holiday to-do list" transcript)', async () => {
+    const u = { id: 'u-list-1', name: 'Grant' };
+    ai.classify.mockResolvedValue({
+      intent: 'create_list',
+      list: { name: 'Holiday' },
+      shopping_items: [{ item: 'baggage', category: 'Other', action: 'add', list_name: 'Holiday' }],
+      response_message: '',
+    });
+    const ans = await handlers.handleTextMessage('Create a holiday to-do list for me and add baggage', u, hh, {});
+    expect(db.createShoppingList).toHaveBeenCalledWith('h1', 'Holiday');
+    const [, items] = db.addShoppingItemsWithDedupe.mock.calls[0];
+    expect(items[0]).toMatchObject({ item: 'baggage', list_id: 'list-new' });
+    expect(items[0].list_name).toBeUndefined(); // stripped before insert
+    expect(ans.response).toMatch(/Created the \*Holiday\* list and added baggage/);
+  });
+
+  test('create_list on an existing list adds to it instead of duplicating', async () => {
+    const u = { id: 'u-list-2', name: 'Grant' };
+    db.findShoppingListByName.mockResolvedValue({ id: 'list-old', name: 'Holiday' });
+    ai.classify.mockResolvedValue({
+      intent: 'create_list',
+      list: { name: 'holiday' },
+      shopping_items: [{ item: 'sunscreen', category: 'Personal Care', action: 'add', list_name: 'holiday' }],
+      response_message: '',
+    });
+    const ans = await handlers.handleTextMessage('make a holiday list with sunscreen', u, hh, {});
+    expect(db.createShoppingList).not.toHaveBeenCalled();
+    expect(db.addShoppingItemsWithDedupe.mock.calls[0][1][0].list_id).toBe('list-old');
+    expect(ans.response).toMatch(/existing \*Holiday\* list/);
+  });
+
+  test('undo after create_list removes the items AND the now-empty new list', async () => {
+    const u = { id: 'u-list-3', name: 'Grant' };
+    ai.classify.mockResolvedValue({
+      intent: 'create_list',
+      list: { name: 'Holiday' },
+      shopping_items: [{ item: 'baggage', category: 'Other', action: 'add', list_name: 'Holiday' }],
+      response_message: '',
+    });
+    await handlers.handleTextMessage('create a holiday list and add baggage', u, hh, {});
+    const undo = await handlers.handleTextMessage('undo', u, hh, {});
+    expect(undo.response).toMatch(/Undone/);
+    expect(db.deleteShoppingItem).toHaveBeenCalledWith('s-0', 'h1');
+    expect(db.deleteShoppingListIfEmpty).toHaveBeenCalledWith('list-new', 'h1');
+  });
+
+  test('an add with list_name lands on that list; unnamed items keep the default', async () => {
+    const u = { id: 'u-list-4', name: 'Grant' };
+    ai.classify.mockResolvedValue({
+      intent: 'add',
+      shopping_items: [
+        { item: 'sunscreen', category: 'Personal Care', action: 'add', list_name: 'Holiday' },
+        { item: 'milk', category: 'Dairy & Eggs', action: 'add' },
+      ],
+      tasks: [],
+      response_message: 'Added!',
+    });
+    await handlers.handleTextMessage('add sunscreen to the holiday list and milk', u, hh, {});
+    const [, items] = db.addShoppingItemsWithDedupe.mock.calls[0];
+    expect(items.find((i) => i.item === 'sunscreen').list_id).toBe('list-new');
+    expect(items.find((i) => i.item === 'milk').list_id).toBe('list-default');
+  });
+
+  test('asking about the holiday list shows the named list', async () => {
+    const u = { id: 'u-list-5', name: 'Grant' };
+    db.getShoppingLists.mockResolvedValue([{ id: 'list-default', name: 'Groceries' }, { id: 'list-hol', name: 'Holiday' }]);
+    db.getShoppingList.mockResolvedValue([{ item: 'baggage', category: 'other', completed: false }]);
+    ai.classify.mockResolvedValue({ intent: 'query_list', response_message: '' });
+    const ans = await handlers.handleTextMessage("what's on the holiday list?", u, hh, {});
+    expect(db.getShoppingList).toHaveBeenCalledWith('h1', { listId: 'list-hol' });
+    expect(ans.response).toMatch(/\*Holiday list\*/);
   });
 });
 
