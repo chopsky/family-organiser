@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
-    acquisition = null, inviteLoop = null, referrals = null, signupSources = null, pendingReplyLeaks = null,
+    acquisition = null, inviteLoop = null, referrals = null, signupSources = null, pendingReplyLeaks = null, paywallFunnel = null,
   } = data || {};
 
   // Calculate DAU average
@@ -237,6 +237,40 @@ export default function AdminAnalytics() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* The hard-wall scoreboard: decides the soft-wall flip (docs/spec-soft-wall-free-mode.md) */}
+      {paywallFunnel && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Paywall funnel (last {paywallFunnel.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            iOS onboarding wall. Decision thresholds: flip to the soft wall only if signups fall
+            &gt;60% AND completion &lt;25% over a fortnight. <strong>Fallthrough</strong> = the wall
+            failed open (store trouble) - by design, not a user choice.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            {[
+              ['Wall-eligible signups', paywallFunnel.eligibleSignups],
+              ['Wall shown', paywallFunnel.shown],
+              ['Converted', paywallFunnel.converted + paywallFunnel.restored],
+              ['Skipped', paywallFunnel.skipped],
+              ['Abandoned', paywallFunnel.abandoned],
+              ['Fallthrough', paywallFunnel.fallthrough],
+            ].map(([label, val]) => (
+              <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
+                <div className="text-2xl font-bold text-plum">{val}</div>
+                <div className="text-xs text-warm-grey mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+          {paywallFunnel.shown > 0 && (
+            <p className="text-sm text-warm-grey mt-3">
+              Completion: <strong className="text-charcoal">
+                {Math.round(((paywallFunnel.converted + paywallFunnel.restored) / paywallFunnel.shown) * 100)}%
+              </strong> of walls shown
+            </p>
+          )}
         </div>
       )}
 

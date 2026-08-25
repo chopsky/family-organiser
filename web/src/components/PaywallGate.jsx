@@ -43,6 +43,7 @@ export default function PaywallGate({ children }) {
 
   return (
     <PaywallScreen
+      context="gate"
       householdId={auth.household?.id}
       onDone={() => { setUnlocked(true); refresh(); }}
       onSignOut={auth.logout}

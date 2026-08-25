@@ -7073,6 +7073,66 @@ const PENDING_ASK_PATTERNS = [
   },
 ];
 
+async function recordPaywallEvent({ householdId, userId, outcome, context }, db = supabase) {
+  const { error } = await db.from('paywall_events').insert({
+    household_id: householdId,
+    user_id: userId || null,
+    outcome,
+    context: context || 'onboarding',
+  });
+  if (error) throw error;
+}
+
+/**
+ * The hard-wall scoreboard (docs/spec-soft-wall-free-mode.md): wall-eligible
+ * signups (households stamped paywall_required in the window) against what
+ * happened at the wall. "abandoned" is derived - a household whose last
+ * 'shown' has no terminal outcome (converted/restored/skipped) within 24h.
+ * Fallthrough (wall failed open) is counted but isn't a user choice.
+ */
+async function getPaywallFunnel({ days = 14 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const out = { days, eligibleSignups: 0, shown: 0, converted: 0, restored: 0, skipped: 0, fallthrough: 0, abandoned: 0 };
+  try {
+    const { count } = await db
+      .from('households')
+      .select('*', { count: 'exact', head: true })
+      .eq('paywall_required', true)
+      .eq('is_internal', false)
+      .gte('created_at', since);
+    out.eligibleSignups = count || 0;
+  } catch { /* paywall_required not migrated - leave 0 */ }
+  const { data: events, error } = await db
+    .from('paywall_events')
+    .select('household_id, outcome, created_at')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(5000);
+  if (error) throw error;
+  const byHousehold = new Map();
+  for (const e of events || []) {
+    if (!byHousehold.has(e.household_id)) byHousehold.set(e.household_id, []);
+    byHousehold.get(e.household_id).push(e);
+  }
+  const TERMINAL = new Set(['converted', 'restored', 'skipped']);
+  for (const rows of byHousehold.values()) {
+    const outcomes = new Set(rows.map((r) => r.outcome));
+    if (outcomes.has('shown')) out.shown += 1;
+    if (outcomes.has('converted')) out.converted += 1;
+    if (outcomes.has('restored')) out.restored += 1;
+    if (outcomes.has('skipped')) out.skipped += 1;
+    if (outcomes.has('fallthrough')) out.fallthrough += 1;
+    if (outcomes.has('shown')) {
+      const lastShown = rows.filter((r) => r.outcome === 'shown').at(-1);
+      const resolved = rows.some((r) => TERMINAL.has(r.outcome)
+        && Date.parse(r.created_at) >= Date.parse(lastShown.created_at) - 60000);
+      const oldEnough = Date.now() - Date.parse(lastShown.created_at) > 24 * 3600000;
+      if (!resolved && oldEnough) out.abandoned += 1;
+    }
+  }
+  return out;
+}
+
 /**
  * Radar for the deterministic reply layer: pairs each bot question from a
  * pending flow with the user's next message and reports the ones that did
@@ -11093,5 +11153,7 @@ module.exports = {
   getUpcomingInviteEvents,
   getInviteLoopFunnel,
   getPendingReplyLeaks,
+  recordPaywallEvent,
+  getPaywallFunnel,
   getReferralFunnel,
 };

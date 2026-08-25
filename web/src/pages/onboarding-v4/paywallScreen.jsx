@@ -145,10 +145,17 @@ function trialEndLabel(introPeriod, introUnit) {
  * @param {string} householdId - identifies the purchase to RevenueCat.
  * @param {() => void} onDone - purchased, restored, or failed open.
  */
-export default function PaywallScreen({ householdId, onDone, onSignOut }) {
+export default function PaywallScreen({ householdId, onDone, onSignOut, context = 'onboarding' }) {
   // Single exit: the onboarding draft has done its job by the time
   // anyone leaves this screen, whichever way they leave.
   const leave = () => { clearDraft(); onDone(); };
+  // Fire-and-forget scoreboard (admin "Paywall funnel"). Telemetry must
+  // never block or break the wall - failures vanish silently.
+  const record = (outcome) => {
+    import('../../lib/api')
+      .then(({ default: api }) => api.post('/telemetry/paywall', { outcome, context }))
+      .catch(() => {});
+  };
   // Both plans, monthly selected by default: leading with the annual
   // number alone made the first price anyone saw look like the only
   // price ("£59.99 sounds like a lot" - founder, first live test).
@@ -203,11 +210,12 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
         const monthly = all.find((p) => p.identifier === '$rc_monthly' || p.packageType === 'MONTHLY') || null;
         const annual = all.find((p) => p.identifier === '$rc_annual' || p.packageType === 'ANNUAL') || null;
         if (cancelled) return;
-        if (!monthly && !annual && !all[0]) { leave(); return; } // nothing configured - fail open
+        if (!monthly && !annual && !all[0]) { record('fallthrough'); leave(); return; } // nothing configured - fail open
         setPkgs({ monthly: monthly || all[0] || null, annual });
         setState('ready');
+        record('shown');
       } catch {
-        if (!cancelled) leave(); // store unreachable - fail open
+        if (!cancelled) { record('fallthrough'); leave(); } // store unreachable - fail open
       }
     })();
     return () => { cancelled = true; };
@@ -219,6 +227,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
     setState('buying');
     try {
       await purchasePackage(pkg);
+      record('converted');
       leave();
     } catch (err) {
       // A cancelled sheet is not an error to apologise for - the wall
@@ -235,7 +244,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut }) {
     setState('restoring');
     try {
       const info = await restorePurchases();
-      if (hasActivePremium(info)) { leave(); return; }
+      if (hasActivePremium(info)) { record('restored'); leave(); return; }
       setError('No previous subscription found on this Apple ID.');
     } catch {
       setError('Couldn’t reach the App Store just then. Try again in a moment.');
