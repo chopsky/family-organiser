@@ -2055,6 +2055,28 @@ async function getInviteByToken(token, db = supabase) {
  * match operator in PostgREST; the `%` wildcards are intentionally
  * absent so we only match exact addresses (just case-insensitive).
  */
+/**
+ * The household's OPEN invite: link/code-only, no recipient email typed
+ * (email = '' - NOT NULL column, and getInviteByEmail's empty-input guard
+ * means it can never match a real signup address). Used by the welcome
+ * screen's one-tap partner invite; reused while unexpired so re-renders
+ * don't mint a fresh row each time.
+ */
+async function getOpenInvite(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('invites')
+    .select()
+    .eq('household_id', householdId)
+    .eq('email', '')
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
 async function getInviteByEmail(email, db = supabase) {
   if (!email?.trim()) return null;
   const { data, error } = await db
@@ -10715,6 +10737,7 @@ module.exports = {
   getInviteByToken,
   getInviteByCode,
   getInviteByEmail,
+  getOpenInvite,
   markInviteAccepted,
   deleteInvite,
   getPendingInvites,

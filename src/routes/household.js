@@ -688,6 +688,39 @@ router.delete('/dependents/:id', requireAuth, requireHousehold, requireAdmin, as
  * POST /api/household/invite
  * Send an email invite to join the household. Admin only.
  */
+/**
+ * POST /api/household/invite-link
+ * The email-less invite: a shareable link + typeable code with no recipient
+ * typed in advance. Powers the welcome screen's one-tap partner invite (and
+ * any future "share an invite" surface). No email is sent - the founder's
+ * own WhatsApp message is the delivery. Reuses the household's open invite
+ * while one is live so repeat calls don't mint a row each time.
+ */
+router.post('/invite-link', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    let invite = await db.getOpenInvite(req.householdId);
+    if (!invite) {
+      invite = await db.createInvite({
+        householdId: req.householdId,
+        email: '',
+        token: crypto.randomBytes(32).toString('hex'),
+        invitedBy: req.user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        code: generateInviteCode(),
+      });
+    }
+    return res.json({
+      url: `https://housemait.com/signup?invite=${invite.token}`,
+      // Absent until migration-invite-codes.sql runs - the client hides
+      // the code line rather than showing "undefined".
+      code: invite.code || null,
+    });
+  } catch (err) {
+    console.error('POST /api/household/invite-link error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/invite', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
   const { email: inviteEmail, name: inviteName, family_role, birthday, color_theme, school_id } = req.body;
 

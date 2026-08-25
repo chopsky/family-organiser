@@ -368,6 +368,22 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
   // jobs - and an empty array is the "not yet" state, so no separate flag.
   const [pieces, setPieces] = useState([]);
 
+  // One-tap partner invite: an email-less invite (link + typeable code) the
+  // founder shares from their own WhatsApp. Fetched lazily; any failure
+  // (joiner without admin rights, offline, endpoint missing) simply hides
+  // the card - the welcome screen must never look broken over an optional
+  // extra. Joiners are also excluded up front: the household they joined
+  // isn't theirs to hand out.
+  const [invite, setInvite] = useState(null);
+  useEffect(() => {
+    if (d?.joining) return undefined;
+    let cancelled = false;
+    import('../../lib/api').then(({ default: api }) => api.post('/household/invite-link'))
+      .then((res) => { if (!cancelled && res.data?.url) setInvite(res.data); })
+      .catch(() => { /* card stays hidden */ });
+    return () => { cancelled = true; };
+  }, [d?.joining]);
+
   // 350ms after landing, per the spec - the mark's pop reads first.
   useEffect(() => {
     if (reduced) return undefined;
@@ -441,6 +457,13 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             ))}
           </div>
         )}
+        {outcome?.kids?.length > 0 && (
+          <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
+            ✓ {outcome.kids.length === 1
+              ? `${outcome.kids[0]}'s profile is ready`
+              : `Profiles ready for ${outcome.kids.slice(0, -1).join(', ')} and ${outcome.kids[outcome.kids.length - 1]}`}
+          </p>
+        )}
         {outcome?.whatsapp?.deepLink && (
           <a
             href={outcome.whatsapp.deepLink}
@@ -456,6 +479,40 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             <img src="/onboarding-v4/whatsapp-white.svg" alt="" aria-hidden="true" style={{ width: 22, height: 22 }} />
             Finish linking WhatsApp
           </a>
+        )}
+        {invite && (
+          <div style={{ textAlign: 'left', background: T.purpleSoft, borderRadius: R.card, padding: '15px 16px', marginBottom: 12 }}>
+            <p style={{ font: '600 14.5px Inter, system-ui, sans-serif', color: T.purpleDeep, margin: 0 }}>
+              Get the whole house on the same page
+            </p>
+            <p style={{ fontSize: 12.5, lineHeight: 1.45, color: T.purpleDeep, opacity: 0.85, margin: '5px 0 0' }}>
+              Everyone sees every event, list and school date the moment you add it.
+            </p>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `Hey - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${invite.url}`
+                + (invite.code ? ` (or download the app and enter invite code ${invite.code.slice(0, 3)}-${invite.code.slice(3)})` : '')
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                width: '100%', minHeight: 42, marginTop: 12, borderRadius: 12,
+                background: T.purple, color: '#fff', textDecoration: 'none',
+                font: '600 14px Inter, system-ui, sans-serif',
+              }}
+            >
+              <img src="/onboarding-v4/whatsapp-white.svg" alt="" aria-hidden="true" style={{ width: 19, height: 19 }} />
+              Invite via WhatsApp
+            </a>
+            {invite.code && (
+              <p style={{ fontSize: 11.5, color: T.purpleDeep, opacity: 0.8, margin: '10px 0 0', textAlign: 'center' }}>
+                Or they can enter code{' '}
+                <b style={{ letterSpacing: '1.5px' }}>{invite.code.slice(0, 3)}-{invite.code.slice(3)}</b>
+                {' '}in the app
+              </p>
+            )}
+          </div>
         )}
         <Cta onClick={onEnter}>Enter Housemait</Cta>
       </div>
