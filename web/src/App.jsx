@@ -31,7 +31,24 @@ const OnboardingFlow  = lazy(() => import('./pages/onboarding/OnboardingFlow'));
 // it's built so the live /signup flow is untouched; the cutover swaps the
 // element on /signup once v4 is complete and measured against it.
 const OnboardingV4    = lazy(() => import('./pages/onboarding-v4/OnboardingV4'));
+const InviteLanding   = lazy(() => import('./pages/InviteLanding'));
 import { V4_ALLOWED } from './pages/onboarding-v4/flow';
+import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+
+// /signup's front door. Web visitors arriving on an invite link get the
+// app-first landing (household name, store buttons, their typeable code)
+// before the signup flow; native never sees it - the same URL deep-links
+// straight into the app's joiner flow via universal link.
+function SignupEntry() {
+  const [params] = useSearchParams();
+  const [continued, setContinued] = useState(false);
+  const inviteToken = params.get('invite');
+  if (!Capacitor.isNativePlatform() && inviteToken && !continued) {
+    return <InviteLanding token={inviteToken} onContinue={() => setContinued(true)} />;
+  }
+  return V4_ALLOWED ? <OnboardingV4 /> : <OnboardingFlow />;
+}
 const KidsShell       = lazy(() => import('./pages/kids/KidsShell'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
 const ForgotPassword  = lazy(() => import('./pages/ForgotPassword'));
@@ -262,7 +279,7 @@ function AppRoutes() {
             web/desktop sign-up is not changing. One codebase ships both, so the
             platform gate lives here rather than being remembered at build time.
             V4_ALLOWED also covers local dev, so `npm run dev` shows v4. */}
-        <Route path="/signup" element={V4_ALLOWED ? <OnboardingV4 /> : <OnboardingFlow />} />
+        <Route path="/signup" element={<SignupEntry />} />
         {/* Kept so v4 has a stable address of its own - handy for jumping
             straight to it, and for opening it on the web while it's being
             worked on. Production web still falls through to the existing flow. */}

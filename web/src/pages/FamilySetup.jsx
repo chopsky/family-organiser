@@ -1306,7 +1306,7 @@ export default function FamilySetup() {
                 return (
                   <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                     <span className="text-charcoal truncate">
-                      {inv.name || inv.email}
+                      {inv.name || inv.email || 'Open invite (anyone with the link or code)'}
                       {codeShown && (
                         <span className="block text-[11px] text-warm-grey mt-0.5">
                           Invite code: <span className="font-semibold tracking-wider text-charcoal">{codeShown}</span>

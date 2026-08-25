@@ -22,6 +22,7 @@ const INVITE = {
   invited_by: 'u-grant',
   name: 'Lynn',
   family_role: 'Mum',
+  code: 'KX7M4Q',
 };
 
 describe('GET /api/invites/lookup', () => {
@@ -37,9 +38,27 @@ describe('GET /api/invites/lookup', () => {
       householdName: 'The Shapiro family',
       inviterName: 'Grant',
       token: INVITE.token,
+      code: 'KX7M4Q',
       invitee: { name: 'Lynn', family_role: 'Mum' },
     });
     expect(db.getInviteByCode).toHaveBeenCalledWith('KX7M4Q');
+  });
+
+  test('token lookup returns the same shape (the invite-aware web landing)', async () => {
+    db.getInviteByToken.mockResolvedValue(INVITE);
+    db.getHouseholdById.mockResolvedValue({ name: 'The Shapiro family' });
+    db.getHouseholdMembers.mockResolvedValue([{ id: 'u-grant', name: 'Grant' }]);
+    const res = await request(app()).get(`/api/invites/lookup?token=${'a'.repeat(64)}`);
+    expect(res.body.valid).toBe(true);
+    expect(res.body.householdName).toBe('The Shapiro family');
+    expect(res.body.code).toBe('KX7M4Q');
+    expect(db.getInviteByCode).not.toHaveBeenCalled();
+  });
+
+  test('a malformed token never reaches the DB', async () => {
+    const res = await request(app()).get('/api/invites/lookup?token=zzz');
+    expect(res.body).toEqual({ valid: false });
+    expect(db.getInviteByToken).not.toHaveBeenCalled();
   });
 
   test('normalises what people actually type: lowercase, hyphens, spaces', async () => {

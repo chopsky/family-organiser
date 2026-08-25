@@ -6,7 +6,8 @@
         "components": [
           { "/": "/verify", "?": { "token": "?*" } },
           { "/": "/verified" },
-          { "/": "/open" }
+          { "/": "/open" },
+          { "/": "/signup", "?": { "invite": "?*" } }
         ]
       }
     ]

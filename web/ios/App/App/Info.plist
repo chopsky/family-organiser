@@ -30,6 +30,10 @@
 	<string>Housemait reads the calendars you choose so your existing events appear in your family calendar. Housemait never changes, adds or deletes anything in your calendars.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 	<key>CFBundleDisplayName</key>
         <string>Housemait</string>
 	<key>CFBundleExecutable</key>

@@ -187,8 +187,12 @@ function useDerivedCompletion(members) {
     // members list answers by itself.
     if (!soloAdult) return undefined;
     let cancelled = false;
+    // Open invites (email '') don't count: the welcome screen mints one just
+    // by rendering its share card, and displaying a code isn't inviting.
+    // An actual share/copy there marks this task via the dismissal endpoint;
+    // here only a typed-email invite counts as sent.
     api.get('/household/invites')
-      .then((res) => { if (!cancelled) setInviteSent((res.data?.invites || []).length > 0); })
+      .then((res) => { if (!cancelled) setInviteSent((res.data?.invites || []).some((i) => i.email && i.email.trim().length > 0)); })
       // Same lean as every check here: on error assume done.
       .catch(() => { if (!cancelled) setInviteSent(true); });
     return () => { cancelled = true; };

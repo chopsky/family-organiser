@@ -5,7 +5,7 @@
  * and screen 12 (celebration). Auth is still a stand-in here - real providers
  * and the deferred-connection replay land in Phase 5.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import { completedRecap } from '../../lib/onboardingDraft';
 import { Lockup, Cta, Ghost, TOP_GAP } from './ui';
@@ -375,6 +375,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
   // extra. Joiners are also excluded up front: the household they joined
   // isn't theirs to hand out.
   const [invite, setInvite] = useState(null);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (d?.joining) return undefined;
     let cancelled = false;
@@ -383,6 +384,54 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
       .catch(() => { /* card stays hidden */ });
     return () => { cancelled = true; };
   }, [d?.joining]);
+
+  // A share or copy is "invite sent" as far as the home screen's Add-your-
+  // family nudge is concerned - fire-and-forget, once.
+  const nudgeMarked = useRef(false);
+  const markInviteNudge = () => {
+    if (nudgeMarked.current) return;
+    nudgeMarked.current = true;
+    import('../../lib/api')
+      .then(({ default: api }) => api.post('/household/setup-nudges/dismiss', { task: 'invite' }))
+      .catch(() => { /* best effort */ });
+  };
+
+  const houseName = d.house || 'our home';
+  const inviteMessage = invite
+    ? `We’re on Housemait, one place for the family calendar, lists and school dates. Join ${houseName}: ${invite.url}`
+    : '';
+
+  // WhatsApp-first (the button says so), generic share sheet when WhatsApp
+  // isn't installed, wa.me as the web/last-ditch fallback.
+  const shareInvite = async () => {
+    markInviteNudge();
+    try {
+      const { AppLauncher } = await import('@capacitor/app-launcher');
+      const { value } = await AppLauncher.canOpenUrl({ url: 'whatsapp://send' });
+      if (value) {
+        await AppLauncher.openUrl({ url: `whatsapp://send?text=${encodeURIComponent(inviteMessage)}` });
+        return;
+      }
+    } catch { /* plugin unavailable (web) - fall through */ }
+    try {
+      const { Share } = await import('@capacitor/share');
+      await Share.share({ text: inviteMessage });
+      return;
+    } catch { /* cancelled or unavailable - fall through */ }
+    try {
+      if (navigator.share) { await navigator.share({ text: inviteMessage }); return; }
+    } catch { return; /* user cancelled the sheet */ }
+    window.open(`https://wa.me/?text=${encodeURIComponent(inviteMessage)}`, '_blank');
+  };
+
+  const codeShown = invite?.code ? `${invite.code.slice(0, 3)}-${invite.code.slice(3)}` : null;
+  const copyCode = async () => {
+    if (!codeShown) return;
+    markInviteNudge();
+    try { await navigator.clipboard.writeText(codeShown); } catch { /* keep the flip anyway - the code is on screen */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
 
   // 350ms after landing, per the spec - the mark's pop reads first.
   useEffect(() => {
@@ -431,9 +480,9 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
         <span style={{ display: 'block' }}>Welcome home,</span>
         <span style={{ color: T.purple }}>{d.you || 'friend'}.</span>
       </h1>
-      <p style={{ ...SUB, fontSize: 15, marginTop: 12, maxWidth: 320 }}>
-        <b style={{ color: T.ink }}>{d.house || 'Your household'}</b> is live. Add your first task or
-        event. Anyone you invite sees it instantly.
+      <p style={{ ...SUB, fontSize: 16, lineHeight: 1.45, marginTop: 12, maxWidth: 300 }}>
+        <b style={{ color: T.ink }}>{d.house || 'Your household'}</b> is live. It gets good when the
+        others are in. Everything you add, they see.
       </p>
 
       <div style={{ width: '100%', marginTop: 30 }}>
@@ -481,40 +530,56 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
           </a>
         )}
         {invite && (
-          <div style={{ textAlign: 'left', background: T.purpleSoft, borderRadius: R.card, padding: '15px 16px', marginBottom: 12 }}>
-            <p style={{ font: '600 14.5px Inter, system-ui, sans-serif', color: T.purpleDeep, margin: 0 }}>
-              Get the whole house on the same page
+          <div
+            className={reduced ? '' : 'ob-in'}
+            style={{
+              textAlign: 'left', background: '#fff', borderRadius: 18, padding: '16px 16px 14px',
+              marginBottom: 14, boxShadow: SHADOW.card, animationDelay: reduced ? undefined : '.35s',
+            }}
+          >
+            <p style={{ font: '700 11px Inter, system-ui, sans-serif', letterSpacing: '.1em', textTransform: 'uppercase', color: T.ink3, margin: 0 }}>
+              Bring the others in
             </p>
-            <p style={{ fontSize: 12.5, lineHeight: 1.45, color: T.purpleDeep, opacity: 0.85, margin: '5px 0 0' }}>
-              Everyone sees every event, list and school date the moment you add it.
-            </p>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(
-                `Hey - I've set up our family on Housemait so we can keep our calendar, shopping and tasks in one place. Tap to join: ${invite.url}`
-                + (invite.code ? ` (or download the app and enter invite code ${invite.code.slice(0, 3)}-${invite.code.slice(3)})` : '')
-              )}`}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={shareInvite}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: '100%', minHeight: 42, marginTop: 12, borderRadius: 12,
-                background: T.purple, color: '#fff', textDecoration: 'none',
-                font: '600 14px Inter, system-ui, sans-serif',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                width: '100%', minHeight: 46, marginTop: 12, borderRadius: 14, border: 0,
+                cursor: 'pointer', background: T.green, color: '#fff',
+                font: '700 15px Inter, system-ui, sans-serif',
+                boxShadow: '0 8px 18px -8px rgba(31,175,84,.6)',
               }}
             >
-              <img src="/onboarding-v4/whatsapp-white.svg" alt="" aria-hidden="true" style={{ width: 19, height: 19 }} />
+              <img src="/onboarding-v4/whatsapp-white.svg" alt="" aria-hidden="true" style={{ width: 20, height: 20 }} />
               Invite via WhatsApp
-            </a>
-            {invite.code && (
-              <p style={{ fontSize: 11.5, color: T.purpleDeep, opacity: 0.8, margin: '10px 0 0', textAlign: 'center' }}>
-                Or they can enter code{' '}
-                <b style={{ letterSpacing: '1.5px' }}>{invite.code.slice(0, 3)}-{invite.code.slice(3)}</b>
-                {' '}in the app
-              </p>
+            </button>
+            {codeShown && (
+              <button
+                type="button"
+                onClick={copyCode}
+                aria-live="polite"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  width: '100%', minHeight: 40, marginTop: 10, borderRadius: 12,
+                  cursor: 'pointer', border: '1.5px dashed rgba(109,56,173,.35)',
+                  background: 'rgba(242,236,250,.5)',
+                }}
+              >
+                {copied ? (
+                  <span style={{ font: '600 13px Inter, system-ui, sans-serif', color: T.okInk }}>✓ Code copied</span>
+                ) : (
+                  <>
+                    <span style={{ font: '600 13px Inter, system-ui, sans-serif', color: T.ink2 }}>or share the code</span>
+                    <span style={{ font: '700 14px ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '.14em', color: T.purpleDeep }}>{codeShown}</span>
+                  </>
+                )}
+              </button>
             )}
           </div>
         )}
         <Cta onClick={onEnter}>Enter Housemait</Cta>
+        {invite && <Ghost onClick={onEnter}>I’ll invite them later</Ghost>}
       </div>
     </div>
   );
