@@ -103,6 +103,7 @@ const Verified        = lazy(() => import('./pages/Verified'));
 const Verify          = lazy(() => import('./pages/Verify'));
 const PartyInvite     = lazy(() => import('./pages/PartyInvite'));
 const GiftLanding     = lazy(() => import('./pages/GiftLanding'));
+const MapleAlternative = lazy(() => import('./pages/MapleAlternative'));
 const SetupHousehold  = lazy(() => import('./pages/SetupHousehold'));
 const Onboarding      = lazy(() => import('./pages/Onboarding'));
 const ConnectWhatsAppStandalone = lazy(() => import('./pages/ConnectWhatsAppStandalone'));
@@ -343,6 +344,9 @@ function AppRoutes() {
         <Route path="/gift/:code" element={<GiftLanding />} />
         {/* Bare /gift: the prerendered OG shell (stays in loading state). */}
         <Route path="/gift" element={<GiftLanding />} />
+        {/* SEO landing page for families leaving Maple (sunsets 31 Dec 2026).
+            Public and indexed, unlike /gift. */}
+        <Route path="/maple-alternative" element={<MapleAlternative />} />
         {/* /open - deep-link target for "Open Housemait" email buttons. It's a
             Universal Link / App Link path (AASA + Android intent-filter), so on
             a phone with the app installed the OS opens the app instead of the

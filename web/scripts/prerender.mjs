@@ -58,6 +58,8 @@ const ROUTES = [
   // OG shell for gift links: vercel rewrites /gift/:code here so WhatsApp's
   // no-JS preview bot sees gift-specific OG tags; humans hydrate normally.
   ['/gift', 'gift.html'],
+  // Families leaving Maple (sunsets 31 Dec 2026) - indexed SEO landing.
+  ['/maple-alternative', 'maple-alternative.html'],
 ];
 
 const MIME = {
