@@ -578,8 +578,11 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             )}
           </div>
         )}
+        {/* One door, not two: a ghost "I'll invite them later" used to sit
+            here doing exactly what the CTA does. With a neutral primary
+            label there's no guilt to absolve - the invite card is plainly
+            optional (founder call 2026-08-26). */}
         <Cta onClick={onEnter}>Enter Housemait</Cta>
-        {invite && <Ghost onClick={onEnter}>I’ll invite them later</Ghost>}
       </div>
     </div>
   );
