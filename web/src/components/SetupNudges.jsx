@@ -48,7 +48,7 @@ import api from '../lib/api';
 
 // Fixed order. The grid reflows as tiles leave; it never re-sorts.
 const TASKS = [
-  { id: 'invite', label: 'Invite your family', to: '/family' },
+  { id: 'invite', label: 'Add your family', to: '/family' },
   // Settings, not the standalone /connect-whatsapp screen: both connect tiles
   // should land in the same place, and Settings keeps them next to the state
   // they change (and, on iOS, opens as the section popup).
@@ -172,10 +172,11 @@ function useDerivedCompletion(members) {
   const [schoolAdded, setSchoolAdded] = useState(null);
   const [inviteSent, setInviteSent] = useState(null);
 
-  // Computed up here because two effects key off it. A second ADULT, not a
-  // second row - dependents don't count as invited family.
-  const soloAdult = members.length > 0
-    && members.filter((m) => (m.member_type || 'account') === 'account').length < 2;
+  // Computed up here because two effects key off it. The tile is "Add your
+  // family" (2026-08-25 relabel): ANY second member satisfies it - a child
+  // added counts as adding family, not just a second adult. Invites only
+  // matter while the household is genuinely one person.
+  const soloAdult = members.length > 0 && members.length < 2;
 
   useEffect(() => {
     // The invite tile's task is INVITING, and sending the invite is the last
@@ -248,14 +249,11 @@ function useDerivedCompletion(members) {
 
   const me = members.find((m) => m.id === user?.id) || null;
 
-  // A second ADULT, not a second row. getHouseholdMembers returns dependents
-  // too, so a solo parent who added one child during onboarding would
-  // otherwise see "Invite your family" tick itself off without inviting
-  // anyone.
-  const adults = members.filter((m) => (m.member_type || 'account') === 'account');
-
   return {
-    invite: adults.length >= 2 || inviteSent === true,
+    // "Add your family": any second row (partner, child, grandparent, pet)
+    // means family was added - the old adults-only rule belonged to the
+    // "Invite your family" label this tile no longer wears.
+    invite: members.length >= 2 || inviteSent === true,
     wa: !!me?.whatsapp_linked,
     cal: calConnected,
     rem: notifGranted,

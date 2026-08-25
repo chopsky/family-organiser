@@ -130,11 +130,30 @@ export async function replayInbox(slug) {
   }
 }
 
+/**
+ * Create the child profiles named at the kids step. Runs after
+ * create-household (the dependents route needs one). Best-effort per name:
+ * one failure must not cost the others, and a fully failed replay just
+ * means the family adds the kids in Family Setup like before.
+ */
+export async function replayKids(names) {
+  const created = [];
+  for (const name of names || []) {
+    try {
+      await api.post('/household/dependents', { name, dependent_kind: 'child' });
+      created.push(name);
+    } catch { /* skip - Family Setup remains the fallback */ }
+  }
+  return created;
+}
+
 export async function replayQueued(d) {
   const calendars = await replayCalendars(d?.cals || {});
   const whatsapp = d?.wa ? await startWhatsAppPairing() : null;
   // A joiner skipped the inbox step, and the house inbox belongs to the
   // household they joined - never try to (re)claim it on their behalf.
+  // Same for kids: the roster belongs to the household they joined.
   const inbox = d?.joining ? { claimed: false, conflict: false } : await replayInbox(d?.inbox);
-  return { calendars, whatsapp, inbox };
+  const kids = d?.joining ? [] : await replayKids(d?.kids);
+  return { calendars, whatsapp, inbox, kids };
 }

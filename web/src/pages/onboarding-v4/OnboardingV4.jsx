@@ -21,7 +21,7 @@ import InviteCodeOverlay from './inviteCodeScreen';
 import useOnboardingFlow from './useOnboardingFlow';
 import { Step, Cta, Ghost, ResumeNotice } from './ui';
 import {
-  Splash, PainPicker, ShapePicker, NameStep, RoleStep, HouseStep, HouseSignOverlay,
+  Splash, PainPicker, ShapePicker, NameStep, RoleStep, KidsStep, HouseStep, HouseSignOverlay,
 } from './screens';
 import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
 import { CalendarList, CalendarConnect } from './calendarScreens';
@@ -285,7 +285,8 @@ export default function OnboardingV4({ initialPhase }) {
                       // The calendar step is never a gate, so its CTA reads as
                       // "done here" rather than implying something is missing.
                       : step === 'cals' ? (calCount > 0 ? `Done · ${calCount} connected` : 'Continue')
-                        : 'Continue'}
+                        : step === 'kids' ? ((d.kids || []).length > 0 ? `That’s everyone (${d.kids.length})` : 'Continue')
+                          : 'Continue'}
               </Cta>
             )}
             {skipLabel && <Ghost onClick={skip}>{skipLabel}</Ghost>}
@@ -303,6 +304,7 @@ export default function OnboardingV4({ initialPhase }) {
         {step === 'shape' && <ShapePicker d={d} pick={pickAndAdvance} />}
         {step === 'you' && <NameStep d={d} update={update} onEnter={() => canAdvance && next()} />}
         {step === 'role' && <RoleStep d={d} pick={pickAndAdvance} />}
+        {step === 'kids' && <KidsStep d={d} update={update} />}
         {step === 'house' && (
           <HouseStep
             d={d}

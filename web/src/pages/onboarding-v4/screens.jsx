@@ -8,7 +8,7 @@
  * Layout values are the spec's; colours resolve through ./tokens to the app's
  * existing custom properties.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import { NOTES, PAINS, SHAPES, ROLES, houseSuggestions } from './content';
 import { Lockup, Cta, Ghost, OptionRow, ChipGrid, Field, Tick } from './ui';
@@ -208,6 +208,85 @@ export function RoleStep({ d, pick }) {
 }
 
 /* ── 07 Household name ─ the first thing they CREATE, hence the reward. */
+/* ── 06 Kids ─ shown only to kid-shaped households (machine.js hops it
+   otherwise). First names are enough; profiles are created at signup by
+   replay.js, so Child Mode / School / stars are alive from day one. */
+export function KidsStep({ d, update }) {
+  const [draft, setDraft] = useState('');
+  const kids = d.kids || [];
+  const add = () => {
+    const name = draft.trim();
+    if (!name) return;
+    if (!kids.some((k) => k.toLowerCase() === name.toLowerCase())) {
+      update({ kids: [...kids, name] });
+    }
+    setDraft('');
+  };
+  return (
+    <>
+      <p style={EYEBROW}>Step 4 of 6</p>
+      <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Who are the kids?</h1>
+      <p style={{ ...SUB, marginTop: 10 }}>First names are enough. They get their own colour, star chart and school days.</p>
+      <div style={{ marginTop: 18, display: 'flex', gap: 10 }}>
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder={kids.length ? 'Another name?' : 'e.g. Olivia'}
+          autoCapitalize="words"
+          autoCorrect="off"
+          aria-label="Child's first name"
+          style={{
+            flex: 1, minWidth: 0, padding: '15px 17px', borderRadius: 16,
+            border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
+            font: '600 16.5px Inter, sans-serif', color: T.ink,
+          }}
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft.trim()}
+          style={{
+            padding: '0 22px', borderRadius: 16, border: 0, cursor: draft.trim() ? 'pointer' : 'default',
+            background: draft.trim() ? T.purple : 'rgba(26,22,32,.08)',
+            color: draft.trim() ? '#fff' : T.ink3, font: '600 15px Inter, sans-serif',
+          }}
+        >
+          Add
+        </button>
+      </div>
+      {kids.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+          {kids.map((k) => (
+            <span
+              key={k}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '9px 9px 9px 14px', borderRadius: 99,
+                background: T.purpleSoft, color: T.purpleDeep, font: '600 14px Inter, sans-serif',
+              }}
+            >
+              {k}
+              <button
+                type="button"
+                onClick={() => update({ kids: kids.filter((x) => x !== k) })}
+                aria-label={`Remove ${k}`}
+                style={{
+                  width: 22, height: 22, borderRadius: 99, border: 0, cursor: 'pointer',
+                  background: 'rgba(26,22,32,.10)', color: T.ink2, font: '600 13px Inter, sans-serif',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function HouseStep({ d, update, onEnter, joinLink }) {
   return (
     <>

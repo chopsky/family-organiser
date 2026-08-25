@@ -25,6 +25,7 @@ export const STEP_META = {
   shape:     { required: false, autoAdvance: true,  skipLabel: 'Skip' },
   you:       { required: true,  autoAdvance: false, skipLabel: null },
   role:      { required: false, autoAdvance: true,  skipLabel: 'Skip for now' },
+  kids:      { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
   house:     { required: true,  autoAdvance: false, skipLabel: null },
   cals:      { required: false, autoAdvance: false, skipLabel: "I'll do this later" },
   ask:       { required: false, autoAdvance: false, skipLabel: "I don't use WhatsApp" },
@@ -49,9 +50,18 @@ export const autoAdvances = (i) => Boolean(metaAt(i)?.autoAdvance);
  * acts. Navigation hops over them; the joiner walks you → role → cals →
  * ask → reminders.
  */
-const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'house', 'inbox']);
-const isSkipped = (i, d) => Boolean(d?.joining) && FOUNDER_ONLY_STEPS.has(stepAt(i));
-const activeSteps = (d) => (d?.joining ? STEPS.filter((s) => !FOUNDER_ONLY_STEPS.has(s)) : STEPS);
+const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'kids', 'house', 'inbox']);
+// Shapes with children in the picture - the only households the kids step
+// applies to. A skipped shape answer means "unknown", and asking housemates
+// to name their children is worse than not asking a family, so unknown skips.
+const KID_SHAPES = new Set(['kids', 'single', 'multigen']);
+const isSkipped = (i, d) => {
+  const s = stepAt(i);
+  if (Boolean(d?.joining) && FOUNDER_ONLY_STEPS.has(s)) return true;
+  if (s === 'kids' && !KID_SHAPES.has(d?.shape)) return true;
+  return false;
+};
+const activeSteps = (d) => STEPS.filter((s, idx) => !isSkipped(idx, d));
 
 /**
  * Progress percentage. Spec: `pct = round(i / 9 * 100)` - denominator is the

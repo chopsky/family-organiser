@@ -15,7 +15,14 @@ import { Capacitor } from '@capacitor/core';
 // continuation ("Or just text it to us." -> "And an address for the
 // paperwork."). progressPct divides by STEPS.length, so the
 // denominator renumbers itself.
-export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'house', 'cals', 'ask', 'inbox', 'reminders'];
+// 'kids' shows only when the shape answer says children are in the picture
+// (kids / single / multigen) - machine.js hops it otherwise. It exists
+// because the shape answer used to be collected and then DISCARDED: a family
+// tapped "Family with kids" and the app still treated them as childless,
+// hiding Child Mode, School and the star chart behind hasChildren gates
+// until someone wandered into Family Setup (and the App Review 2.3.6
+// rejection hit exactly that blindness).
+export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'kids', 'house', 'cals', 'ask', 'inbox', 'reminders'];
 
 export const PHASES = ['splash', 'flow', 'login', 'signup', 'done'];
 
