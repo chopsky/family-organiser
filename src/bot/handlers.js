@@ -213,6 +213,13 @@ function isRecentReferent(userId, kind, id) {
   return !!fresh?.items?.some((i) => i.kind === kind && i.id === id);
 }
 
+/** Newest-first referents of one kind - {id, label} rows the bot recently
+ *  NAMED, so a modify can survive a fuzzy-title miss on "that thing". */
+function getRecentReferents(userId, kind) {
+  const fresh = peekFresh(recentReferents, userId, REFERENT_TTL_MS);
+  return (fresh?.items || []).filter((i) => i.kind === kind);
+}
+
 function forgetReferent(userId, kind, id) {
   const fresh = peekFresh(recentReferents, userId, REFERENT_TTL_MS);
   if (!fresh?.items) return;
@@ -1365,10 +1372,30 @@ async function handleModifyIntent(result, user, household, { openTasks = [], cal
     return { response: "I had trouble looking that up. Try again in a moment.", actions };
   }
 
-  // 2. No matches
+  // 2. No matches by title. Before giving up, consult the conversational
+  // referents: "assign that to Lynn" right after the bot NAMED an event must
+  // resolve even when the spoken name and the stored title drifted apart
+  // (real 2026-08-25 transcript: stored "Loki vet", spoken "Loki's vet
+  // appointment" - the title search missed while the row's id sat in
+  // referent memory the whole time). A deictic ("that"/"it"/"this") reads
+  // as the newest named row; without one, the referent's label must be a
+  // token-subset of the asked-for title.
+  if (candidates.length === 0 && kind === 'event') {
+    const deictic = /\b(that|it|this)\b/i.test(originalText || '');
+    const wanted = new Set(String(title).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+    const referent = getRecentReferents(user.id, 'event').find((r) => {
+      if (deictic) return true;
+      const labelTokens = String(r.label || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+      return labelTokens.length > 0 && labelTokens.every((t) => wanted.has(t));
+    });
+    if (referent) {
+      const row = await db.getCalendarEventById(referent.id, household.id).catch(() => null);
+      if (row && !row.deleted_at) candidates = [row];
+    }
+  }
   if (candidates.length === 0) {
     return {
-      response: `I couldn't find ${kind === 'shopping' ? 'a shopping item' : `a ${kind}`} matching "${title}"${target.context ? ` (${target.context})` : ''}. Check the name and try again.`,
+      response: `I couldn't find ${kind === 'shopping' ? 'a shopping item' : kind === 'event' ? 'an event' : 'a task'} matching "${title}"${target.context ? ` (${target.context})` : ''}. Check the name and try again.`,
       actions,
     };
   }

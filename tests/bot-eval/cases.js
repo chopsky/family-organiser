@@ -985,6 +985,20 @@ module.exports = [
     },
   },
   {
+    name: 'NAME WHAT YOU SAVED: the reply speaks the exact stored title (Loki vet transcript 2026-08-25)',
+    message: 'Lok vet tomorrow at 11:45',
+    ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn', 'Loki'], tasks: [], calendarEvents: [] },
+    check: (r) => {
+      if (r.intent !== 'create_event') return `intent ${r.intent}`;
+      const title = r.calendar_event?.title;
+      if (!title) return 'no title';
+      if (r.response_message && !r.response_message.toLowerCase().includes(title.toLowerCase())) {
+        return `response says something other than the stored title "${title}": ${JSON.stringify(r.response_message)}`;
+      }
+      return null;
+    },
+  },
+  {
     name: 'list_name guard: a plain "add milk to the shopping list" stays on the main list',
     message: 'Add milk to the shopping list',
     ctx: { sender: 'Grant', memberNames: ['Grant', 'Lynn'], tasks: [], calendarEvents: [] },

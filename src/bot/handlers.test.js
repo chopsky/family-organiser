@@ -34,6 +34,7 @@ jest.mock('../db/queries', () => ({
   updateUser: jest.fn(() => Promise.resolve({})),
   upsertNotificationPreferences: jest.fn(() => Promise.resolve({})),
   getNotificationPreferences: jest.fn(() => Promise.resolve(null)),
+  getCalendarEventById: jest.fn(() => Promise.resolve(null)),
   // Named lists (create_list intent + list_name targeting)
   getDefaultShoppingList: jest.fn(() => Promise.resolve({ id: 'list-default', name: 'Default' })),
   findShoppingListByName: jest.fn(() => Promise.resolve(null)),
@@ -1690,6 +1691,31 @@ describe('modify disambiguation', () => {
     expect(ans.response).toMatch(/21:00/); // 20:00Z is 9pm BST
     expect(ans.response).toMatch(/23:00/);
     expect(ans.response).not.toMatch(/20:00/);
+  });
+
+  test('zero candidates + "that" resolves via the referent the bot just named (Loki vet transcript)', async () => {
+    const u = { id: 'u-ref-rescue', name: 'Grant' };
+    // The bot booked "Loki vet" but SPOKE "Loki's vet appointment"; the
+    // follow-up targets the spoken name, so the title search misses.
+    ai.classify.mockResolvedValueOnce({
+      intent: 'create_event',
+      calendar_event: { title: 'Loki vet', date: '2026-08-26', start_time: '11:45' },
+      response_message: "Booked! Loki's vet appointment for tomorrow.",
+    });
+    await handlers.handleTextMessage('Lok vet tomorrow at 11:45', u, hh, {});
+    db.findEventsByFuzzyTitle.mockResolvedValue([]); // the miss
+    db.getCalendarEventById.mockResolvedValue({ id: 'e-1', title: 'Loki vet', household_id: 'h1', start_time: '2026-08-26T10:45:00Z' });
+    db.resolveAssignees.mockReturnValue({ ids: ['u-lynn', 'u-loki'], names: ['Lynn', 'Loki'] });
+    ai.classify.mockResolvedValueOnce({
+      intent: 'update_event',
+      target: { title: "Loki's vet appointment", context: 'tomorrow at 11:45' },
+      updates: { assigned_to_names: ['Lynn', 'Loki'] },
+      response_message: '',
+    });
+    const ans = await handlers.handleTextMessage('assign that to Lynn and Loki', u, hh, {});
+    expect(db.getCalendarEventById).toHaveBeenCalledWith('e-1', 'h1');
+    expect(ans.response).not.toMatch(/couldn't find/i);
+    expect(db.updateCalendarEvent).toHaveBeenCalled();
   });
 
   test('a bare deictic resolves to the recent referent instead of asking which one', async () => {
