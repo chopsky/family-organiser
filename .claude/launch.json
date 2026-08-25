@@ -4,23 +4,51 @@
     {
       "name": "frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "cwd": "web"
     },
     {
+      "name": "backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
+      "port": 8080
+    },
+    {
       "name": "website",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "5174"],
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5174"
+      ],
       "port": 5174,
       "cwd": "website"
     },
     {
       "name": "design",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "5175"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5175"
+      ],
       "port": 5175,
       "cwd": "design"
+    },
+    {
+      "name": "la-term-dates",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tmp/view-app.js"
+      ],
+      "port": 4600
     }
   ]
 }

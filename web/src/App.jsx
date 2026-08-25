@@ -42,12 +42,57 @@ import { useState } from 'react';
 // straight into the app's joiner flow via universal link.
 function SignupEntry() {
   const [params] = useSearchParams();
+  const auth = useAuth();
   const [continued, setContinued] = useState(false);
   const inviteToken = params.get('invite');
+  // A signed-in member opening someone's invite used to bounce silently to
+  // their own dashboard - a confusing dead end (and the wall separated
+  // families hit). One account belongs to one home, so say that honestly.
+  // Signing out falls straight back through to the invite landing, which is
+  // the legitimate route to a separate account.
+  if (inviteToken && auth.token && auth.household) {
+    return <AlreadyHome household={auth.household} onSignOut={auth.logout} />;
+  }
   if (!Capacitor.isNativePlatform() && inviteToken && !continued) {
     return <InviteLanding token={inviteToken} onContinue={() => setContinued(true)} />;
   }
   return V4_ALLOWED ? <OnboardingV4 /> : <OnboardingFlow />;
+}
+
+function AlreadyHome({ household, onSignOut }) {
+  return (
+    <div style={{ minHeight: '100dvh', background: '#FBF8F3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ maxWidth: 400, width: '100%', background: '#fff', borderRadius: 16, padding: '30px 26px', textAlign: 'center', boxShadow: '0 4px 16px rgba(107,63,160,0.08)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif-display, Instrument Serif, serif)', fontWeight: 400, fontSize: 27, color: '#2D2A33', margin: 0 }}>
+          You&rsquo;re already home
+        </h1>
+        <p style={{ fontSize: 15, lineHeight: 1.55, color: '#6B6774', margin: '12px 0 0' }}>
+          You&rsquo;re signed in as part of <b style={{ color: '#2D2A33' }}>{household?.name || 'your household'}</b>.
+          One account can only belong to one home for now, so this invite can&rsquo;t be added to your account.
+        </p>
+        <a
+          href="/dashboard"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 48,
+            marginTop: 20, borderRadius: 12, background: '#6B3FA0', color: '#fff',
+            textDecoration: 'none', font: '600 14px Inter, system-ui, sans-serif',
+          }}
+        >
+          Go to my home
+        </a>
+        <button
+          type="button"
+          onClick={onSignOut}
+          style={{
+            width: '100%', minHeight: 44, marginTop: 6, border: 0, background: 'transparent',
+            cursor: 'pointer', font: '600 13px Inter, system-ui, sans-serif', color: '#6B3FA0',
+          }}
+        >
+          Sign out and join with a different account
+        </button>
+      </div>
+    </div>
+  );
 }
 const KidsShell       = lazy(() => import('./pages/kids/KidsShell'));
 const FairRedirect    = lazy(() => import('./pages/FairRedirect'));
