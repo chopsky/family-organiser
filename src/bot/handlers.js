@@ -558,10 +558,14 @@ async function autoAddEventReminders(events, household, actions) {
   }
   if (saved === 0) return null;
   actions.remindersSaved = (actions.remindersSaved || 0) + saved;
-  if (saved > 1) return `⏰ I'll remind you 30 minutes before each - say the word to change or drop them.`;
+  // Terse by design (founder, 2026-08-27): no "say the word to change it"
+  // coaching tail - this is a chat thread, adjustment is discoverable by
+  // nature, and a permanent tail is a nag. The computed fire time stays:
+  // "(8:30 pm)" saves the reader the arithmetic.
+  if (saved > 1) return `⏰ I'll remind you 30 minutes before each.`;
   const first = eligible[0];
   const remindAt = describeRemindAt(first.start_time, AUTO_REMINDER_OFFSETS, household.timezone);
-  return `⏰ I'll remind you 30 minutes before${remindAt ? ` (${remindAt})` : ''} - say the word to change or drop it.`;
+  return `⏰ I'll remind you 30 minutes before${remindAt ? ` (${remindAt})` : ''}.`;
 }
 
 /**
