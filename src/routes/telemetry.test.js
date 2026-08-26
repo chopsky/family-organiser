@@ -46,3 +46,39 @@ test('a missing table (migration pending) answers 200, never 500', async () => {
   expect(res.status).toBe(200);
   expect(res.body).toEqual({ ok: false });
 });
+
+// --- Onboarding step telemetry (unauthenticated, same never-break contract) ---
+
+const ANON = 'a41f0c8e-9d21-4b1a-8a3e-1f2d3c4b5a69';
+
+test('records an anonymous onboarding step', async () => {
+  db.recordOnboardingEvent.mockResolvedValue();
+  const res = await request(app()).post('/api/telemetry/onboarding')
+    .send({ anonId: ANON, step: 'house', action: 'enter', platform: 'ios' });
+  expect(res.body).toEqual({ ok: true });
+  expect(db.recordOnboardingEvent).toHaveBeenCalledWith({
+    anonId: ANON, step: 'house', action: 'enter', platform: 'ios',
+  });
+});
+
+test('garbage anonId, unknown step, and unknown action never reach the DB', async () => {
+  for (const body of [
+    { anonId: 'x', step: 'house', action: 'enter' },
+    { anonId: `${ANON}'; DROP TABLE--`, step: 'house', action: 'enter' },
+    { anonId: ANON, step: 'renamed-step', action: 'enter' },
+    { anonId: ANON, step: 'house', action: 'exploded' },
+  ]) {
+    const res = await request(app()).post('/api/telemetry/onboarding').send(body);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: false });
+  }
+  expect(db.recordOnboardingEvent).not.toHaveBeenCalled();
+});
+
+test('onboarding events survive a missing table with 200, never 500', async () => {
+  db.recordOnboardingEvent.mockRejectedValue(new Error('relation "onboarding_events" does not exist'));
+  const res = await request(app()).post('/api/telemetry/onboarding')
+    .send({ anonId: ANON, step: 'pains', action: 'enter' });
+  expect(res.status).toBe(200);
+  expect(res.body).toEqual({ ok: false });
+});

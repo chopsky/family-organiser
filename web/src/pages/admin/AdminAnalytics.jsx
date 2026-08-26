@@ -34,7 +34,7 @@ export default function AdminAnalytics() {
   const {
     dau = [], featureUsage = {}, funnel = {}, wau = 0,
     retention = null, channelCohorts = null, calendarConnection = null, appleAds = null,
-    acquisition = null, inviteLoop = null, referrals = null, signupSources = null, pendingReplyLeaks = null, paywallFunnel = null,
+    acquisition = null, inviteLoop = null, referrals = null, signupSources = null, pendingReplyLeaks = null, paywallFunnel = null, onboardingFunnel = null,
   } = data || {};
 
   // Calculate DAU average
@@ -270,6 +270,48 @@ export default function AdminAnalytics() {
                 {Math.round(((paywallFunnel.converted + paywallFunnel.restored) / paywallFunnel.shown) * 100)}%
               </strong> of walls shown
             </p>
+          )}
+        </div>
+      )}
+
+      {/* The pre-account staircase: iOS accounts are created at the END of the flow,
+          so the signups funnel above can't see where people quit. This can. */}
+      {onboardingFunnel && (
+        <div className="mt-8">
+          <h2 className="font-display text-lg font-medium text-charcoal mb-1">Onboarding steps (last {onboardingFunnel.days} days)</h2>
+          <p className="text-sm text-warm-grey mb-3">
+            Anonymous per-device step tracking from inside the app flow - it sees the
+            pre-account drop the signup funnel can't. <strong>Reached</strong> counts devices
+            whose furthest step was this one or later; conditional steps (kids, inbox) read
+            lower by design because not every household sees them.
+          </p>
+          {onboardingFunnel.starts === 0 ? (
+            <p className="text-sm text-warm-grey">No events yet - data starts flowing with the next app build.</p>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5">
+              <p className="text-sm text-warm-grey mb-3">
+                Devices that started: <strong className="text-charcoal">{onboardingFunnel.starts}</strong>
+              </p>
+              <div className="space-y-1.5">
+                {onboardingFunnel.steps.map(({ step, reached, skipped }) => (
+                  <div key={step} className="flex items-center gap-3 text-sm">
+                    <div className="w-24 shrink-0 text-warm-grey">{step}</div>
+                    <div className="flex-1 h-4 bg-plum-light rounded overflow-hidden">
+                      <div
+                        className="h-full bg-plum rounded"
+                        style={{ width: `${Math.round((reached / onboardingFunnel.starts) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="w-28 shrink-0 text-right text-charcoal">
+                      {reached} <span className="text-warm-grey">({Math.round((reached / onboardingFunnel.starts) * 100)}%)</span>
+                    </div>
+                    <div className="w-16 shrink-0 text-right text-xs text-warm-grey">
+                      {skipped > 0 ? `${skipped} skip` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

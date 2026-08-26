@@ -7073,6 +7073,70 @@ const PENDING_ASK_PATTERNS = [
   },
 ];
 
+async function recordOnboardingEvent({ anonId, step, action, platform }, db = supabase) {
+  const { error } = await db.from('onboarding_events').insert({
+    anon_id: anonId,
+    step,
+    action,
+    platform: platform || null,
+  });
+  if (error) throw error;
+}
+
+// The funnel's spine. Order matters (it defines "furthest reached");
+// conditional steps (kids shows only for kid-shaped households, inbox and
+// paywall vary) naturally read lower - the panel says so rather than the
+// data pretending otherwise. splash/login/invitecode/done are tracked but
+// off-spine.
+const ONBOARDING_FUNNEL_STEPS = [
+  'pains', 'plan', 'shape', 'you', 'role', 'kids', 'house',
+  'cals', 'ask', 'inbox', 'reminders', 'signup', 'done',
+];
+
+/**
+ * Pure aggregation - exported for tests. events: [{anon_id, step, action}].
+ * Returns per-step reach counts plus total distinct journeys ("starts" =
+ * reached the first spine step).
+ */
+function computeOnboardingFunnel(events) {
+  const rank = new Map(ONBOARDING_FUNNEL_STEPS.map((s, i) => [s, i]));
+  const furthest = new Map(); // anon_id -> highest rank entered
+  const skips = new Map();    // step -> skip count
+  for (const e of events || []) {
+    if (e.action === 'skip' && rank.has(e.step)) {
+      skips.set(e.step, (skips.get(e.step) || 0) + 1);
+    }
+    if (e.action !== 'enter' || !rank.has(e.step)) continue;
+    const r = rank.get(e.step);
+    if (!furthest.has(e.anon_id) || furthest.get(e.anon_id) < r) furthest.set(e.anon_id, r);
+  }
+  const steps = ONBOARDING_FUNNEL_STEPS.map((step, i) => ({
+    step,
+    reached: [...furthest.values()].filter((r) => r >= i).length,
+    skipped: skips.get(step) || 0,
+  }));
+  return { starts: furthest.size, steps };
+}
+
+/** The onboarding drop-off funnel over a recent window (paginated fetch -
+ *  the 1000-row cap bites busy tables). */
+async function getOnboardingFunnel({ days = 30 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('onboarding_events')
+      .select('anon_id, step, action')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return { days, ...computeOnboardingFunnel(rows) };
+}
+
 async function recordPaywallEvent({ householdId, userId, outcome, context }, db = supabase) {
   const { error } = await db.from('paywall_events').insert({
     household_id: householdId,
@@ -11155,5 +11219,8 @@ module.exports = {
   getPendingReplyLeaks,
   recordPaywallEvent,
   getPaywallFunnel,
+  recordOnboardingEvent,
+  computeOnboardingFunnel,
+  getOnboardingFunnel,
   getReferralFunnel,
 };

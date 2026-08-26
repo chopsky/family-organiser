@@ -31,6 +31,7 @@ import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import PaywallScreen from './paywallScreen';
 import { setCalUrl } from '../../lib/onboardingDraft';
+import { trackOnboardingStep } from '../../lib/onboardingTelemetry';
 import useSocialAuth from '../../hooks/useSocialAuth';
 import useV4Auth from './useV4Auth';
 
@@ -50,6 +51,7 @@ export default function OnboardingV4({ initialPhase }) {
   // step and the house step, the two places a second adult realises the
   // flow is about to found a household they already have.
   const [joinEntry, setJoinEntry] = useState(false);
+  const openJoin = () => { trackOnboardingStep('invitecode', 'enter'); setJoinEntry(true); };
   // The plan screen's CTA stays disabled until its scripted reply finishes -
   // letting someone skip past the payback would waste the screen's whole job.
   const [planDone, setPlanDone] = useState(false);
@@ -313,7 +315,7 @@ export default function OnboardingV4({ initialPhase }) {
             joinLink={!d.joining ? (
               <button
                 type="button"
-                onClick={() => setJoinEntry(true)}
+                onClick={openJoin}
                 style={{
                   marginTop: 12, padding: '6px 0', border: 0, background: 'transparent',
                   cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,
@@ -354,7 +356,7 @@ export default function OnboardingV4({ initialPhase }) {
         {step === 'pains' && !d.joining && (
           <button
             type="button"
-            onClick={() => setJoinEntry(true)}
+            onClick={openJoin}
             style={{
               marginTop: 18, padding: '10px 0', border: 0, background: 'transparent',
               cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,

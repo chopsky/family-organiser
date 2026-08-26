@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearDraft, emptyDraft, isDraftEmpty, loadDraft, saveDraft } from '../../lib/onboardingDraft';
+import { trackOnboardingStep } from '../../lib/onboardingTelemetry';
 import {
   AUTO_ADVANCE_MS, backFrom, backFromSignup, canAdvance,
   forwardFrom, progressPct, stepAt,
@@ -80,16 +81,22 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
 
   const back = useCallback(() => {
     clearTimer();
+    if (nav.phase === 'flow') trackOnboardingStep(stepAt(effectiveI(nav.i)), 'back');
     setNav((cur) => {
       if (cur.phase === 'signup') return backFromSignup(d);
       if (cur.phase === 'login') return { phase: 'splash', i: 0 };
       if (cur.phase === 'flow') return backFrom(effectiveI(cur.i), d);
       return cur; // splash/done have nowhere back to go
     });
-  }, [clearTimer, d, effectiveI]);
+  }, [clearTimer, d, effectiveI, nav]);
 
-  /** Skip is just "forward without answering" - the answer stays unset. */
-  const skip = next;
+  /** Skip is "forward without answering" - the answer stays unset. The
+   *  wrapper only adds telemetry: which steps get skipped is exactly the
+   *  kind of signal the funnel exists for. */
+  const skip = useCallback(() => {
+    if (nav.phase === 'flow') trackOnboardingStep(stepAt(effectiveI(nav.i)), 'skip');
+    next();
+  }, [nav, next, effectiveI]);
 
   /** Jump straight to a phase (splash -> flow, splash -> login, etc). */
   const goPhase = useCallback((phase, i = 0) => {
@@ -131,6 +138,14 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
 
   // Every consumer sees the effective index, never a skipped one.
   const shownI = nav.phase === 'flow' ? effectiveI(nav.i) : nav.i;
+
+  // Anonymous drop-off telemetry: one 'enter' per screen actually shown.
+  // Keyed on what the user SEES (phase, or the effective step inside the
+  // flow) - fire-and-forget, and never this hook's problem if it fails.
+  useEffect(() => {
+    const shown = nav.phase === 'flow' ? stepAt(shownI) : nav.phase;
+    if (shown) trackOnboardingStep(shown, 'enter');
+  }, [nav.phase, shownI]);
   return {
     phase: nav.phase,
     i: shownI,
