@@ -1,6 +1,8 @@
 # Spec: soft wall + free mode (the pre-built flip for the paywall experiment)
 
-Status: SPEC ONLY - not built. Written 2026-08-26 while the 1.13.0 hard
+Status: SUPERSEDED 2026-08-27 by docs/spec-free-app-paid-assistant.md (the hard wall was pulled from review; the free-app/paid-assistant model replaces both the hard and soft wall). Kept for the decision trail.
+
+Originally: Written 2026-08-26 while the 1.13.0 hard
 paywall sits in App Review. Purpose: if the hard wall's first fortnight
 says "too expensive" (agreed thresholds below), flipping to this design is
 a day of assembly, not a rethink. Decision context in the founder chat of
