@@ -55,8 +55,8 @@ review round).
 - **10 assistant actions a month, per household** (see the meter).
 
 ### Premium (unlimited assistant + what feeds it)
-- Unlimited assistant everywhere: WhatsApp (both directions), in-app AI
-  chat, voice-note transcription, photo/receipt scanning.
+- Unlimited assistant everywhere: WhatsApp, in-app AI chat, voice-note
+  transcription, photo/receipt scanning.
 - House email inbox (AI extraction pipeline).
 - Morning + evening briefs, weekly digest (premium-only, NOT metered -
   daily briefs would burn a 10-meter in a week).
@@ -95,6 +95,36 @@ review round).
   rows, no sliding-window bookkeeping), and the monthly re-engagement
   drumbeat (the bot comes back to life on the 1st for every lapsed
   household - win-back copy can lean on the date).
+
+### Channel doctrine: conversation on WhatsApp, pings on push
+
+DECIDED 2026-08-27 (founder). **Reminders are push notifications for
+everyone, both tiers** - not WhatsApp. Three reasons: zero marginal
+cost; zero Meta compliance surface (the resilience doctrine - routine
+business-initiated template traffic is exactly what gets platforms
+evicted, see docs/whatsapp-resilience.md); and it makes the app
+install the delivery mechanism. WhatsApp carries the INTERACTIVE
+layer only: talking to the bot, briefs, nudges - the premium half.
+
+Every WhatsApp-linked person holds an account (linking requires a
+signed-in verification code - there is no account-less member), but
+~25% of linked users are push-unreachable (web-only signups, or app
+installed with notifications declined). The bot coaches by cause when
+they set a reminder:
+- No app: "I'll set that reminder - grab the app so it can reach you:
+  [link]". The reminder is created either way; the install is the
+  delivery mechanism, not a toll booth. The app is free, so this ask
+  now costs the user nothing (the hard wall used to poison it).
+- App but notifications declined: point at the settings toggle, not
+  the App Store; the app re-prompts on next open.
+- Bot confirmations must name the channel ("I'll send you a
+  notification 30 minutes before") - a person promised something in
+  WhatsApp who then sees silence there assumes the reminder failed.
+
+Transition: the currently push-unreachable users who receive WhatsApp
+reminders today get ONE honest WhatsApp message explaining the change
+with the app link - never silent disappearance of a thing they rely
+on.
 
 ### Quota visibility (the WhatsApp problem)
 1. **Ambient counter near the edge**: from action 7 the bot appends one
@@ -153,6 +183,10 @@ review round).
 5. Calendar connect routes + feed-sync jobs - new connections premium;
    existing feeds of lapsed households pause (not delete).
 6. Brief jobs - skip lapsed households after one farewell send.
+6b. Reminder delivery - route to push for push-capable users (both
+   tiers); bot copy names the channel + coaches install/settings when
+   unreachable; one-time WhatsApp heads-up to today's push-unreachable
+   reminder recipients when the routing flips.
 7. Postmark trial-expiry templates - copy to the new framing (manual).
 8. Copy sweep (bundle-side, rides next regular build): Settings expired
    banners, TrialIndicator, onboarding paywall phase removed, landing
