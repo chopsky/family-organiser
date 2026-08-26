@@ -7117,6 +7117,37 @@ async function getLapsedHouseholdIds(db = supabase) {
     .map((h) => h.id);
 }
 
+/** Assistant-meter funnel for the admin panel: how many lapsed households
+ *  are actually using their free actions, and how hard the meter binds.
+ *  Calendar-month window approximated in UTC here - the panel is a gauge,
+ *  not a bill. */
+async function getMeterStats(db = supabase) {
+  const monthStart = new Date();
+  monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+  const lapsedIds = await getLapsedHouseholdIds(db);
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from('assistant_actions')
+      .select('household_id')
+      .gte('started_at', monthStart.toISOString())
+      .range(from, from + 999);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  const perHousehold = new Map();
+  for (const r of rows) perHousehold.set(r.household_id, (perHousehold.get(r.household_id) || 0) + 1);
+  const counts = [...perHousehold.values()];
+  return {
+    lapsedHouseholds: lapsedIds.length,
+    activeThisMonth: perHousehold.size,
+    actionsThisMonth: rows.length,
+    exhausted: counts.filter((n) => n >= 10).length,
+    nearLimit: counts.filter((n) => n >= 7 && n < 10).length,
+  };
+}
+
 async function recordOnboardingEvent({ anonId, step, action, platform }, db = supabase) {
   const { error } = await db.from('onboarding_events').insert({
     anon_id: anonId,
@@ -11268,6 +11299,7 @@ module.exports = {
   markMeterLimitNotice,
   markFarewellBriefSent,
   getLapsedHouseholdIds,
+  getMeterStats,
   computeOnboardingFunnel,
   getOnboardingFunnel,
   getReferralFunnel,
