@@ -23,7 +23,7 @@ full premium free for the first 14 days.**
 | Cozi | Generous + ads | n/a | Feature nags; 2024 squeeze angered users |
 | Sense | Manual calendar/lists only | 10 extractions/mo | TWO gates (features + meter) - confusing |
 | Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation |
-| **Housemait** | **Full shared app, manual** | **10 requests/mo** | **Meter + cost-centre features only** |
+| **Housemait** | **Full shared app, manual** | **10 actions/mo (burst unit)** | **Meter + cost-centre features only** |
 
 Rejected on the way here: the hard onboarding wall (fear of strangling
 the base; never launched, machinery mothballed not deleted); the hard
@@ -54,10 +54,14 @@ review round).
 - Push notifications for the above (event reminders stay).
 - **10 assistant actions a month, per household** (see the meter).
 
-### Premium (unlimited assistant + what feeds it)
-- Unlimited assistant everywhere: WhatsApp, in-app AI chat, voice-note
-  transcription, photo/receipt scanning.
-- House email inbox (AI extraction pipeline).
+### Premium (unlimited assistant + the standing automations)
+The dividing principle: **requests are metered, automations are
+premium.** A request is anything the family asks for, in any modality -
+typed, voice note, photo, forwarded school letter. An automation is
+something that works for them without being asked.
+- Unlimited assistant requests (free gets 10 a month; voice and photo
+  requests count as actions like any other - no modality cliff).
+- House email inbox (AI extraction pipeline - a standing automation).
 - Morning + evening briefs, weekly digest (premium-only, NOT metered -
   daily briefs would burn a 10-meter in a week).
 - Document + event-attachment UPLOADS (storage is the one cost that
@@ -68,14 +72,27 @@ review round).
 
 ## The meter (the heart of the model)
 
-### Unit: one REQUEST, not one message
-- One user-initiated request **plus its entire follow-up chain** = 1
-  action. "Add padel Thursday" -> "want a reminder?" -> "yes" -> "how
-  long before?" -> "30 min" is ONE action, not four. The reply ladder
-  already ties pending-question replies to their originating action, so
-  the chain boundary is machinery we have, not new inference.
+### Unit: one BURST, not one message
+- Anything the family asks **within ~10 minutes of their last exchange
+  counts as the same action** (DECIDED 2026-08-27). This subsumes the
+  follow-up-chain rule (a reply to the bot's question is the tightest
+  kind of burst) and solves the shopping-dribble problem: "add milk"...
+  "oh and bread"... "and eggs" is one restock, not three actions.
+  "Add padel Thursday" -> confirmation with its auto-reminder -> "make
+  it an hour before" is likewise ONE action. Implementation is a
+  timestamp comparison: last charged action per household, charge only
+  when it's >10 minutes old.
+- The generosity is deliberate: what premium sells is the assistant
+  being there ALL MONTH (the 8am ask, the 1pm ask, the 6pm ask) - a
+  daily-habit household still generates ~30-90 bursts against a limit
+  of 10. A family doing their weekly admin in one dense session is a
+  family learning the product's value, capped at 10 such sessions. If
+  the exhaustion metric shows the meter never binding, the window
+  shrinks to 5 minutes with a one-line change.
 - Failed or refused actions charge nothing ("I couldn't find that
   event" is our miss, not their spend).
+- Replying to anything the BOT initiated never charges - an exchange
+  that was the bot's idea is never the family's spend.
 - Meta-questions about the meter charge nothing and always get an
   exact, deterministic answer ("how many do I have left?" -> "3 of 10
   left; resets 1 September"). Sense's bot fumbles its own quota
@@ -98,13 +115,20 @@ review round).
 
 ### Channel doctrine: conversation on WhatsApp, pings on push
 
-DECIDED 2026-08-27 (founder). **Reminders are push notifications for
-everyone, both tiers** - not WhatsApp. Three reasons: zero marginal
-cost; zero Meta compliance surface (the resilience doctrine - routine
+DECIDED 2026-08-27 (founder). **Every one-way ping is a push
+notification for everyone, both tiers** - not WhatsApp. That covers
+event reminders, the overdue-task nudge, the school-prep reminder, and
+activity broadcasts ("Grant added Padel Thursday"); the holiday-pause
+notice is a push already. Three reasons: zero marginal cost; zero Meta
+compliance surface (the resilience doctrine - routine
 business-initiated template traffic is exactly what gets platforms
 evicted, see docs/whatsapp-resilience.md); and it makes the app
-install the delivery mechanism. WhatsApp carries the INTERACTIVE
-layer only: talking to the bot, briefs, nudges - the premium half.
+install the delivery mechanism. WhatsApp carries the CONVERSATION:
+requests to the bot (free inside the meter, unlimited on premium),
+briefs (premium), and the day-1-3 capture openers (which run inside
+the trial by construction, so they never reach a free household).
+"Nudges" need no tier of their own - the ping/conversation split sorts
+every sender.
 
 Every WhatsApp-linked person holds an account (linking requires a
 signed-in verification code - there is no account-less member), but
@@ -128,12 +152,9 @@ on.
 
 Auto-reminders (SHIPPED 2026-08-27, live for everyone the bot serves):
 a bot-created timed event automatically carries a 30-minute reminder -
-the default, not a question. The confirmation names the lead and fire
-time; "an hour before" / "no reminder" adjusts or removes it in one
-follow-up. All-day events, birthdays, and events starting too soon get
-none. A user-specified lead always wins over the default. Under the
-free tier this rides inside the event's own metered request - never a
-second action.
+the default, not a question; adjustment and removal are follow-ups
+inside the same burst. Full behaviour and guards live with the reply
+ladder (docs/bot-reply-ladder.md).
 
 ### Quota visibility (the WhatsApp problem)
 1. **Ambient counter near the edge**: from action 7 the bot appends one
@@ -145,6 +166,9 @@ second action.
    - "add it in the app (always free)" with a deep link, or upgrade.
    After that, further AI requests get a short deterministic version at
    most once a day per household (no lecture-spam, zero token cost).
+   The upgrade door is per-platform: iOS IAP and web Stripe are live;
+   Android's arrives with the Play Billing build - until then the
+   Android limit message links the web checkout, not a dead end.
 4. The same counter appears in the app's chat screen and on the upgrade
    screen - one story everywhere.
 
@@ -179,9 +203,11 @@ second action.
 ## Implementation map (ALL server-side - no store submission)
 
 1. Meter: household-month action counter (new table or derived from
-   ai_usage_log + whatsapp/chat logs), charged at request-completion in
-   the bot pipeline + chat route; counter line appended by the reply
-   builder; limit reply deterministic + once-a-day throttled.
+   ai_usage_log + whatsapp/chat logs), charged on the first successful
+   request of a burst (>10 min since the last charged action) in the
+   bot pipeline + chat route; counter line appended by the reply
+   builder; limit reply deterministic + once-a-day throttled, checked
+   BEFORE the model pipeline so over-limit traffic costs no tokens.
 2. `src/middleware/subscriptionStatus.js` - lapsed households: allow
    manual writes; gate upload/sync/brief routes; assistant routes defer
    to the meter instead of refusing outright.
@@ -192,16 +218,17 @@ second action.
 5. Calendar connect routes + feed-sync jobs - new connections premium;
    existing feeds of lapsed households pause (not delete).
 6. Brief jobs - skip lapsed households after one farewell send.
-6b. Reminder delivery - route to push for push-capable users (both
-   tiers); bot copy names the channel + coaches install/settings when
-   unreachable; one-time WhatsApp heads-up to today's push-unreachable
-   reminder recipients when the routing flips.
-7. Postmark trial-expiry templates - copy to the new framing (manual).
-8. Copy sweep (bundle-side, rides next regular build): Settings expired
+7. Ping delivery - route reminders, overdue/school-prep nudges, and
+   broadcasts to push for push-capable users (both tiers); bot copy
+   names the channel + coaches install/settings when unreachable;
+   one-time WhatsApp heads-up to today's push-unreachable recipients
+   when the routing flips.
+8. Postmark trial-expiry templates - copy to the new framing (manual).
+9. Copy sweep (bundle-side, rides next regular build): Settings expired
    banners, TrialIndicator, onboarding paywall phase removed, landing
    pages, in-app meter display. KNOWN STALE: the new marketing site
    prototype's hero still says "Free 30-day trial".
-9. Rollout: single env flag (FREE_APP_MODE=1) flips the estate, so the
+10. Rollout: single env flag (FREE_APP_MODE=1) flips the estate, so the
    currently-expired + all expiring households switch the moment it's
    on. Reversible by unsetting.
 
@@ -210,13 +237,16 @@ second action.
 Trial->paid conversion, lapsed->paid reactivation, meter exhaustion
 rate (share of free households hitting 10 - the direct upgrade-pressure
 gauge), actions-per-household distribution (is 10 the right number),
-upload/sync gate hits by lapsed households (demand signals). The admin
-paywall-funnel panel gets repurposed to this once the gates ship.
+upload/sync gate hits by lapsed households (demand signals), and
+WhatsApp-link rate - the meter can only bind on households that talk
+to the bot, so linking is the monetisation-critical funnel step. The
+admin paywall-funnel panel gets repurposed to this once the gates ship.
 
 ## v2 candidates (only if data asks)
 
-- Tune the 10 (engaged households run 20-70 bot messages a fortnight,
-  so request-metered 10/month should bind mid-month for the engaged -
-  verify with the exhaustion-rate metric before moving it).
+- Tune the 10, or the burst window (engaged households run 20-70 bot
+  messages a fortnight, so 10 bursts/month should bind mid-month for
+  the engaged - verify with the exhaustion-rate metric before moving
+  either knob).
 - Shorter trial if habit-to-lapse is reliably formed inside a week.
 - Storage cap instead of hard upload gate if support asks for it.
