@@ -7073,6 +7073,50 @@ const PENDING_ASK_PATTERNS = [
   },
 ];
 
+// ─── Assistant meter stamps (free-app mode) ─────────────────────────────────
+// Both columns ship in migration-free-app-mode.sql; callers wrap these in
+// try/catch so a pending migration degrades to "announce again later"
+// rather than an error.
+
+async function markFreeDealAnnounced(householdId, db = supabase) {
+  const { error } = await db.from('households')
+    .update({ free_deal_announced_at: new Date().toISOString() })
+    .eq('id', householdId);
+  if (error) throw error;
+}
+
+async function markMeterLimitNotice(householdId, db = supabase) {
+  const { error } = await db.from('households')
+    .update({ meter_limit_notice_at: new Date().toISOString() })
+    .eq('id', householdId);
+  if (error) throw error;
+}
+
+async function markFarewellBriefSent(householdId, db = supabase) {
+  const { error } = await db.from('households')
+    .update({ farewell_brief_sent_at: new Date().toISOString() })
+    .eq('id', householdId);
+  if (error) throw error;
+}
+
+/** Household ids on the lapsed free tier (expired/cancelled, not
+ *  internal). Used by the sync/brief jobs to pause premium automations
+ *  when FREE_APP_MODE is on. Complimentary credit is checked by the
+ *  meter for the bot; for jobs a lapsed-with-credit household is rare
+ *  enough that the finer check lives with the caller if ever needed. */
+async function getLapsedHouseholdIds(db = supabase) {
+  const { data, error } = await db
+    .from('households')
+    .select('id, is_internal, complimentary_until')
+    .in('subscription_status', ['expired', 'cancelled']);
+  if (error) throw error;
+  const now = Date.now();
+  return (data || [])
+    .filter((h) => !h.is_internal)
+    .filter((h) => !h.complimentary_until || new Date(h.complimentary_until).getTime() < now)
+    .map((h) => h.id);
+}
+
 async function recordOnboardingEvent({ anonId, step, action, platform }, db = supabase) {
   const { error } = await db.from('onboarding_events').insert({
     anon_id: anonId,
@@ -11220,6 +11264,10 @@ module.exports = {
   recordPaywallEvent,
   getPaywallFunnel,
   recordOnboardingEvent,
+  markFreeDealAnnounced,
+  markMeterLimitNotice,
+  markFarewellBriefSent,
+  getLapsedHouseholdIds,
   computeOnboardingFunnel,
   getOnboardingFunnel,
   getReferralFunnel,

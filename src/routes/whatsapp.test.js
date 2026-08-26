@@ -14,6 +14,7 @@
 const express = require('express');
 const request = require('supertest');
 
+jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
 jest.mock('../db/queries', () => ({
   getUserByWhatsAppPhone: jest.fn(),
   getHouseholdById: jest.fn(),

@@ -5273,8 +5273,25 @@ function formatRecipeResponse(recipe) {
   return lines.join('\n');
 }
 
+/**
+ * Does this user have ANY bot question open? The assistant meter's limit
+ * gate must let an answer through even when the household is out of
+ * actions - blocking someone mid-conversation from answering the bot's
+ * own question would be the meter charging for our curiosity. Presence
+ * check only: each store enforces its own TTL at pop time.
+ */
+function hasOpenQuestion(userId) {
+  return [
+    pendingModifyConfirm, pendingDisambiguations, pendingBirthdayRecurrence,
+    pendingBriefStartChoice, pendingInviteOffer, pendingReminderTarget,
+    pendingDuplicateTodo, pendingTermDatesImport, pendingSchoolConfirm,
+    pendingSchoolChildLink, pendingSchoolSource, pendingOpenerSchoolAnswer,
+  ].some((store) => store.has(userId));
+}
+
 module.exports = {
   handleTextMessage,
+  hasOpenQuestion,
   BRIEF_INTRO_MESSAGE,
   EVENING_BRIEF_OFFER_MESSAGE,
   isGroundedTarget,

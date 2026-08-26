@@ -1,6 +1,7 @@
 const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
 const push = require('../services/push');
+const assistantMeter = require('../services/assistant-meter');
 const { generateMorningBriefPush } = require('../services/morning-brief');
 const { pickDigestFooter } = require('../utils/whatsapp-tips');
 const { buildDigestWeatherLine } = require('../utils/weather-line');
@@ -591,6 +592,26 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   // user's local clock rather than UTC).
   const household = await db.getHouseholdById(householdId).catch(() => null);
   const tz = household?.timezone || 'Europe/London';
+
+  // FREE_APP_MODE: briefs are premium. A lapsed household gets ONE
+  // farewell (a push - the WhatsApp-side announcement is the lapse
+  // template's job, and an out-of-window free-form send would bounce
+  // anyway), then this job goes quiet for them until they resubscribe.
+  if (assistantMeter.isMeteredHousehold(household)) {
+    if (!household.farewell_brief_sent_at) {
+      try {
+        await push.sendToHousehold(householdId, null, {
+          title: 'My last daily brief',
+          body: 'Your trial has ended - the app stays free for your family, and daily briefs are part of Premium. I\'m still here for 10 free assistant actions a month.',
+          data: { type: 'farewell_brief' },
+        });
+      } catch (err) {
+        console.warn('[reminders] farewell brief push failed:', err.message);
+      }
+      db.markFarewellBriefSent(householdId).catch(() => {});
+    }
+    return;
+  }
 
   const shoppingItems = await db.getShoppingList(householdId);
   const shoppingCount = shoppingItems.length;

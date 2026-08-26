@@ -73,15 +73,18 @@ something that works for them without being asked.
 ## The meter (the heart of the model)
 
 ### Unit: one BURST, not one message
-- Anything the family asks **within ~10 minutes of their last exchange
-  counts as the same action** (DECIDED 2026-08-27). This subsumes the
-  follow-up-chain rule (a reply to the bot's question is the tightest
-  kind of burst) and solves the shopping-dribble problem: "add milk"...
-  "oh and bread"... "and eggs" is one restock, not three actions.
+- **A 10-minute block anchored at the burst's FIRST message** (DECIDED
+  2026-08-28, build go). Anything asked inside the block is the same
+  action; the clock does NOT restart per message, so a long
+  consultation charges roughly one action per 10 minutes instead of
+  riding one action forever. The window buys the GAPS in distracted
+  use ("add milk"... unpacking... "and bin bags"... "oh and Calpol" =
+  one restock), not ten minutes of talking.
+- **Chain exception**: answering the bot's open question NEVER starts
+  a new action, even when the block has expired - charging someone for
+  answering our own question is the Nori sin the unit exists to avoid.
   "Add padel Thursday" -> confirmation with its auto-reminder -> "make
-  it an hour before" is likewise ONE action. Implementation is a
-  timestamp comparison: last charged action per household, charge only
-  when it's >10 minutes old.
+  it an hour before" is ONE action.
 - The generosity is deliberate: what premium sells is the assistant
   being there ALL MONTH (the 8am ask, the 1pm ask, the 6pm ask) - a
   daily-habit household still generates ~30-90 bursts against a limit

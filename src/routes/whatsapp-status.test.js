@@ -3,6 +3,7 @@
  * signature guard, the SID→status recording, and the always-ack behaviour.
  */
 jest.mock('twilio', () => ({ validateRequest: jest.fn(() => true) }));
+jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
 jest.mock('../db/queries', () => ({ recordWhatsAppDeliveryStatus: jest.fn(() => Promise.resolve()) }));
 // Stub the heavy require chain the whatsapp router pulls at load, so the
 // router mounts without real services / Supabase / AI credentials.

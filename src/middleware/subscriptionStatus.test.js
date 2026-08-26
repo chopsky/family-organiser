@@ -617,4 +617,73 @@ describe('requireActiveSubscription', () => {
       expect(res.status).toHaveBeenCalledWith(402);
     });
   });
+
+  // ── FREE_APP_MODE: lapsed households keep the free app ─────────────
+
+  describe('FREE_APP_MODE premium doors', () => {
+    beforeEach(() => { process.env.FREE_APP_MODE = '1'; });
+    afterEach(() => { delete process.env.FREE_APP_MODE; });
+
+    const lapsed = { id: 'h1', is_internal: false, subscription_status: 'expired', trial_ends_at: '2026-01-01T00:00:00Z' };
+
+    test('an expired household PASSES ordinary mutations (the app is free)', async () => {
+      primeChain({ household: lapsed });
+      const req = makeReq({ path: '/shopping' });
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['/documents/upload', 'documents'],
+      ['/calendar/events/ev-1/attachments', 'attachments'],
+      ['/calendar/external-feeds', 'calendar_sync'],
+      ['/calendar/external-feeds/f-1/refresh', 'calendar_sync'],
+      ['/calendar/google/select', 'calendar_sync'],
+    ])('premium door %s still 402s with premium_required', async (path, feature) => {
+      primeChain({ household: lapsed });
+      const req = makeReq({ path });
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(402);
+      expect(res.json).toHaveBeenCalledWith({ status: 'premium_required', feature });
+    });
+
+    test('DELETE on a door path is never gated - gate the door, not the vault', async () => {
+      primeChain({ household: lapsed });
+      const req = makeReq({ path: '/calendar/external-feeds/f-1', method: 'DELETE' });
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(next).toHaveBeenCalled();
+    });
+
+    test('a trial crossing its end still flips to expired, then lands on free, not a wall', async () => {
+      primeChain({
+        household: { id: 'h1', is_internal: false, subscription_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00Z' },
+      });
+      const req = makeReq({ path: '/shopping' });
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(mockChain.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'expired' }));
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    test('with the flag OFF, expired mutations 402 exactly as before', async () => {
+      delete process.env.FREE_APP_MODE;
+      primeChain({ household: lapsed });
+      const req = makeReq({ path: '/shopping' });
+      const res = makeRes();
+      const next = jest.fn();
+      await requireActiveSubscription(req, res, next);
+      expect(res.status).toHaveBeenCalledWith(402);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'expired' }));
+    });
+  });
 });

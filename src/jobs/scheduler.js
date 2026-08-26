@@ -4,6 +4,7 @@ const { hhmmWithinWindow } = require('../utils/brief-window');
 const db = require('../db/queries');
 const externalFeed = require('../services/externalFeed');
 const googleCal = require('../services/googleCalendar');
+const assistantMeter = require('../services/assistant-meter');
 const staleDeviceNudge = require('../services/stale-device-nudge');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
@@ -467,6 +468,25 @@ async function runTaskNotificationCheck() {
  * here is iterate, swallow per-feed errors so one bad feed doesn't
  * abort the rest of the batch, and log a summary line for ops.
  */
+/** FREE_APP_MODE helper: drop feeds belonging to lapsed households (sync
+ *  is premium; their feeds pause, never delete). Fail-open - a lookup
+ *  error refreshes everything rather than silently pausing paying
+ *  households. */
+async function filterOutLapsedFeeds(feeds) {
+  if (!assistantMeter.enabled() || !feeds?.length) return feeds || [];
+  try {
+    const lapsed = new Set(await db.getLapsedHouseholdIds());
+    if (lapsed.size === 0) return feeds;
+    const kept = feeds.filter((f) => !f.household_id || !lapsed.has(f.household_id));
+    const paused = feeds.length - kept.length;
+    if (paused > 0) console.log(`[scheduler] ${paused} feed(s) paused (lapsed households, free-app mode)`);
+    return kept;
+  } catch (err) {
+    console.warn('[scheduler] lapsed-household lookup failed, refreshing all feeds:', err.message);
+    return feeds;
+  }
+}
+
 async function refreshAllExternalFeeds() {
   console.log('[scheduler] Starting external feed refresh');
   let succeeded = 0;
@@ -476,7 +496,11 @@ async function refreshAllExternalFeeds() {
   let totalDeleted = 0;
 
   try {
-    const feeds = await db.getAllActiveExternalFeeds();
+    let feeds = await db.getAllActiveExternalFeeds();
+    // FREE_APP_MODE: external calendar sync is premium - lapsed
+    // households' feeds PAUSE (stop refreshing, rows and events kept)
+    // rather than delete, so resubscribing picks up where they left off.
+    feeds = await filterOutLapsedFeeds(feeds);
     if (feeds.length === 0) {
       console.log('[scheduler] No external feeds to refresh');
       return;
@@ -534,7 +558,8 @@ async function refreshAllGoogleFeeds() {
   let failed = 0;
 
   try {
-    const feeds = await db.getAllActiveGoogleFeeds();
+    let feeds = await db.getAllActiveGoogleFeeds();
+    feeds = await filterOutLapsedFeeds(feeds);
     if (feeds.length === 0) {
       console.log('[scheduler] No Google feeds to refresh');
       return;

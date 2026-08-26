@@ -12,6 +12,7 @@ const db = require('../db/queries');
 const whatsapp = require('../services/whatsapp');
 const broadcast = require('../services/broadcast');
 const handlers = require('../bot/handlers');
+const assistantMeter = require('../services/assistant-meter');
 const cache = require('../services/cache');
 const { isSupportedDocument } = require('../services/document-extract');
 
@@ -81,14 +82,63 @@ function verifyTwilioSignature(req) {
   return false;
 }
 
+// ── Assistant meter (free-app mode) charge + decoration ──
+// Chain intents answer a question the bot asked - never a new action.
+const METER_CHAIN_INTENTS = /^(reminder_|birthday_recurrence|duplicate_todo|invite_link_reply|modify_confirm|school_add_confirm|school_add_retry|school_child_link|school_source_|term_dates_import|brief_start_)/;
+// Zero-cost system intents - greetings and deterministic toggles never
+// charge (no model ran, no assistant value delivered).
+const METER_FREE_INTENTS = /^(trivial$|brief_opt|brief_offer|brief_toggle|meter_)/;
+
 /**
- * Message an expired/cancelled household sees when it messages the bot.
- * Beyond "your trial ended", it states the price and gives a direct link to
- * checkout so a willing buyer can subscribe in a tap - the WhatsApp channel
- * was previously the weakest paywall in the product (a single bare line).
- * The £ figures are GBP (the primary market) for display only; the /subscribe
- * page localises the real amount and handles the actual checkout + any
- * pre-applied promo.
+ * Charge the meter for a completed turn and decorate the outgoing reply
+ * (deal announcement on the first post-lapse reply, counter lines, the
+ * action-10 limit announcement). Failure sends the reply undecorated -
+ * the meter must never cost a family their answer. Note the burst design
+ * self-heals failed actions: a miss plus its immediate retry rides one
+ * charge, so the eventual outcome costs one action.
+ */
+async function applyAssistantMeter(householdRow, user, ctx, responseText, channel) {
+  try {
+    if (!assistantMeter.isMeteredHousehold(householdRow)) return responseText;
+    const intent = ctx?.intent || '';
+    if (METER_FREE_INTENTS.test(intent)) return responseText;
+    const isChainReply = METER_CHAIN_INTENTS.test(intent);
+    const result = await assistantMeter.chargeIfNewBurst(householdRow, {
+      userId: user.id, channel, isChainReply,
+    });
+    let out = responseText;
+    let dealJustAnnounced = false;
+    if (!householdRow.free_deal_announced_at) {
+      out = `${assistantMeter.dealAnnouncement(result.resetLabel)}\n\n${out}`;
+      dealJustAnnounced = true;
+      db.markFreeDealAnnounced(householdRow.id).catch(() => {});
+      householdRow.free_deal_announced_at = new Date().toISOString();
+    }
+    if (result.charged) {
+      if (result.used >= assistantMeter.FREE_MONTHLY_ACTIONS) {
+        out = `${out}\n\n${assistantMeter.limitAnnouncement(result.resetLabel, process.env.WEB_URL)}`;
+        db.markMeterLimitNotice(householdRow.id).catch(() => {});
+      } else if (!dealJustAnnounced) {
+        // The deal announcement already says "this was one" - stacking
+        // the full-tank line on it would say the same thing twice.
+        const line = assistantMeter.counterLine(result.used, result.resetLabel);
+        if (line) out = `${out}\n\n${line}`;
+      }
+    }
+    return out;
+  } catch (err) {
+    console.warn('[whatsapp] meter decoration failed, sending undecorated:', err.message);
+    return responseText;
+  }
+}
+
+/**
+ * Message an expired/cancelled household sees when it messages the bot
+ * while FREE_APP_MODE is off (the legacy hard gate). Beyond "your trial
+ * ended", it states the price and gives a direct link to checkout so a
+ * willing buyer can subscribe in a tap. The £ figures are GBP (the
+ * primary market) for display only; the /subscribe page localises the
+ * real amount and handles the actual checkout + any pre-applied promo.
  */
 function buildExpiredUpgradeMessage(webUrl) {
   const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
@@ -326,7 +376,9 @@ router.post('/webhook', async (req, res) => {
         && !householdRow.is_internal
         && (householdRow.subscription_status === 'expired'
           || householdRow.subscription_status === 'cancelled');
-      if (expired) {
+      if (expired && !assistantMeter.enabled()) {
+        // Legacy hard gate - only while FREE_APP_MODE is off. With the
+        // flag on, lapsed households fall through to the meter below.
         await whatsapp.sendMessage(phone, buildExpiredUpgradeMessage(process.env.WEB_URL));
         db.logWhatsAppMessage({
           householdId: user.household_id,
@@ -339,6 +391,52 @@ router.post('/webhook', async (req, res) => {
           response: 'subscription required',
         });
         return;
+      }
+
+      // ── The assistant meter (free-app mode) ──
+      // Quota meta-questions are free, exact, and never touch a model -
+      // for every tier ("no limits on your plan" is also an answer).
+      if (assistantMeter.enabled() && householdRow && numMedia === 0
+        && Body && assistantMeter.isQuotaQuestion(Body)) {
+        const status = await assistantMeter.meterStatus(householdRow);
+        const answer = assistantMeter.quotaAnswer(status);
+        await whatsapp.sendMessage(phone, answer);
+        db.logWhatsAppMessage({
+          householdId: user.household_id, userId: user.id, direction: 'inbound',
+          messageType: 'text', intent: 'meter_query', processingMs: 0,
+          body: Body, response: answer,
+        });
+        return;
+      }
+      // Over-limit gate, checked BEFORE the model pipeline so exhausted
+      // traffic costs no tokens. Three carve-outs let a message through:
+      // an open burst (they're mid-action), an open bot question (the
+      // chain exception - blocking an answer to our own question would
+      // be charging for our curiosity), or a meter that failed open.
+      if (assistantMeter.isMeteredHousehold(householdRow)) {
+        const status = await assistantMeter.meterStatus(householdRow);
+        if (status.metered && status.exhausted && !status.burstOpen
+          && !handlers.hasOpenQuestion(user.id)) {
+          const lastNotice = householdRow.meter_limit_notice_at
+            ? new Date(householdRow.meter_limit_notice_at).getTime() : 0;
+          const sinceNotice = Date.now() - lastNotice;
+          let reply = null;
+          if (sinceNotice > 24 * 60 * 60 * 1000) {
+            reply = assistantMeter.limitReplyFull(status.resetLabel, process.env.WEB_URL);
+          } else if (sinceNotice > assistantMeter.BURST_WINDOW_MS) {
+            reply = assistantMeter.limitReplyShort(status.resetLabel, process.env.WEB_URL);
+          } // else: they were told inside this very window - no lecture-spam.
+          if (reply) {
+            await whatsapp.sendMessage(phone, reply);
+            db.markMeterLimitNotice(user.household_id).catch(() => {});
+          }
+          db.logWhatsAppMessage({
+            householdId: user.household_id, userId: user.id, direction: 'inbound',
+            messageType: numMedia > 0 ? 'media' : 'text', intent: 'meter_limited',
+            processingMs: 0, body: Body || '[media]', response: reply || '[throttled]',
+          });
+          return;
+        }
       }
     } catch (err) {
       // Fail-open: a DB blip in the subscription check shouldn't silently
@@ -401,7 +499,8 @@ router.post('/webhook', async (req, res) => {
           // for voice notes too - not the perma-null it used to write.
           const ctx = {};
           const result = await handlers.handleVoiceNote(audioBuffer, 'voice.ogg', user, household, ctx);
-          await whatsapp.sendMessage(phone, result.response);
+          const metered = await applyAssistantMeter(householdRow, user, ctx, result.response, 'whatsapp');
+          await whatsapp.sendMessage(phone, metered);
           // Persist the transcribed text (if any) as the body so voice-note
           // turns can be replayed as conversation context too.
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'voice', intent: ctx.intent || null, processingMs: Date.now() - start, body: result.transcription || null, response: result.response });
@@ -425,7 +524,8 @@ router.post('/webhook', async (req, res) => {
         try {
           const imageBuffer = await whatsapp.downloadMedia(mediaUrl);
           const result = await handlers.handlePhoto(imageBuffer, mediaType, user, household, caption);
-          await whatsapp.sendMessage(phone, result.response);
+          const metered = await applyAssistantMeter(householdRow, user, {}, result.response, 'whatsapp');
+          await whatsapp.sendMessage(phone, metered);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'image', intent: null, processingMs: Date.now() - start, body: caption ? `[photo] ${caption}` : '[photo]', response: result.response });
 
           // Broadcast to other members
@@ -450,7 +550,8 @@ router.post('/webhook', async (req, res) => {
           const docBuffer = await whatsapp.downloadMedia(mediaUrl);
           const ctx = {};
           const result = await handlers.handleDocument(docBuffer, mediaType, filename, user, household, ctx);
-          await whatsapp.sendMessage(phone, result.response);
+          const metered = await applyAssistantMeter(householdRow, user, ctx, result.response, 'whatsapp');
+          await whatsapp.sendMessage(phone, metered);
           db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'document', intent: ctx.intent || null, processingMs: Date.now() - start, body: filename || '[document]', response: result.response });
 
           const notification = handlers.buildBroadcastMessage(user.name, result.actions, household);
@@ -479,7 +580,8 @@ router.post('/webhook', async (req, res) => {
         // inside handleTextMessage's 30+ branches.
         const ctx = {};
         const result = await handlers.handleTextMessage(text, user, household, ctx);
-        await whatsapp.sendMessage(phone, result.response);
+        const metered = await applyAssistantMeter(householdRow, user, ctx, result.response, 'whatsapp');
+        await whatsapp.sendMessage(phone, metered);
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: ctx.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
 
         // Broadcast to other members
@@ -540,3 +642,4 @@ router.get('/webhook', (req, res) => {
 module.exports = router;
 // Exposed for unit tests - pure helper, no Express/Twilio dependency.
 module.exports.buildExpiredUpgradeMessage = buildExpiredUpgradeMessage;
+module.exports.applyAssistantMeter = applyAssistantMeter;

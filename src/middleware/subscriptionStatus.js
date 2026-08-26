@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { supabaseAdmin } = require('../db/client');
+const assistantMeter = require('../services/assistant-meter');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -59,6 +60,25 @@ const EXCLUDED_PATH_PREFIXES = [
 // product spec describes (Section 8 - "What the user sees… A summary of
 // their household's data, pulled from the database").
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+// FREE_APP_MODE premium doors (docs/spec-free-app-paid-assistant.md):
+// with the flag on, a lapsed household keeps every manual write - the
+// app is free - and only the standing cost centres 402. POSTs only:
+// reads, downloads and DELETEs are never gated ("gate the door, not the
+// vault"). The assistant routes (/chat, the WhatsApp webhook) are not
+// doors either - they defer to the meter in-route.
+const PREMIUM_DOORS = [
+  { feature: 'documents', re: /^\/documents\/upload$/ },
+  { feature: 'attachments', re: /^\/calendar\/events\/[^/]+\/attachments$/ },
+  { feature: 'calendar_sync', re: /^\/calendar\/external-feeds$/ },
+  { feature: 'calendar_sync', re: /^\/calendar\/external-feeds\/[^/]+\/refresh$/ },
+  { feature: 'calendar_sync', re: /^\/calendar\/google\/select$/ },
+];
+
+function premiumDoorFor(method, path) {
+  if (method !== 'POST') return null;
+  return PREMIUM_DOORS.find((d) => d.re.test(path)) || null;
+}
 
 function isExcluded(path) {
   // Match `/auth` exactly and `/auth/anything`, but not `/authorize` etc.
@@ -180,14 +200,28 @@ async function requireActiveSubscription(req, res, next) {
       // future phase) will sync the row.
       console.error('[subscriptionStatus] trial-expiry UPDATE failed:', err);
     }
+    // FREE_APP_MODE: the trial still flips to 'expired' above (the status
+    // is real), but the household lands on the free tier, not a wall.
+    if (assistantMeter.enabled()) {
+      const door = premiumDoorFor(req.method, req.path);
+      if (!door) return next();
+      return res.status(402).json({ status: 'premium_required', feature: door.feature });
+    }
     return res.status(402).json({
       status: 'trial_expired',
       trial_ended_at: household.trial_ends_at,
     });
   }
 
-  // 10. Already-expired or cancelled - no entitlement.
+  // 10. Already-expired or cancelled - no entitlement... unless the free
+  //     app mode is on, in which case a lapsed household keeps every
+  //     manual write and only the premium doors 402.
   if (status === 'expired' || status === 'cancelled') {
+    if (assistantMeter.enabled()) {
+      const door = premiumDoorFor(req.method, req.path);
+      if (!door) return next();
+      return res.status(402).json({ status: 'premium_required', feature: door.feature });
+    }
     return res.status(402).json({
       status: 'expired',
       trial_ended_at: household.trial_ends_at,

@@ -11,6 +11,7 @@ const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { transcribeVoice } = require('../services/transcribe');
+const assistantMeter = require('../services/assistant-meter');
 const cache = require('../services/cache');
 
 // ── In-app assistant budget ───────────────────────────────────────────────
@@ -584,6 +585,35 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // address: it's only added to the prompt when this specific
     // message asks about somewhere local. See location-relevance.js.
     const household = await db.getHouseholdById(req.householdId);
+
+    // ── Assistant meter (free-app mode) ──
+    // Quota meta-questions are free, exact, and never touch a model.
+    if (assistantMeter.enabled() && household && assistantMeter.isQuotaQuestion(message)) {
+      const status = await assistantMeter.meterStatus(household);
+      const answer = assistantMeter.quotaAnswer(status);
+      await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
+      await db.saveChatMessage(req.householdId, req.user.id, 'assistant', answer, conversationId);
+      return res.json({ message: answer, conversation_id: conversationId });
+    }
+    // Over-limit gate BEFORE the model call, so exhausted traffic costs no
+    // tokens. An open burst passes (they're mid-action). In-app we always
+    // answer - the user is looking at the thread - full version daily,
+    // short after that (stamp shared with the WhatsApp throttle).
+    if (assistantMeter.isMeteredHousehold(household)) {
+      const status = await assistantMeter.meterStatus(household);
+      if (status.metered && status.exhausted && !status.burstOpen) {
+        const lastNotice = household.meter_limit_notice_at
+          ? new Date(household.meter_limit_notice_at).getTime() : 0;
+        const reply = Date.now() - lastNotice > 24 * 60 * 60 * 1000
+          ? assistantMeter.limitReplyFull(status.resetLabel, process.env.WEB_URL)
+          : assistantMeter.limitReplyShort(status.resetLabel, process.env.WEB_URL);
+        db.markMeterLimitNotice(req.householdId).catch(() => {});
+        await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);
+        await db.saveChatMessage(req.householdId, req.user.id, 'assistant', reply, conversationId);
+        return res.json({ message: reply, conversation_id: conversationId });
+      }
+    }
+
     const systemPrompt = await buildSystemPrompt(req.householdId, household?.name, req.user.id, message, deviceCoords);
 
     // Get recent conversation history for context. Capped at 12 turns (was
@@ -1233,8 +1263,35 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // next fetch instead of serving the pre-action snapshot.
     if (executedActions.length > 0) cache.invalidate(`digest:${req.householdId}`);
 
+    // Meter charge + decoration on the RESPONSE only - the counter lines
+    // never enter saved history (they'd confuse the model on replay and
+    // duplicate on every turn). App chat has no deterministic chain
+    // intents; the burst window covers multi-turn clarifications.
+    let outboundMessage = cleanContent;
+    if (assistantMeter.isMeteredHousehold(household)) {
+      try {
+        const charge = await assistantMeter.chargeIfNewBurst(household, {
+          userId: req.user.id, channel: 'chat',
+        });
+        if (!household.free_deal_announced_at) {
+          outboundMessage = `${assistantMeter.dealAnnouncement(charge.resetLabel)}\n\n${outboundMessage}`;
+          db.markFreeDealAnnounced(req.householdId).catch(() => {});
+        } else if (charge.charged) {
+          if (charge.used >= assistantMeter.FREE_MONTHLY_ACTIONS) {
+            outboundMessage = `${outboundMessage}\n\n${assistantMeter.limitAnnouncement(charge.resetLabel, process.env.WEB_URL)}`;
+            db.markMeterLimitNotice(req.householdId).catch(() => {});
+          } else {
+            const line = assistantMeter.counterLine(charge.used, charge.resetLabel);
+            if (line) outboundMessage = `${outboundMessage}\n\n${line}`;
+          }
+        }
+      } catch (err) {
+        console.warn('[chat] meter decoration failed, sending undecorated:', err.message);
+      }
+    }
+
     return res.json({
-      message: cleanContent,
+      message: outboundMessage,
       conversation_id: conversationId,
       actions: executedActions.length > 0 ? executedActions : undefined,
     });
@@ -1268,6 +1325,25 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
     if (!conversationId) {
       const conv = await db.createConversation(req.householdId, req.user.id, 'Attachment');
       conversationId = conv.id;
+    }
+
+    // ── Assistant meter (free-app mode) ──
+    // A photo/PDF scan is the costliest single request, and this endpoint
+    // has a dozen return paths - so the meter gates AND charges up front:
+    // an exhausted household gets the limit reply, an allowed scan is
+    // charged at acceptance (the burst window still merges it with the
+    // conversation around it).
+    if (assistantMeter.enabled()) {
+      const meterHousehold = await db.getHouseholdById(req.householdId).catch(() => null);
+      if (assistantMeter.isMeteredHousehold(meterHousehold)) {
+        const status = await assistantMeter.meterStatus(meterHousehold);
+        if (status.metered && status.exhausted && !status.burstOpen) {
+          const reply = assistantMeter.limitReplyFull(status.resetLabel, process.env.WEB_URL);
+          db.markMeterLimitNotice(req.householdId).catch(() => {});
+          return res.json({ message: reply, conversation_id: conversationId });
+        }
+        await assistantMeter.chargeIfNewBurst(meterHousehold, { userId: req.user.id, channel: 'chat-image' });
+      }
     }
 
     const members = await db.getHouseholdMembers(req.householdId);
