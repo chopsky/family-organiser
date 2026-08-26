@@ -2436,19 +2436,35 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (offsets.length === 0) offsets = parseBareDuration(text);
     let timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
     const bareYes = parseAffirmative(text) === 'yes';
-    // A bare "no" to the auto-reminder line means "drop it" - deterministic,
-    // no model round-trip. (For an unanswered task offer the same "no" just
-    // settles the question; nothing was saved to remove.)
-    if (parseAffirmative(text) === 'no' && offsets.length === 0 && !timeOfDay) {
+    // "No reminder" names its target - drop the auto-saved reminder
+    // deterministically, no model round-trip.
+    const noReminderPhrase = /^(no|without( a)?|skip( the)?|drop( the)?|remove( the)?) reminders?( needed| necessary| thanks| thank you| please)?$/i
+      .test(text.trim().replace(/[.!,\s]+$/g, ''));
+    if (noReminderPhrase && pendingRem.autoSaved && pendingRem.itemType === 'event') {
       ctx.intent = 'reminder_declined';
-      if (pendingRem.autoSaved && pendingRem.itemType === 'event') {
-        try {
-          await db.saveEventReminders(pendingRem.itemId, household.id, [], pendingRem.startTime);
-        } catch (err) {
-          console.error('[handlers] auto reminder removal failed:', err.message);
-        }
-        return { response: `Done - no reminder. **${pendingRem.label}** stays on the calendar. 👍`, actions: remActions };
+      try {
+        await db.saveEventReminders(pendingRem.itemId, household.id, [], pendingRem.startTime);
+      } catch (err) {
+        console.error('[handlers] auto reminder removal failed:', err.message);
       }
+      return { response: `Done - no reminder. **${pendingRem.label}** stays on the calendar. 👍`, actions: remActions };
+    }
+    if (parseAffirmative(text) === 'no' && offsets.length === 0 && !timeOfDay) {
+      // After an OFFER question, "no" answers it: nothing was saved, settle.
+      // After the AUTO-reminder line there was no question, so a bare "no"
+      // is ambiguous - no to the reminder, or to the event itself? Guessing
+      // "reminder" at someone who meant "wrong event" would confirm the very
+      // thing they were rejecting. One clarifying question, once.
+      if (pendingRem.autoSaved && pendingRem.itemType === 'event') {
+        ctx.intent = 'reminder_no_ambiguous';
+        if (!pendingRem.clarifiedNo) {
+          rememberReminderTarget(user.id, { ...pendingRem, clarifiedNo: true });
+          return { response: `Just checking - no to the reminder, or to the event? Say *no reminder* and I'll drop the reminder, or *cancel ${pendingRem.label}* to take it off the calendar.`, actions: remActions };
+        }
+        // A second bare "no" - stop guessing, change nothing.
+        return { response: `Okay - I've left everything as it is: **${pendingRem.label}** is on the calendar with its reminder. Say *no reminder* or *cancel ${pendingRem.label}* any time.`, actions: remActions };
+      }
+      ctx.intent = 'reminder_declined';
       return { response: `No problem - **${pendingRem.label}** is saved without a reminder. 👍`, actions: remActions };
     }
     // A bare "yes" accepts whatever lead time the offer itself suggested

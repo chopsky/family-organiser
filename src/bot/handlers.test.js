@@ -1380,16 +1380,46 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(adj.response).toMatch(/day before/i);
   });
 
-  test('a bare "No" removes the auto-saved reminder deterministically', async () => {
-    const u = { id: 'u-loop-no', name: 'Grant' };
+  test('"no reminder" removes the auto-saved reminder deterministically', async () => {
+    const u = { id: 'u-loop-noreminder', name: 'Grant' };
     await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
     ai.classify.mockClear();
-    const no = await handlers.handleTextMessage('No', u, hh, {});
+    const no = await handlers.handleTextMessage('No reminder needed', u, hh, {});
     expect(ai.classify).not.toHaveBeenCalled();
     expect(extractReminderOffsets).not.toHaveBeenCalled();
     expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [], expect.anything());
     expect(no.response).toMatch(/no reminder/i);
     expect(no.response).toMatch(/stays on the calendar/i);
+  });
+
+  test('a bare "No" to the auto-reminder line is ambiguous: one clarify, never a guess', async () => {
+    const u = { id: 'u-loop-bareno', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
+    ai.classify.mockClear();
+    // There was no question, so "No" could mean the reminder OR the event.
+    const no = await handlers.handleTextMessage('No', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(no.response).toMatch(/no to the reminder, or to the event/i);
+    // Nothing deleted on a guess - only the creation-time auto-save exists.
+    expect(db.saveEventReminders).toHaveBeenCalledTimes(1);
+    // Answering the clarify with "no reminder" resolves deterministically.
+    const drop = await handlers.handleTextMessage('no reminder', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenLastCalledWith('e-1', 'h1', [], expect.anything());
+    expect(drop.response).toMatch(/stays on the calendar/i);
+  });
+
+  test('a second bare "No" stops the guessing and changes nothing', async () => {
+    const u = { id: 'u-loop-bareno2', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
+    await handlers.handleTextMessage('No', u, hh, {});
+    const again = await handlers.handleTextMessage('no', u, hh, {});
+    expect(again.response).toMatch(/left everything as it is/i);
+    expect(db.saveEventReminders).toHaveBeenCalledTimes(1); // creation only
+    // The store is spent - the next message classifies normally.
+    ai.classify.mockClear();
+    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'ok' });
+    await handlers.handleTextMessage('no', u, hh, {});
+    expect(ai.classify).toHaveBeenCalled();
   });
 
   test('an all-day event gets no auto-reminder and no reminder talk at all', async () => {
