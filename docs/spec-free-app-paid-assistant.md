@@ -22,7 +22,7 @@ full premium free for the first 14 days.**
 |---|---|---|---|
 | Cozi | Generous + ads | n/a | Feature nags; 2024 squeeze angered users |
 | Sense | Manual calendar/lists only | 10 extractions/mo | TWO gates (features + meter) - confusing |
-| Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation |
+| Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation (founder-verified 2026-08-27: two consecutive shopping adds burned 2 uses) |
 | **Housemait** | **Full shared app, manual** | **10 actions/mo (burst unit)** | **Meter + cost-centre features only** |
 
 Rejected on the way here: the hard onboarding wall (fear of strangling
