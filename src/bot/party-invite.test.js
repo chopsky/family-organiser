@@ -134,15 +134,31 @@ describe('invite offer after a gathering-looking event', () => {
     expect(res.response).not.toContain('invite guests');
   });
 
-  test('a plain event gets the reminder offer, not the invite offer', async () => {
+  test('a plain event gets the auto-reminder line, not the invite offer', async () => {
     classify.mockResolvedValue({
       intent: 'create_event',
-      calendar_event: { title: 'Dentist', date: '2026-08-01', start_time: '09:00' },
+      calendar_event: { title: 'Dentist', date: '2030-08-03', start_time: '09:00' },
       response_message: 'Added.',
     });
     const res = await handlers.handleTextMessage('Dentist Saturday 9am', user, household);
     expect(res.response).not.toContain('invite guests');
-    expect(res.response).toMatch(/reminder/i);
+    expect(res.response).toMatch(/I'll remind you 30 minutes before/i);
+  });
+
+  test('a future party gets BOTH the auto-reminder line and the invite ask, question last', async () => {
+    classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_event: { title: "Olivia's party", date: '2030-08-03', start_time: '13:00', end_time: '15:00' },
+      response_message: 'Added.',
+    });
+    db.createCalendarEvent.mockResolvedValueOnce({ id: 'e-77', title: "Olivia's party", start_time: '2030-08-03T12:00:00Z' });
+    const res = await handlers.handleTextMessage("Olivia's party Saturday 1-3pm", user, household);
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-77', expect.anything(), [{ time: 30, unit: 'minutes' }], expect.anything());
+    expect(res.response).toMatch(/I'll remind you 30 minutes before/i);
+    expect(res.response).toContain('invite guests');
+    expect(res.response.trim()).toMatch(/🎈$/); // the invite ask stays last
+    // The invite ask owns the next "yes" - no reminder target armed.
+    expect(handlers.popReminderTarget(user.id)).toBeNull();
   });
 
   test('"no" to the offer acknowledges without creating anything', async () => {

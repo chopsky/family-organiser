@@ -527,61 +527,79 @@ function popReminderTarget(userId) {
   return entry;
 }
 
-// A reminder offer that lost its turn to a more urgent question (duplicate
-// check, party-invite ask) is deferred here instead of dropped - one
-// question per turn, but never forgotten. Consumed on the next turn whose
-// reply isn't asking anything (real 2026-08-23 padel transcript: the
-// duplicate question won the turn and the offer evaporated).
-const deferredReminderOffer = new Map(); // userId → { target, householdId, timestamp }
-const DEFERRED_OFFER_TTL_MS = 10 * 60 * 1000;
+// ─── Auto-reminder for bot-created timed events (2026-08-27) ──
+// A reminder is the DEFAULT, not a question: 30 minutes before, saved at
+// creation, named in the confirmation. The user only speaks up to adjust
+// or remove it. This replaced the offer-question flow ("Want me to add a
+// reminder?") and its deferred-offer machinery - reminders are free pushes,
+// so opt-out beats opt-in.
+const AUTO_REMINDER_OFFSETS = [{ time: 30, unit: 'minutes' }];
 
-function rememberDeferredReminderOffer(userId, entry) {
-  deferredReminderOffer.set(userId, { ...entry, timestamp: Date.now() });
-}
-
-function popDeferredReminderOffer(userId) {
-  const entry = deferredReminderOffer.get(userId);
-  if (!entry) return null;
-  deferredReminderOffer.delete(userId);
-  if (Date.now() - entry.timestamp > DEFERRED_OFFER_TTL_MS) return null;
-  return entry;
-}
-
-// Append a deferred reminder offer to a quiet outgoing reply and arm the
-// pending store so "yes" completes in one turn. `owed` is the entry the
-// caller already popped (the reconciliation tail pops BEFORE writing any
-// new deferral, so an offer deferred on a turn can't bounce straight back
-// onto that same reply). Returns the possibly-extended response.
-function settleDeferredReminderOffer(owed, user, household, ctx, response, actions) {
-  if (!owed || owed.householdId !== household.id || ctx._reminderRemainder) return response;
-  const trail = response.replace(/[\s)*_~`.!]+$/g, '');
-  const remindersSortedNow = (actions?.remindersSaved || 0) > 0 || actions?.notificationSnap;
-  if (!/\?$/.test(trail) && !remindersSortedNow) {
-    const t = owed.target;
-    const timed = t.itemType === 'event' && t.startTime && !t.allDay;
-    rememberReminderTarget(user.id, {
-      ...t,
-      householdId: household.id,
-      suggestedOffsets: timed ? [{ time: 30, unit: 'minutes' }] : [],
-    });
-    return `${response}\n\nWant me to add a reminder for **${t.label}**${timed ? ', say 30 minutes before' : ''}?`;
+/**
+ * Save the default reminder on every eligible just-created event. Eligible:
+ * timed (not all-day - their midnight start would fire at 23:30), not a
+ * birthday, and far enough out that the reminder can still fire. Skipped
+ * entirely when the user's own message already set reminders. Returns the
+ * confirmation line to append, or null when nothing was saved.
+ */
+async function autoAddEventReminders(events, household, actions) {
+  if ((actions.remindersSaved || 0) > 0) return null;
+  const eligible = (events || []).filter((ev) =>
+    ev?.id && ev.start_time && !ev.all_day && ev.category !== 'birthday'
+    && new Date(ev.start_time).getTime() - 30 * 60 * 1000 > Date.now());
+  let saved = 0;
+  for (const ev of eligible) {
+    try {
+      await db.saveEventReminders(ev.id, household.id, AUTO_REMINDER_OFFSETS, ev.start_time);
+      saved += 1;
+    } catch (err) {
+      console.error('[handlers] auto reminder failed:', err.message);
+    }
   }
-  // This turn is busy too (it asks its own question) - keep waiting, unless
-  // the user sorted a reminder in the meantime or a newer offer took the slot.
-  if (!remindersSortedNow && !deferredReminderOffer.has(user.id)) {
-    rememberDeferredReminderOffer(user.id, owed);
-  }
-  return response;
+  if (saved === 0) return null;
+  actions.remindersSaved = (actions.remindersSaved || 0) + saved;
+  if (saved > 1) return `⏰ I'll remind you 30 minutes before each - say the word to change or drop them.`;
+  const first = eligible[0];
+  const remindAt = describeRemindAt(first.start_time, AUTO_REMINDER_OFFSETS, household.timezone);
+  return `⏰ I'll remind you 30 minutes before${remindAt ? ` (${remindAt})` : ''} - say the word to change or drop it.`;
 }
 
-// When an add is undone, any reminder offer or pending question about the
-// removed rows must die with them - otherwise "yes" a moment later saves a
-// reminder onto a deleted event.
+/**
+ * Arm the pending store so a terse follow-up to the auto-reminder line
+ * ("an hour before", "no reminder") resolves deterministically. Only on a
+ * quiet reply: when the outgoing turn asks its own question (party invite,
+ * duplicate check), that question owns the next "yes" - adjustment then
+ * rides the normal update_event path instead.
+ */
+function armAutoReminderAdjust(user, household, ev, response) {
+  if (!ev?.id) return;
+  if (/\?$/.test(String(response || '').replace(/[\s)*_~`.!]+$/g, ''))) return;
+  rememberReminderTarget(user.id, {
+    itemId: ev.id, itemType: 'event', label: ev.title,
+    startTime: ev.start_time, householdId: household.id,
+    suggestedOffsets: AUTO_REMINDER_OFFSETS, autoSaved: true,
+  });
+}
+
+/** Slot the auto-reminder line into a reply, keeping any final question
+ *  last (a question that gets buried mid-message stops reading as the
+ *  thing to answer). */
+function appendAutoReminderLine(response, autoLine) {
+  if (!autoLine) return response;
+  if (/\?$/.test(response.replace(/[\s)*_~`.!]+$/g, ''))) {
+    const idx = response.lastIndexOf('\n\n');
+    if (idx > 0) return `${response.slice(0, idx)}\n\n${autoLine}${response.slice(idx)}`;
+    return `${autoLine}\n\n${response}`;
+  }
+  return `${response}\n\n${autoLine}`;
+}
+
+// When an add is undone, any pending reminder follow-up about the removed
+// rows must die with them - otherwise "an hour before" a moment later saves
+// a reminder onto a deleted event.
 function clearReminderStoresFor(userId, removedIds) {
   const pending = pendingReminderTarget.get(userId);
   if (pending && removedIds.has(pending.itemId)) pendingReminderTarget.delete(userId);
-  const deferred = deferredReminderOffer.get(userId);
-  if (deferred && removedIds.has(deferred.target?.itemId)) deferredReminderOffer.delete(userId);
 }
 
 // Merge a recursively-handled message's actions into the current turn's,
@@ -2414,6 +2432,21 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     if (offsets.length === 0) offsets = parseBareDuration(text);
     let timeOfDay = pendingRem.itemType === 'task' ? parseTimeOfDay(text) : null;
     const bareYes = parseAffirmative(text) === 'yes';
+    // A bare "no" to the auto-reminder line means "drop it" - deterministic,
+    // no model round-trip. (For an unanswered task offer the same "no" just
+    // settles the question; nothing was saved to remove.)
+    if (parseAffirmative(text) === 'no' && offsets.length === 0 && !timeOfDay) {
+      ctx.intent = 'reminder_declined';
+      if (pendingRem.autoSaved && pendingRem.itemType === 'event') {
+        try {
+          await db.saveEventReminders(pendingRem.itemId, household.id, [], pendingRem.startTime);
+        } catch (err) {
+          console.error('[handlers] auto reminder removal failed:', err.message);
+        }
+        return { response: `Done - no reminder. **${pendingRem.label}** stays on the calendar. 👍`, actions: remActions };
+      }
+      return { response: `No problem - **${pendingRem.label}** is saved without a reminder. 👍`, actions: remActions };
+    }
     // A bare "yes" accepts whatever lead time the offer itself suggested
     // ("Want me to add a reminder the day before?" → yes → day before).
     // Asking "how long before?" after proposing a lead ourselves was a
@@ -2445,8 +2478,17 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
     if (!deterministicHit && verdict?.verdict === 'decline') {
       // Deterministic goodbye: the item is safe, no reminder wanted. The
-      // target stays popped - the question is settled.
+      // target stays popped - the question is settled. An AUTO-saved
+      // reminder actually exists, so declining one means deleting it.
       ctx.intent = 'reminder_declined';
+      if (pendingRem.autoSaved && pendingRem.itemType === 'event') {
+        try {
+          await db.saveEventReminders(pendingRem.itemId, household.id, [], pendingRem.startTime);
+        } catch (err) {
+          console.error('[handlers] auto reminder removal failed:', err.message);
+        }
+        return { response: `Done - no reminder. **${pendingRem.label}** stays on the calendar. 👍`, actions: remActions };
+      }
       return { response: `No problem - **${pendingRem.label}** is saved without a reminder. 👍`, actions: remActions };
     }
     if (!deterministicHit && offsets.length === 0 && verdict?.verdict === 'unrelated') {
@@ -3677,6 +3719,10 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       // The reply names the new event - it's a valid "it" for follow-ups.
       rememberReferents(user.id, [{ kind: 'event', id: createdEv.id, label: createdEv.title }]);
 
+      // Auto-reminder: saved BEFORE the copy is assembled so the reply can
+      // name it. The helper no-ops when the user's message already carried
+      // a reminder, or the event is all-day/birthday/too soon.
+      const autoLine = await autoAddEventReminders([createdEv], household, actions);
       if (looksLikeParty(createdEv.title)) {
         // A party owns this turn: offer the shareable invite link. This branch
         // returns early (never reaching the reconciliation tail where the other
@@ -3688,63 +3734,32 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           const stripped = eventReply.replace(/\s*[^.?!\n]*\?["')\]]*\s*$/, '').trimEnd();
           if (stripped.length > 10) eventReply = stripped;
         }
+        if (autoLine) eventReply += `\n\n${autoLine}`;
         eventReply += '\n\nWant to invite guests? Reply *yes* and I\'ll make a shareable RSVP link - they can reply with headcounts and any allergies, no app needed. 🎈';
         rememberInviteOffer(user.id, {
           eventId: createdEv.id,
           householdId: household.id,
           title: createdEv.title,
         });
-        // The invite ask owns this turn - the reminder offer waits for the
-        // first quiet turn instead of being dropped.
-        rememberDeferredReminderOffer(user.id, {
-          target: { itemId: createdEv.id, itemType: 'event', label: createdEv.title, startTime: createdEv.start_time, allDay: !!createdEv.all_day },
-          householdId: household.id,
-        });
+        // The invite ask owns the next "yes" - reminder adjustment rides the
+        // normal update path instead (armAutoReminderAdjust would refuse the
+        // question-ending reply anyway).
       } else {
-        const remindersAlreadySaved = (actions.remindersSaved || 0) > 0;
-        if (!remindersAlreadySaved && createdEv.category !== 'birthday') {
-          // A timed event proposes a concrete lead so a bare "yes" finishes
-          // in one turn; all-day rows still carry a midnight start_time, so
-          // gate on all_day too ("30 minutes before" would fire at 23:30).
-          const timedEvent = createdEv.start_time && !createdEv.all_day;
-          // Deterministic offer backstop when the model didn't ask anything
-          // (same trailing-question test as the reconciliation tail's
-          // alreadyAsks - "...time?)" counts as already-asking).
-          if (!/\?$/.test(eventReply.replace(/[\s)*_~`.!]+$/g, ''))) {
-            eventReply += timedEvent
-              ? `\n\nWant me to add a reminder, say 30 minutes before?`
-              : `\n\nWant me to add a reminder for it?`;
-          }
-          // Arm the pending store whenever the outgoing reply asks a reminder
-          // question - ours or the model's - so "Yes" resolves deterministically.
-          if (/remind[^.!\n]*\?/i.test(eventReply)) {
-            // If the outgoing question itself names a lead ("...reminder the
-            // day before?"), a bare "yes" applies it directly; when nothing
-            // is proposed, a timed event falls back to a 30-minute default -
-            // the confirmation names the lead and the fire time, so "yes"
-            // completes in one turn and stays correctable.
-            const proposed = parseRemindersFromMessage(eventReply);
-            rememberReminderTarget(user.id, {
-              itemId: createdEv.id,
-              itemType: 'event',
-              label: createdEv.title,
-              startTime: createdEv.start_time,
-              householdId: household.id,
-              suggestedOffsets: proposed.length > 0
-                ? proposed
-                : (timedEvent ? [{ time: 30, unit: 'minutes' }] : []),
-            });
-          } else {
-            // The model's own question owns this turn (a duplicate check,
-            // "shall I invite Lynn?"). One question per turn - but the
-            // reminder offer is deferred to the first quiet turn, not
-            // dropped (real 2026-08-23 padel transcript: "genuine" settled
-            // the duplicate and the offer evaporated).
-            rememberDeferredReminderOffer(user.id, {
-              target: { itemId: createdEv.id, itemType: 'event', label: createdEv.title, startTime: createdEv.start_time, allDay: !!createdEv.all_day },
-              householdId: household.id,
-            });
-          }
+        // The model is told never to offer reminders; strip a stray trailing
+        // offer UNCONDITIONALLY - when no auto-reminder was saved (past or
+        // all-day event) a surviving model question would have nothing armed
+        // behind it, and "Yes" would leak to classification (the 2026-07-16
+        // phantom-update bug).
+        if (/remind[^.!\n]*\?\s*$/i.test(eventReply)) {
+          const stripped = eventReply.replace(/\s*[^.?!\n]*remind[^.?!\n]*\?["')\]]*\s*$/i, '').trimEnd();
+          // When the question was most of the reply, fall back to a named
+          // confirmation rather than keeping the question (a kept question
+          // would block arming and dangle unanswered).
+          eventReply = stripped.length > 0 ? stripped : `**${createdEv.title}** is on the calendar.`;
+        }
+        if (autoLine) {
+          eventReply = appendAutoReminderLine(eventReply, autoLine);
+          armAutoReminderAdjust(user, household, createdEv, eventReply);
         }
       }
     }
@@ -4043,12 +4058,9 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   }
 
   // Handle general chat - just return the AI's conversational response.
-  // Chat turns are the most common "first quiet turn" after a create whose
-  // reminder offer was displaced by another question - pay the offer back
-  // here (this branch never reaches the reconciliation tail).
   if (result.intent === 'chat') {
     const chatReply = result.response_message || "I'm not sure how to help with that. Try asking me about shopping, tasks, or anything around the house!";
-    return { response: settleDeferredReminderOffer(popDeferredReminderOffer(user.id), user, household, ctx, chatReply, actions), actions };
+    return { response: chatReply, actions };
   }
 
   // Handle shopping items
@@ -4412,9 +4424,6 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   const eventAdded = actions.eventsAdded?.length > 0;
   const taskAdded = actions.tasksAdded.length > 0;
   const reminderSaved = (actions.remindersSaved || 0) > 0 || actions.notificationSnap;
-  // Popped BEFORE any new deferral is written below, so an offer deferred
-  // on THIS turn can't bounce straight back onto the same reply.
-  const owedReminderOffer = popDeferredReminderOffer(user.id);
   // Strip trailing markdown / whitespace / closing parens / periods to
   // get at the actual final character. A response ending in "...time?)"
   // should count as already-asking, even though the literal last char
@@ -4474,18 +4483,8 @@ async function handleTextMessage(text, user, household, ctx = {}) {
         householdId: household.id,
         label: birthdayEvent.title,
       });
-    } else if ((eventAdded || taskAdded) && !reminderSaved) {
-      // For a timed event, propose a concrete lead: the offer text itself is
-      // parsed at the arming site below, so naming "30 minutes before" here
-      // is what lets a bare "yes" finish the job in one turn instead of
-      // opening a "how long before?" round trip.
-      // (all-day rows still carry a midnight start_time, so gate on all_day
-      // too - "30 minutes before" an all-day event would fire at 23:30.)
-      const firstEvent = (actions.eventsAdded || [])[0];
-      const timedEvent = eventAdded && firstEvent?.start_time && !firstEvent?.all_day;
-      followUp = eventAdded
-        ? (timedEvent ? 'Want me to add a reminder, say 30 minutes before?' : 'Want me to add a reminder for it?')
-        : 'Want me to set a reminder time?';
+    } else if (taskAdded && !eventAdded && !reminderSaved) {
+      followUp = 'Want me to set a reminder time?';
     }
     if (followUp) {
       response += `\n\n${followUp}`;
@@ -4493,48 +4492,49 @@ async function handleTextMessage(text, user, household, ctx = {}) {
     }
   }
 
-  // Arm the pending-reminder store whenever the OUTGOING reply asks a
-  // reminder question - whether we appended it above or the model wrote its
-  // own ("Want me to add a reminder before it?" in response_message). The
-  // arming used to live inside the !alreadyAsks branch, so a model-authored
-  // offer skipped it and the user's "Yes" fell through to classification,
-  // where it misrouted into a phantom update (real 2026-07-16 transcript).
-  // The reply flow at the top of handleTextMessage handles the answer
-  // deterministically either way. Never arm for a party turn - the invite
-  // offer already owns the "yes".
-  if ((eventAdded || taskAdded) && !reminderSaved && !birthdayEvent) {
-    const remindQuestionOut = /remind[^.!\n]*\?/i.test(response);
-    const ev = eventAdded ? (actions.eventsAdded || [])[0] : null;
-    const tk = !eventAdded ? (actions.tasksAddedRows || [])[0] : null;
-    const target = ev
-      ? { itemId: ev.id, itemType: 'event', label: ev.title, startTime: ev.start_time, allDay: !!ev.all_day }
-      : tk
-        ? { itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null }
-        : null;
-    if (target?.itemId && remindQuestionOut && !partyEvent) {
-      // Capture any lead the question proposed ("...the day before?") so a
-      // bare "yes" applies it instead of re-asking. When the offer proposed
-      // nothing (model-authored questions usually don't) a timed event still
-      // gets a 30-minute default: the confirmation names the lead AND the
-      // clock time, so "yes" completes in one turn and stays correctable.
-      const proposed = parseRemindersFromMessage(response);
-      const suggestedOffsets = proposed.length > 0
-        ? proposed
-        : (target.itemType === 'event' && target.startTime && !target.allDay ? [{ time: 30, unit: 'minutes' }] : []);
-      rememberReminderTarget(user.id, { ...target, householdId: household.id, suggestedOffsets });
-    } else if (target?.itemId && !remindQuestionOut) {
-      // The reminder offer lost this turn to a more urgent question (a
-      // duplicate check, the party-invite ask). Defer it - it comes back
-      // on the first quiet turn instead of being dropped (real 2026-08-23
-      // padel transcript).
-      rememberDeferredReminderOffer(user.id, { target, householdId: household.id });
+  // Auto-reminder for bot-created timed events: saved by default, named in
+  // the reply. Adjustment ("an hour before", "no reminder") is a follow-up,
+  // never a question from us. Strip a stray model-authored offer first so
+  // the auto-line isn't contradicted by it.
+  if (eventAdded && !reminderSaved && !birthdayEvent) {
+    // Strip a stray model-authored offer UNCONDITIONALLY - when no
+    // auto-reminder was saved (past or all-day event) a surviving question
+    // would have nothing armed behind it, and "Yes" would leak to
+    // classification (the 2026-07-16 phantom-update bug).
+    if (/remind[^.!\n]*\?\s*$/i.test(response)) {
+      const stripped = response.replace(/\s*[^.?!\n]*remind[^.?!\n]*\?["')\]]*\s*$/i, '').trimEnd();
+      const firstEv = (actions.eventsAdded || [])[0];
+      response = stripped.length > 0
+        ? stripped
+        : (firstEv?.title ? `**${firstEv.title}** is on the calendar.` : response);
+    }
+    const autoLine = await autoAddEventReminders(actions.eventsAdded || [], household, actions);
+    if (autoLine) {
+      response = appendAutoReminderLine(response, autoLine);
+      const firstTimed = (actions.eventsAdded || []).find((e) => e?.start_time && !e.all_day);
+      armAutoReminderAdjust(user, household, firstTimed, response);
     }
   }
 
-  // Pay back a deferred reminder offer once the turn that displaced it is
-  // settled - but only on a reply that isn't asking anything itself (one
-  // question per turn), and not if the user sorted a reminder in between.
-  response = settleDeferredReminderOffer(owedReminderOffer, user, household, ctx, response, actions);
+  // Arm the pending-reminder store whenever the OUTGOING reply asks a TASK
+  // reminder question - whether we appended it above or the model wrote its
+  // own. The arming used to live inside the !alreadyAsks branch, so a
+  // model-authored offer skipped it and the user's "Yes" fell through to
+  // classification, where it misrouted into a phantom update (real
+  // 2026-07-16 transcript). Never arm for a party turn - the invite offer
+  // already owns the "yes". (Events no longer ask: their reminder is saved
+  // automatically above.)
+  if (taskAdded && !eventAdded && !reminderSaved && !birthdayEvent) {
+    const remindQuestionOut = /remind[^.!\n]*\?/i.test(response);
+    const tk = (actions.tasksAddedRows || [])[0];
+    if (tk?.id && remindQuestionOut && !partyEvent) {
+      rememberReminderTarget(user.id, {
+        itemId: tk.id, itemType: 'task', label: tk.title, dueTime: tk.due_time || null,
+        householdId: household.id,
+        suggestedOffsets: parseRemindersFromMessage(response),
+      });
+    }
+  }
 
   // The reply is about to NAME the created rows - remember them so an
   // immediate follow-up modify ("actually make it 5pm") is conversationally

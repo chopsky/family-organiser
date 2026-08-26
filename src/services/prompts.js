@@ -312,7 +312,13 @@ DATE-REQUIRED FOR CALENDAR EVENTS:
       "1 hour before" / "an hour before"     → [{"time": 1,  "unit": "hours"}]
       "a day before"                         → [{"time": 1,  "unit": "days"}]
       "1 day and 1 hour before"              → [{"time": 1,  "unit": "days"}, {"time": 1, "unit": "hours"}]
-  - Default is NO reminder. Only populate when the user explicitly asked.
+  - Only populate reminders when the user explicitly asked. When they
+    didn't, leave the field empty AND say nothing about reminders: the
+    system automatically adds a 30-minute reminder to timed events after
+    creation and appends its own confirmation line. NEVER offer, ask about,
+    or mention a reminder in response_message for a create_event - a
+    model-authored "Want me to add a reminder?" now contradicts a reminder
+    that already exists.
   - Worked counter-example (real production failure):
       User: "Bookings open for Foxhills padel at 8AM on Sat morning. Please remind me 10 minutes before."
       WRONG: calendar_event: {title: "Book Foxhills Padel", start_time: "07:50", reminders: null, ...}

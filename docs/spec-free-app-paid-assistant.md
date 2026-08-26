@@ -126,6 +126,15 @@ reminders today get ONE honest WhatsApp message explaining the change
 with the app link - never silent disappearance of a thing they rely
 on.
 
+Auto-reminders (SHIPPED 2026-08-27, live for everyone the bot serves):
+a bot-created timed event automatically carries a 30-minute reminder -
+the default, not a question. The confirmation names the lead and fire
+time; "an hour before" / "no reminder" adjusts or removes it in one
+follow-up. All-day events, birthdays, and events starting too soon get
+none. A user-specified lead always wins over the default. Under the
+free tier this rides inside the event's own metered request - never a
+second action.
+
 ### Quota visibility (the WhatsApp problem)
 1. **Ambient counter near the edge**: from action 7 the bot appends one
    quiet line to its normal reply - "(8 of 10 free actions used this

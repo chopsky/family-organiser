@@ -655,25 +655,44 @@ describe('handleTextMessage — conversational referents + stateful offers', () 
     expect(db.updateCalendarEvent).not.toHaveBeenCalled();
   });
 
-  test('a model-authored reminder offer still arms the store: "Yes" is handled without the classifier', async () => {
+  test('a model-authored reminder offer is stripped: the auto-reminder line replaces the question', async () => {
     const userC = { id: 'user-offer-c', name: 'Grant' };
-    // 1. Create an event where the MODEL writes its own trailing offer.
+    // The model writes its own trailing offer despite the prompt rule. The
+    // auto-reminder is saved at creation, so a surviving question would
+    // contradict a reminder that already exists - it gets stripped and the
+    // deterministic confirmation line takes its place.
+    ai.classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_event: { title: "Logan's haircut", date: '2030-07-16', start_time: '15:55' },
+      response_message: "Booked - Logan's haircut on the 16th at 3:55 pm. Want me to add a reminder before it?",
+    });
+    const created = await handlers.handleTextMessage('Logan haircut 16 July 2030 at 15:55', userC, hh, {});
+    expect(created.response).not.toMatch(/Want me to add a reminder/i);
+    expect(created.response).toMatch(/I'll remind you 30 minutes before/i);
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', expect.anything(), [{ time: 30, unit: 'minutes' }], expect.anything());
+
+    // A terse adjustment resolves deterministically - no classifier.
+    ai.classify.mockClear();
+    const adj = await handlers.handleTextMessage('an hour before', userC, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', expect.anything(), [{ time: 1, unit: 'hours' }], expect.anything());
+    expect(adj.response).toMatch(/(1|an) hour before/i);
+  });
+
+  test('a model offer on an event too soon for an auto-reminder is stripped, not left dangling', async () => {
+    const userC2 = { id: 'user-offer-past', name: 'Grant' };
+    // Past/imminent start: no auto-reminder is saved, so nothing would be
+    // armed behind a surviving model question - "Yes" would leak to
+    // classification (the 2026-07-16 phantom-update bug). Strip it.
     ai.classify.mockResolvedValue({
       intent: 'create_event',
       calendar_event: { title: "Logan's haircut", date: '2026-07-16', start_time: '15:55' },
-      response_message: "Booked - Logan's haircut tomorrow at 3:55 pm. Want me to add a reminder before it?",
+      response_message: "Booked - Logan's haircut at 3:55 pm. Want me to add a reminder before it?",
     });
-    await handlers.handleTextMessage('Logan haircut tomorrow at 15:55', userC, hh, {});
-
-    // 2. "Yes" must route to the deterministic reminder flow, NOT to
-    //    classification (the 2026-07-16 phantom-update transcript). The offer
-    //    proposed no lead, so the timed-event 30-minute default applies in
-    //    one turn - the confirmation names it so it stays correctable.
-    ai.classify.mockClear();
-    const yes = await handlers.handleTextMessage('Yes', userC, hh, {});
-    expect(ai.classify).not.toHaveBeenCalled();
-    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', expect.anything(), [{ time: 30, unit: 'minutes' }], expect.anything());
-    expect(yes.response).toMatch(/30 minutes before/i);
+    const created = await handlers.handleTextMessage('Logan haircut 16 July at 15:55', userC2, hh, {});
+    expect(created.response).not.toMatch(/remind/i);
+    expect(db.saveEventReminders).not.toHaveBeenCalled();
+    expect(handlers.popReminderTarget(userC2.id)).toBeNull();
   });
 
   test('no-op update (echoed existing values) asks what to change instead of claiming success', async () => {
@@ -1342,49 +1361,64 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     return handlers.handleTextMessage('Logan eye appointment on 29 October 9:30', u, hh, {});
   }
 
-  test('offer names "the day before" → bare "Yes" saves it directly, no re-ask', async () => {
+  test('a timed event auto-saves the 30-minute reminder and names it, no question asked', async () => {
     const u = { id: 'u-loop-1', name: 'Grant' };
-    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Want me to add a reminder the day before?');
-    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
-    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 1, unit: 'days' }], expect.anything());
-    expect(yes.response).toMatch(/day before/i);
-    expect(yes.response).not.toMatch(/how long before/i);
+    const created = await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
+    expect(created.response).toMatch(/I'll remind you 30 minutes before/i);
+    expect(created.response).toMatch(/9:00\s?am/i); // 09:30 London start - 30 min
+    expect(created.response).not.toMatch(/\?/); // the default is not a question
   });
 
-  test('generic offer on a timed event → bare "Yes" applies the 30-minute default in one turn', async () => {
+  test('a terse follow-up changes the auto-reminder lead in one deterministic turn', async () => {
     const u = { id: 'u-loop-default', name: 'Grant' };
-    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Want me to add a reminder for it?');
-    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
-    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
-    expect(yes.response).toMatch(/30 minutes before/i);
-    expect(yes.response).not.toMatch(/how long before/i);
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
+    ai.classify.mockClear();
+    const adj = await handlers.handleTextMessage('the day before', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 1, unit: 'days' }], expect.anything());
+    expect(adj.response).toMatch(/day before/i);
   });
 
-  test('the confirmation states the actual fire time for a future event', async () => {
-    const u = { id: 'u-loop-clock', name: 'Grant' };
-    ai.classify.mockResolvedValue({
-      intent: 'create_event',
-      calendar_event: { title: 'School recital', date: '2030-01-15', start_time: '09:30' },
-      response_message: 'Booked! Want me to add a reminder for it?',
-    });
-    await handlers.handleTextMessage('recital 15 Jan 2030 9:30', u, hh, {});
-    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
-    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
-    expect(yes.response).toMatch(/30 minutes before/i);
-    expect(yes.response).toMatch(/9:00\s?am/i); // 09:30 London start - 30 min
+  test('a bare "No" removes the auto-saved reminder deterministically', async () => {
+    const u = { id: 'u-loop-no', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.');
+    ai.classify.mockClear();
+    const no = await handlers.handleTextMessage('No', u, hh, {});
+    expect(ai.classify).not.toHaveBeenCalled();
+    expect(extractReminderOffsets).not.toHaveBeenCalled();
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [], expect.anything());
+    expect(no.response).toMatch(/no reminder/i);
+    expect(no.response).toMatch(/stays on the calendar/i);
   });
 
-  test('an all-day event has no sensible lead default: "Yes" still asks', async () => {
+  test('an all-day event gets no auto-reminder and no reminder talk at all', async () => {
     const u = { id: 'u-loop-allday', name: 'Grant' };
     ai.classify.mockResolvedValue({
       intent: 'create_event',
       calendar_event: { title: 'Sports day', date: '2030-06-20', all_day: true },
-      response_message: 'Booked! Want me to add a reminder for it?',
+      response_message: 'Booked! Sports day on 20 June.',
     });
-    await handlers.handleTextMessage('sports day 20 June 2030', u, hh, {});
-    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
+    const created = await handlers.handleTextMessage('sports day 20 June 2030', u, hh, {});
     expect(db.saveEventReminders).not.toHaveBeenCalled();
-    expect(yes.response).toMatch(/how long before/i);
+    expect(created.response).not.toMatch(/remind/i);
+    expect(handlers.popReminderTarget(u.id)).toBeNull();
+  });
+
+  test('a user-specified reminder wins: no auto default stacked on top', async () => {
+    const u = { id: 'u-loop-explicit', name: 'Grant' };
+    ai.classify.mockResolvedValue({
+      intent: 'create_event',
+      calendar_event: {
+        title: 'Logan eye appointment', date: '2026-10-29', start_time: '09:30',
+        reminders: [{ time: 2, unit: 'hours' }],
+      },
+      response_message: 'Booked!',
+    });
+    await handlers.handleTextMessage('Logan eye appt 29 Oct 9:30, remind me 2 hours before', u, hh, {});
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 2, unit: 'hours' }], expect.anything());
+    // Exactly once - the auto default must not overwrite the asked-for lead.
+    expect(db.saveEventReminders).toHaveBeenCalledTimes(1);
   });
 
   test.each(['You said day before', 'Day before', 'The day before !!'])(
@@ -1435,15 +1469,16 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(ans.response).toMatch(/30 minutes before/i);
   });
 
-  test('a decline settles the question deterministically - no classifier, no re-ask', async () => {
+  test('a phrased decline removes the auto-reminder - no classifier, no re-ask', async () => {
     const u = { id: 'u-loop-decline', name: 'Grant' };
-    await createLoganEvent(u, 'Booked! Want me to add a reminder for it?');
+    await createLoganEvent(u, 'Booked! Logan eye appointment on 29 October at 9:30 am.');
     extractReminderOffsets.mockResolvedValueOnce({ verdict: 'decline', offsets: [], timeOfDay: null, remainder: '' });
     ai.classify.mockClear();
-    const no = await handlers.handleTextMessage('nah all good', u, hh, {});
+    const no = await handlers.handleTextMessage('nah dont bother with that', u, hh, {});
     expect(ai.classify).not.toHaveBeenCalled();
-    expect(no.response).toMatch(/saved without a reminder/i);
-    expect(db.saveEventReminders).not.toHaveBeenCalled();
+    expect(no.response).toMatch(/no reminder/i);
+    // The auto-saved reminder is actually deleted, not just talked away.
+    expect(db.saveEventReminders).toHaveBeenLastCalledWith('e-1', 'h1', [], expect.anything());
   });
 
   test('a compound answer saves the reminder AND handles the second request (2026-08-02 transcript)', async () => {
@@ -1514,41 +1549,27 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     expect(Date.parse(patch.end_time)).toBeGreaterThan(Date.parse(patch.start_time));
   });
 
-  test('a reminder offer displaced by another question comes back on the next quiet turn', async () => {
-    const u = { id: 'u-loop-deferred', name: 'Grant' };
-    // The model spent this turn's question on a duplicate check - no
-    // reminder question in the reply, so nothing armed... but the offer is
-    // owed, not dropped (padel transcript 2026-08-23).
-    await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am. Is this a genuine second session, or shall I double check for a duplicate?');
-    expect(handlers.popReminderTarget(u.id)).toBeNull();
-    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Got it, keeping both sessions.' });
-    const quiet = await handlers.handleTextMessage('genuine', u, hh, {});
-    expect(quiet.response).toMatch(/keeping both sessions/);
-    expect(quiet.response).toMatch(/Want me to add a reminder for \*\*Logan eye appointment\*\*, say 30 minutes before\?/);
-    // ...and the offer is armed: "Yes" completes in one turn.
-    const yes = await handlers.handleTextMessage('Yes', u, hh, {});
+  test('a busy turn (duplicate question) still auto-saves; the question stays last and owns the "yes"', async () => {
+    const u = { id: 'u-loop-busy', name: 'Grant' };
+    // The model spent this turn's question on a duplicate check. The
+    // reminder is saved anyway (it is a default, not an offer), the line
+    // slots in BEFORE the question so the question still reads as the thing
+    // to answer, and the adjust store is NOT armed - "yes" belongs to the
+    // duplicate question, not the reminder.
+    const created = await createLoganEvent(u, 'Booked! Logan eye appointment on Thursday 29 October at 9:30 am.\n\nIs this a genuine second session, or shall I double check for a duplicate?');
     expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
-    expect(yes.response).toMatch(/30 minutes before/i);
+    expect(created.response).toMatch(/I'll remind you 30 minutes before/i);
+    expect(created.response.trim()).toMatch(/duplicate\?$/); // question kept last
+    expect(handlers.popReminderTarget(u.id)).toBeNull(); // "yes" is not a reminder answer
   });
 
-  test('a deferred offer waits again if the next turn also asks a question', async () => {
-    const u = { id: 'u-loop-deferred2', name: 'Grant' };
-    await createLoganEvent(u, 'Booked! Logan eye appointment. Is this a genuine second session?');
-    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'Shall I invite Lynn too?' });
-    const busy = await handlers.handleTextMessage('genuine', u, hh, {});
-    expect(busy.response).not.toMatch(/add a reminder/i); // one question per turn
-    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'No problem.' });
-    const quiet = await handlers.handleTextMessage('no', u, hh, {});
-    expect(quiet.response).toMatch(/Want me to add a reminder/i);
-  });
-
-  test('undoing the add kills the deferred offer with it', async () => {
-    const u = { id: 'u-loop-deferred3', name: 'Grant' };
-    await createLoganEvent(u, 'Booked! Logan eye appointment. Is this a genuine second session?');
+  test('undoing the add kills the pending reminder adjustment with it', async () => {
+    const u = { id: 'u-loop-undo', name: 'Grant' };
+    await createLoganEvent(u, 'Booked! Logan eye appointment on 29 October at 9:30 am.');
     await handlers.handleTextMessage('undo', u, hh, {});
-    ai.classify.mockResolvedValue({ intent: 'general', response_message: 'All quiet.' });
-    const quiet = await handlers.handleTextMessage('thanks anyway', u, hh, {});
-    expect(quiet.response).not.toMatch(/add a reminder/i); // the event is gone
+    // The store died with the event: a terse "no" is no longer a reminder
+    // removal, it goes to normal classification.
+    expect(handlers.popReminderTarget(u.id)).toBeNull();
   });
 
   test('"Actually undo that" is an undo, not a which-one interrogation', async () => {
@@ -1568,7 +1589,10 @@ describe('pending reminder flow — the "Day before" loop transcript (2026-07-24
     const q2 = await handlers.handleTextMessage('remind me at whatever works', u, hh, {}); // give up, keep the event
     expect(q1.response).toMatch(/how far ahead/i);
     expect(q2.response).toMatch(/saved either way/i);
-    expect(db.saveEventReminders).not.toHaveBeenCalled();
+    // Only the auto default from creation - the unreadable answers never
+    // overwrote it.
+    expect(db.saveEventReminders).toHaveBeenCalledTimes(1);
+    expect(db.saveEventReminders).toHaveBeenCalledWith('e-1', 'h1', [{ time: 30, unit: 'minutes' }], expect.anything());
     // State dropped: the next message goes to normal classification.
     ai.classify.mockClear();
     ai.classify.mockResolvedValue({ intent: 'general', response_message: 'ok' });
