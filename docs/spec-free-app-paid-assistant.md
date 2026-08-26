@@ -159,13 +159,20 @@ ladder (docs/bot-reply-ladder.md).
 ### Quota visibility (the WhatsApp problem)
 The rule behind the ladder: no step may be the first mention of the
 step before it - the meter is announced, never discovered.
-0. **The deal is introduced at trial's end** (WhatsApp lapse message +
-   trial-expiry email + in-app banner): "the app stays free forever;
-   the assistant gives you 10 free actions a month, resetting on the
-   1st." A counter appearing at 7 is only unsurprising if the meter's
+0. **The deal is introduced at trial's end** - one WhatsApp message
+   (WhatsApp-linked households only; a one-time lifecycle notice about
+   the channel it arrives on, outside the pings-on-push doctrine, which
+   governs RECURRING one-way traffic) + the trial-expiry email + the
+   in-app banner. Deliberately no push: anyone push-reachable has the
+   app and sees the banner. Copy: "the app stays free forever; the
+   assistant gives you 10 free actions a month, resetting on the 1st."
+   A counter appearing at 7 is only unsurprising if the meter's
    existence was already news the family received.
 1. **First action of each month carries a full-tank line**: "(1 of 10 -
-   your free actions reset 1 October)". Doubles as the monthly
+   your free actions reset 1 October)". Not a standalone send - it
+   rides the bot's reply to that first action, in whichever channel
+   the family asked (WhatsApp or app chat); a household that doesn't
+   use the assistant that month never sees it. Doubles as the monthly
    "bot is back" re-engagement beat, and restates the deal when the
    news is good, not when it's nearly bad. Then silent from 2-6 (a
    counter on action 3 is noise), and from action 7 the reply that
