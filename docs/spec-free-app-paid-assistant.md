@@ -157,9 +157,20 @@ inside the same burst. Full behaviour and guards live with the reply
 ladder (docs/bot-reply-ladder.md).
 
 ### Quota visibility (the WhatsApp problem)
-1. **Ambient counter near the edge**: from action 7 the bot appends one
-   quiet line to its normal reply - "(8 of 10 free actions used this
-   month)". Silent before that; a counter on action 2 is noise.
+The rule behind the ladder: no step may be the first mention of the
+step before it - the meter is announced, never discovered.
+0. **The deal is introduced at trial's end** (WhatsApp lapse message +
+   trial-expiry email + in-app banner): "the app stays free forever;
+   the assistant gives you 10 free actions a month, resetting on the
+   1st." A counter appearing at 7 is only unsurprising if the meter's
+   existence was already news the family received.
+1. **First action of each month carries a full-tank line**: "(1 of 10 -
+   your free actions reset 1 October)". Doubles as the monthly
+   "bot is back" re-engagement beat, and restates the deal when the
+   news is good, not when it's nearly bad. Then silent from 2-6 (a
+   counter on action 3 is noise), and from action 7 the reply that
+   starts a new action appends the countdown - "(8 of 10 free actions
+   used this month)".
 2. **Ask anytime, free**: remaining-quota questions are deterministic,
    exact, never charged.
 3. **The limit message**: warm, names the reset date, offers both doors
@@ -185,9 +196,11 @@ ladder (docs/bot-reply-ladder.md).
 
 ## The lapse experience (the conversion moment)
 
-- Trial ends -> household drops to free, silently keeps working. The
-  bot NEVER goes silent: it keeps answering inside the meter, and at
-  the limit gives the warm two-door reply above.
+- Trial ends -> household drops to free and keeps working, but the
+  SWITCH is never silent: the lapse moment announces the new deal on
+  every channel the family uses (quota ladder step 0). The bot NEVER
+  goes silent either: it keeps answering inside the meter, and at the
+  limit gives the warm two-door reply above.
 - Upload attempts, calendar-connect attempts, brief settings: warm
   server-side refusals with the same one-line story, never errors.
 - The app itself keeps working fully for manual use - the middleware's
