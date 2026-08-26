@@ -628,8 +628,8 @@ export default function LandingPage() {
       {/* ── Intro ── */}
       <section className="lv-intro">
         <div className="lv-intro-inner" data-lv-reveal="0">
-          <h2>Your family&rsquo;s operating&nbsp;system.</h2>
-          <p className="lv-sub" style={{ fontSize: 'clamp(15px,1.5vw,17.5px)' }}>Calendar, meals, lists, chores and school life. One app that keeps everyone in&nbsp;sync.</p>
+          <h2>You&rsquo;re carrying it all in your&nbsp;head.</h2>
+          <p className="lv-sub" style={{ fontSize: 'clamp(15px,1.5vw,17.5px)' }}>Between the to-dos, the school dates and making sure everyone&rsquo;s fed, Housemait takes it all off your&nbsp;plate.</p>
         </div>
       </section>
 
