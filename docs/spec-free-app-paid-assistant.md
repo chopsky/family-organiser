@@ -168,6 +168,15 @@ step before it - the meter is announced, never discovered.
    assistant gives you 10 free actions a month, resetting on the 1st."
    A counter appearing at 7 is only unsurprising if the meter's
    existence was already news the family received.
+   MECHANICS: most lapsing households are OUTSIDE the 24h WhatsApp
+   window (the quiet ones especially), where free-form sends are
+   rejected - the proactive send uses a pre-approved utility template
+   (one per household ever, ~2p; the digest already runs on this
+   machinery; template needs Meta approval BEFORE launch - see the
+   implementation map). Belt-and-braces: the bot's FIRST reply after
+   lapse restates the deal inline before anything else - free,
+   in-window by definition, and it reaches exactly the people the
+   meter affects. No one can reach action 7 untold.
 1. **First action of each month carries a full-tank line**: "(1 of 10 -
    your free actions reset 1 October)". Not a standalone send - it
    rides the bot's reply to that first action, in whichever channel
@@ -244,6 +253,10 @@ step before it - the meter is announced, never discovered.
    one-time WhatsApp heads-up to today's push-unreachable recipients
    when the routing flips.
 8. Postmark trial-expiry templates - copy to the new framing (manual).
+8b. WhatsApp lapse-announcement TEMPLATE - submit for Meta approval
+   BEFORE launch (utility category, one variable for the reset date);
+   out-of-window households are the majority of lapses and free-form
+   sends to them are rejected. Founder task, like the Postmark edits.
 9. Copy sweep (bundle-side, rides next regular build): Settings expired
    banners, TrialIndicator, onboarding paywall phase removed, landing
    pages, in-app meter display. KNOWN STALE: the new marketing site
