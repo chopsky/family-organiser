@@ -33,7 +33,7 @@ describe('runTrialExpirySweep', () => {
     const sel = selectChain({ data: [], error: null });
     supabaseAdmin.from.mockReturnValue(sel);
     const out = await runTrialExpirySweep();
-    expect(out).toEqual({ flipped: 0, failed: 0 });
+    expect(out).toEqual({ flipped: 0, failed: 0, announced: 0 });
     expect(sel.eq).toHaveBeenCalledWith('subscription_status', 'trialing');
     expect(sel.eq).toHaveBeenCalledWith('is_internal', false);
     expect(sel.is).toHaveBeenCalledWith('trial_paused_at', null);
@@ -69,7 +69,7 @@ describe('runTrialExpirySweep', () => {
     supabaseAdmin.from.mockImplementation(() => (call++ === 0 ? sel : updates[call - 2]));
 
     const out = await runTrialExpirySweep();
-    expect(out).toEqual({ flipped: 2, failed: 0 });
+    expect(out).toEqual({ flipped: 2, failed: 0, announced: 0 });
     expect(updates[0].update).toHaveBeenCalledWith({
       subscription_status: 'expired',
       inactive_since: '2026-08-01T00:00:00Z',
@@ -90,7 +90,7 @@ describe('runTrialExpirySweep', () => {
     supabaseAdmin.from.mockImplementation(() => (call++ === 0 ? sel : updates[call - 2]));
 
     const out = await runTrialExpirySweep();
-    expect(out).toEqual({ flipped: 1, failed: 1 });
+    expect(out).toEqual({ flipped: 1, failed: 1, announced: 0 });
   });
 
   it('a fetch failure returns cleanly instead of throwing into the cron', async () => {
@@ -103,5 +103,67 @@ describe('runTrialExpirySweep', () => {
     const out = await runTrialExpirySweep();
     expect(out.flipped).toBe(0);
     expect(out.error).toBe('db down');
+  });
+});
+
+describe('announceLapsedDeals (the proactive lapse template)', () => {
+  const { announceLapsedDeals } = require('./trial-expiry-sweep');
+  const whatsapp = require('../services/whatsapp');
+  jest.mock('../services/whatsapp', () => ({ sendTemplate: jest.fn() }));
+
+  afterEach(() => {
+    delete process.env.FREE_APP_MODE;
+    delete process.env.TWILIO_TEMPLATE_LAPSE_ANNOUNCEMENT;
+  });
+
+  test('no-ops without BOTH the flag and the approved template SID', async () => {
+    expect(await announceLapsedDeals()).toEqual({ announced: 0 });
+    process.env.FREE_APP_MODE = '1';
+    expect(await announceLapsedDeals()).toEqual({ announced: 0 });
+    delete process.env.FREE_APP_MODE;
+    process.env.TWILIO_TEMPLATE_LAPSE_ANNOUNCEMENT = 'HX' + 'a'.repeat(32);
+    expect(await announceLapsedDeals()).toEqual({ announced: 0 });
+    expect(supabaseAdmin.from).not.toHaveBeenCalled();
+  });
+
+  test('sends the template to linked members, stamps the household, skips the unlinked', async () => {
+    process.env.FREE_APP_MODE = '1';
+    process.env.TWILIO_TEMPLATE_LAPSE_ANNOUNCEMENT = 'HX' + 'a'.repeat(32);
+    whatsapp.sendTemplate.mockResolvedValue({});
+
+    // households select: .select().in().is().eq().limit()
+    const hhChain = { select: jest.fn(), in: jest.fn(), is: jest.fn(), eq: jest.fn(), limit: jest.fn() };
+    hhChain.select.mockReturnValue(hhChain);
+    hhChain.in.mockReturnValue(hhChain);
+    hhChain.is.mockReturnValue(hhChain);
+    hhChain.eq.mockReturnValue(hhChain);
+    hhChain.limit.mockResolvedValue({
+      data: [
+        { id: 'h-linked', subscription_status: 'expired' },
+        { id: 'h-unlinked', subscription_status: 'expired' },
+      ],
+      error: null,
+    });
+    // users select per household: .select().eq().eq()
+    const usersFor = (rows) => {
+      const c = { select: jest.fn(), eq: jest.fn() };
+      c.select.mockReturnValue(c);
+      c.eq.mockReturnValueOnce(c).mockResolvedValueOnce({ data: rows, error: null });
+      return c;
+    };
+    const stamp = updateChain({ error: null });
+    supabaseAdmin.from
+      .mockReturnValueOnce(hhChain)                                              // households list
+      .mockReturnValueOnce(usersFor([{ id: 'u1', whatsapp_phone: '+447', whatsapp_linked: true }])) // h-linked members
+      .mockReturnValueOnce(stamp)                                                // h-linked stamp
+      .mockReturnValueOnce(usersFor([]));                                        // h-unlinked members
+
+    const out = await announceLapsedDeals();
+    expect(out.announced).toBe(1);
+    expect(whatsapp.sendTemplate).toHaveBeenCalledWith('+447', process.env.TWILIO_TEMPLATE_LAPSE_ANNOUNCEMENT, {});
+    expect(stamp.update).toHaveBeenCalledWith(expect.objectContaining({ free_deal_announced_at: expect.any(String) }));
+    // The unlinked household is NOT stamped - its in-chat backstop must
+    // still fire (only 4 from() calls happened: no second stamp).
+    expect(supabaseAdmin.from).toHaveBeenCalledTimes(4);
   });
 });
