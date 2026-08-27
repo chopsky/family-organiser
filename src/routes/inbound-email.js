@@ -8,6 +8,7 @@ const { localToUTC } = require('../utils/local-time');
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation, sendInboundEmailNoResults } = require('../services/email');
 const push = require('../services/push');
+const assistantMeter = require('../services/assistant-meter');
 
 // Don't auto-reply to automated/no-reply senders even if they're somehow
 // on the allowlist - replying risks a mail loop and the bounce is noise.
@@ -165,6 +166,37 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       const log = await db.createInboundEmailLog(householdId, from, subject);
       logId = log.id;
       db.touchInboundSender(householdId, fromAddress).catch(() => {});
+
+      // ── Assistant meter (free-app mode) ──
+      // Approved-sender emails are AI uses (the Nori/Sense norm - approving
+      // the sender is the consent that covers the stream). At the limit the
+      // email is NOT extracted, and never silently: the log says why, the
+      // household gets at most one push a day, and the photo path stays
+      // open as the escape hatch. Fail-open like every meter site.
+      if (assistantMeter.enabled()) {
+        const meterHousehold = await db.getHouseholdById(householdId).catch(() => null);
+        if (assistantMeter.isMeteredHousehold(meterHousehold)) {
+          const meterState = await assistantMeter.meterStatus(meterHousehold);
+          if (meterState.metered && meterState.exhausted && !meterState.burstOpen) {
+            await db.updateInboundEmailLog(logId, {
+              status: 'failed',
+              error_message: `Out of free AI uses this month (they reset on ${meterState.resetLabel}). Upgrade to Premium to process emails, or send the letter as a photo to the assistant.`,
+            }).catch(() => {});
+            const lastNotice = meterHousehold.meter_limit_notice_at
+              ? new Date(meterHousehold.meter_limit_notice_at).getTime() : 0;
+            if (Date.now() - lastNotice > 24 * 60 * 60 * 1000) {
+              db.markMeterLimitNotice(householdId).catch(() => {});
+              push.sendToHousehold(householdId, null, {
+                title: 'Email not processed',
+                body: `You're out of free AI uses until ${meterState.resetLabel}, so an email from ${fromAddress} wasn't read. Upgrade for unlimited, or send letters as photos.`,
+                data: { type: 'meter_limited_email' },
+              }).catch(() => {});
+            }
+            return;
+          }
+          await assistantMeter.chargeIfNewBurst(meterHousehold, { channel: 'email' });
+        }
+      }
 
       await db.updateInboundEmailLog(logId, { status: 'processing' });
 

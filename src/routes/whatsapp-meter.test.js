@@ -48,13 +48,13 @@ test('a charged action mid-tank (2-6) carries no counter line', async () => {
 test('action 8 appends the countdown line', async () => {
   assistantMeter.chargeIfNewBurst.mockResolvedValue({ charged: true, used: 8, limit: 10, resetLabel: '1 September' });
   const out = await applyAssistantMeter(lapsed(), USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
-  expect(out).toMatch(/8 of 10 free actions/);
+  expect(out).toMatch(/8 of 10 free AI uses/);
 });
 
 test('action 10 appends the limit announcement and stamps the notice', async () => {
   assistantMeter.chargeIfNewBurst.mockResolvedValue({ charged: true, used: 10, limit: 10, resetLabel: '1 September' });
   const out = await applyAssistantMeter(lapsed(), USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
-  expect(out).toMatch(/last of your 10 free assistant actions/);
+  expect(out).toMatch(/last of your 10 free AI uses/);
   expect(out).toMatch(/1 September/);
   expect(db.markMeterLimitNotice).toHaveBeenCalledWith('h1');
 });
@@ -64,7 +64,7 @@ test('the first post-lapse reply carries the deal announcement, once, without a 
   const hh = lapsed({ free_deal_announced_at: null });
   const first = await applyAssistantMeter(hh, USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
   expect(first).toMatch(/your free trial has ended/i);
-  expect(first).toMatch(/10 free assistant actions a month/);
+  expect(first).toMatch(/10 free AI uses a month/);
   expect(first).not.toMatch(/1 of 10/); // the announcement already says "this was one"
   expect(db.markFreeDealAnnounced).toHaveBeenCalledWith('h1');
   // Second reply: already announced (the helper stamped the row in hand).

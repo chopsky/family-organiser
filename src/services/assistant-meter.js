@@ -1,5 +1,5 @@
 /**
- * The assistant meter - free households get 10 assistant actions a month
+ * The assistant meter - free households get 10 AI uses a month
  * (docs/spec-free-app-paid-assistant.md).
  *
  * Unit: a 10-minute BURST anchored at its first message. Messages inside
@@ -148,8 +148,8 @@ async function chargeIfNewBurst(household, { userId, channel, isChainReply = fal
 /** The one quiet line under a reply. Month's first action gets the
  *  full-tank restatement; 7+ gets the countdown; 2-6 silence. */
 function counterLine(used, resetLabel) {
-  if (used === 1) return `_(1 of ${FREE_MONTHLY_ACTIONS} free assistant actions this month - they reset on ${resetLabel})_`;
-  if (used >= COUNTDOWN_FROM && used < FREE_MONTHLY_ACTIONS) return `_(${used} of ${FREE_MONTHLY_ACTIONS} free actions used this month)_`;
+  if (used === 1) return `_(1 of ${FREE_MONTHLY_ACTIONS} free AI uses this month - they reset on ${resetLabel})_`;
+  if (used >= COUNTDOWN_FROM && used < FREE_MONTHLY_ACTIONS) return `_(${used} of ${FREE_MONTHLY_ACTIONS} free AI uses this month)_`;
   if (used === FREE_MONTHLY_ACTIONS) return null; // the limit announcement handles this one
   return null;
 }
@@ -159,7 +159,7 @@ function counterLine(used, resetLabel) {
 function limitAnnouncement(resetLabel, webUrl) {
   const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
   return [
-    `That was the last of your ${FREE_MONTHLY_ACTIONS} free assistant actions this month - they're back on ${resetLabel}.`,
+    `That was the last of your ${FREE_MONTHLY_ACTIONS} free AI uses this month - they're back on ${resetLabel}.`,
     '',
     `Everything else keeps working: add and manage it all in the app, free, any time. Or go unlimited with Premium: ${base}/subscribe`,
   ].join('\n');
@@ -169,7 +169,7 @@ function limitAnnouncement(resetLabel, webUrl) {
 function limitReplyFull(resetLabel, webUrl) {
   const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
   return [
-    `You've used all ${FREE_MONTHLY_ACTIONS} free assistant actions for this month - they're back on ${resetLabel}.`,
+    `That's all ${FREE_MONTHLY_ACTIONS} of your free AI uses for this month - they're back on ${resetLabel}.`,
     '',
     'The app itself is free forever - you can add events, lists, tasks and meals there any time.',
     `Want me unlimited? Premium is £5.99/month: ${base}/subscribe`,
@@ -179,7 +179,7 @@ function limitReplyFull(resetLabel, webUrl) {
 /** The short over-limit reply (per new burst after the daily full one). */
 function limitReplyShort(resetLabel, webUrl) {
   const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
-  return `Out of free assistant actions until ${resetLabel} - add it in the app, or go unlimited: ${base}/subscribe`;
+  return `Out of free AI uses until ${resetLabel} - add it in the app, or go unlimited: ${base}/subscribe`;
 }
 
 /** The deal restatement prepended to the FIRST bot reply after lapse -
@@ -187,7 +187,7 @@ function limitReplyShort(resetLabel, webUrl) {
 function dealAnnouncement() {
   return [
     'Quick heads-up: your free trial has ended, and Housemait is now free for your family - the app, calendar, lists, meals and tasks all keep working.',
-    `I can help with ${FREE_MONTHLY_ACTIONS} free assistant actions a month (this was one), resetting on the 1st. Premium makes me unlimited.`,
+    `I can help with ${FREE_MONTHLY_ACTIONS} free AI uses a month (this was one), resetting on the 1st. Premium makes me unlimited.`,
   ].join('\n');
 }
 
@@ -205,8 +205,8 @@ function quotaAnswer(status) {
     return 'No limits on your plan - ask me as much as you like. 👍';
   }
   const left = Math.max(0, status.limit - status.used);
-  if (left === 0) return `You've used all ${status.limit} free actions this month - they reset on ${status.resetLabel}. (Asking me this is always free.)`;
-  return `You've used ${status.used} of ${status.limit} free actions this month - ${left} left, resetting on ${status.resetLabel}. (Asking me this is always free.)`;
+  if (left === 0) return `That's all ${status.limit} of your free AI uses this month - they reset on ${status.resetLabel}. (Asking me this is always free.)`;
+  return `You've used ${status.used} of your ${status.limit} free AI uses this month - ${left} left, resetting on ${status.resetLabel}. (Asking me this is always free.)`;
 }
 
 module.exports = {

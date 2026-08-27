@@ -10,8 +10,8 @@ of this deploys server-side with NO App Store submission.
 
 ## The model in one sentence
 
-**Housemait is free for the whole family, including 10 assistant
-actions a month. Premium is unlimited assistant plus the automations
+**Housemait is free for the whole family, including 10 free AI uses
+a month. Premium is unlimited assistant plus the automations
 that feed it - calendar sync, document + attachment uploads, the daily
 briefs. £5.99 a month or £59.99 a year, one subscription per household,
 full premium free for the first 14 days.**
@@ -21,7 +21,7 @@ full premium free for the first 14 days.**
 | | Free tier | AI on free | Gates |
 |---|---|---|---|
 | Cozi | Generous + ads | n/a | Feature nags; 2024 squeeze angered users |
-| Sense | Manual calendar/lists only | 10 extractions/mo | TWO gates (features + meter) - confusing |
+| Sense | Manual calendar/lists only | 10 extractions/mo (chat itself UNMETERED - affordable only because their free features are crippled) | TWO gates (features + meter) - confusing |
 | Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation (founder-verified 2026-08-27: two consecutive shopping adds burned 2 uses) |
 | **Housemait** | **Full shared app, manual** | **10 actions/mo (burst unit)** | **Meter + cost-centre features only** |
 
@@ -52,16 +52,25 @@ review round).
 - Reading, downloading and exporting EVERYTHING, documents included.
   Data is never hostage - the promise is literal.
 - Push notifications for the above (event reminders stay).
-- **10 assistant actions a month, per household** (see the meter).
+- **10 AI uses a month, per household** (see the meter).
 
 ### Premium (unlimited assistant + the standing automations)
 The dividing principle: **requests are metered, automations are
 premium.** A request is anything the family asks for, in any modality -
-typed, voice note, photo, forwarded school letter. An automation is
-something that works for them without being asked.
-- Unlimited assistant requests (free gets 10 a month; voice and photo
-  requests count as actions like any other - no modality cliff).
-- House email inbox (AI extraction pipeline - a standing automation).
+typed, voice note, photo, or an email from a sender they approved
+(approving the sender is the consent that covers the stream - the
+Nori/Sense norm, founder-verified 2026-08-28). An automation is
+something that works for them without being asked (calendar sync,
+briefs).
+- Unlimited AI uses (free gets 10 a month; voice, photo and
+  approved-sender email requests count like any other - no modality
+  cliff). User-facing term everywhere: **"AI uses"** (founder's copy;
+  "assistant actions" retired 2026-08-28).
+- REJECTED: Sense-style unmetered free chat. Sense can give chat away
+  because its free tier is feature-crippled (manual-only); our model is
+  the inverse - every feature free, the assistant metered. Copying
+  their chat policy without their feature gates would give away both
+  halves and leave Premium selling nothing the engaged family feels.
 - Morning + evening briefs, weekly digest (premium-only, NOT metered -
   daily briefs would burn a 10-meter in a week).
 - Document + event-attachment UPLOADS (storage is the one cost that
@@ -96,6 +105,14 @@ something that works for them without being asked.
   event" is our miss, not their spend).
 - Replying to anything the BOT initiated never charges - an exchange
   that was the bot's idea is never the family's spend.
+- APPROVED-SENDER EMAILS count as AI uses (each arriving email = one,
+  bursts merging near-simultaneous forwards). At the limit an email is
+  NOT extracted and never silently: the inbox log says why, the
+  household gets at most one push a day, and the photo path stays open
+  as the escape hatch. The sender-approval flow must DISCLOSE the
+  metering ("emails from this sender use your free AI allowance") -
+  that disclosure is what makes third-party sending consented rather
+  than a sleeping drain.
 - Meta-questions about the meter charge nothing and always get an
   exact, deterministic answer ("how many do I have left?" -> "3 of 10
   left; resets 1 September"). Sense's bot fumbles its own quota
@@ -250,6 +267,9 @@ step before it - the meter is announced, never discovered.
 5. Calendar connect routes + feed-sync jobs - new connections premium;
    existing feeds of lapsed households pause (not delete).
 6. Brief jobs - skip lapsed households after one farewell send.
+6b. Inbound email - approved-sender emails charge the meter; at the
+   limit the email is logged unprocessed + one push a day; approval
+   flow discloses metering (client copy, rides next app build).
 7. Ping delivery - route reminders, overdue/school-prep nudges, and
    broadcasts to push for push-capable users (both tiers); bot copy
    names the channel + coaches install/settings when unreachable;

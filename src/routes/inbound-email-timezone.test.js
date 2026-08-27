@@ -9,6 +9,7 @@
 const request = require('supertest');
 const express = require('express');
 
+jest.mock('../db/client', () => ({ supabase: {}, supabaseAdmin: {} }));
 jest.mock('../db/queries', () => ({
   getHouseholdByEmailAlias: jest.fn(),
   getHouseholdByInboundToken: jest.fn(),

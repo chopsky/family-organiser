@@ -138,7 +138,7 @@ describe('copy', () => {
     expect(meter.isQuotaQuestion("what's my limit?")).toBe(true);
     expect(meter.isQuotaQuestion('add milk to the list')).toBe(false);
     expect(meter.quotaAnswer({ metered: true, used: 7, limit: 10, resetLabel: '1 September' }))
-      .toMatch(/7 of 10.*3 left.*1 September/);
+      .toMatch(/7 of your 10.*3 left.*1 September/);
     expect(meter.quotaAnswer({ metered: false })).toMatch(/No limits/);
   });
 });

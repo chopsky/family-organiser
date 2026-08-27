@@ -71,7 +71,7 @@ afterEach(() => { delete process.env.FREE_APP_MODE; });
 test('a quota question is answered exactly, free, without any model call', async () => {
   assistantMeter.meterStatus.mockResolvedValue({ metered: true, used: 7, limit: 10, resetLabel: '1 September' });
   const res = await request(app()).post('/api/chat').send({ message: 'How many actions do I have left?' });
-  expect(res.body.message).toMatch(/7 of 10.*3 left.*1 September/);
+  expect(res.body.message).toMatch(/7 of your 10.*3 left.*1 September/);
   expect(callWithFailover).not.toHaveBeenCalled();
   expect(assistantMeter.chargeIfNewBurst).not.toHaveBeenCalled();
 });
@@ -81,7 +81,7 @@ test('over the limit outside a burst: the gate answers BEFORE the model runs', a
     metered: true, used: 10, limit: 10, exhausted: true, burstOpen: false, resetLabel: '1 September',
   });
   const res = await request(app()).post('/api/chat').send({ message: 'add milk' });
-  expect(res.body.message).toMatch(/all 10 free assistant actions/);
+  expect(res.body.message).toMatch(/10 of your free AI uses/);
   expect(res.body.message).toMatch(/1 September/);
   expect(callWithFailover).not.toHaveBeenCalled();
 });
@@ -102,7 +102,7 @@ test('a successful turn is charged; the counter decorates the response but not s
   callWithFailover.mockResolvedValue({ text: 'Milk added.', provider: 'claude' });
   const res = await request(app()).post('/api/chat').send({ message: 'add milk' });
   expect(res.body.message).toMatch(/Milk added/);
-  expect(res.body.message).toMatch(/8 of 10 free actions/);
+  expect(res.body.message).toMatch(/8 of 10 free AI uses/);
   const assistantSave = db.saveChatMessage.mock.calls.find((c) => c[2] === 'assistant');
   expect(assistantSave[3]).not.toMatch(/8 of 10/); // history stays clean for model replay
 });
