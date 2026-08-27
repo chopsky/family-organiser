@@ -171,7 +171,10 @@ function limitReplyFull(resetLabel, webUrl) {
     `That's all ${FREE_MONTHLY_ACTIONS} of your free AI uses for this month - they're back on ${resetLabel}.`,
     '',
     'The app itself is free forever - you can add events, lists, tasks and meals there any time.',
-    `Want me unlimited? Premium is £5.99/month: ${base}/subscribe`,
+    // No hardcoded price: six live currencies (GBP/USD/EUR/AUD/CAD/ZAR) -
+    // the subscribe page resolves the household's own. Same rule as the
+    // trial-expired email.
+    `Want me unlimited? Upgrade to Premium: ${base}/subscribe`,
   ].join('\n');
 }
 
