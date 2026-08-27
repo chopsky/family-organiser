@@ -5,6 +5,7 @@ const db = require('../db/queries');
 const externalFeed = require('../services/externalFeed');
 const googleCal = require('../services/googleCalendar');
 const assistantMeter = require('../services/assistant-meter');
+const pingRouter = require('../services/ping-router');
 const staleDeviceNudge = require('../services/stale-device-nudge');
 const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
@@ -20,7 +21,6 @@ const { runSetupNudgeCheck } = require('./setup-nudges');
 const { runMonthlyLAImport } = require('./la-term-dates-import');
 const { runHolidayPauseCheck } = require('./holiday-pause');
 const publicHolidays = require('../services/publicHolidays');
-const whatsapp = require('../services/whatsapp');
 const { callWithFailover, LONG_TIMEOUT_MS } = require('../services/ai-client');
 const { isSchoolInSession, activityActiveOn, resolveTermSchoolForChild } = require('../utils/school-terms');
 
@@ -344,12 +344,19 @@ async function runEveningSchoolPrepCheck() {
 
       const message = lines.join('\n');
 
-      // Send to all WhatsApp-connected account members
-      const accountMembers = members.filter(m => m.member_type !== 'dependent' && m.whatsapp_phone);
+      // Pings on push (channel doctrine): every adult member, not just
+      // the WhatsApp-linked - the router pushes + records the centre.
+      const accountMembers = members.filter(m => m.member_type !== 'dependent');
       console.log(`[scheduler] Evening prep for ${household.name}: sending to ${accountMembers.length} member(s): ${accountMembers.map(m => m.name).join(', ')}`);
       for (const member of accountMembers) {
         try {
-          await whatsapp.sendTemplate(member.whatsapp_phone, message);
+          await pingRouter.deliverPing(member, {
+            title: 'School prep for tomorrow',
+            body: message,
+            category: 'calendar_reminders',
+            householdId: household.id,
+            data: { type: 'school_prep' },
+          });
         } catch (err) {
           console.error(`[scheduler] Evening school prep failed for ${member.name}:`, err.message);
         }
@@ -425,21 +432,26 @@ async function runTaskNotificationCheck() {
       // separate pass.
       const members = await db.getHouseholdMembers(task.household_id);
       const ids = Array.isArray(task.assigned_to_ids) ? task.assigned_to_ids : [];
+      // Pings on push (channel doctrine): no WhatsApp filter - the router
+      // pushes, records the in-app centre, and handles the one-time
+      // heads-up for the push-unreachable.
       const recipients = ids.length > 0
-        ? members.filter((m) => ids.includes(m.id) && m.whatsapp_linked && m.whatsapp_phone)
-        : members.filter((m) => m.whatsapp_linked && m.whatsapp_phone);
+        ? members.filter((m) => ids.includes(m.id) && m.member_type !== 'dependent')
+        : members.filter((m) => m.member_type !== 'dependent');
 
       const timeStr = task.due_time.substring(0, 5);
-      const message = `🔔 *Task Reminder*\n\n*${task.title}*\nDue: ${task.due_date} at ${timeStr}${task.description ? `\n${task.description}` : ''}`;
 
       for (const member of recipients) {
-        // Send via WhatsApp
-        if (member.whatsapp_linked && member.whatsapp_phone && whatsapp.isConfigured()) {
-          try {
-            await whatsapp.sendTemplate(member.whatsapp_phone, message);
-          } catch (err) {
-            console.error(`[scheduler] Failed to send task notification to ${member.name} via WhatsApp:`, err.message);
-          }
+        try {
+          await pingRouter.deliverPing(member, {
+            title: `Task due: ${task.title}`,
+            body: `Due ${task.due_date} at ${timeStr}${task.description ? ` - ${task.description}` : ''}`,
+            category: 'task_assigned',
+            householdId: task.household_id,
+            data: { type: 'task_reminder', taskId: task.id },
+          });
+        } catch (err) {
+          console.error(`[scheduler] Failed to send task notification to ${member.name}:`, err.message);
         }
       }
 

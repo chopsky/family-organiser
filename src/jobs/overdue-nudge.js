@@ -1,5 +1,5 @@
 const db = require('../db/queries');
-const whatsapp = require('../services/whatsapp');
+const { deliverPing } = require('../services/ping-router');
 
 /**
  * Build a gentle personal nudge for overdue tasks.
@@ -38,12 +38,9 @@ async function sendOverdueNudges(householdId) {
   const members = await db.getHouseholdMembers(householdId);
 
   for (const member of members) {
-    const hasWhatsApp = member.whatsapp_linked && member.whatsapp_phone;
-    if (!hasWhatsApp) {
-      console.log(`[overdue-nudge] Skipping ${member.name} - whatsapp_linked=${member.whatsapp_linked}, whatsapp_phone=${!!member.whatsapp_phone}`);
-      continue;
-    }
-    // Per-user opt-out (Settings → Notifications → WhatsApp).
+    if (member.member_type === 'dependent') continue;
+    // Legacy WhatsApp opt-out still honoured - someone who silenced the
+    // nudge on WhatsApp didn't ask for it back on push.
     const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
     if (prefs && prefs.whatsapp_overdue_nudge === false) continue;
 
@@ -52,30 +49,19 @@ async function sendOverdueNudges(householdId) {
 
     const message = buildOverdueNudgeMessage(member, overdueTasks);
 
-    // Send via WhatsApp
-    if (whatsapp.isConfigured()) {
-      try {
-        await whatsapp.sendTemplate(member.whatsapp_phone, message);
-        await db.logWhatsAppMessage({
-          householdId,
-          userId: member.id,
-          direction: 'outbound',
-          messageType: 'overdue_nudge',
-          body: message,
-        });
-      } catch (err) {
-        console.error(`Failed to send overdue nudge to ${member.name} via WhatsApp:`, err.message);
-        await db.logWhatsAppMessage({
-          householdId,
-          userId: member.id,
-          direction: 'outbound',
-          messageType: 'overdue_nudge',
-          body: message,
-          error: err.message,
-        });
-      }
-    } else {
-      console.log(`[overdue-nudge] Skipping ${member.name} - whatsapp service not configured`);
+    // Pings on push (channel doctrine): push + in-app centre for
+    // everyone; a push-unreachable WhatsApp member gets the one-time
+    // routing heads-up from the router instead of the nudge.
+    try {
+      await deliverPing(member, {
+        title: 'Overdue tasks',
+        body: message,
+        category: 'task_assigned',
+        householdId,
+        data: { type: 'overdue_nudge' },
+      });
+    } catch (err) {
+      console.error(`Failed to send overdue nudge to ${member.name}:`, err.message);
     }
   }
 }

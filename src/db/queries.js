@@ -7092,6 +7092,20 @@ async function markMeterLimitNotice(householdId, db = supabase) {
   if (error) throw error;
 }
 
+/** Atomically claim the one-ever ping-routing WhatsApp heads-up for a
+ *  user. Returns true only for the caller that WON the stamp (conditional
+ *  on ping_notice_at IS NULL), so concurrent jobs can't double-send.
+ *  Throws pre-migration - callers treat that as "skip, don't send". */
+async function markPingNoticeIfUnsent(userId, db = supabase) {
+  const { data, error } = await db.from('users')
+    .update({ ping_notice_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('ping_notice_at', null)
+    .select('id');
+  if (error) throw error;
+  return (data || []).length > 0;
+}
+
 async function markFarewellBriefSent(householdId, db = supabase) {
   const { error } = await db.from('households')
     .update({ farewell_brief_sent_at: new Date().toISOString() })
@@ -11299,6 +11313,7 @@ module.exports = {
   markFreeDealAnnounced,
   markMeterLimitNotice,
   markFarewellBriefSent,
+  markPingNoticeIfUnsent,
   getLapsedHouseholdIds,
   getMeterStats,
   computeOnboardingFunnel,

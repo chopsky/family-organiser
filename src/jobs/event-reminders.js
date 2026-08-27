@@ -7,7 +7,7 @@
  */
 
 const db = require('../db/queries');
-const whatsapp = require('../services/whatsapp');
+const { deliverPing } = require('../services/ping-router');
 
 /**
  * Format a date/time for display in a reminder message.
@@ -36,8 +36,8 @@ function formatEventTime(startTime, timezone) {
  * Called every minute by the scheduler.
  */
 async function processEventReminders() {
-  if (!whatsapp.isConfigured()) return;
-
+  // No WhatsApp-configured gate any more: pings ride push + the in-app
+  // notification centre, which work regardless of Twilio state.
   try {
     const pendingReminders = await db.getPendingReminders();
     if (pendingReminders.length === 0) return;
@@ -74,31 +74,33 @@ async function processEventReminders() {
 
         // Determine who to notify:
         // - If there are assignees, notify only them
-        // - Otherwise, notify all WhatsApp-connected household members
+        // - Otherwise, all non-dependent household members.
+        // Pings on push (channel doctrine): recipients are no longer
+        // filtered to the WhatsApp-linked - a reminder routes to push
+        // (and the in-app centre) for everyone, and the router sends a
+        // push-unreachable, WhatsApp-linked member their one-time
+        // routing heads-up instead.
         let recipients;
         if (assignees.length > 0) {
           const assigneeIds = new Set(assignees.map((a) => a.member_id));
-          recipients = members.filter(
-            (m) => assigneeIds.has(m.id) && m.whatsapp_linked && m.whatsapp_phone
-          );
+          recipients = members.filter((m) => assigneeIds.has(m.id) && m.member_type !== 'dependent');
         } else {
-          recipients = members.filter(
-            (m) => m.member_type !== 'dependent' && m.whatsapp_linked && m.whatsapp_phone
-          );
+          recipients = members.filter((m) => m.member_type !== 'dependent');
         }
 
         if (recipients.length === 0) continue;
 
         const formattedTime = formatEventTime(event.start_time, timezone);
-        const message = `🔔 *Reminder:* ${event.title}\nStarts in ${reminder.reminder_offset} (${formattedTime})`;
 
         for (const recipient of recipients) {
-          // Per-user opt-out (Settings → Notifications → WhatsApp).
-          // Overrides per-event reminder_offset if disabled.
-          const prefs = await db.getNotificationPreferences(recipient.id).catch(() => null);
-          if (prefs && prefs.whatsapp_event_reminders === false) continue;
           try {
-            await whatsapp.sendTemplate(recipient.whatsapp_phone, message);
+            await deliverPing(recipient, {
+              title: `Reminder: ${event.title}`,
+              body: `Starts in ${reminder.reminder_offset} (${formattedTime})`,
+              category: 'calendar_reminders',
+              householdId: reminder.household_id,
+              data: { type: 'event_reminder', eventId: reminder.event_id },
+            });
           } catch (err) {
             console.error(
               `[event-reminders] Failed to send to ${recipient.name}:`,
