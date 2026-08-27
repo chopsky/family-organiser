@@ -1334,7 +1334,9 @@ export default function Settings() {
       setNewFeedProvider(null);
       setShowAddFeed(false);
     } catch (err) {
-      setFeedError(err.response?.data?.error || "Couldn't reach that calendar. Check the link is the iCal/webcal address and try again.");
+      setFeedError(err.response?.data?.status === 'premium_required'
+        ? 'Connecting calendars is part of Premium. Calendars you connected before keep their events - upgrade any time to sync new ones.'
+        : (err.response?.data?.error || "Couldn't reach that calendar. Check the link is the iCal/webcal address and try again."));
     } finally {
       setAddingFeed(false);
     }

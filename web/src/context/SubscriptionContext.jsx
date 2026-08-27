@@ -114,7 +114,13 @@ export function SubscriptionProvider({ children }) {
   // subscribe page's own checkout call would cause a redirect loop back
   // to itself.
   useEffect(() => {
-    function onSubscriptionRequired() {
+    function onSubscriptionRequired(e) {
+      // FREE_APP_MODE premium doors answer 402 {status:'premium_required'}.
+      // Those must NEVER yank the app to the paywall - the free app is a
+      // working product, and the surface the user tapped explains the door
+      // in place (warm copy, not an error). Only the legacy whole-account
+      // statuses (flag-off world) still redirect.
+      if (e?.detail?.status === 'premium_required') return;
       // /subscribe dispatches by platform: web → Stripe Checkout flow,
       // iOS → IosSubscribe (Apple IAP). Both are App-Review-compliant
       // destinations; the old "never redirect iOS" guard from before

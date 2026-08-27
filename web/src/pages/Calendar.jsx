@@ -1033,7 +1033,9 @@ export default function Calendar() {
       });
       setEventAttachments(prev => [...prev, data.attachment]);
     } catch (err) {
-      alert(err.response?.data?.error || 'Could not attach that file.');
+      alert(err.response?.data?.status === 'premium_required'
+        ? 'Attaching files is part of Premium. Everything already attached stays viewable - upgrade any time in Settings.'
+        : (err.response?.data?.error || 'Could not attach that file.'));
     } finally {
       setUploadingAttachment(false);
       if (attachmentInputRef.current) attachmentInputRef.current.value = '';

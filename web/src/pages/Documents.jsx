@@ -304,6 +304,14 @@ export default function Documents() {
         });
       } catch (err) {
         const data = err.response?.data;
+        if (data?.status === 'premium_required') {
+          // One warm line, once - not a per-file error. Reads/downloads of
+          // everything already here stay free ("gate the door, not the vault").
+          setError('Uploading new documents is part of Premium. Everything already in your vault stays readable and downloadable - upgrade any time in Settings.');
+          setUploadProgress(null);
+          refresh();
+          return;
+        }
         failed.push(`${file.name} (${data?.detail || data?.error || 'failed'})`);
       }
       setUploadProgress({ done: i + 1, total: filesArr.length });

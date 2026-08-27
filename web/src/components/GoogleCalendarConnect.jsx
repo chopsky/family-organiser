@@ -134,8 +134,10 @@ export default function GoogleCalendarConnect({ onChange }) {
       setNotice(chosen.length ? `Importing ${chosen.length} calendar${chosen.length === 1 ? '' : 's'} from Google.` : 'No Google calendars selected.');
       setPicking(false);
       onChange?.();
-    } catch {
-      setError('Could not save your calendar selection. Please try again.');
+    } catch (err) {
+      setError(err?.response?.data?.status === 'premium_required'
+        ? 'Connecting calendars is part of Premium - upgrade any time in Settings.'
+        : 'Could not save your calendar selection. Please try again.');
     } finally {
       setBusy(false);
     }
