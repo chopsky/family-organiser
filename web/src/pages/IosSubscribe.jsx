@@ -38,31 +38,20 @@ import {
   getCurrentOffering,
   purchasePackage,
   restorePurchases,
-  presentCodeRedemptionSheet,
   getCustomerInfo,
   invalidateCustomerInfoCache,
   hasActivePremium,
 } from '../lib/revenuecat';
 import { useSubscription } from '../context/SubscriptionContext';
-import PeriodToggle from '../components/PeriodToggle';
 import { useAuth } from '../context/AuthContext';
 import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { appleOfferCodeRedeemUrl, APP_STORE_CONFIGURED } from '../lib/app-store';
-import ErrorBanner from '../components/ErrorBanner';
-
-const FEATURES = [
-  'Unlimited AI - ask by text, photo or voice note',
-  'School letters: snap or forward, dates land themselves',
-  'Morning & evening briefs, weekly digest',
-  'Google, Apple & Outlook calendars in one place',
-  'Document vault for paperwork & memories',
-  'Attach files to the events they belong to',
-];
+import PremiumPaywall from '../components/PremiumPaywall';
+import api from '../lib/api';
 
 export default function IosSubscribe() {
-  const [period, setPeriod] = useState('monthly');
   const navigate = useNavigate();
-  const { isExpired, isTrialing, isActive, daysRemaining, refresh } = useSubscription();
+  const { isActive, refresh } = useSubscription();
   const { user } = useAuth();
   // A campaign promo captured at signup (e.g. school-fair HILLELFEST). On iOS
   // the discount is an Apple Custom Offer Code with the SAME string; we surface
@@ -159,54 +148,18 @@ export default function IosSubscribe() {
     }
   }, [submitting, navigate, refresh]);
 
-  // ── Redeem an offer code ───────────────────────────────────────
-  // Opens Apple's native code-redemption sheet (e.g. a school-fair Apple Offer
-  // Code for 25% off annual). The offer attaches asynchronously, so after the
-  // sheet closes we poll the entitlement; if it becomes active we proceed,
-  // otherwise (sheet dismissed / no code) we quietly return to the paywall.
-  const handleRedeemCode = useCallback(async () => {
-    if (submitting) return;
-    setSubmitting('redeem');
-    setError('');
-    try {
-      await presentCodeRedemptionSheet();
-      setConfirming(true);
-      let active = false;
-      for (let i = 0; i < 8 && !active; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        try {
-          const info = await getCustomerInfo();
-          if (hasActivePremium(info)) active = true;
-        } catch { /* transient - retry */ }
-      }
-      if (active) {
-        await refresh();
-        navigate('/dashboard', { replace: true });
-        return;
-      }
-      setConfirming(false);
-      setSubmitting(null);
-    } catch (err) {
-      if (err?.userCancelled) { setSubmitting(null); setConfirming(false); return; }
-      console.error('[IosSubscribe] redeem failed:', err);
-      setError(err?.message || 'Could not open the redeem sheet. Please try again.');
-      setSubmitting(null);
-      setConfirming(false);
-    }
-  }, [submitting, navigate, refresh]);
-
   // ── Claim the pending campaign promo (one tap, code pre-filled) ────────
   // Opens Apple's redemption with the offer code already entered, via the
   // app's proven external-URL path (window.open '_system' - see lib/location.js).
   // The app backgrounds to the App Store; on return, the foreground hook below
   // re-checks the entitlement.
-  const handleClaimPromo = useCallback(() => {
-    if (submitting || !pendingPromo) return;
+  const claimWithOfferCode = useCallback((codeStr) => {
+    if (submitting || !codeStr) return;
     setError('');
     setClaimingPromo(true);
-    const url = appleOfferCodeRedeemUrl(pendingPromo);
+    const url = appleOfferCodeRedeemUrl(codeStr);
     try { window.open(url, '_system'); } catch { window.location.href = url; }
-  }, [submitting, pendingPromo]);
+  }, [submitting]);
 
   // When the user returns from redeeming in the App Store, the entitlement
   // changed in ANOTHER process - so invalidate RevenueCat's cache first
@@ -241,13 +194,30 @@ export default function IosSubscribe() {
     })();
   }, { throttleMs: 0 });
 
-  // ── Render ─────────────────────────────────────────────────────
-  const copy = buildCopy({ isExpired, isTrialing, isActive, daysRemaining });
+  // ── Household members for the "One plan covers all N of you" row ──
+  const [members, setMembers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/household')
+      .then(({ data }) => { if (!cancelled) setMembers(data.members ?? []); })
+      .catch(() => { /* the row simply hides */ });
+    return () => { cancelled = true; };
+  }, []);
 
-  // Pull packages by RevenueCat's standard identifiers (Phase 0 setup
-  // assigned Monthly/Annual package types, which get $rc_monthly /
-  // $rc_annual identifiers). Fall back to a search by period if the
-  // identifiers ever change.
+  // ── Promo validation (server-side, real coupon rules) ──────────
+  // Campaign codes exist as BOTH a Stripe promotion code (which this
+  // endpoint validates and prices) and an Apple Custom Offer Code with
+  // the same string (which actually discounts the StoreKit charge). A
+  // purchase with a code applied therefore routes through Apple's
+  // redemption with the code pre-filled - Apple must bill the discount,
+  // not us; showing a discount and then charging full price would be
+  // the worst kind of paywall lie.
+  const validatePromo = useCallback(async (codeStr) => {
+    const { data } = await api.get(`/subscription/promo/${encodeURIComponent(codeStr)}`);
+    return data; // { valid, code, percentOff, amountOff, currency } | { valid:false }
+  }, []);
+
+  // ── Packages ───────────────────────────────────────────────────
   const monthlyPkg = offering?.availablePackages?.find(
     (p) => p.identifier === '$rc_monthly' || p.packageType === 'MONTHLY'
   );
@@ -255,304 +225,67 @@ export default function IosSubscribe() {
     (p) => p.identifier === '$rc_annual' || p.packageType === 'ANNUAL'
   );
 
-  return (
-    <div
-      className="min-h-screen bg-cream pb-10 px-4"
-      // env(safe-area-inset-top) pushes content below the iOS status bar +
-      // Dynamic Island. Without this, the Back button sits flush against
-      // the time/battery icons and is barely tappable. Min 24px so the
-      // top has breathing room on web (where safe-area-inset-top is 0).
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
-    >
-      <div className="max-w-4xl mx-auto">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-warm-grey hover:text-charcoal transition-colors mb-6 flex items-center gap-1 -ml-2 px-2 py-2"
-          disabled={submitting !== null}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
+  const handlePaywallPurchase = useCallback((plan, appliedPromo) => {
+    if (appliedPromo?.code) { claimWithOfferCode(appliedPromo.code); return; }
+    const pkg = plan === 'annual' ? annualPkg : monthlyPkg;
+    if (pkg) handlePurchase(pkg);
+  }, [annualPkg, monthlyPkg, claimWithOfferCode, handlePurchase]);
 
-        <div className="text-center mb-10">
-          <h1
-            className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400 }}
-          >
-            {copy.headline}
-          </h1>
-          <p className="text-cocoa text-base max-w-xl mx-auto">
-            {copy.subhead}
-          </p>
-        </div>
-
-        <ErrorBanner message={error} onDismiss={() => setError('')} />
-
-        {confirming && (
-          <div className="text-center mb-6 text-sm text-warm-grey">
-            Confirming your subscription…
-          </div>
-        )}
-
-        {/* Pending campaign promo - one-tap claim that pre-fills the Apple
-            Offer Code in the App Store. 25% matches the configured offer; keep
-            this in step with the App Store Connect Custom Offer Code. */}
-        {pendingPromo && (
-          <div className="mb-6 rounded-2xl bg-plum-light border border-plum/20 px-5 py-4 text-center">
-            <p className="text-sm font-semibold text-plum">
-              🎁 Your {pendingPromo} discount — 25% off the annual plan
-            </p>
-            <p className="text-xs text-plum/80 mt-1">
-              One tap — your code is entered for you in the App Store.
-            </p>
-            <button
-              type="button"
-              onClick={handleClaimPromo}
-              disabled={submitting !== null || claimingPromo}
-              className="mt-3 w-full rounded-2xl bg-plum hover:bg-plum-pressed text-white font-semibold py-3 active:scale-[0.99] transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {claimingPromo ? 'Opening App Store…' : 'Claim 25% off →'}
-            </button>
-          </div>
-        )}
-
-        {loadingOffering ? (
-          <div className="text-center py-12 text-warm-grey">Loading plans…</div>
-        ) : (
-          <div>
-            {/* One card + a period toggle: both plans visible without
-                scrolling on a phone. Both remain purchasable; per-card
-                Apple disclosures render with whichever is shown. */}
-            <PeriodToggle period={period} onChange={setPeriod} />
-            <div className="mt-4">
-              {period === 'monthly' && monthlyPkg && (
-                <IapPricingCard
-                  pkg={monthlyPkg}
-                  planLabel="Monthly"
-                  tagline="Pay as you go, cancel anytime."
-                  highlighted={false}
-                  submitting={submitting === monthlyPkg.identifier}
-                  disabled={submitting !== null}
-                  onPurchase={() => handlePurchase(monthlyPkg)}
-                />
-              )}
-              {period === 'annual' && annualPkg && (
-                <IapPricingCard
-                  pkg={annualPkg}
-                  planLabel="Annual"
-                  tagline="Best value - two months free."
-                  badge="Best value"
-                  highlighted={true}
-                  submitting={submitting === annualPkg.identifier}
-                  disabled={submitting !== null}
-                  onPurchase={() => handlePurchase(annualPkg)}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Redeem an offer code - prominent so flyer/campaign users can claim
-            an Apple Offer Code (e.g. 25% off annual) without us tagging them. */}
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={handleRedeemCode}
-            disabled={submitting !== null}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl border-[1.5px] border-plum text-plum font-semibold py-3 active:scale-[0.99] transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {submitting === 'redeem' ? 'Opening…' : '🎁 Have a code? Redeem your discount'}
-          </button>
-        </div>
-
-        {/* Restore Purchases - required by App Review Guideline 3.1.1.
-            Always present, even before offerings load (a returning user
-            with a previous purchase needs this to recover access). */}
-        <div className="mt-5 text-center">
-          <button
-            type="button"
-            onClick={handleRestore}
-            disabled={submitting !== null}
-            className="text-sm text-plum hover:text-plum-pressed font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {submitting === 'restore' ? 'Restoring…' : 'Restore purchases'}
-          </button>
-        </div>
-
-        {/* Footer - short reassurance text. Per-card disclosure blocks
-            above carry the full Apple-required Terms + Privacy + auto-
-            renew language; this is just the consolidated "managed by
-            Apple" line for users who scrolled past the cards.        */}
-        <div className="mt-8 text-center text-xs text-warm-grey">
-          <p>
-            Payments are processed by Apple. Subscription is charged to your
-            Apple ID and managed under Settings → Apple ID → Subscriptions.
-          </p>
-          <p className="mt-2">
-            <Link to="/terms" className="underline hover:text-charcoal">Terms of use</Link>
-            {' · '}
-            <Link to="/privacy" className="underline hover:text-charcoal">Privacy policy</Link>
-          </p>
-
-          <p className="mt-2">
-            {/* An expired household can't mutate anything, and the app used to
-                bounce them here on load - so this was the only screen they could
-                reach. Deletion is never gated (and Apple requires it be
-                reachable in-app), so it needs a door from the paywall. */}
-            <Link to="/settings?section=delete" className="underline hover:text-charcoal">Delete my account</Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Copy helpers ────────────────────────────────────────────────
-
-function buildCopy({ isExpired, isTrialing, isActive, daysRemaining }) {
-  if (isExpired) {
-    return {
-      headline: 'Go unlimited with Premium',
-      subhead: 'The app is free for your family. Premium adds unlimited AI, briefs, calendar sync and the document vault.',
-    };
-  }
-  if (isTrialing && daysRemaining != null) {
-    return {
-      headline:
-        daysRemaining <= 5
-          ? `Your trial ends in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
-          : 'Subscribe to Housemait',
-      subhead:
-        daysRemaining <= 5
-          ? 'Keep Premium without a gap when your trial ends.'
-          : 'Switch to a paid plan any time before your trial ends, with no gap.',
-    };
-  }
+  // Already subscribed - nothing to sell; say so and offer the way out.
   if (isActive) {
-    return {
-      headline: "You're already subscribed",
-      subhead: 'You have full access. Manage your subscription in Settings.',
-    };
+    return (
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center px-6 text-center" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 28, color: '#1A1620' }}>
+          You&rsquo;re already subscribed
+        </h1>
+        <p className="text-sm text-warm-grey mt-2">You have full access. Manage your subscription in Settings.</p>
+        <button
+          type="button" onClick={() => navigate('/dashboard', { replace: true })}
+          className="mt-6 px-6 py-3 rounded-2xl bg-plum text-white font-semibold"
+        >
+          Back to Housemait
+        </button>
+      </div>
+    );
   }
-  return {
-    headline: 'Subscribe to Housemait',
-    subhead: 'One subscription covers your whole household.',
-  };
-}
-
-// ─── Pricing card ────────────────────────────────────────────────
-
-function IapPricingCard({ pkg, planLabel, tagline, badge, highlighted, submitting, disabled, onPurchase }) {
-  // Use Apple's localised price string - never hardcode. App Review
-  // checks for parity between displayed price and StoreConnect.
-  const priceString = pkg?.product?.priceString || '';
-  const isAnnual = pkg?.packageType === 'ANNUAL';
-  const periodDisplay = isAnnual ? 'per year' : 'per month';
-  // Subscription length disclosure (Apple Guideline 3.1.2(c) requires
-  // the period to be displayed explicitly, not just "/month").
-  const lengthDisclosure = isAnnual
-    ? '1 year subscription, auto-renewing'
-    : '1 month subscription, auto-renewing';
-  // Per-unit price for annual - Apple specifically calls out price-per-
-  // unit "if appropriate", and annual subscriptions where it differs from
-  // the headline price are the canonical case.
-  // Computes from the localized price (defensive: returns null if Apple's
-  // pricing object is unexpected so we never hardcode).
-  const perUnitDisplay = isAnnual ? computeAnnualPerMonth(pkg) : null;
-  // Subscription title - Apple wants the EXACT product title visible.
-  // Falls back to a sensible default if the SDK doesn't surface it.
-  const subscriptionTitle =
-    pkg?.product?.title?.replace(/\s*\(.*\)\s*$/, '').trim() ||
-    `Housemait Premium ${planLabel}`;
 
   return (
-    <div
-      className={
-        'relative rounded-2xl p-6 md:p-7 transition-shadow ' +
-        (highlighted
-          ? 'bg-white border-2 border-plum shadow-[0_8px_24px_rgba(107,63,160,0.10)]'
-          : 'bg-white border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)]')
-      }
-    >
-      {badge && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-semibold px-3 py-1 rounded-full">
-          {badge}
-        </div>
+    <PremiumPaywall
+      members={members}
+      monthly={{
+        available: !!monthlyPkg,
+        perMonth: monthlyPkg?.product?.priceString || null,
+        sub: 'Pay as you go',
+        ctaPrice: monthlyPkg?.product?.priceString || null,
+        amount: monthlyPkg?.product?.price,
+        currencyCode: monthlyPkg?.product?.currencyCode,
+      }}
+      annual={{
+        available: !!annualPkg,
+        perMonth: computeAnnualPerMonth(annualPkg),
+        sub: annualPkg?.product?.priceString ? `Billed ${annualPkg.product.priceString} once a year` : 'Billed once a year',
+        ctaPrice: annualPkg?.product?.priceString || null,
+        amount: annualPkg?.product?.price,
+        currencyCode: annualPkg?.product?.currencyCode,
+      }}
+      onPurchase={handlePaywallPurchase}
+      onRestore={handleRestore}
+      onClose={() => navigate(-1)}
+      validatePromo={validatePromo}
+      initialPromoCode={pendingPromo}
+      busy={claimingPromo ? 'purchase' : submitting}
+      confirming={confirming || loadingOffering}
+      error={error}
+      onDismissError={() => setError('')}
+      finePrint={(
+        <>
+          <span>Auto-renews until cancelled in Settings &rarr; Apple ID &rarr; Subscriptions</span>
+          <Link to="/terms" className="underline" style={{ textUnderlineOffset: 2 }}>Terms</Link>
+          <Link to="/privacy" className="underline" style={{ textUnderlineOffset: 2 }}>Privacy</Link>
+          <Link to="/settings?section=delete" className="underline" style={{ textUnderlineOffset: 2 }}>Delete my account</Link>
+        </>
       )}
-
-      <h2
-        className="text-[22px] text-charcoal mb-1"
-        style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
-      >
-        {subscriptionTitle}
-      </h2>
-      <p className="text-sm text-warm-grey mb-5">{tagline}</p>
-
-      <div className="mb-3">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="text-[36px] font-semibold text-charcoal leading-none"
-            style={{ fontFamily: 'var(--font-serif-display)' }}
-          >
-            {priceString || '-'}
-          </span>
-          <span className="text-sm text-warm-grey">{periodDisplay}</span>
-        </div>
-        {perUnitDisplay && (
-          <p className="text-xs text-warm-grey mt-1">
-            (works out to {perUnitDisplay} per month)
-          </p>
-        )}
-      </div>
-
-      {/* Subscription length disclosure - Apple Guideline 3.1.2(c). */}
-      <p className="text-xs text-warm-grey mb-5">
-        {lengthDisclosure}
-      </p>
-
-      <ul className="space-y-2 mb-6 text-sm text-charcoal">
-        {FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-2">
-            <svg className="text-sage shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        type="button"
-        onClick={onPurchase}
-        disabled={disabled || !priceString}
-        className={
-          'w-full py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ' +
-          (highlighted
-            ? 'bg-plum hover:bg-plum-pressed text-white'
-            : 'bg-white border-[1.5px] border-plum text-plum hover:bg-plum-light')
-        }
-      >
-        {submitting
-          ? 'Processing…'
-          : priceString
-            ? `Subscribe - ${priceString}`
-            : 'Unavailable'}
-      </button>
-
-      {/* Per-card disclosure block - Apple Guideline 3.1.2(c) requires
-          the auto-renew disclaimer + Terms + Privacy links to be near
-          the purchase button, not buried in a footer.                 */}
-      <p className="text-[11px] text-warm-grey mt-3 leading-snug">
-        Auto-renews each {isAnnual ? 'year' : 'month'} until cancelled. Cancel anytime in
-        Settings → Apple ID → Subscriptions at least 24 hours before the end of
-        the current period. By subscribing you agree to the{' '}
-        <Link to="/terms" className="underline">Terms of use</Link>
-        {' '}and{' '}
-        <Link to="/privacy" className="underline">Privacy policy</Link>.
-      </p>
-    </div>
+    />
   );
 }
 

@@ -32,8 +32,8 @@ import {
   iapKeyPresent,
 } from '../lib/revenuecat';
 import { useSubscription } from '../context/SubscriptionContext';
-import PeriodToggle from '../components/PeriodToggle';
-import ErrorBanner from '../components/ErrorBanner';
+import PremiumPaywall from '../components/PremiumPaywall';
+import api from '../lib/api';
 
 const FEATURES = [
   'Unlimited AI - ask by text, photo or voice note',
@@ -85,9 +85,8 @@ function NoPurchaseNotice() {
 // ─── Mode 1: Google Play Billing paywall ───────────────────────────
 
 function PlayBillingPaywall() {
-  const [period, setPeriod] = useState('monthly');
   const navigate = useNavigate();
-  const { isExpired, isTrialing, isActive, daysRemaining, refresh } = useSubscription();
+  const { isActive, refresh } = useSubscription();
 
   const [offering, setOffering] = useState(null);
   const [loadingOffering, setLoadingOffering] = useState(true);
@@ -166,8 +165,15 @@ function PlayBillingPaywall() {
     }
   }, [submitting, navigate, refresh]);
 
-  // ── Render ─────────────────────────────────────────────────────
-  const copy = buildCopy({ isExpired, isTrialing, isActive, daysRemaining });
+  // ── Household members for the coverage row ─────────────────────
+  const [members, setMembers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/household')
+      .then(({ data }) => { if (!cancelled) setMembers(data.members ?? []); })
+      .catch(() => { /* the row simply hides */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const monthlyPkg = offering?.availablePackages?.find(
     (p) => p.identifier === '$rc_monthly' || p.packageType === 'MONTHLY'
@@ -176,244 +182,63 @@ function PlayBillingPaywall() {
     (p) => p.identifier === '$rc_annual' || p.packageType === 'ANNUAL'
   );
 
-  return (
-    <div
-      className="min-h-screen bg-cream pb-10 px-4"
-      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 24px)' }}
-    >
-      <div className="max-w-4xl mx-auto">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-warm-grey hover:text-charcoal transition-colors mb-6 flex items-center gap-1 -ml-2 px-2 py-2"
-          disabled={submitting !== null}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
+  const handlePaywallPurchase = useCallback((plan) => {
+    const pkg = plan === 'annual' ? annualPkg : monthlyPkg;
+    if (pkg) handlePurchase(pkg);
+  }, [annualPkg, monthlyPkg, handlePurchase]);
 
-        <div className="text-center mb-10">
-          <h1
-            className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400 }}
-          >
-            {copy.headline}
-          </h1>
-          <p className="text-cocoa text-base max-w-xl mx-auto">
-            {copy.subhead}
-          </p>
-        </div>
-
-        <ErrorBanner message={error} onDismiss={() => setError('')} />
-
-        {confirming && (
-          <div className="text-center mb-6 text-sm text-warm-grey">
-            Confirming your subscription…
-          </div>
-        )}
-
-        {loadingOffering ? (
-          <div className="text-center py-12 text-warm-grey">Loading plans…</div>
-        ) : (
-          <div>
-            <PeriodToggle period={period} onChange={setPeriod} />
-            <div className="mt-4">
-              {period === 'monthly' && monthlyPkg && (
-                <PlayPricingCard
-                  pkg={monthlyPkg}
-                  planLabel="Monthly"
-                  tagline="Pay as you go, cancel anytime."
-                  highlighted={false}
-                  submitting={submitting === monthlyPkg.identifier}
-                  disabled={submitting !== null}
-                  onPurchase={() => handlePurchase(monthlyPkg)}
-                />
-              )}
-              {period === 'annual' && annualPkg && (
-                <PlayPricingCard
-                  pkg={annualPkg}
-                  planLabel="Annual"
-                  tagline="Best value - two months free."
-                  badge="Best value"
-                  highlighted={true}
-                  submitting={submitting === annualPkg.identifier}
-                  disabled={submitting !== null}
-                  onPurchase={() => handlePurchase(annualPkg)}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Restore - a returning user with a previous Play purchase on a
-            fresh install recovers access here without paying twice. */}
-        <div className="mt-5 text-center">
-          <button
-            type="button"
-            onClick={handleRestore}
-            disabled={submitting !== null}
-            className="text-sm text-plum hover:text-plum-pressed font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {submitting === 'restore' ? 'Restoring…' : 'Restore purchases'}
-          </button>
-        </div>
-
-        <div className="mt-8 text-center text-xs text-warm-grey">
-          <p>
-            Payments are processed by Google Play. Your subscription is charged to your
-            Google account and managed in the Play Store under Payments &amp; subscriptions.
-          </p>
-          <p className="mt-2">
-            <Link to="/terms" className="underline hover:text-charcoal">Terms of use</Link>
-            {' · '}
-            <Link to="/privacy" className="underline hover:text-charcoal">Privacy policy</Link>
-          </p>
-
-          <p className="mt-2">
-            {/* An expired household can't mutate anything, and the app used to
-                bounce them here on load - so this was the only screen they could
-                reach. Deletion is never gated (and Apple requires it be
-                reachable in-app), so it needs a door from the paywall. */}
-            <Link to="/settings?section=delete" className="underline hover:text-charcoal">Delete my account</Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Copy helpers (mirrors IosSubscribe) ────────────────────────────
-
-function buildCopy({ isExpired, isTrialing, isActive, daysRemaining }) {
-  if (isExpired) {
-    return {
-      headline: 'Go unlimited with Premium',
-      subhead: 'The app is free for your family. Premium adds unlimited AI, briefs, calendar sync and the document vault.',
-    };
-  }
-  if (isTrialing && daysRemaining != null) {
-    return {
-      headline:
-        daysRemaining <= 5
-          ? `Your trial ends in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
-          : 'Subscribe to Housemait',
-      subhead:
-        daysRemaining <= 5
-          ? 'Keep Premium without a gap when your trial ends.'
-          : 'Switch to a paid plan any time before your trial ends, with no gap.',
-    };
-  }
   if (isActive) {
-    return {
-      headline: "You're already subscribed",
-      subhead: 'You have full access. Manage your subscription in Settings.',
-    };
+    return (
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center px-6 text-center" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <h1 style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 28, color: '#1A1620' }}>
+          You&rsquo;re already subscribed
+        </h1>
+        <p className="text-sm text-warm-grey mt-2">You have full access. Manage your subscription in the Play Store.</p>
+        <button
+          type="button" onClick={() => navigate('/dashboard', { replace: true })}
+          className="mt-6 px-6 py-3 rounded-2xl bg-plum text-white font-semibold"
+        >
+          Back to Housemait
+        </button>
+      </div>
+    );
   }
-  return {
-    headline: 'Subscribe to Housemait',
-    subhead: 'One subscription covers your whole household.',
-  };
-}
-
-// ─── Pricing card ────────────────────────────────────────────────
-
-function PlayPricingCard({ pkg, planLabel, tagline, badge, highlighted, submitting, disabled, onPurchase }) {
-  // Google's localised price string - never hardcode; Play pricing is
-  // per-storefront and the displayed price must match the console.
-  const priceString = pkg?.product?.priceString || '';
-  const isAnnual = pkg?.packageType === 'ANNUAL';
-  const periodDisplay = isAnnual ? 'per year' : 'per month';
-  const lengthDisclosure = isAnnual
-    ? '1 year subscription, auto-renewing'
-    : '1 month subscription, auto-renewing';
-  const perUnitDisplay = isAnnual ? computeAnnualPerMonth(pkg) : null;
-  const subscriptionTitle =
-    pkg?.product?.title?.replace(/\s*\(.*\)\s*$/, '').trim() ||
-    `Housemait Premium ${planLabel}`;
 
   return (
-    <div
-      className={
-        'relative rounded-2xl p-6 md:p-7 transition-shadow ' +
-        (highlighted
-          ? 'bg-white border-2 border-plum shadow-[0_8px_24px_rgba(107,63,160,0.10)]'
-          : 'bg-white border border-light-grey shadow-[0_2px_8px_rgba(107,63,160,0.06)]')
-      }
-    >
-      {badge && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-coral text-white text-xs font-semibold px-3 py-1 rounded-full">
-          {badge}
-        </div>
+    <PremiumPaywall
+      members={members}
+      monthly={{
+        available: !!monthlyPkg,
+        perMonth: monthlyPkg?.product?.priceString || null,
+        sub: 'Pay as you go',
+        ctaPrice: monthlyPkg?.product?.priceString || null,
+        amount: monthlyPkg?.product?.price,
+        currencyCode: monthlyPkg?.product?.currencyCode,
+      }}
+      annual={{
+        available: !!annualPkg,
+        perMonth: computeAnnualPerMonth(annualPkg),
+        sub: annualPkg?.product?.priceString ? `Billed ${annualPkg.product.priceString} once a year` : 'Billed once a year',
+        ctaPrice: annualPkg?.product?.priceString || null,
+        amount: annualPkg?.product?.price,
+        currencyCode: annualPkg?.product?.currencyCode,
+      }}
+      onPurchase={handlePaywallPurchase}
+      onRestore={handleRestore}
+      onClose={() => navigate(-1)}
+      busy={submitting}
+      confirming={confirming || loadingOffering}
+      error={error}
+      onDismissError={() => setError('')}
+      finePrint={(
+        <>
+          <span>Auto-renews until cancelled in Play Store &rarr; Payments &amp; subscriptions</span>
+          <Link to="/terms" className="underline" style={{ textUnderlineOffset: 2 }}>Terms</Link>
+          <Link to="/privacy" className="underline" style={{ textUnderlineOffset: 2 }}>Privacy</Link>
+          <Link to="/settings?section=delete" className="underline" style={{ textUnderlineOffset: 2 }}>Delete my account</Link>
+        </>
       )}
-
-      <h2
-        className="text-[22px] text-charcoal mb-1"
-        style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
-      >
-        {subscriptionTitle}
-      </h2>
-      <p className="text-sm text-warm-grey mb-5">{tagline}</p>
-
-      <div className="mb-3">
-        <div className="flex items-baseline gap-2">
-          <span
-            className="text-[36px] font-semibold text-charcoal leading-none"
-            style={{ fontFamily: 'var(--font-serif-display)' }}
-          >
-            {priceString || '-'}
-          </span>
-          <span className="text-sm text-warm-grey">{periodDisplay}</span>
-        </div>
-        {perUnitDisplay && (
-          <p className="text-xs text-warm-grey mt-1">
-            (works out to {perUnitDisplay} per month)
-          </p>
-        )}
-      </div>
-
-      <p className="text-xs text-warm-grey mb-5">
-        {lengthDisclosure}
-      </p>
-
-      <ul className="space-y-2 mb-6 text-sm text-charcoal">
-        {FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-2">
-            <svg className="text-sage shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        type="button"
-        onClick={onPurchase}
-        disabled={disabled || !priceString}
-        className={
-          'w-full py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ' +
-          (highlighted
-            ? 'bg-plum hover:bg-plum-pressed text-white'
-            : 'bg-white border-[1.5px] border-plum text-plum hover:bg-plum-light')
-        }
-      >
-        {submitting
-          ? 'Processing…'
-          : priceString
-            ? `Subscribe - ${priceString}`
-            : 'Unavailable'}
-      </button>
-
-      <p className="text-[11px] text-warm-grey mt-3 leading-snug">
-        Auto-renews each {isAnnual ? 'year' : 'month'} until cancelled. Cancel anytime in
-        the Play Store under Payments &amp; subscriptions at least 24 hours before the
-        end of the current period. By subscribing you agree to the{' '}
-        <Link to="/terms" className="underline">Terms of use</Link>
-        {' '}and{' '}
-        <Link to="/privacy" className="underline">Privacy policy</Link>.
-      </p>
-    </div>
+    />
   );
 }
 

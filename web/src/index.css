@@ -61,6 +61,15 @@
   --color-plum-dark: #5A3488;
   --color-plum-light: #F3EDFC;
   --color-plum-mid: #8B6DB5;
+  /* Paywall gradient partner - the lighter end of the plum ramp
+     (design's #8E5FFF interpolated into the brand hue). */
+  --color-plum-bright: #8E5FD6;
+  /* Paywall benefit-chip accents (design handoff premium_paywall).
+     Soft tints pair with existing accent inks where those exist. */
+  --color-amber-light: #FBF1DE;
+  --color-sky-light: #E2ECFA;
+  --color-rose: #D8788A;
+  --color-rose-light: #FBE6EA;
   --color-coral: #E8724A;
   --color-coral-light: #FDF0EB;
   --color-sage: #7DAE82;
