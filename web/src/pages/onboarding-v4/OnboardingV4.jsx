@@ -30,7 +30,7 @@ import InboxStep, { InboxFooter } from './inboxScreen';
 import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import PaywallScreen from './paywallScreen';
-import { setCalUrl } from '../../lib/onboardingDraft';
+import { setCalUrl, clearDraft } from '../../lib/onboardingDraft';
 import { trackOnboardingStep } from '../../lib/onboardingTelemetry';
 import useSocialAuth from '../../hooks/useSocialAuth';
 import useV4Auth from './useV4Auth';
@@ -64,9 +64,24 @@ export default function OnboardingV4({ initialPhase }) {
   // the providers and hands their payload straight to it. The same hook backs
   // the existing signup page, so the two can't drift.
   const v4 = useV4Auth(d);
+  const appAuth = useAuth();
   const [authError, setAuthError] = useState('');
+  // The provider buttons appear on the sign-up screen AND the login screen,
+  // and only the sign-up one may run the draft-replay completion: a login
+  // must land in the account as it exists, never dressed in (or mutated by)
+  // an abandoned draft from an earlier run on this device.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const socialAuth = useSocialAuth({
-    onSuccess: async (data) => { if (await v4.completeSignup(data)) f.finish(); },
+    onSuccess: async (data) => {
+      if (phaseRef.current === 'login') {
+        appAuth.login(data);
+        clearDraft();
+        navigate('/dashboard');
+        return;
+      }
+      if (await v4.completeSignup(data)) f.finish();
+    },
     onError: setAuthError,
   });
 
@@ -90,8 +105,7 @@ export default function OnboardingV4({ initialPhase }) {
   // Gated on a household NAME in the draft: that is the marker of a real v4
   // run reaching step 07. Without it there is nothing to create and nothing to
   // replay, so the flow should simply carry on rather than declare itself done.
-  const auth = useAuth();
-  const needsResume = Boolean(auth.token) && !auth.user?.onboarded_at && Boolean((d.house || '').trim());
+  const needsResume = Boolean(appAuth.token) && !appAuth.user?.onboarded_at && Boolean((d.house || '').trim());
   const resumedRef = useRef(false);
   const [resuming, setResuming] = useState(needsResume);
   useEffect(() => {
@@ -172,8 +186,9 @@ export default function OnboardingV4({ initialPhase }) {
         auth={socialAuth}
         v4={v4}
         // An existing account has a household already: straight to the app,
-        // never through the welcome screen, which is for new households.
-        onLoggedIn={() => navigate('/dashboard')}
+        // never through the welcome screen, which is for new households. Any
+        // abandoned draft from an earlier run on this device dies here too.
+        onLoggedIn={() => { clearDraft(); navigate('/dashboard'); }}
       />
     );
   }
@@ -199,11 +214,11 @@ export default function OnboardingV4({ initialPhase }) {
   if (phase === 'paywall') {
     return (
       <PaywallScreen
-        householdId={auth.household?.id}
+        householdId={appAuth.household?.id}
         onDone={() => goPhase('done')}
         // An exit exists here too, not just from the launch gate: nobody
         // should have to force-quit the app to get off this screen.
-        onSignOut={auth.logout}
+        onSignOut={appAuth.logout}
       />
     );
   }
