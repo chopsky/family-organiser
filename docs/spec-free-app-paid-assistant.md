@@ -21,7 +21,7 @@ full premium free for the first 14 days.**
 | | Free tier | AI on free | Gates |
 |---|---|---|---|
 | Cozi | Generous + ads | n/a | Feature nags; 2024 squeeze angered users |
-| Sense | Manual calendar/lists only | 10 extractions/mo (chat itself UNMETERED - affordable only because their free features are crippled) | TWO gates (features + meter) - confusing |
+| Sense | Manual calendar/lists only | 10 extractions/mo (chat itself UNMETERED - they meter extractions because extraction is what Sense sells) | TWO gates (features + meter) - confusing |
 | Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation (founder-verified 2026-08-27: two consecutive shopping adds burned 2 uses) |
 | **Housemait** | **Full shared app, manual** | **10 actions/mo (burst unit)** | **Meter + cost-centre features only** |
 
@@ -66,11 +66,15 @@ briefs).
   approved-sender email requests count like any other - no modality
   cliff). User-facing term everywhere: **"AI uses"** (founder's copy;
   "assistant actions" retired 2026-08-28).
-- REJECTED: Sense-style unmetered free chat. Sense can give chat away
-  because its free tier is feature-crippled (manual-only); our model is
-  the inverse - every feature free, the assistant metered. Copying
-  their chat policy without their feature gates would give away both
-  halves and leave Premium selling nothing the engaged family feels.
+- REJECTED: Sense-style unmetered free chat. The principle: each
+  product meters its CONVERSION ENGINE. Sense is an extraction tool -
+  extraction is what they sell, so that is what they meter, and chat is
+  a giveaway side feature. Housemait is assistant-led: the bot IS the
+  felt daily value (the heaviest households are heavy BOT households),
+  so unmetering chat would leave Premium selling uploads and sync -
+  minority features - to families whose actual dependency we gave away.
+  (Note our free tier is BROADER-featured than Sense's, not narrower:
+  they gate meals/tasks/etc entirely; we gate nothing manual.)
 - Morning + evening briefs, weekly digest (premium-only, NOT metered -
   daily briefs would burn a 10-meter in a week).
 - Document + event-attachment UPLOADS (storage is the one cost that
