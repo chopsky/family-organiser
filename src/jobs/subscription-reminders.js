@@ -3,9 +3,10 @@
  *
  * Runs once a day at 09:00 (household timezone - gated by scheduler.js).
  * Picks every household_subscriptions row whose `next_renewal_at` is
- * in the next 3 days, sends a WhatsApp nudge to every linked member,
- * marks the row as reminded for that date, and after the renewal day
- * passes, advances `next_renewal_at` by one cadence period.
+ * in the next 3 days, pings every adult member (push + notification
+ * centre via the ping router - channel doctrine: pings never ride
+ * WhatsApp), marks the row as reminded for that date, and after the
+ * renewal day passes, advances `next_renewal_at` by one cadence period.
  *
  * Idempotency: a row's `reminded_for_date` column stores the
  * `next_renewal_at` we last reminded for. If the same row comes up
@@ -16,7 +17,7 @@
  */
 
 const db = require('../db/queries');
-const whatsapp = require('../services/whatsapp');
+const { deliverPing } = require('../services/ping-router');
 const { formatMoney } = require('../utils/currency');
 const { advanceRenewal } = require('../utils/subscription-renewal');
 
@@ -33,11 +34,7 @@ function buildReminderMessage(sub) {
   const renewLabel = new Date(sub.next_renewal_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const price = sub.amount != null ? formatMoney(sub.amount, sub.currency) : '';
   const priceClause = price ? ` (${price})` : '';
-  return [
-    `💳 *${sub.name}*${priceClause} renews on *${renewLabel}*.`,
-    '',
-    `If you want to skip this one, cancel before then. Reply _"I cancelled ${sub.name}"_ and I'll stop tracking it.`,
-  ].join('\n');
+  return `${sub.name}${priceClause} renews on ${renewLabel}. Cancel before then if you want to skip it.`;
 }
 
 /**
@@ -59,8 +56,10 @@ async function runSubscriptionRemindersForHousehold(householdId) {
   const householdSubs = dueSubs.filter((s) => s.household_id === householdId);
   if (householdSubs.length === 0) return { sent: 0, advanced: 0 };
 
+  // Channel doctrine: renewal nudges are one-way pings, so they ride
+  // push + the notification centre for every adult - not WhatsApp.
   const members = await db.getHouseholdMembers(householdId);
-  const linked = members.filter((m) => m.whatsapp_linked && m.whatsapp_phone);
+  const adults = members.filter((m) => m.member_type !== 'dependent');
 
   let sent = 0;
   let advanced = 0;
@@ -79,18 +78,18 @@ async function runSubscriptionRemindersForHousehold(householdId) {
     if (sub.reminded_for_date === sub.next_renewal_at) continue;
 
     const body = buildReminderMessage(sub);
-    for (const member of linked) {
-      // Per-user opt-out (Settings → Notifications → WhatsApp).
+    for (const member of adults) {
+      // Honour the existing per-user opt-out (set back when this rode
+      // WhatsApp) - "stop nudging me about renewals" survives the
+      // channel move.
       const prefs = await db.getNotificationPreferences(member.id).catch(() => null);
       if (prefs && prefs.whatsapp_subscription_reminder === false) continue;
       try {
-        await whatsapp.sendMessage(member.whatsapp_phone, body);
-        await db.logWhatsAppMessage({
-          householdId,
-          userId: member.id,
-          direction: 'outbound',
-          messageType: 'subscription_reminder',
+        await deliverPing(member, {
+          title: '💳 Subscription renewing',
           body,
+          householdId,
+          data: { type: 'subscription_reminder', subscriptionId: sub.id },
         });
       } catch (err) {
         console.error(`[subscription-reminders] failed to send to ${member.name}:`, err.message);
