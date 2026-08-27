@@ -379,7 +379,7 @@ export default function PremiumPaywall({
         </button>
         <div
           className="flex items-center justify-center flex-wrap text-center font-medium"
-          style={{ columnGap: 14, fontSize: 11.5, color: '#8A8493', padding: '10px 0 calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+          style={{ columnGap: 14, rowGap: 2, fontSize: 11.5, color: '#8A8493', padding: '8px 0 max(env(safe-area-inset-bottom, 0px), 14px)' }}
         >
           {finePrint || (
             <>
