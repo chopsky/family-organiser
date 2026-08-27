@@ -92,10 +92,8 @@ const METER_FREE_INTENTS = /^(trivial$|brief_opt|brief_offer|brief_toggle|meter_
 /**
  * Charge the meter for a completed turn and decorate the outgoing reply
  * (deal announcement on the first post-lapse reply, counter lines, the
- * action-10 limit announcement). Failure sends the reply undecorated -
- * the meter must never cost a family their answer. Note the burst design
- * self-heals failed actions: a miss plus its immediate retry rides one
- * charge, so the eventual outcome costs one action.
+ * final-use limit announcement). Failure sends the reply undecorated -
+ * the meter must never cost a family their answer.
  */
 async function applyAssistantMeter(householdRow, user, ctx, responseText, channel) {
   try {
@@ -103,7 +101,7 @@ async function applyAssistantMeter(householdRow, user, ctx, responseText, channe
     const intent = ctx?.intent || '';
     if (METER_FREE_INTENTS.test(intent)) return responseText;
     const isChainReply = METER_CHAIN_INTENTS.test(intent);
-    const result = await assistantMeter.chargeIfNewBurst(householdRow, {
+    const result = await assistantMeter.chargeUse(householdRow, {
       userId: user.id, channel, isChainReply,
     });
     let out = responseText;
@@ -409,23 +407,24 @@ router.post('/webhook', async (req, res) => {
         return;
       }
       // Over-limit gate, checked BEFORE the model pipeline so exhausted
-      // traffic costs no tokens. Three carve-outs let a message through:
-      // an open burst (they're mid-action), an open bot question (the
-      // chain exception - blocking an answer to our own question would
-      // be charging for our curiosity), or a meter that failed open.
+      // traffic costs no tokens. One carve-out lets a message through: an
+      // open bot question (the chain exception - blocking an answer to
+      // our own question would be charging for our curiosity). A failed-
+      // open meter also passes.
       if (assistantMeter.isMeteredHousehold(householdRow)) {
         const status = await assistantMeter.meterStatus(householdRow);
-        if (status.metered && status.exhausted && !status.burstOpen
-          && !handlers.hasOpenQuestion(user.id)) {
+        // The one carve-out: an open bot question (the chain exception) -
+        // an exhausted family must still be able to answer us.
+        if (status.metered && status.exhausted && !handlers.hasOpenQuestion(user.id)) {
           const lastNotice = householdRow.meter_limit_notice_at
             ? new Date(householdRow.meter_limit_notice_at).getTime() : 0;
           const sinceNotice = Date.now() - lastNotice;
           let reply = null;
           if (sinceNotice > 24 * 60 * 60 * 1000) {
             reply = assistantMeter.limitReplyFull(status.resetLabel, process.env.WEB_URL);
-          } else if (sinceNotice > assistantMeter.BURST_WINDOW_MS) {
+          } else if (sinceNotice > 10 * 60 * 1000) {
             reply = assistantMeter.limitReplyShort(status.resetLabel, process.env.WEB_URL);
-          } // else: they were told inside this very window - no lecture-spam.
+          } // else: told within the last ten minutes - no lecture-spam.
           if (reply) {
             await whatsapp.sendMessage(phone, reply);
             db.markMeterLimitNotice(user.household_id).catch(() => {});

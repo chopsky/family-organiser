@@ -602,7 +602,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       try {
         await push.sendToHousehold(householdId, null, {
           title: 'My last daily brief',
-          body: 'Your trial has ended - the app stays free for your family, and daily briefs are part of Premium. I\'m still here for 10 free AI uses a month.',
+          body: `Your trial has ended - the app stays free for your family, and daily briefs are part of Premium. I'm still here for ${assistantMeter.FREE_MONTHLY_ACTIONS} free AI uses a month.`,
           data: { type: 'farewell_brief' },
         });
       } catch (err) {

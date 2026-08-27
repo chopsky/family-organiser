@@ -23,7 +23,7 @@ jest.mock('../services/weather', () => ({
 jest.mock('../services/transcribe', () => ({ transcribeVoice: jest.fn() }));
 jest.mock('../services/assistant-meter', () => {
   const real = jest.requireActual('../services/assistant-meter');
-  return { ...real, meterStatus: jest.fn(), chargeIfNewBurst: jest.fn() };
+  return { ...real, meterStatus: jest.fn(), chargeUse: jest.fn() };
 });
 
 const express = require('express');
@@ -69,42 +69,32 @@ beforeEach(() => {
 afterEach(() => { delete process.env.FREE_APP_MODE; });
 
 test('a quota question is answered exactly, free, without any model call', async () => {
-  assistantMeter.meterStatus.mockResolvedValue({ metered: true, used: 7, limit: 10, resetLabel: '1 September' });
+  assistantMeter.meterStatus.mockResolvedValue({ metered: true, used: 12, limit: 15, resetLabel: '1 September' });
   const res = await request(app()).post('/api/chat').send({ message: 'How many actions do I have left?' });
-  expect(res.body.message).toMatch(/7 of your 10.*3 left.*1 September/);
+  expect(res.body.message).toMatch(/12 of your 15.*3 left.*1 September/);
   expect(callWithFailover).not.toHaveBeenCalled();
-  expect(assistantMeter.chargeIfNewBurst).not.toHaveBeenCalled();
+  expect(assistantMeter.chargeUse).not.toHaveBeenCalled();
 });
 
-test('over the limit outside a burst: the gate answers BEFORE the model runs', async () => {
+test('over the limit: the gate answers BEFORE the model runs', async () => {
   assistantMeter.meterStatus.mockResolvedValue({
-    metered: true, used: 10, limit: 10, exhausted: true, burstOpen: false, resetLabel: '1 September',
+    metered: true, used: 15, limit: 15, exhausted: true, resetLabel: '1 September',
   });
   const res = await request(app()).post('/api/chat').send({ message: 'add milk' });
-  expect(res.body.message).toMatch(/10 of your free AI uses/);
+  expect(res.body.message).toMatch(/15 of your free AI uses/);
   expect(res.body.message).toMatch(/1 September/);
   expect(callWithFailover).not.toHaveBeenCalled();
 });
 
-test('over the limit but INSIDE an open burst still answers - they are mid-action', async () => {
-  assistantMeter.meterStatus.mockResolvedValue({
-    metered: true, used: 10, limit: 10, exhausted: true, burstOpen: true, resetLabel: '1 September',
-  });
-  assistantMeter.chargeIfNewBurst.mockResolvedValue({ charged: false, used: 10, limit: 10, resetLabel: '1 September' });
-  callWithFailover.mockResolvedValue({ text: 'And eggs, done.', provider: 'claude' });
-  const res = await request(app()).post('/api/chat').send({ message: 'and eggs' });
-  expect(res.body.message).toMatch(/eggs, done/);
-});
-
 test('a successful turn is charged; the counter decorates the response but not saved history', async () => {
-  assistantMeter.meterStatus.mockResolvedValue({ metered: true, used: 7, limit: 10, exhausted: false, burstOpen: false, resetLabel: '1 September' });
-  assistantMeter.chargeIfNewBurst.mockResolvedValue({ charged: true, used: 8, limit: 10, resetLabel: '1 September' });
+  assistantMeter.meterStatus.mockResolvedValue({ metered: true, used: 12, limit: 15, exhausted: false, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 13, limit: 15, resetLabel: '1 September' });
   callWithFailover.mockResolvedValue({ text: 'Milk added.', provider: 'claude' });
   const res = await request(app()).post('/api/chat').send({ message: 'add milk' });
   expect(res.body.message).toMatch(/Milk added/);
-  expect(res.body.message).toMatch(/8 of 10 free AI uses/);
+  expect(res.body.message).toMatch(/13 of 15 free AI uses/);
   const assistantSave = db.saveChatMessage.mock.calls.find((c) => c[2] === 'assistant');
-  expect(assistantSave[3]).not.toMatch(/8 of 10/); // history stays clean for model replay
+  expect(assistantSave[3]).not.toMatch(/13 of 15/); // history stays clean for model replay
 });
 
 test('an unmetered (trialing) household chats without meter involvement', async () => {
@@ -112,5 +102,5 @@ test('an unmetered (trialing) household chats without meter involvement', async 
   callWithFailover.mockResolvedValue({ text: 'Hello!', provider: 'claude' });
   const res = await request(app()).post('/api/chat').send({ message: 'hi there what can you do' });
   expect(res.body.message).toBe('Hello!');
-  expect(assistantMeter.chargeIfNewBurst).not.toHaveBeenCalled();
+  expect(assistantMeter.chargeUse).not.toHaveBeenCalled();
 });

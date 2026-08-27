@@ -596,12 +596,12 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
       return res.json({ message: answer, conversation_id: conversationId });
     }
     // Over-limit gate BEFORE the model call, so exhausted traffic costs no
-    // tokens. An open burst passes (they're mid-action). In-app we always
-    // answer - the user is looking at the thread - full version daily,
-    // short after that (stamp shared with the WhatsApp throttle).
+    // tokens. In-app we always answer - the user is looking at the thread
+    // - full version daily, short after that (stamp shared with the
+    // WhatsApp throttle).
     if (assistantMeter.isMeteredHousehold(household)) {
       const status = await assistantMeter.meterStatus(household);
-      if (status.metered && status.exhausted && !status.burstOpen) {
+      if (status.metered && status.exhausted) {
         const lastNotice = household.meter_limit_notice_at
           ? new Date(household.meter_limit_notice_at).getTime() : 0;
         const reply = Date.now() - lastNotice > 24 * 60 * 60 * 1000
@@ -1266,11 +1266,11 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
     // Meter charge + decoration on the RESPONSE only - the counter lines
     // never enter saved history (they'd confuse the model on replay and
     // duplicate on every turn). App chat has no deterministic chain
-    // intents; the burst window covers multi-turn clarifications.
+    // intents - every user message is one use.
     let outboundMessage = cleanContent;
     if (assistantMeter.isMeteredHousehold(household)) {
       try {
-        const charge = await assistantMeter.chargeIfNewBurst(household, {
+        const charge = await assistantMeter.chargeUse(household, {
           userId: req.user.id, channel: 'chat',
         });
         if (!household.free_deal_announced_at) {
@@ -1337,12 +1337,12 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
       const meterHousehold = await db.getHouseholdById(req.householdId).catch(() => null);
       if (assistantMeter.isMeteredHousehold(meterHousehold)) {
         const status = await assistantMeter.meterStatus(meterHousehold);
-        if (status.metered && status.exhausted && !status.burstOpen) {
+        if (status.metered && status.exhausted) {
           const reply = assistantMeter.limitReplyFull(status.resetLabel, process.env.WEB_URL);
           db.markMeterLimitNotice(req.householdId).catch(() => {});
           return res.json({ message: reply, conversation_id: conversationId });
         }
-        await assistantMeter.chargeIfNewBurst(meterHousehold, { userId: req.user.id, channel: 'chat-image' });
+        await assistantMeter.chargeUse(meterHousehold, { userId: req.user.id, channel: 'chat-image' });
       }
     }
 

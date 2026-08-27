@@ -280,17 +280,17 @@ export default function AdminAnalytics() {
         <div className="mt-8">
           <h2 className="font-display text-lg font-medium text-charcoal mb-1">Assistant meter (this month)</h2>
           <p className="text-sm text-warm-grey mb-3">
-            Free-tier usage of the 10 monthly actions. <strong>Exhausted</strong> households hit
-            the limit - the direct upgrade-pressure gauge; if it stays at zero, the meter is
-            too loose (shrink the burst window before lowering the 10).
+            Free-tier usage of the 15 monthly AI uses. <strong>Exhausted</strong> households hit
+            the limit - the direct upgrade-pressure gauge; the number itself is the only
+            tuning knob (one constant in assistant-meter.js).
           </p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
               ['Lapsed households', meterStats.lapsedHouseholds],
               ['Used the bot', meterStats.activeThisMonth],
               ['Actions charged', meterStats.actionsThisMonth],
-              ['Near limit (7-9)', meterStats.nearLimit],
-              ['Exhausted (10)', meterStats.exhausted],
+              ['Near limit (12-14)', meterStats.nearLimit],
+              ['Exhausted (15)', meterStats.exhausted],
             ].map(([label, val]) => (
               <div key={label} className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-5 text-center">
                 <div className="text-2xl font-bold text-plum">{val}</div>

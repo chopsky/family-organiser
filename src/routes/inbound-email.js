@@ -168,16 +168,17 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       db.touchInboundSender(householdId, fromAddress).catch(() => {});
 
       // ── Assistant meter (free-app mode) ──
-      // Approved-sender emails are AI uses (the Nori/Sense norm - approving
-      // the sender is the consent that covers the stream). At the limit the
-      // email is NOT extracted, and never silently: the log says why, the
-      // household gets at most one push a day, and the photo path stays
-      // open as the escape hatch. Fail-open like every meter site.
+      // Approved-sender emails are AI uses, one each (the Nori/Sense norm
+      // - approving the sender is the consent that covers the stream). At
+      // the limit the email is NOT extracted, and never silently: the log
+      // says why, the household gets at most one push a day, and the
+      // photo path stays open as the escape hatch. Fail-open like every
+      // meter site.
       if (assistantMeter.enabled()) {
         const meterHousehold = await db.getHouseholdById(householdId).catch(() => null);
         if (assistantMeter.isMeteredHousehold(meterHousehold)) {
           const meterState = await assistantMeter.meterStatus(meterHousehold);
-          if (meterState.metered && meterState.exhausted && !meterState.burstOpen) {
+          if (meterState.metered && meterState.exhausted) {
             await db.updateInboundEmailLog(logId, {
               status: 'failed',
               error_message: `Out of free AI uses this month (they reset on ${meterState.resetLabel}). Upgrade to Premium to process emails, or send the letter as a photo to the assistant.`,
@@ -194,7 +195,7 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             }
             return;
           }
-          await assistantMeter.chargeIfNewBurst(meterHousehold, { channel: 'email' });
+          await assistantMeter.chargeUse(meterHousehold, { channel: 'email' });
         }
       }
 

@@ -1,15 +1,17 @@
 /**
- * The assistant meter - free households get 10 AI uses a month
+ * The assistant meter - free households get 15 AI uses a month
  * (docs/spec-free-app-paid-assistant.md).
  *
- * Unit: a 10-minute BURST anchored at its first message. Messages inside
- * the block ride the same action; the clock does not restart per message,
- * so a long consultation charges roughly one action per 10 minutes.
- * Chain exception: answering the bot's open question never starts a new
- * action - callers pass isChainReply for those turns.
+ * Unit: one USE per user-initiated request - every message, photo,
+ * document or email counts one. The single exception is the CHAIN rule:
+ * answering the bot's open question never charges (callers pass
+ * isChainReply) - charging someone for answering our own question is
+ * the toxic case every simpler rule exists to avoid. Bursts were tried
+ * and removed (founder call 2026-08-28): real families land in the same
+ * place under either design, and flat counting explains itself.
  *
  * Reset: calendar month in the HOUSEHOLD's timezone, so "your free
- * actions are back on 1 September" is always true as written.
+ * uses are back on 1 September" is always true as written.
  *
  * Fail-open doctrine throughout: a broken meter must never block the bot
  * or crash a reply. Every DB error here degrades to "allowed, uncharged"
@@ -18,12 +20,11 @@
 
 const { supabase } = require('../db/client');
 
-const FREE_MONTHLY_ACTIONS = 10;
-const BURST_WINDOW_MS = 10 * 60 * 1000;
-// Counter lines are silent from action 2-6: shown on the month's first
-// action (the full-tank line doubles as the deal restatement) and from 7
-// (the countdown). See "Quota visibility" in the spec.
-const COUNTDOWN_FROM = 7;
+const FREE_MONTHLY_ACTIONS = 15;
+// Counter lines are silent mid-tank: shown on the month's first use (the
+// full-tank line doubles as the deal restatement) and from 12 (the
+// countdown - the last few). See "Quota visibility" in the spec.
+const COUNTDOWN_FROM = 12;
 
 /** Read at call time (not module load) so tests and Railway flag flips
  *  behave without a restart-ordering trap. */
@@ -83,9 +84,9 @@ function resetDateLabel(timezone, now = new Date()) {
 }
 
 /**
- * The household's meter state this month: rows used, whether a burst is
- * currently open, and whether they're out. Fail-open: on any error the
- * household reads as unmetered for this turn.
+ * The household's meter state this month: uses so far and whether they
+ * are out. Fail-open: on any error the household reads as unmetered for
+ * this turn.
  */
 async function meterStatus(household, { now = new Date(), db = supabase } = {}) {
   const base = {
@@ -93,7 +94,6 @@ async function meterStatus(household, { now = new Date(), db = supabase } = {}) 
     used: 0,
     limit: FREE_MONTHLY_ACTIONS,
     exhausted: false,
-    burstOpen: false,
     resetLabel: resetDateLabel(household?.timezone, now),
   };
   if (!base.metered) return base;
@@ -110,8 +110,6 @@ async function meterStatus(household, { now = new Date(), db = supabase } = {}) 
     const rows = data || [];
     base.used = rows.length;
     base.exhausted = rows.length >= FREE_MONTHLY_ACTIONS;
-    base.burstOpen = rows.length > 0
-      && now.getTime() - new Date(rows[0].started_at).getTime() < BURST_WINDOW_MS;
     return base;
   } catch (err) {
     console.warn('[assistant-meter] status failed (migration pending?), failing open:', err.message);
@@ -120,14 +118,14 @@ async function meterStatus(household, { now = new Date(), db = supabase } = {}) 
 }
 
 /**
- * Charge the meter if this turn starts a NEW burst. No-ops (and reports
- * charged:false) inside an open burst, on chain replies, and on any
- * failure. Returns the post-charge used count for counter lines.
+ * Charge one use for this turn. No-ops (and reports charged:false) on
+ * chain replies and on any failure. Returns the post-charge used count
+ * for counter lines.
  */
-async function chargeIfNewBurst(household, { userId, channel, isChainReply = false, now = new Date(), db = supabase } = {}) {
+async function chargeUse(household, { userId, channel, isChainReply = false, now = new Date(), db = supabase } = {}) {
   const status = await meterStatus(household, { now, db });
   if (!status.metered) return { charged: false, ...status };
-  if (isChainReply || status.burstOpen) return { charged: false, ...status };
+  if (isChainReply) return { charged: false, ...status };
   try {
     const { error } = await db.from('assistant_actions').insert({
       household_id: household.id,
@@ -145,8 +143,9 @@ async function chargeIfNewBurst(household, { userId, channel, isChainReply = fal
 
 // ─── Copy builders (pure - keep every user-facing meter word here) ──────────
 
-/** The one quiet line under a reply. Month's first action gets the
- *  full-tank restatement; 7+ gets the countdown; 2-6 silence. */
+/** The one quiet line under a reply. The month's first use gets the
+ *  full-tank restatement; the countdown runs over the last few; silence
+ *  in between. */
 function counterLine(used, resetLabel) {
   if (used === 1) return `_(1 of ${FREE_MONTHLY_ACTIONS} free AI uses this month - they reset on ${resetLabel})_`;
   if (used >= COUNTDOWN_FROM && used < FREE_MONTHLY_ACTIONS) return `_(${used} of ${FREE_MONTHLY_ACTIONS} free AI uses this month)_`;
@@ -154,8 +153,8 @@ function counterLine(used, resetLabel) {
   return null;
 }
 
-/** Appended to the reply that consumes action 10 - the request itself
- *  still completed. */
+/** Appended to the reply that consumes the final use - the request
+ *  itself still completed. */
 function limitAnnouncement(resetLabel, webUrl) {
   const base = (webUrl || 'https://housemait.com').replace(/\/+$/, '');
   return [
@@ -213,7 +212,7 @@ module.exports = {
   enabled,
   isMeteredHousehold,
   meterStatus,
-  chargeIfNewBurst,
+  chargeUse,
   monthStartUtc,
   resetDateLabel,
   counterLine,
@@ -224,5 +223,4 @@ module.exports = {
   isQuotaQuestion,
   quotaAnswer,
   FREE_MONTHLY_ACTIONS,
-  BURST_WINDOW_MS,
 };
