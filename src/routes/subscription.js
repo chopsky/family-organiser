@@ -99,7 +99,9 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       // onboarding presented a paywall - the client re-shows that wall on
       // launch until they've actually subscribed, so closing the app on
       // the payment screen no longer walks straight past it.
-      paywall_required: household.paywall_required === true,
+      // Households stamped by the wall-era builds (32-38) are freed under
+      // the free-app model - PaywallGate must never re-wall anyone.
+      paywall_required: household.paywall_required === true && !assistantMeter.enabled(),
       subscription_plan: household.subscription_plan || null,
       // Lowercase ISO-4217 code the household is billed in (gbp, usd,
       // eur, aud, cad, zar). NULL for trialing/never-subscribed

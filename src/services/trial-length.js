@@ -66,12 +66,13 @@ function trialDaysForRequest(req) {
  * promised a card-free trial and must never be walled retrospectively,
  * so anything unrecognised answers false.
  */
-function paywallRequiredForRequest(req) {
-  const platform = String(req?.get?.('x-client-platform') || '').toLowerCase();
-  if (platform !== 'ios') return false;
-  const version = parseVersion(req?.get?.('x-app-version'));
-  if (!version) return false; // unknown build - never wall on a guess
-  return gte(version, NEW_COPY_MIN_VERSION);
+function paywallRequiredForRequest(_req) {
+  // MOTHBALLED (free-app model, docs/spec-free-app-paid-assistant.md):
+  // the hard onboarding wall was pulled from App Review on 2026-08-27 and
+  // the decision is standing - no onboarding wall on any platform. The
+  // version-gated logic below is kept in history, not in code: new
+  // signups are never stamped, whatever build they arrive on.
+  return false;
 }
 
 /** ISO timestamp for when a trial starting now should end. */

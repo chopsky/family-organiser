@@ -54,29 +54,15 @@ describe('trialDaysForRequest', () => {
   });
 });
 
-describe('paywallRequiredForRequest (who may be walled on launch)', () => {
+describe('paywallRequiredForRequest (MOTHBALLED - free-app model)', () => {
   const { paywallRequiredForRequest } = require('./trial-length');
 
-  test('iOS builds that show a paywall in their own onboarding', () => {
-    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': '1.13.0 (34)' }))).toBe(true);
-    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': '2.0.0' }))).toBe(true);
-  });
-
-  test('older iOS builds promised a card-free trial and are never walled', () => {
-    for (const v of ['1.11.0 (29)', '1.12.0 (30)']) {
-      expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': v }))).toBe(false);
-    }
-  });
-
-  test('web and Android are never walled', () => {
+  test('nobody is walled, on any platform or build - the standing decision', () => {
+    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': '1.13.0 (34)' }))).toBe(false);
+    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': '2.0.0' }))).toBe(false);
     expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'web' }))).toBe(false);
     expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'android', 'x-app-version': '1.13.0' }))).toBe(false);
     expect(paywallRequiredForRequest(null)).toBe(false);
-  });
-
-  test('an unreadable version is never walled - never lock someone out on a guess', () => {
-    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios' }))).toBe(false);
-    expect(paywallRequiredForRequest(reqWith({ 'x-client-platform': 'ios', 'x-app-version': 'beta' }))).toBe(false);
   });
 });
 

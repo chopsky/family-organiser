@@ -114,27 +114,16 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
     timer.current = setTimeout(() => { timer.current = null; next(); }, AUTO_ADVANCE_MS);
   }, [update, next, clearTimer]);
 
-  /** Called once the account exists and queued connections have been replayed.
-   *  Lands on the subscription wall first (iOS); the wall sends everyone
-   *  on to 'done' itself, including when it has nothing to sell. */
+  /** Called once the account exists and queued connections have been
+   *  replayed. Straight to 'done' for everyone: the onboarding wall is
+   *  MOTHBALLED under the free-app model (no wall on any platform -
+   *  docs/spec-free-app-paid-assistant.md). PaywallScreen stays in the
+   *  codebase unreferenced-by-flow, not deleted. */
   const finish = useCallback(() => {
     clearTimer();
-    // A joiner never sees the wall: billing is owner-only, and the
-    // household they just joined already carries its own trial or
-    // subscription. Offering them their OWN Apple trial on top would be
-    // double-billing bait. Their draft has nothing the wall needs, so it
-    // can be cleared here.
-    if (d?.joining) {
-      clearDraft();
-      setNav({ phase: 'done', i: 0 });
-      return;
-    }
-    // NOT clearDraft() here: the paywall reads the picked pains and what
-    // they connected to build its case, and must still do so after a
-    // force-quit and reopen. PaywallScreen clears it once they're
-    // through, whether by paying or by the wall failing open.
-    setNav({ phase: 'paywall', i: 0 });
-  }, [clearTimer, d]);
+    clearDraft();
+    setNav({ phase: 'done', i: 0 });
+  }, [clearTimer]);
 
   // Every consumer sees the effective index, never a skipped one.
   const shownI = nav.phase === 'flow' ? effectiveI(nav.i) : nav.i;

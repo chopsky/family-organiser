@@ -2332,6 +2332,13 @@ export default function Settings() {
                 </form>
               )}
               {senderError && <p className="text-xs text-coral mt-1">{senderError}</p>}
+              {/* Metering disclosure (spec: the approval IS the consent that
+                  lets a sender's stream draw from the allowance). Shown to
+                  everyone - trial households lapse eventually, and the deal
+                  should never be discovered. */}
+              <p className="text-xs text-warm-grey mt-2">
+                On the Free plan, each email from an allowed sender counts as one of your monthly AI uses. Premium is unlimited.
+              </p>
             </div>
 
             {/* Apple private relay: their ACCOUNT address can never be the
