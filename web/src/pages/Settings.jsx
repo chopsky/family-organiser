@@ -276,18 +276,17 @@ function ProfileCard({ me, members }) {
   }).format(new Date(d));
 
   const badge = (label, cls) => (
-    <span className={`inline-flex items-center gap-1.5 px-[11px] py-1 rounded-full text-[12.5px] font-bold ${cls}`}>{label}</span>
+    <span className={`inline-flex items-center gap-1.5 px-[11px] py-1 rounded-full text-[12.5px] font-bold whitespace-nowrap ${cls}`}>{label}</span>
   );
   const planBadge = isInternal ? badge('Internal', 'bg-plum-light text-plum')
     : isActive ? badge(<><span className="text-[13px]">✦</span> Premium</>, 'bg-plum-light text-plum')
     : isTrialing ? badge('Free trial', 'bg-plum-light text-plum')
-    : isFreeTier ? badge('Free plan', 'bg-sage-light text-sage')
+    : isFreeTier ? badge('Free', 'bg-sage-light text-sage')
     : isExpired ? badge('Ended', 'bg-coral-light text-coral')
     : null;
   const planMeta = isInternal ? null
     : isActive ? priceLabel
     : isTrialing && daysRemaining != null ? `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left`
-    : isFreeTier && meter ? `${Math.max(0, meter.limit - meter.used)} of ${meter.limit} AI uses left` 
     : null;
 
   const isAndroidPlatform = isAndroid();
@@ -298,9 +297,7 @@ function ProfileCard({ me, members }) {
   const billingSub = isInternal ? 'No billing applies to this household'
     : isTrialing ? (trialEndsAt ? `Trial ends ${fmtDate(trialEndsAt)}` : 'Subscribe any time to avoid interruption')
     : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : provider === 'google' ? 'Billed through Google Play' : 'Billed by card via Stripe')
-    : isFreeTier ? (meter?.reset_label
-      ? `The app is free for your family - AI uses reset on ${meter.reset_label}. Premium adds unlimited AI, briefs, calendar sync and uploads`
-      : 'The app is free for your family. Premium adds unlimited AI, briefs, calendar sync and uploads')
+    : isFreeTier ? 'The app is free for your family'
     : isExpired ? (androidCanPurchase ? "Your data's still here - subscribe to unlock everything" : "Your data's still here and safe")
     : '';
   const billingControl = isInternal ? null
@@ -352,6 +349,30 @@ function ProfileCard({ me, members }) {
               </div>
             }
           />
+          {isFreeTier && meter && (
+            <SetRow
+              title="AI uses"
+              sub={`${Math.max(0, meter.limit - meter.used)} of ${meter.limit} left${meter.reset_label ? ` · resets ${meter.reset_label}` : ''}`}
+              control={
+                <div
+                  className="flex items-center gap-[3px]"
+                  role="img"
+                  aria-label={`${Math.max(0, meter.limit - meter.used)} of ${meter.limit} AI uses remaining`}
+                >
+                  {Array.from({ length: meter.limit }, (_, i) => (
+                    <span
+                      key={i}
+                      className="rounded-full"
+                      style={{
+                        width: 7, height: 5, background: 'var(--color-plum)',
+                        opacity: i < Math.max(0, meter.limit - meter.used) ? 1 : 0.2,
+                      }}
+                    />
+                  ))}
+                </div>
+              }
+            />
+          )}
           <SetRow title="Billing" sub={billingSub} control={billingControl} last />
         </div>
       )}
