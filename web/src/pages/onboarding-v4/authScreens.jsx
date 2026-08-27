@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
+import { INBOUND_EMAIL_DOMAIN } from '../../lib/inboundEmail';
 import { completedRecap } from '../../lib/onboardingDraft';
 import { Lockup, Cta, Ghost, TOP_GAP } from './ui';
 
@@ -520,6 +521,20 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             ✓ {outcome.kids.length === 1
               ? `${outcome.kids[0]}'s profile is ready`
               : `Profiles ready for ${outcome.kids.slice(0, -1).join(', ')} and ${outcome.kids[outcome.kids.length - 1]}`}
+          </p>
+        )}
+        {/* The inbox claim, confirmed or honestly lost - replayInbox's
+            contract promises the welcome screen reports it, and a silent
+            claim is how a mis-captured alias goes unnoticed until Settings
+            (real founder report, 2026-08-27). */}
+        {outcome?.inbox?.claimed && (
+          <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
+            ✓ {outcome.inbox.claimed}@{INBOUND_EMAIL_DOMAIN} is your house address
+          </p>
+        )}
+        {outcome?.inbox?.conflict && (
+          <p style={{ fontSize: 13, lineHeight: 1.45, color: T.ink2, marginBottom: 10 }}>
+            That email address got taken while you signed up - pick another in Settings.
           </p>
         )}
         {outcome?.whatsapp?.deepLink && (

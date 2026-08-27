@@ -35,6 +35,13 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
   const [avail, setAvail] = useState(null);     // null | true | false
   const [error, setError] = useState('');
   const seq = useRef(0);
+  // The post-claim auto-advance. Held in a ref so an EDIT during the
+  // 1-second "it's yours" pause cancels it - otherwise the step advanced
+  // carrying the OLD claimed slug while the input showed the new text
+  // (real founder report, 2026-08-27: claimed the prefilled default,
+  // retyped, and the retype was silently lost).
+  const advanceTimer = useRef(null);
+  useEffect(() => () => clearTimeout(advanceTimer.current), []);
 
   const valid = value.trim().length >= 3;
 
@@ -72,7 +79,7 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
     if (free === false) { setClaim('idle'); return; }
     update({ inbox: value });
     setClaim('done');
-    setTimeout(onNext, 1000);
+    advanceTimer.current = setTimeout(onNext, 1000);
   }
 
   // Publish state up so the pinned footer (rendered by the Step frame in
@@ -102,7 +109,7 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
       >
         <input
           value={value}
-          onChange={(e) => { setValue(slugify(e.target.value)); setClaim('idle'); setAvail(null); setError(''); }}
+          onChange={(e) => { clearTimeout(advanceTimer.current); setValue(slugify(e.target.value)); setClaim('idle'); setAvail(null); setError(''); }}
           onKeyDown={(e) => { if (e.key === 'Enter') go(); }}
           placeholder="yourhouse"
           autoCapitalize="none"
