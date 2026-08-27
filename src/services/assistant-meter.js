@@ -1,5 +1,5 @@
 /**
- * The assistant meter - free households get 15 AI uses a month
+ * The assistant meter - free households get 10 AI uses a month
  * (docs/spec-free-app-paid-assistant.md).
  *
  * Unit: one USE per user-initiated request - every message, photo,
@@ -20,11 +20,11 @@
 
 const { supabase } = require('../db/client');
 
-const FREE_MONTHLY_ACTIONS = 15;
+const FREE_MONTHLY_ACTIONS = 10;
 // Counter lines are silent mid-tank: shown on the month's first use (the
-// full-tank line doubles as the deal restatement) and from 12 (the
+// full-tank line doubles as the deal restatement) and from 7 (the
 // countdown - the last few). See "Quota visibility" in the spec.
-const COUNTDOWN_FROM = 12;
+const COUNTDOWN_FROM = 7;
 
 /** Read at call time (not module load) so tests and Railway flag flips
  *  behave without a restart-ordering trap. */

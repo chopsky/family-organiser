@@ -40,41 +40,41 @@ test('an unmetered household gets its reply untouched, uncharged', async () => {
 });
 
 test('a charged use mid-tank carries no counter line', async () => {
-  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 3, limit: 15, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 3, limit: 10, resetLabel: '1 September' });
   const out = await applyAssistantMeter(lapsed(), USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
   expect(out).toBe('Done.');
 });
 
-test('use 13 appends the countdown line', async () => {
-  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 13, limit: 15, resetLabel: '1 September' });
+test('use 8 appends the countdown line', async () => {
+  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 8, limit: 10, resetLabel: '1 September' });
   const out = await applyAssistantMeter(lapsed(), USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
-  expect(out).toMatch(/13 of 15 free AI uses/);
+  expect(out).toMatch(/8 of 10 free AI uses/);
 });
 
 test('the final use appends the limit announcement and stamps the notice', async () => {
-  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 15, limit: 15, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 10, limit: 10, resetLabel: '1 September' });
   const out = await applyAssistantMeter(lapsed(), USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
-  expect(out).toMatch(/last of your 15 free AI uses/);
+  expect(out).toMatch(/last of your 10 free AI uses/);
   expect(out).toMatch(/1 September/);
   expect(db.markMeterLimitNotice).toHaveBeenCalledWith('h1');
 });
 
 test('the first post-lapse reply carries the deal announcement, once, without a stacked counter', async () => {
-  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 1, limit: 15, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: true, used: 1, limit: 10, resetLabel: '1 September' });
   const hh = lapsed({ free_deal_announced_at: null });
   const first = await applyAssistantMeter(hh, USER, { intent: 'create_event' }, 'Done.', 'whatsapp');
   expect(first).toMatch(/your free trial has ended/i);
-  expect(first).toMatch(/15 free AI uses a month/);
-  expect(first).not.toMatch(/1 of 15/); // the announcement already says "this was one"
+  expect(first).toMatch(/10 free AI uses a month/);
+  expect(first).not.toMatch(/1 of 10/); // the announcement already says "this was one"
   expect(db.markFreeDealAnnounced).toHaveBeenCalledWith('h1');
   // Second reply: already announced (the helper stamped the row in hand).
-  assistantMeter.chargeUse.mockResolvedValue({ charged: false, used: 1, limit: 15, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: false, used: 1, limit: 10, resetLabel: '1 September' });
   const second = await applyAssistantMeter(hh, USER, { intent: 'chat' }, 'Sure.', 'whatsapp');
   expect(second).toBe('Sure.');
 });
 
 test('chain intents pass isChainReply so they can never charge', async () => {
-  assistantMeter.chargeUse.mockResolvedValue({ charged: false, used: 5, limit: 15, resetLabel: '1 September' });
+  assistantMeter.chargeUse.mockResolvedValue({ charged: false, used: 5, limit: 10, resetLabel: '1 September' });
   await applyAssistantMeter(lapsed(), USER, { intent: 'reminder_followup' }, 'Done.', 'whatsapp');
   expect(assistantMeter.chargeUse).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ isChainReply: true }));
 });

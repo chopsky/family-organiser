@@ -10,7 +10,7 @@ of this deploys server-side with NO App Store submission.
 
 ## The model in one sentence
 
-**Housemait is free for the whole family, including 15 free AI uses
+**Housemait is free for the whole family, including 10 free AI uses
 a month. Premium is unlimited assistant plus the automations
 that feed it - calendar sync, document + attachment uploads, the daily
 briefs. £5.99 a month or £59.99 a year, one subscription per household,
@@ -23,7 +23,7 @@ full premium free for the first 14 days.**
 | Cozi | Generous + ads | n/a | Feature nags; 2024 squeeze angered users |
 | Sense | Manual calendar/lists only | 10 extractions/mo (chat itself UNMETERED - they meter extractions because extraction is what Sense sells) | TWO gates (features + meter) - confusing |
 | Nori | ALL features | 10 AI uses/mo (any chat) | One meter - simple but taxes conversation (founder-verified 2026-08-27: two consecutive shopping adds burned 2 uses) |
-| **Housemait** | **Full shared app, manual** | **15 uses/mo, flat + chain exception** | **Meter + cost-centre features only** |
+| **Housemait** | **Full shared app, manual** | **10 uses/mo, flat + chain exception** | **Meter + cost-centre features only** |
 
 Rejected on the way here: the hard onboarding wall (fear of strangling
 the base; never launched, machinery mothballed not deleted); the hard
@@ -52,7 +52,7 @@ review round).
 - Reading, downloading and exporting EVERYTHING, documents included.
   Data is never hostage - the promise is literal.
 - Push notifications for the above (event reminders stay).
-- **15 AI uses a month, per household** (see the meter).
+- **10 AI uses a month, per household** (see the meter).
 
 ### Premium (unlimited assistant + the standing automations)
 The dividing principle: **requests are metered, automations are
@@ -62,7 +62,7 @@ typed, voice note, photo, or an email from a sender they approved
 Nori/Sense norm, founder-verified 2026-08-28). An automation is
 something that works for them without being asked (calendar sync,
 briefs).
-- Unlimited AI uses (free gets 15 a month; voice, photo and
+- Unlimited AI uses (free gets 10 a month; voice, photo and
   approved-sender email requests count like any other - no modality
   cliff). User-facing term everywhere: **"AI uses"** (founder's copy;
   "assistant actions" retired 2026-08-28).
@@ -86,15 +86,17 @@ briefs).
 ## The meter (the heart of the model)
 
 ### Unit: FLAT - every request is one use (bursts tried and removed)
-- **15 flat AI uses a month; every message, photo, document or email
+- **10 flat AI uses a month; every message, photo, document or email
   counts one** (DECIDED 2026-08-28, superseding the burst design the
   same day). The burst needed three patches in a day - a chain
   exception, a start-anchor fix, a deliverables carve-out - and real
   families land within a use or two of the same place under either
-  design. Flat counting explains itself; the generosity moved into the
-  NUMBER (15 vs Nori's 10) instead of the unit. 20 was considered and
-  rejected as too much of the premium magic (15-20 heavy extractions
-  free); raw cost is a non-factor either way (a vision scan is ~1-2p).
+  design. Flat counting explains itself. 20 and 15 were both floated
+  and pulled back to 10 on the RAISE-ONLY PRINCIPLE: a free allowance
+  is easy to raise (a gift you get to announce) and painful to lower
+  (the Cozi 2024 move) - so launch at the floor of comfort and let the
+  exhaustion data argue it UP. Raw cost was never the issue (a vision
+  scan is ~1-2p).
 - **The one kept rule - the chain exception**: answering the bot's open
   question NEVER charges. Charging someone for answering our own
   question is the toxic case every design iteration existed to avoid.
@@ -115,7 +117,7 @@ briefs).
   that disclosure is what makes third-party sending consented rather
   than a sleeping drain.
 - Meta-questions about the meter charge nothing and always get an
-  exact, deterministic answer ("how many do I have left?" -> "12 of 15
+  exact, deterministic answer ("how many do I have left?" -> "7 of 10
   used; resets 1 September"). Sense's bot fumbles its own quota
   mechanics; ours never will because the answer never touches a model.
 - Proactive outbound (nudges, confirmations, RSVP notifications) never
@@ -127,7 +129,7 @@ briefs).
 - Resets on the 1st, anchored to the household's timezone, so "your
   free AI uses are back on 1 September" is always true as written.
 - No rollover. Partial first months are generous: whenever the trial
-  ends, the household gets the full 15 for the remainder of that month.
+  ends, the household gets the full 10 for the remainder of that month.
 - Chosen over rolling-30-days for explainability (one sentence, one
   shared household date), implementation simplicity (count this month's
   rows, no sliding-window bookkeeping), and the monthly re-engagement
@@ -186,7 +188,7 @@ step before it - the meter is announced, never discovered.
    governs RECURRING one-way traffic) + the trial-expiry email + the
    in-app banner. Deliberately no push: anyone push-reachable has the
    app and sees the banner. Copy: "the app stays free forever; the
-   assistant gives you 15 free AI uses a month, resetting on the 1st."
+   assistant gives you 10 free AI uses a month, resetting on the 1st."
    A counter appearing at 7 is only unsurprising if the meter's
    existence was already news the family received.
    MECHANICS: most lapsing households are OUTSIDE the 24h WhatsApp
@@ -198,15 +200,15 @@ step before it - the meter is announced, never discovered.
    lapse restates the deal inline before anything else - free,
    in-window by definition, and it reaches exactly the people the
    meter affects. No one can reach action 7 untold.
-1. **First action of each month carries a full-tank line**: "(1 of 15 -
+1. **First action of each month carries a full-tank line**: "(1 of 10 -
    your free actions reset 1 October)". Not a standalone send - it
    rides the bot's reply to that first action, in whichever channel
    the family asked (WhatsApp or app chat); a household that doesn't
    use the assistant that month never sees it. Doubles as the monthly
    "bot is back" re-engagement beat, and restates the deal when the
    news is good, not when it's nearly bad. Then silent mid-tank (a
-   counter on use 3 is noise), and from use 12 each charged reply
-   appends the countdown - "(13 of 15 free AI uses this month)".
+   counter on use 3 is noise), and from use 7 each charged reply
+   appends the countdown - "(8 of 10 free AI uses this month)".
 2. **Ask anytime, free**: remaining-quota questions are deterministic,
    exact, never charged.
 3. **The limit message**: warm, names the reset date, offers both doors
@@ -291,8 +293,8 @@ step before it - the meter is announced, never discovered.
 ## Metrics that replace the paywall funnel
 
 Trial->paid conversion, lapsed->paid reactivation, meter exhaustion
-rate (share of free households hitting 15 - the direct upgrade-pressure
-gauge), uses-per-household distribution (is 15 the right number),
+rate (share of free households hitting 10 - the direct upgrade-pressure
+gauge), uses-per-household distribution (is 10 the right number),
 upload/sync gate hits by lapsed households (demand signals), and
 WhatsApp-link rate - the meter can only bind on households that talk
 to the bot, so linking is the monetisation-critical funnel step. The
@@ -300,8 +302,10 @@ admin paywall-funnel panel gets repurposed to this once the gates ship.
 
 ## v2 candidates (only if data asks)
 
-- Tune the 15 (engaged households run 20-70 bot messages a fortnight,
-  so flat 15/month binds mid-month for the engaged - verify with the
-  exhaustion-rate metric before moving it).
+- RAISE the 10 (never lower it - the raise-only principle above).
+  Engaged households run 20-70 bot messages a fortnight, so flat
+  10/month binds mid-month for the engaged; if the exhaustion metric
+  shows it binding too hard on families who'd otherwise convert, a
+  raise to 12 or 15 is a free good-news announcement.
 - Shorter trial if habit-to-lapse is reliably formed inside a week.
 - Storage cap instead of hard upload gate if support asks for it.

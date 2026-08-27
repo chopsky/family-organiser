@@ -7143,9 +7143,9 @@ async function getMeterStats(db = supabase) {
     lapsedHouseholds: lapsedIds.length,
     activeThisMonth: perHousehold.size,
     actionsThisMonth: rows.length,
-    // Mirror assistant-meter.js: 15 uses/month, countdown from 12.
-    exhausted: counts.filter((n) => n >= 15).length,
-    nearLimit: counts.filter((n) => n >= 12 && n < 15).length,
+    // Mirror assistant-meter.js: 10 uses/month, countdown from 7.
+    exhausted: counts.filter((n) => n >= 10).length,
+    nearLimit: counts.filter((n) => n >= 7 && n < 10).length,
   };
 }
 
