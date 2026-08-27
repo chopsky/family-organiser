@@ -107,7 +107,7 @@ export default function TrialEndedOverlay() {
         <div className="relative bg-white rounded-2xl shadow-[0_8px_24px_rgba(107,63,160,0.10)] max-w-lg w-full p-7 md:p-8">
           <h2
             id="free-tier-heading"
-            className="text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
+            className="serif-display text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
             style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
           >
             Housemait is now free for your family
@@ -117,9 +117,10 @@ export default function TrialEndedOverlay() {
             tasks and all the kids&rsquo; bits, free for good. Nothing has been deleted.
           </p>
           <p className="text-cocoa text-base mt-4">
-            You can still message your assistant too, with{' '}
-            <strong>{limit} free AI uses each month</strong>
-            {used !== null ? ` (${Math.max(0, limit - used)} left right now)` : ''}, resetting on {resetLabel}.
+            You can still use your assistant too, with{' '}
+            <strong>{limit} free AI uses each month</strong> - texts, photos,
+            voice notes and emails all count as one
+            {used !== null ? ` (${Math.max(0, limit - used)} left right now)` : ''}. They reset on {resetLabel}.
             Daily briefs, connected calendars and new uploads are part of Premium.
           </p>
           <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
@@ -168,7 +169,7 @@ export default function TrialEndedOverlay() {
       <div className="relative bg-white rounded-2xl shadow-[0_8px_24px_rgba(107,63,160,0.10)] max-w-lg w-full p-7 md:p-8">
         <h2
           id="trial-ended-heading"
-          className="text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
+          className="serif-display text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
           style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
         >
           Your free trial has ended
