@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscription } from '../context/SubscriptionContext';
 import api from '../lib/api';
+import { IconCheck, IconSparkles } from './Icons';
 import { isAndroid } from '../lib/platform';
 
 const DISMISSED_KEY = 'trial-ended-overlay-dismissed';
@@ -69,7 +70,7 @@ export default function TrialEndedOverlay() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isExpired, dismissed]);
+  }, [isExpired, dismissed, isFreeTier]);
 
   // Don't render anywhere near the subscribe flow itself. Belt-and-braces
   // with the Layout-scope already excluding those routes.
@@ -89,57 +90,123 @@ export default function TrialEndedOverlay() {
   // upgrade link is suppressed there per Play payments policy.
   if (isFreeTier) {
     if (freeNoticeDismissed) return null;
-    const used = meter?.used ?? null;
+    const used = meter?.used ?? 0;
     const limit = meter?.limit ?? 10;
+    const remaining = Math.max(0, limit - used);
     const resetLabel = meter?.reset_label || 'the 1st';
     const dismissFree = () => {
       safeLocalSet(FREE_NOTICE_KEY, 'true');
       setFreeNoticeDismissed(true);
     };
+    const CHIPS = ['Calendar', 'Lists', 'Meals', 'Tasks', 'School', 'Child Mode'];
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ padding: '24px 16px' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="free-tier-heading"
       >
-        <div className="absolute inset-0 bg-charcoal/60 backdrop-blur-sm" aria-hidden="true" />
-        <div className="relative bg-white rounded-2xl shadow-[0_8px_24px_rgba(107,63,160,0.10)] max-w-lg w-full p-7 md:p-8">
+        {/* Spec dim: rgba(26,22,32,0.42) over the app, platform blur. */}
+        <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(26,22,32,0.42)' }} aria-hidden="true" />
+
+        <div
+          className="relative w-full max-w-md"
+          style={{
+            background: 'var(--color-cream, #FBF8F3)', borderRadius: 28,
+            padding: '26px 22px 20px', boxShadow: '0 30px 70px rgba(26,22,32,0.35)',
+          }}
+        >
+          {/* Green check badge */}
+          <div
+            className="flex items-center justify-center"
+            style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--color-sage-light)', marginBottom: 14 }}
+          >
+            <IconCheck className="h-5 w-5" style={{ color: 'var(--color-sage)', strokeWidth: 2.4 }} />
+          </div>
+
           <h2
             id="free-tier-heading"
-            className="serif-display text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
-            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
+            className="serif-display"
+            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, fontSize: 26, lineHeight: 1.12, color: '#1A1620' }}
           >
-            Housemait is now free for your family
+            Housemait is now <em style={{ color: 'var(--color-plum)' }}>free</em> for your family
           </h2>
-          <p className="text-cocoa text-base">
-            Your trial has ended, and the app keeps working - calendar, lists, meals,
-            tasks and all the kids&rsquo; bits, free for good. Nothing has been deleted.
+
+          <p className="font-medium" style={{ fontSize: 13.5, color: '#4A4453', lineHeight: 1.45, marginTop: 9 }}>
+            Your trial has ended and the app keeps working. Nothing has been deleted.
           </p>
-          <p className="text-cocoa text-base mt-4">
-            You can still use your assistant too, with{' '}
-            <strong>{limit} free AI uses each month</strong> - texts, photos,
-            voice notes and emails all count as one
-            {used !== null ? ` (${Math.max(0, limit - used)} left right now)` : ''}. They reset on {resetLabel}.
-            Daily briefs, connected calendars and new uploads are part of Premium.
-          </p>
-          <div className="mt-7 flex items-center justify-between gap-3 flex-wrap">
-            <button
-              type="button"
-              onClick={dismissFree}
-              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-plum hover:bg-plum-pressed text-white text-sm font-semibold transition-colors"
-            >
-              Carry on free
-            </button>
-            {!isAndroid() && (
-              <a
-                href="/subscribe"
-                className="text-sm font-medium text-warm-grey hover:text-charcoal transition-colors px-2 py-1"
+
+          {/* What stays free */}
+          <div className="flex flex-wrap items-center" style={{ gap: 6, marginTop: 13 }}>
+            {CHIPS.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center bg-white font-semibold"
+                style={{ gap: 4, border: '1px solid rgba(26,22,32,0.07)', borderRadius: 100, padding: '5px 11px 5px 8px', fontSize: 12, color: '#4A4453' }}
               >
-                Go unlimited with Premium
-              </a>
-            )}
+                <IconCheck className="h-[11px] w-[11px]" style={{ color: 'var(--color-sage)' }} />
+                {label}
+              </span>
+            ))}
+            <span className="font-bold" style={{ fontSize: 12, color: 'var(--color-sage)' }}>free for good</span>
           </div>
+
+          {/* AI allowance meter - real numbers from the subscription meter */}
+          <div style={{ background: 'var(--color-plum-light)', borderRadius: 16, padding: '12px 14px', marginTop: 14 }}>
+            <div className="flex items-center" style={{ gap: 7 }}>
+              <IconSparkles className="h-[15px] w-[15px]" style={{ color: 'var(--color-plum)' }} />
+              <span className="font-bold" style={{ fontSize: 13.5, color: 'var(--color-plum-dark)' }}>
+                {limit} free AI uses each month
+              </span>
+            </div>
+            <div
+              className="flex"
+              style={{ gap: 4, marginTop: 10 }}
+              role="img"
+              aria-label={`${remaining} of ${limit} AI uses remaining`}
+            >
+              {Array.from({ length: limit }, (_, i) => (
+                <span
+                  key={i}
+                  style={{
+                    flex: 1, height: 5, borderRadius: 100,
+                    background: 'var(--color-plum)', opacity: i < remaining ? 1 : 0.2,
+                  }}
+                />
+              ))}
+            </div>
+            <p className="font-semibold" style={{ fontSize: 11.5, color: 'var(--color-plum-dark)', opacity: 0.75, marginTop: 7 }}>
+              {remaining} left right now &middot; resets {resetLabel}
+            </p>
+          </div>
+
+          <p className="font-medium" style={{ fontSize: 12, color: '#8A8493', marginTop: 11 }}>
+            Daily briefs, connected calendars and adding to the document vault are part of Premium.
+          </p>
+
+          <button
+            type="button"
+            onClick={dismissFree}
+            className="w-full text-white font-bold active:scale-[0.99] transition-transform"
+            style={{
+              border: 0, cursor: 'pointer', marginTop: 16,
+              background: 'linear-gradient(135deg, var(--color-plum) 0%, var(--color-plum-bright) 100%)',
+              borderRadius: 16, padding: 15, fontSize: 15.5,
+              boxShadow: '0 10px 24px rgba(109,56,173,0.35), inset 0 2px 0 rgba(255,255,255,0.28)',
+            }}
+          >
+            Carry on free
+          </button>
+          {!isAndroid() && (
+            <a
+              href="/subscribe"
+              className="block text-center font-bold"
+              style={{ fontSize: 13.5, color: 'var(--color-plum-dark)', paddingTop: 13, textDecoration: 'none' }}
+            >
+              Go unlimited with Premium &rarr;
+            </a>
+          )}
         </div>
       </div>
     );
