@@ -15,16 +15,18 @@ export default function PeriodToggle({ period, onChange }) {
         aria-selected={on}
         onClick={() => onChange(key)}
         className={
-          'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-colors ' +
-          (on ? 'bg-plum text-white' : 'text-warm-grey')
+          'flex-1 h-11 inline-flex items-center justify-center gap-1.5 px-3 rounded-full text-sm transition-all ' +
+          (on
+            ? 'bg-white text-plum font-semibold shadow-[0_2px_8px_rgba(45,42,51,0.10)]'
+            : 'text-warm-grey font-medium')
         }
       >
         {label}
         {tag && (
           <span
             className={
-              'text-[10.5px] font-bold tracking-wide px-2 py-0.5 rounded-full ' +
-              (on ? 'bg-white/20 text-white' : 'bg-plum-light text-plum')
+              'text-[9.5px] font-bold tracking-[0.04em] px-1.5 py-[3px] rounded-full whitespace-nowrap ' +
+              (on ? 'bg-plum-light text-plum' : 'bg-charcoal/[0.06] text-warm-grey')
             }
           >
             {tag}
@@ -34,7 +36,7 @@ export default function PeriodToggle({ period, onChange }) {
     );
   };
   return (
-    <div role="tablist" aria-label="Billing period" className="flex gap-1 p-1 bg-white border border-light-grey rounded-full shadow-[0_2px_8px_rgba(107,63,160,0.06)]">
+    <div role="tablist" aria-label="Billing period" className="flex gap-1 p-1 bg-charcoal/[0.06] rounded-full">
       {seg('monthly', 'Monthly')}
       {seg('annual', 'Annually', '2 MONTHS FREE')}
     </div>
