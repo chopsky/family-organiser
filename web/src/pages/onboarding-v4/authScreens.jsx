@@ -267,7 +267,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.okInk }} />
-              Free for 14 days, cancel anytime
+              Free for your family · Premium included for 14 days
             </span>
           </div>
 
@@ -505,6 +505,15 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
               </p>
             ))}
           </div>
+        )}
+        {/* The trial is ANNOUNCED here, never discovered at day 14: the
+            lapse message says "your Premium free trial has ended", and this
+            line is what makes that land as a known fact. Founders only - a
+            joiner inherits the household's existing plan, whatever it is. */}
+        {!d?.joining && (
+          <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
+            ✓ 14 days of Premium included - unlimited assistant, briefs and more
+          </p>
         )}
         {outcome?.kids?.length > 0 && (
           <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>

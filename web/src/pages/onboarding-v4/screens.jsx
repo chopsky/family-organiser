@@ -120,11 +120,11 @@ export function Splash({ onStart, onLogin, reduced }) {
       <div style={rise(0.74, reduced)}>
         <Cta onClick={onStart}>Hand it over to Housemait</Cta>
         <p style={{ fontSize: 12.5, color: T.ink3, textAlign: 'center', marginTop: 10 }}>
-          {/* NOT "no card needed": iOS onboarding ends at the Apple trial,
-              which auto-renews. Promising no-card then presenting a
-              subscription sheet is the kind of lie App Review notices
-              (founder caught it on the first TestFlight run). */}
-          Free for 14 days · cancel anytime
+          {/* Free-app model: the app is free for good and signup takes no
+              card - the old "cancel anytime" implied an auto-renewing
+              wall that no longer exists. Premium (the assistant
+              unlimited, briefs, sync) rides along free for 14 days. */}
+          Free for your family · Premium included for 14 days
         </p>
         <Ghost onClick={onLogin}>I already have an account</Ghost>
       </div>
