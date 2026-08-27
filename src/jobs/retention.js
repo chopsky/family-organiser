@@ -41,6 +41,7 @@
 
 const { supabaseAdmin } = require('../db/client');
 const db = require('../db/queries');
+const assistantMeter = require('../services/assistant-meter');
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -137,6 +138,28 @@ async function runHouseholdRetentionCleanup() {
   if (matched.length === 0) {
     return 0;
   }
+
+  // FREE_APP_MODE: inactive_since means "trial ended", but a lapsed
+  // household is the FREE tier now and may be in daily use - deleting an
+  // active family's data because they stopped PAYING would be data loss
+  // dressed as privacy compliance. Before any deletion, probe each
+  // candidate for deliberate activity inside the retention window; alive
+  // households are skipped (and stay skipped every night until they've
+  // been genuinely quiet for the full window - the probe IS the clock).
+  if (assistantMeter.enabled() && matched.length > 0) {
+    const alive = [];
+    const dead = [];
+    for (const h of matched) {
+      const active = await db.hasRecentDeliberateActivity(h.id, cutoff).catch(() => true);
+      (active ? alive : dead).push(h);
+    }
+    if (alive.length > 0) {
+      console.log(`[retention] ${alive.length} candidate(s) show free-tier activity - kept: ${alive.map((h) => h.id).join(', ')}`);
+    }
+    matched = dead;
+    if (matched.length === 0) return 0;
+  }
+
   console.log(`[retention] ${matched.length} household(s) past ${HOUSEHOLD_INACTIVE_RETENTION_DAYS}-day inactive window - deleting`);
 
   let deleted = 0;

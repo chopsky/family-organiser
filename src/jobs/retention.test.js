@@ -111,6 +111,48 @@ describe('runHouseholdRetentionCleanup', () => {
     expect(selectChain.lt).toHaveBeenCalledWith('inactive_since', expect.any(String));
   });
 
+  test('FREE_APP_MODE: an actively-used free-tier household is NEVER deleted', async () => {
+    process.env.FREE_APP_MODE = '1';
+    try {
+      supabaseAdmin.from.mockReturnValue(makeChain({
+        data: [
+          { id: 'hh-alive', name: 'The Actives' },
+          { id: 'hh-dead', name: 'The Ghosts' },
+        ],
+      }));
+      db.deleteHouseholdCascade.mockResolvedValue();
+      // The probe: alive household has deliberate activity, ghost doesn't.
+      db.hasRecentDeliberateActivity.mockImplementation(async (id) => id === 'hh-alive');
+
+      const deleted = await runHouseholdRetentionCleanup();
+
+      expect(deleted).toBe(1);
+      expect(db.deleteHouseholdCascade).toHaveBeenCalledTimes(1);
+      expect(db.deleteHouseholdCascade).toHaveBeenCalledWith('hh-dead');
+      expect(db.deleteHouseholdCascade).not.toHaveBeenCalledWith('hh-alive');
+    } finally {
+      delete process.env.FREE_APP_MODE;
+    }
+  });
+
+  test('FREE_APP_MODE: a failed activity probe counts as ALIVE - never delete on doubt', async () => {
+    process.env.FREE_APP_MODE = '1';
+    try {
+      supabaseAdmin.from.mockReturnValue(makeChain({
+        data: [{ id: 'hh-unknown', name: 'The Unknowns' }],
+      }));
+      db.deleteHouseholdCascade.mockResolvedValue();
+      db.hasRecentDeliberateActivity.mockRejectedValue(new Error('db blip'));
+
+      const deleted = await runHouseholdRetentionCleanup();
+
+      expect(deleted).toBe(0);
+      expect(db.deleteHouseholdCascade).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.FREE_APP_MODE;
+    }
+  });
+
   test('writes an audit row per deletion with null user fields', async () => {
     supabaseAdmin.from.mockReturnValue(makeChain({
       data: [{ id: 'hh-1', name: 'Household 1' }],

@@ -7092,6 +7092,32 @@ async function markMeterLimitNotice(householdId, db = supabase) {
   if (error) throw error;
 }
 
+/** Any sign of deliberate life in this household since `sinceIso`?
+ *  Cheap per-candidate probe (limit-1 per table, early return) used by
+ *  the retention job under FREE_APP_MODE: `inactive_since` marks "trial
+ *  ended", but a free-tier household using the app is NOT inactive, and
+ *  deleting it would be data loss dressed as privacy compliance. */
+async function hasRecentDeliberateActivity(householdId, sinceIso, db = supabase) {
+  const probes = [
+    () => db.from('shopping_items').select('id').eq('household_id', householdId).gte('created_at', sinceIso).limit(1),
+    () => db.from('tasks').select('id').eq('household_id', householdId).gte('created_at', sinceIso).limit(1),
+    () => db.from('chore_completions').select('id').eq('household_id', householdId).gte('completed_at', sinceIso).limit(1),
+    () => db.from('meal_plan').select('id').eq('household_id', householdId).gte('created_at', sinceIso).limit(1),
+    () => db.from('chat_messages').select('id').eq('household_id', householdId).eq('role', 'user').gte('created_at', sinceIso).limit(1),
+    () => db.from('assistant_actions').select('id').eq('household_id', householdId).gte('started_at', sinceIso).limit(1),
+    () => db.from('calendar_events').select('id').eq('household_id', householdId)
+      .is('external_feed_id', null).is('subscription_id', null)
+      .gte('created_at', sinceIso).limit(1),
+  ];
+  for (const probe of probes) {
+    try {
+      const { data, error } = await probe();
+      if (!error && data && data.length > 0) return true;
+    } catch { /* a missing table (pending migration) proves nothing - keep probing */ }
+  }
+  return false;
+}
+
 /** Atomically claim the one-ever ping-routing WhatsApp heads-up for a
  *  user. Returns true only for the caller that WON the stamp (conditional
  *  on ping_notice_at IS NULL), so concurrent jobs can't double-send.
@@ -11314,6 +11340,7 @@ module.exports = {
   markMeterLimitNotice,
   markFarewellBriefSent,
   markPingNoticeIfUnsent,
+  hasRecentDeliberateActivity,
   getLapsedHouseholdIds,
   getMeterStats,
   computeOnboardingFunnel,
