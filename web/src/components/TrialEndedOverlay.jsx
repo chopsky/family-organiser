@@ -108,7 +108,7 @@ export default function TrialEndedOverlay() {
           <h2
             id="free-tier-heading"
             className="text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
-            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600, letterSpacing: '-0.02em' }}
+            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
           >
             Housemait is now free for your family
           </h2>
@@ -169,7 +169,7 @@ export default function TrialEndedOverlay() {
         <h2
           id="trial-ended-heading"
           className="text-[28px] md:text-[32px] text-charcoal leading-tight mb-3"
-          style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600, letterSpacing: '-0.02em' }}
+          style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
         >
           Your free trial has ended
         </h2>

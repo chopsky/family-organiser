@@ -32,16 +32,16 @@ import {
   iapKeyPresent,
 } from '../lib/revenuecat';
 import { useSubscription } from '../context/SubscriptionContext';
+import PeriodToggle from '../components/PeriodToggle';
 import ErrorBanner from '../components/ErrorBanner';
 
 const FEATURES = [
-  'Unlimited shopping lists',
-  'Shared family calendar',
-  'Meal planning & recipes',
-  'Unlimited AI chat',
-  'Receipt scanning',
-  'WhatsApp assistant',
-  'Document storage',
+  'Unlimited assistant - text, photo or voice note',
+  'School letters: snap or forward, dates land themselves',
+  'Morning & evening briefs, weekly digest',
+  'Google, Apple & Outlook calendars in one place',
+  'Document vault for paperwork & memories',
+  'Attach files to the events they belong to',
 ];
 
 export default function AndroidSubscribe() {
@@ -61,7 +61,7 @@ function NoPurchaseNotice() {
         <div className="text-3xl mb-4" aria-hidden="true">🏡</div>
         <h1
           className="text-[26px] text-charcoal leading-tight mb-3"
-          style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600, letterSpacing: '-0.02em' }}
+          style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
         >
           Subscriptions aren&apos;t available in this app
         </h1>
@@ -85,6 +85,7 @@ function NoPurchaseNotice() {
 // ─── Mode 1: Google Play Billing paywall ───────────────────────────
 
 function PlayBillingPaywall() {
+  const [period, setPeriod] = useState('monthly');
   const navigate = useNavigate();
   const { isExpired, isTrialing, isActive, daysRemaining, refresh } = useSubscription();
 
@@ -195,7 +196,7 @@ function PlayBillingPaywall() {
         <div className="text-center mb-10">
           <h1
             className="text-[36px] md:text-[48px] leading-[1.05] tracking-[-0.02em] text-charcoal mb-3"
-            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600 }}
+            style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400 }}
           >
             {copy.headline}
           </h1>
@@ -215,30 +216,33 @@ function PlayBillingPaywall() {
         {loadingOffering ? (
           <div className="text-center py-12 text-warm-grey">Loading plans…</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            {monthlyPkg && (
-              <PlayPricingCard
-                pkg={monthlyPkg}
-                planLabel="Monthly"
-                tagline="Pay as you go, cancel anytime."
-                highlighted={false}
-                submitting={submitting === monthlyPkg.identifier}
-                disabled={submitting !== null}
-                onPurchase={() => handlePurchase(monthlyPkg)}
-              />
-            )}
-            {annualPkg && (
-              <PlayPricingCard
-                pkg={annualPkg}
-                planLabel="Annual"
-                tagline="Best value - two months free."
-                badge="Best value"
-                highlighted={true}
-                submitting={submitting === annualPkg.identifier}
-                disabled={submitting !== null}
-                onPurchase={() => handlePurchase(annualPkg)}
-              />
-            )}
+          <div>
+            <PeriodToggle period={period} onChange={setPeriod} />
+            <div className="mt-4">
+              {period === 'monthly' && monthlyPkg && (
+                <PlayPricingCard
+                  pkg={monthlyPkg}
+                  planLabel="Monthly"
+                  tagline="Pay as you go, cancel anytime."
+                  highlighted={false}
+                  submitting={submitting === monthlyPkg.identifier}
+                  disabled={submitting !== null}
+                  onPurchase={() => handlePurchase(monthlyPkg)}
+                />
+              )}
+              {period === 'annual' && annualPkg && (
+                <PlayPricingCard
+                  pkg={annualPkg}
+                  planLabel="Annual"
+                  tagline="Best value - two months free."
+                  badge="Best value"
+                  highlighted={true}
+                  submitting={submitting === annualPkg.identifier}
+                  disabled={submitting !== null}
+                  onPurchase={() => handlePurchase(annualPkg)}
+                />
+              )}
+            </div>
           </div>
         )}
 
@@ -284,8 +288,8 @@ function PlayBillingPaywall() {
 function buildCopy({ isExpired, isTrialing, isActive, daysRemaining }) {
   if (isExpired) {
     return {
-      headline: 'Keep Housemait for your family',
-      subhead: 'Your trial has ended. Pick a plan below to unlock everything again.',
+      headline: 'Go unlimited with Premium',
+      subhead: 'The app is free for your family. Premium adds the unlimited assistant, briefs, calendar sync and the document vault.',
     };
   }
   if (isTrialing && daysRemaining != null) {
@@ -296,7 +300,7 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining }) {
           : 'Subscribe to Housemait',
       subhead:
         daysRemaining <= 5
-          ? 'Lock in your plan now so nothing gets interrupted.'
+          ? 'Keep Premium without a gap when your trial ends.'
           : 'Switch to a paid plan any time before your trial ends, with no gap.',
     };
   }
@@ -345,7 +349,7 @@ function PlayPricingCard({ pkg, planLabel, tagline, badge, highlighted, submitti
 
       <h2
         className="text-[22px] text-charcoal mb-1"
-        style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 600, letterSpacing: '-0.02em' }}
+        style={{ fontFamily: 'var(--font-serif-display)', fontWeight: 400, letterSpacing: '-0.02em' }}
       >
         {subscriptionTitle}
       </h2>

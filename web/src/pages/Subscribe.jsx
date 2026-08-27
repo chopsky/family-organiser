@@ -270,8 +270,8 @@ export default function Subscribe() {
 function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan }) {
   if (isExpired) {
     return {
-      headline: 'Keep Housemait for your family',
-      subhead: 'Your trial has ended. Pick a plan below to unlock everything again.',
+      headline: 'Go unlimited with Premium',
+      subhead: 'The app is free for your family. Premium adds the unlimited assistant, briefs, calendar sync and the document vault.',
     };
   }
   if (isTrialing && daysRemaining != null) {
@@ -282,7 +282,7 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan
           : 'Subscribe to Housemait',
       subhead:
         daysRemaining <= 5
-          ? 'Lock in your plan now so nothing gets interrupted.'
+          ? 'Keep Premium without a gap when your trial ends.'
           : 'Any time before your trial ends, you can switch to a paid plan with no gap.',
     };
   }
@@ -326,7 +326,7 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
 
       <h2
         className="text-[22px] text-charcoal mb-1"
-        style={{ fontWeight: 600, letterSpacing: '-0.02em' }}
+        style={{ fontWeight: 400, letterSpacing: '-0.02em' }}
       >
         {p.label}
       </h2>
@@ -358,13 +358,12 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
 
       <ul className="space-y-2 mb-6 text-sm text-charcoal">
         {[
-          'Unlimited shopping lists',
-          'Shared family calendar',
-          'Meal planning & recipes',
-          'Unlimited AI chat',
-          'Receipt scanning',
-          'WhatsApp assistant',
-          'Document storage',
+          'Unlimited assistant - text, photo or voice note',
+          'School letters: snap or forward, dates land themselves',
+          'Morning & evening briefs, weekly digest',
+          'Google, Apple & Outlook calendars in one place',
+          'Document vault for paperwork & memories',
+          'Attach files to the events they belong to',
         ].map((feature) => (
           <li key={feature} className="flex items-start gap-2">
             <svg className="text-sage shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
