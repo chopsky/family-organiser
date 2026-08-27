@@ -19,7 +19,7 @@ import { FEED_PROVIDERS } from '../lib/feedProviders';
 import {
   IconMessageCircle, IconCalendar, IconMail, IconBell,
   IconDownload, IconShield, IconUser, IconTrash, IconChevronRight, IconX, IconMapPin, IconStar,
-  IconGift, IconClipboard,
+  IconGift, IconClipboard, IconSparkles,
 } from '../components/Icons';
 import { share } from '../lib/share';
 import { LOCALES, getLocaleByCountry } from '../lib/locales';
@@ -352,24 +352,12 @@ function ProfileCard({ me, members }) {
           {isFreeTier && meter && (
             <SetRow
               title="AI uses"
-              sub={`${Math.max(0, meter.limit - meter.used)} of ${meter.limit} left${meter.reset_label ? ` · resets ${meter.reset_label}` : ''}`}
+              sub={meter.reset_label ? `Resets ${meter.reset_label}` : null}
               control={
-                <div
-                  className="flex items-center gap-[3px]"
-                  role="img"
-                  aria-label={`${Math.max(0, meter.limit - meter.used)} of ${meter.limit} AI uses remaining`}
-                >
-                  {Array.from({ length: meter.limit }, (_, i) => (
-                    <span
-                      key={i}
-                      className="rounded-full"
-                      style={{
-                        width: 7, height: 5, background: 'var(--color-plum)',
-                        opacity: i < Math.max(0, meter.limit - meter.used) ? 1 : 0.2,
-                      }}
-                    />
-                  ))}
-                </div>
+                <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-plum whitespace-nowrap">
+                  <IconSparkles className="h-[15px] w-[15px]" />
+                  {Math.max(0, meter.limit - meter.used)} of {meter.limit} left
+                </span>
               }
             />
           )}
