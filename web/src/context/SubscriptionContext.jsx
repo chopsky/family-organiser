@@ -237,10 +237,13 @@ export function useSubscription() {
  * interceptor catches it and redirects to /subscribe.
  */
 export function useCanWrite() {
-  const { isActive, isTrialing, loading, status } = useSubscription();
+  const { isActive, isTrialing, isFreeTier, loading, status } = useSubscription();
   // Allow writes while status is still loading to avoid the read-only
   // flash on first paint. Internal accounts surface as isActive already
   // (SubscriptionContext maps them onto active).
   if (loading && status == null) return true;
-  return isActive || isTrialing;
+  // Free tier (FREE_APP_MODE lapsed households) keeps every core surface
+  // writable - only Premium features are gated, and those doors are
+  // per-surface via premium_required 402s, never through this hook.
+  return isActive || isTrialing || isFreeTier;
 }
