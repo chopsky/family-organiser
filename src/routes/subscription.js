@@ -2,6 +2,7 @@ const { Router } = require('express');
 const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const stripeService = require('../services/stripe');
+const assistantMeter = require('../services/assistant-meter');
 
 const router = Router();
 
@@ -108,6 +109,20 @@ router.get('/status', requireAuth, requireHousehold, async (req, res) => {
       // pre-Phase-1a were backfilled, but defensive fallback).
       subscription_provider: household.subscription_provider || 'stripe',
       is_internal: household.is_internal === true,
+      // FREE_APP_MODE: tells the client to render a lapsed household as
+      // the FREE tier (welcome notice, "Free plan" badge, meter display)
+      // instead of the legacy read-only expired state. `meter` is present
+      // only for households actually metered right now.
+      free_app_mode: assistantMeter.enabled(),
+      ...(assistantMeter.isMeteredHousehold(household)
+        ? {
+          meter: await assistantMeter.meterStatus(household).then((m) => ({
+            used: m.used,
+            limit: m.limit,
+            reset_label: m.resetLabel,
+          })).catch(() => null),
+        }
+        : {}),
     });
   } catch (err) {
     console.error('GET /api/subscription/status error:', err);

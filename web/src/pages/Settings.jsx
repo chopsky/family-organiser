@@ -191,7 +191,7 @@ function SelectBtn({ value, onClick, disabled }) {
  * Billing controls stay owner-only (server enforces this too).
  */
 function ProfileCard({ me, members }) {
-  const { isActive, isTrialing, isExpired, isInternal, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
+  const { isActive, isTrialing, isExpired, isInternal, isFreeTier, meter, plan, provider, daysRemaining, trialEndsAt, loading } = useSubscription();
   // Billing is owner-only: non-owners see the plan status but not the
   // subscribe/manage controls (the server also enforces this).
   const { isOwner, user, household } = useAuth();
@@ -281,11 +281,13 @@ function ProfileCard({ me, members }) {
   const planBadge = isInternal ? badge('Internal', 'bg-plum-light text-plum')
     : isActive ? badge(<><span className="text-[13px]">✦</span> Premium</>, 'bg-plum-light text-plum')
     : isTrialing ? badge('Free trial', 'bg-plum-light text-plum')
+    : isFreeTier ? badge('Free plan', 'bg-sage-light text-sage')
     : isExpired ? badge('Ended', 'bg-coral-light text-coral')
     : null;
   const planMeta = isInternal ? null
     : isActive ? priceLabel
     : isTrialing && daysRemaining != null ? `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} left`
+    : isFreeTier && meter ? `${Math.max(0, meter.limit - meter.used)} of ${meter.limit} AI uses left` 
     : null;
 
   const isAndroidPlatform = isAndroid();
@@ -296,6 +298,9 @@ function ProfileCard({ me, members }) {
   const billingSub = isInternal ? 'No billing applies to this household'
     : isTrialing ? (trialEndsAt ? `Trial ends ${fmtDate(trialEndsAt)}` : 'Subscribe any time to avoid interruption')
     : isActive ? (provider === 'apple' ? 'Billed through your Apple ID' : provider === 'google' ? 'Billed through Google Play' : 'Billed by card via Stripe')
+    : isFreeTier ? (meter?.reset_label
+      ? `The app is free for your family - AI uses reset on ${meter.reset_label}. Premium adds unlimited AI, briefs, calendar sync and uploads`
+      : 'The app is free for your family. Premium adds unlimited AI, briefs, calendar sync and uploads')
     : isExpired ? (androidCanPurchase ? "Your data's still here - subscribe to unlock everything" : "Your data's still here and safe")
     : '';
   const billingControl = isInternal ? null
@@ -308,7 +313,7 @@ function ProfileCard({ me, members }) {
           // build (Play payments policy; /subscribe then shows the paywall).
           ? (!androidCanPurchase ? null : (
             <Link to="/subscribe" className="inline-flex items-center px-4 py-2 rounded-[11px] bg-plum hover:bg-plum-pressed text-white text-[13px] font-semibold transition-colors whitespace-nowrap">
-              Subscribe
+              {isFreeTier ? 'Go unlimited' : 'Subscribe'}
             </Link>
           ))
           : null;

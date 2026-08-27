@@ -36,6 +36,8 @@ export function SubscriptionProvider({ children }) {
   const [currency, setCurrency] = useState(null);           // 'gbp' | 'usd' | … | null
   const [provider, setProvider] = useState(null);           // 'stripe' | 'apple' | null
   const [isInternal, setIsInternal] = useState(false);
+  const [freeAppMode, setFreeAppMode] = useState(false);   // server flag: lapsed = FREE tier, not read-only
+  const [meter, setMeter] = useState(null);                // { used, limit, reset_label } when metered
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -55,6 +57,8 @@ export function SubscriptionProvider({ children }) {
       setCurrency(null);
       setProvider(null);
       setIsInternal(false);
+      setFreeAppMode(false);
+      setMeter(null);
       setLoading(false);
       setError(null);
       loadedHouseholdRef.current = null;
@@ -83,6 +87,8 @@ export function SubscriptionProvider({ children }) {
       setProvider(data.subscription_provider || null);
       setPaywallRequired(data.paywall_required === true);
       setIsInternal(data.is_internal === true);
+      setFreeAppMode(data.free_app_mode === true);
+      setMeter(data.meter || null);
       loadedHouseholdRef.current = household.id;
     } catch (err) {
       // Don't blow up the app if this fails - the trial indicators
@@ -180,6 +186,12 @@ export function SubscriptionProvider({ children }) {
       isActive,
       isTrialing,
       isExpired,
+      // FREE_APP_MODE: an expired/cancelled household is the FREE tier -
+      // components render "Free plan" framing instead of the legacy
+      // read-only expired state. meter = { used, limit, reset_label }.
+      freeAppMode,
+      isFreeTier: freeAppMode && isExpired,
+      meter,
       // Signed up through a build whose onboarding showed a paywall, and
       // hasn't subscribed: PaywallGate re-shows that wall on launch.
       paywallRequired,
