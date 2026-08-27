@@ -513,7 +513,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             joiner inherits the household's existing plan, whatever it is. */}
         {!d?.joining && (
           <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
-            ✓ 14 days of Premium included - unlimited assistant, briefs and more
+            ✓ 14 days of Premium included - unlimited AI, briefs and more
           </p>
         )}
         {outcome?.kids?.length > 0 && (

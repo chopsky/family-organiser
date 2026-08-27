@@ -271,7 +271,7 @@ function buildCopy({ isExpired, isTrialing, isActive, daysRemaining, currentPlan
   if (isExpired) {
     return {
       headline: 'Go unlimited with Premium',
-      subhead: 'The app is free for your family. Premium adds the unlimited assistant, briefs, calendar sync and the document vault.',
+      subhead: 'The app is free for your family. Premium adds unlimited AI, briefs, calendar sync and the document vault.',
     };
   }
   if (isTrialing && daysRemaining != null) {
@@ -358,7 +358,7 @@ function PricingCard({ plan, plans, highlighted, currentPlan, submitting, disabl
 
       <ul className="space-y-2 mb-6 text-sm text-charcoal">
         {[
-          'Unlimited assistant - text, photo or voice note',
+          'Unlimited AI - ask by text, photo or voice note',
           'School letters: snap or forward, dates land themselves',
           'Morning & evening briefs, weekly digest',
           'Google, Apple & Outlook calendars in one place',
