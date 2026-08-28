@@ -213,33 +213,6 @@
 .lv [data-lv-reveal].pre { opacity: 0; transform: translateY(28px); }
 .lv [data-lv-reveal].in { opacity: 1; transform: translateY(0); }
 
-/* ── Watch it happen (before/after transformation) ── */
-.lv-transform { padding: 130px clamp(18px, 5vw, 72px) 0; max-width: 1240px; margin: 0 auto; }
-.lv-transform-grid { margin-top: 64px; display: flex; align-items: stretch; gap: 22px; }
-.lv-letter { flex: 1 1 0; background: #fff; border: 1px solid var(--lv-border); border-radius: 30px; padding: 32px 34px; font-size: 14.5px; line-height: 1.7; color: var(--lv-ink-2); box-shadow: 0 14px 40px rgba(80, 48, 140, 0.07); transform: rotate(-1.1deg); }
-.lv-letter p { margin: 0 0 12px; }
-.lv-letter mark { background: var(--lv-tint); color: var(--lv-purple); font-weight: 600; border-radius: 5px; padding: 1px 4px; }
-.lv-letter-head { border-bottom: 1px solid var(--lv-border); padding-bottom: 12px; margin-bottom: 16px; }
-.lv-letter-from { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--lv-muted); }
-.lv-letter-subj { font-size: 16.5px; font-weight: 700; color: var(--lv-ink); margin-top: 4px; }
-.lv-transform-arrow { align-self: center; flex: none; color: var(--lv-purple); background: var(--lv-tint); width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center; }
-.lv-extracted { flex: 1 1 0; background: #fff; border: 1px solid var(--lv-border); border-radius: 30px; padding: 32px 34px; display: flex; flex-direction: column; gap: 9px; }
-.lv-extracted .lv-chip { margin-bottom: 8px; }
-.lv-transform-note { margin-top: 10px; font-size: 13px; color: var(--lv-muted); line-height: 1.55; }
-@media (max-width: 860px) {
-  .lv-transform-grid { flex-direction: column; }
-  .lv-transform-arrow { transform: rotate(90deg); margin: -6px auto; }
-  .lv-letter { transform: none; }
-}
-
-/* ── Every way in (capture grid) ── */
-.lv-ways { padding: 110px clamp(18px, 5vw, 72px) 0; max-width: 1240px; margin: 0 auto; }
-.lv-ways-grid { margin-top: 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px; }
-.lv-way { background: #fff; border: 1px solid var(--lv-border); border-radius: 24px; padding: 26px 26px 24px; }
-.lv-way-ic { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--lv-tint); font-size: 22px; }
-.lv-way h4 { font-size: 18px; margin: 14px 0 6px; color: var(--lv-ink); }
-.lv-way p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--lv-ink-2); }
-
 /* ── Features grid ── */
 .lv-touches { padding: 130px clamp(18px, 5vw, 72px) 30px; max-width: 1240px; margin: 0 auto; }
 .lv-touch-head { max-width: 640px; margin: 0 auto; text-align: center; }
