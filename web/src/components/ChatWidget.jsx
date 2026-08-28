@@ -6,6 +6,8 @@ import { getDeviceLocation } from '../lib/location';
 import { useAuth } from '../context/AuthContext';
 import Sheet from './ui/Sheet';
 import AIComposer from './ui/AIComposer';
+import AiConsentNotice from './AiConsentNotice';
+import { hasAiConsent } from '../lib/aiConsent';
 
 // TEMPORARY (App Store screenshots, 2026-07-10): hide the floating AI orb in
 // the native app until this timestamp so screenshots don't include it. It
@@ -300,6 +302,10 @@ export default function ChatWidget({ isDashboard = false }) {
   const mobileFileRef = useRef(null);
   const mobileEndRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
+  // App Review 5.1.1(i): nothing may reach the AI providers until the user
+  // has seen the disclosure and agreed. Lazy initial read; agreeing flips
+  // it for good on this device.
+  const [aiConsented, setAiConsented] = useState(() => hasAiConsent());
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -630,12 +636,21 @@ I'm always here if you need me!`;
       setIsOpen(true);
 
       if (msg) {
-        // Send after a tick to let state settle
-        setTimeout(() => sendMessage(msg), 100);
+        if (!hasAiConsent()) {
+          // Consent not yet given: the overlay is about to show over the
+          // opened panel. Park the text in the composer instead of sending -
+          // nothing reaches the AI until they agree and press send.
+          setInput(msg);
+        } else {
+          // Send after a tick to let state settle
+          setTimeout(() => sendMessage(msg), 100);
+        }
       }
-      if (attach) {
+      if (attach && hasAiConsent()) {
         // Open the native file picker once the composer has mounted — target
         // whichever composer is visible (desktop docked panel vs mobile sheet).
+        // Pre-consent the picker stays shut: the overlay explains first, and
+        // the attach button is one tap away once they agree.
         setTimeout(() => {
           const sel = window.matchMedia('(min-width: 768px)').matches
             ? '[data-chat-file-input-desktop]' : '[data-chat-file-input]';
@@ -708,6 +723,18 @@ I'm always here if you need me!`;
         >
           <SparklesIcon className="h-6 w-6" />
         </button>
+      )}
+
+      {/* AI disclosure + permission - sits above BOTH panel variants and
+          blocks every input (composer, attachments, voice) until agreed.
+          "Not now" simply closes the chat; nothing has been sent. */}
+      {isOpen && !aiConsented && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{ background: 'rgba(26,22,32,0.42)' }}>
+          <AiConsentNotice
+            onAgree={() => setAiConsented(true)}
+            onNotNow={() => setIsOpen(false)}
+          />
+        </div>
       )}
 
       {/* Chat panel */}

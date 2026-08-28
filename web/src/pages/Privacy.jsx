@@ -184,8 +184,14 @@ export default function Privacy() {
               Housemait uses large-language-model AI providers to deliver several features - for example,
               classifying your WhatsApp messages into tasks or shopping items, answering chat questions,
               extracting items from receipt photos, and importing recipes from URLs. When these features
-              are used, the relevant message text, photo, or document you submit is sent to our AI providers
-              (see section 5).
+              are used, the relevant content you submit - message text, photos, documents, voice notes
+              (transcribed), school letters or website addresses you ask us to read, and emails from
+              senders you have approved for your house inbox - is sent to our AI providers (see section 5)
+              solely to produce the response or extraction you asked for.
+            </p>
+            <p>
+              The app asks for your permission before the first time it sends your content to an AI
+              provider, and names the providers in that notice.
             </p>
             <p>
               We do <strong>not</strong> use your household's personal data to train any third-party AI
@@ -220,7 +226,7 @@ export default function Privacy() {
                   <Row c1="Amazon Web Services (S3)" c2="Object storage for uploaded documents and media" c3="EU / US" />
                   <Row c1="Google (Gemini)" c2="Primary AI model for message classification and chat" c3="US" />
                   <Row c1="Anthropic (Claude)" c2="Fallback AI model" c3="US" />
-                  <Row c1="OpenAI (GPT-4o)" c2="Secondary fallback AI model" c3="US" />
+                  <Row c1="OpenAI (Whisper)" c2="Voice-note transcription (WhatsApp voice messages) and secondary fallback AI model" c3="US" />
                   <Row c1="Twilio" c2="WhatsApp message delivery and receiving" c3="US / EU" />
                   <Row c1="Postmark" c2="Transactional email delivery" c3="US / EU" />
                   <Row c1="Apple Push Notification service" c2="Delivering iOS push notifications" c3="Global" />

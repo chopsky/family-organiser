@@ -28,6 +28,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { BottomSheet } from './BottomSheet';
 import api from '../lib/api';
+import AiConsentNotice from './AiConsentNotice';
+import { hasAiConsent } from '../lib/aiConsent';
 
 // Matching src/components/ActivityModal.jsx so the two read as one family.
 const INK = '#1A1620', INK2 = '#4A4453', INK3 = '#8A8493';
@@ -145,6 +147,22 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
   // countries go straight to the country-neutral method picker.
   const hasFork = country === 'GB' || country === 'ZA' || (sharedDates?.count > 0);
   const [step, setStep] = useState(hasFork ? 'fork' : 'methods');
+  // App Review 5.1.1(i): the AI-touching imports (website page, PDF, photo
+  // of the letter) send what the user provides to the AI providers, so
+  // those actions are fronted by the same disclosure as the chat - shared
+  // once-per-device flag. Manual entry, iCal and the structured sources
+  // are deterministic and stay ungated.
+  const [aiConsented, setAiConsented] = useState(() => hasAiConsent());
+  // When set, the consent card is showing and holds the action to resume
+  // on agree: {resume: fn}.
+  const [askConsent, setAskConsent] = useState(null);
+  const withAiConsent = (fn) => (...args) => {
+    if (!aiConsented && !hasAiConsent()) {
+      setAskConsent({ resume: () => fn(...args) });
+      return;
+    }
+    return fn(...args);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [url, setUrl] = useState('');
@@ -281,6 +299,14 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
     }
   }
 
+  function openLetterPicker() {
+    if (!aiConsented && !hasAiConsent()) {
+      setAskConsent({ resume: () => fileRef.current?.click() });
+      return;
+    }
+    fileRef.current?.click();
+  }
+
   function previewWebsite() {
     // Parents paste "school.com/term-dates" as often as a full address.
     let target = url.trim();
@@ -350,6 +376,15 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
 
   return (
     <BottomSheet open={open} onDismiss={abandon} contentClassName="bg-white">
+      {askConsent && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(26,22,32,0.42)', borderRadius: 'inherit' }}>
+          <AiConsentNotice
+            context="school"
+            onAgree={() => { setAiConsented(true); const r = askConsent.resume; setAskConsent(null); r(); }}
+            onNotNow={() => setAskConsent(null)}
+          />
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
         {/* Header: back appears from step 2 onward, × always. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 22px 12px' }}>
@@ -551,7 +586,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
               <Sub>A photo of the printed calendar works too.</Sub>
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={openLetterPicker}
                 disabled={busy}
                 style={{
                   width: '100%', padding: '28px 16px', borderRadius: 16,
@@ -685,7 +720,7 @@ export default function TermDatesSheet({ open, school, sharedDates = null, count
               </>
             )}
             {(step === 'website' || step === 'ical') && (
-              <button type="button" onClick={isIcal ? previewIcal : previewWebsite} disabled={!urlOk || busy} style={cta(!urlOk || busy)}>
+              <button type="button" onClick={isIcal ? previewIcal : withAiConsent(previewWebsite)} disabled={!urlOk || busy} style={cta(!urlOk || busy)}>
                 {busy ? 'Reading the page…' : 'Find the dates'}
               </button>
             )}
