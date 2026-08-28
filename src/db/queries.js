@@ -7132,6 +7132,20 @@ async function markPingNoticeIfUnsent(userId, db = supabase) {
   return (data || []).length > 0;
 }
 
+/** Claim the once-ever gratitude review ask for a user. Same atomic
+ *  conditional-update shape as markPingNoticeIfUnsent: only the caller
+ *  that flips NULL -> now() wins; pre-migration the missing column
+ *  throws and the caller skips (no stamp = repeat risk = don't send). */
+async function markReviewAskIfUnsent(userId, db = supabase) {
+  const { data, error } = await db.from('users')
+    .update({ review_ask_sent_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('review_ask_sent_at', null)
+    .select('id');
+  if (error) throw error;
+  return (data || []).length > 0;
+}
+
 async function markFarewellBriefSent(householdId, db = supabase) {
   const { error } = await db.from('households')
     .update({ farewell_brief_sent_at: new Date().toISOString() })
@@ -11340,6 +11354,7 @@ module.exports = {
   markMeterLimitNotice,
   markFarewellBriefSent,
   markPingNoticeIfUnsent,
+  markReviewAskIfUnsent,
   hasRecentDeliberateActivity,
   getLapsedHouseholdIds,
   getMeterStats,

@@ -13,6 +13,7 @@ const whatsapp = require('../services/whatsapp');
 const broadcast = require('../services/broadcast');
 const handlers = require('../bot/handlers');
 const assistantMeter = require('../services/assistant-meter');
+const reviewAsk = require('../services/review-ask');
 const cache = require('../services/cache');
 const { isSupportedDocument } = require('../services/document-extract');
 
@@ -580,7 +581,11 @@ router.post('/webhook', async (req, res) => {
         const ctx = {};
         const result = await handlers.handleTextMessage(text, user, household, ctx);
         const metered = await applyAssistantMeter(householdRow, user, ctx, result.response, 'whatsapp');
-        await whatsapp.sendMessage(phone, metered);
+        // Pure-gratitude turns may carry the once-ever review-ask PS
+        // (service enforces every guard; on any doubt it returns the
+        // reply untouched).
+        const decorated = await reviewAsk.maybeAppendReviewAsk({ user, text, intent: ctx.intent, reply: metered });
+        await whatsapp.sendMessage(phone, decorated);
         db.logWhatsAppMessage({ householdId: user.household_id, userId: user.id, direction: 'inbound', messageType: 'text', intent: ctx.intent || null, processingMs: Date.now() - start, body: text, response: result.response });
 
         // Broadcast to other members
