@@ -2854,7 +2854,7 @@ export default function Settings() {
       {/* Rate Housemait - Android's counterpart to the row iOS gets in its
           grouped list (iosListMode). Opens the Play listing; web is skipped
           because a browser-only user has no store to review in. */}
-      {isAndroidPlatform && (
+      {isAndroid() && (
         <button
           onClick={openWriteReview}
           className="w-full mt-3 py-3 rounded-2xl border border-cream-border text-cocoa font-semibold text-sm hover:bg-cream transition-colors inline-flex items-center justify-center gap-2"
