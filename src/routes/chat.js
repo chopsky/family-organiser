@@ -1409,7 +1409,15 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         ...(result.calendar_event ? [result.calendar_event] : []),
         ...(Array.isArray(result.calendar_events) ? result.calendar_events.filter(Boolean) : []),
       ];
-      for (const ev of pdfEvents) {
+      // Same dedupe as the image path: skip what synced term dates or
+      // existing rows already cover (school PDFs repeat both).
+      const pdfDupVerdicts = await findExtractionDuplicates(
+        req.householdId,
+        pdfEvents.map((e) => ({ title: e.title, date: e.date })),
+      );
+      const pdfSkipped = pdfDupVerdicts.filter(Boolean);
+      for (const [evIndex, ev] of pdfEvents.entries()) {
+        if (pdfDupVerdicts[evIndex]) continue;
         try {
           const rawNames = Array.isArray(ev.assigned_to_names) ? ev.assigned_to_names : (ev.assigned_to_name ? [ev.assigned_to_name] : []);
           const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
@@ -1454,7 +1462,9 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         }
       }
 
-      if (summaryLines.length > 0) cache.invalidate(`digest:${req.householdId}`);
+      const pdfSkipLine = skippedLine(pdfSkipped.length, pdfSkipped.includes('term_dates'));
+      if (pdfSkipLine) summaryLines.push(pdfSkipLine);
+      if (executedActions.length > 0) cache.invalidate(`digest:${req.householdId}`);
       const msg = summaryLines.length > 0
         ? `📄 Read your PDF.\n\n${summaryLines.join('\n')}`
         : (result.response_message || "📄 I read the PDF but didn't find anything actionable to add (no clear events, tasks, or items).");

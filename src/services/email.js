@@ -294,12 +294,17 @@ async function sendVerifyNudgeEmail(to, name, token, code = null) {
  * mangles HTML, and the link survives plain text fine.
  */
 async function sendInboundEmailConfirmation(to, summary, undoUrl, originalSubject) {
-  const html = emailTemplate('Housemait processed your email', `
-    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Got your forwarded email${originalSubject ? ` (<em>${originalSubject}</em>)` : ''}.</p>
-    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;white-space:pre-line;">${summary}</p>
+  // No undoUrl = nothing was changed (e.g. every event was already on the
+  // calendar), so the revert section would be a broken button - omit it.
+  const undoBlock = undoUrl ? `
     <p style="color:${BRAND.ink};line-height:1.6;font-size:14px;">If anything looks wrong, tap below to revert everything:</p>
     <div style="text-align:center;">${button('Undo everything', undoUrl)}</div>
     <p style="color:${BRAND.inkLight};font-size:13px;">The undo link works once - after you tap it, your data is restored to before this email was processed.</p>
+  ` : '';
+  const html = emailTemplate('Housemait processed your email', `
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;">Got your forwarded email${originalSubject ? ` (<em>${originalSubject}</em>)` : ''}.</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;white-space:pre-line;">${summary}</p>
+    ${undoBlock}
   `);
   await sendEmail(to, 'Housemait: processed your forwarded email', html);
 }

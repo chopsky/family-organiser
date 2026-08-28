@@ -7,6 +7,7 @@ const { extractEmailContent, extractAttachmentText } = require('../services/emai
 const { localToUTC } = require('../utils/local-time');
 const { detectAisle } = require('../utils/aisle-detect');
 const { sendInboundEmailConfirmation, sendInboundEmailNoResults } = require('../services/email');
+const { findExtractionDuplicates, skippedLine } = require('../services/event-dedupe');
 const push = require('../services/push');
 const assistantMeter = require('../services/assistant-meter');
 
@@ -343,8 +344,22 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
       // Beef Mince 500g" alongside "beef mince").
 
       // Handle calendar events
+      let eventsSkipped = 0;
+      let skippedTermDates = false;
       if (emailResult?.events?.length) {
-        for (const ev of emailResult.events) {
+        // A forwarded school newsletter usually repeats the half term and
+        // INSET days the term-date sync already shows, and a re-forwarded
+        // email repeats everything - skip what the calendar already covers.
+        const dupVerdicts = await findExtractionDuplicates(
+          householdId,
+          emailResult.events.map((e) => ({ title: e.title, date: e.date })),
+        );
+        for (const [evIndex, ev] of emailResult.events.entries()) {
+          if (dupVerdicts[evIndex]) {
+            eventsSkipped++;
+            if (dupVerdicts[evIndex] === 'term_dates') skippedTermDates = true;
+            continue;
+          }
           try {
             const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
             const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
@@ -449,6 +464,10 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
             const names = actionsTaken.event_titles.slice(0, 4).join(', ');
             lines.push(`📅 Added ${eventsCreated} event${eventsCreated === 1 ? '' : 's'} to the calendar${names ? ` (${names})` : ''}.`);
           }
+          if (eventsSkipped) {
+            const skipLine = skippedLine(eventsSkipped, skippedTermDates);
+            if (skipLine) lines.push(skipLine.replace('⏭️ ', ''));
+          }
           if (tasksCreated) {
             const names = actionsTaken.task_titles.slice(0, 4).join(', ');
             lines.push(`☑ Added ${tasksCreated} task${tasksCreated === 1 ? '' : 's'}${names ? ` (${names})` : ''}.`);
@@ -457,6 +476,16 @@ router.post('/webhook', inboundLimiter, async (req, res) => {
           await sendInboundEmailConfirmation(from, lines.join('\n'), undoUrl, subject);
         } catch (err) {
           console.warn('[inbound-email] Confirmation email failed:', err.message);
+        }
+      } else if (from && eventsSkipped > 0) {
+        // Everything in the email was already on the calendar (usually a
+        // re-forward, or a newsletter repeating synced term dates). "Found
+        // nothing" would read as a failure - say what actually happened.
+        try {
+          const skipLine = skippedLine(eventsSkipped, skippedTermDates).replace('⏭️ ', '');
+          await sendInboundEmailConfirmation(from, `${skipLine} Nothing new to add.`, null, subject);
+        } catch (err) {
+          console.warn('[inbound-email] Skip-only confirmation failed:', err.message);
         }
       } else if (from && !NO_REPLY_RE.test(fromAddress)) {
         // We received and processed the email but found nothing to add. Always
