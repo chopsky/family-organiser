@@ -9,6 +9,7 @@ const { callWithFailover } = require('../services/ai-client');
 const { getWeatherReport, composeWeatherAnswer, getCityFromTimezone, extractLocationFromMessage, geocodeLocation, reverseGeocode } = require('../services/weather');
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
+const { findExtractionDuplicates, skippedLine } = require('../services/event-dedupe');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { transcribeVoice } = require('../services/transcribe');
 const assistantMeter = require('../services/assistant-meter');
@@ -1523,7 +1524,15 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
     // ── Event/invitation handling ──
     if (scan.type === 'event' && scan.events?.length) {
       const created = [];
-      for (const ev of scan.events) {
+      const skippedDups = [];
+      // Skip what the calendar already shows - synced term dates
+      // (half term/INSET) and same-title-same-day rows (re-sent photos).
+      const dupVerdicts = await findExtractionDuplicates(
+        req.householdId,
+        scan.events.map((e) => ({ title: e.title, date: e.date })),
+      );
+      for (const [evIndex, ev] of scan.events.entries()) {
+        if (dupVerdicts[evIndex]) { skippedDups.push(dupVerdicts[evIndex]); continue; }
         try {
           // Image-scan output uses assigned_to_names[] in the prompt
           // schema; fall back to legacy singular for safety. Resolve to
@@ -1582,9 +1591,16 @@ router.post('/image', requireAuth, requireHousehold, chatAttachmentUpload.single
         }
       }
 
-      if (created.length) {
-        let msg = `📅 **${created.length} event${created.length > 1 ? 's' : ''} added to calendar:**\n`;
-        created.forEach(t => { msg += `• ${t}\n`; });
+      if (created.length || skippedDups.length) {
+        let msg;
+        if (created.length) {
+          msg = `📅 **${created.length} event${created.length > 1 ? 's' : ''} added to calendar:**\n`;
+          created.forEach(t => { msg += `• ${t}\n`; });
+          const skipLine = skippedLine(skippedDups.length, skippedDups.includes('term_dates'));
+          if (skipLine) msg += `\n${skipLine}\n`;
+        } else {
+          msg = `📅 ${skippedLine(skippedDups.length, skippedDups.includes('term_dates'))} Nothing new to add.\n`;
+        }
         if (scan.summary) msg += `\n${scan.summary}`;
         cache.invalidate(`digest:${req.householdId}`);
 

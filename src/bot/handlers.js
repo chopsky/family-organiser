@@ -26,6 +26,7 @@ const { routeReadIntent } = require('../services/intent-router');
 const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
 const { buildDayView } = require('../services/chores');
 const { looksLikeParty } = require('../utils/party-detect');
+const { findExtractionDuplicates, skippedLine } = require('../services/event-dedupe');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
 //
@@ -4933,7 +4934,16 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
   if (scan.type === 'event' && scan.events?.length) {
     const userTz = user.timezone || household.timezone || 'Europe/London';
     const created = [];
-    for (const ev of scan.events) {
+    const skipped = [];
+    // A photographed school schedule usually contains the half term and
+    // INSET days the term-date sync already puts on the calendar - and a
+    // re-sent photo contains everything. Skip what's already covered.
+    const dupVerdicts = await findExtractionDuplicates(
+      household.id,
+      scan.events.map((e) => ({ title: e.title, date: e.date })),
+    );
+    for (const [evIndex, ev] of scan.events.entries()) {
+      if (dupVerdicts[evIndex]) { skipped.push(dupVerdicts[evIndex]); continue; }
       try {
         const rawNames = ev.assigned_to_names || (ev.assigned_to_name ? [ev.assigned_to_name] : []);
         const { ids: assigneeIds, names: assigneeNames } = db.resolveAssignees(rawNames, members);
@@ -4973,8 +4983,19 @@ async function handlePhoto(imageBuffer, mimeType, user, household, caption = '')
     if (created.length) {
       const lines = [`📅 *${created.length} event${created.length > 1 ? 's' : ''} added to calendar:*`];
       created.forEach(t => lines.push(`• ${t}`));
+      const skipLine = skippedLine(skipped.length, skipped.includes('term_dates'));
+      if (skipLine) lines.push(`\n${skipLine}`);
       if (scan.summary) lines.push(`\n${scan.summary}`);
       return { response: lines.join('\n'), actions: noActions };
+    }
+
+    if (skipped.length) {
+      // Everything in the photo was already on the calendar - say so
+      // rather than reporting a failure.
+      return {
+        response: `📅 ${skippedLine(skipped.length, skipped.includes('term_dates'))} Nothing new to add.`,
+        actions: noActions,
+      };
     }
 
     return {
