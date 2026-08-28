@@ -2851,6 +2851,19 @@ export default function Settings() {
         Help &amp; support
       </button>
 
+      {/* Rate Housemait - Android's counterpart to the row iOS gets in its
+          grouped list (iosListMode). Opens the Play listing; web is skipped
+          because a browser-only user has no store to review in. */}
+      {isAndroidPlatform && (
+        <button
+          onClick={openWriteReview}
+          className="w-full mt-3 py-3 rounded-2xl border border-cream-border text-cocoa font-semibold text-sm hover:bg-cream transition-colors inline-flex items-center justify-center gap-2"
+        >
+          <IconStar className="h-4 w-4 text-plum" />
+          Rate Housemait
+        </button>
+      )}
+
       {/* Log out - bottom of the page. Standard convention in most
           settings UIs; users scrolling to the end of Settings expect to
           find it here. */}

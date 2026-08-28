@@ -28,6 +28,7 @@ import { App } from '@capacitor/app';
 import { InAppReview } from '@capacitor-community/in-app-review';
 
 export const APP_STORE_ID = '6762131562';
+export const PLAY_PACKAGE_ID = 'com.housemait.app';
 
 const FIRST_SEEN_KEY = 'housemait_first_seen';
 const PROMPTED_KEY = 'housemait_review_prompted_version';
@@ -88,12 +89,23 @@ export async function maybeRequestReview() {
   } catch { /* never surface */ }
 }
 
-/** Open the App Store review composer directly (no quota, user-initiated). */
+/** Open the store review composer directly (no quota, user-initiated).
+ *  Platform-aware: Play has no write-review deep link, so Android opens
+ *  the listing (the review box is one scroll down). */
 export function openWriteReview() {
-  const url = Capacitor.isNativePlatform()
+  const isNative = Capacitor.isNativePlatform();
+  if (Capacitor.getPlatform() === 'android') {
+    const url = isNative
+      ? `market://details?id=${PLAY_PACKAGE_ID}`
+      : `https://play.google.com/store/apps/details?id=${PLAY_PACKAGE_ID}`;
+    if (isNative) window.location.href = url;
+    else window.open(url, '_blank', 'noopener');
+    return;
+  }
+  const url = isNative
     ? `itms-apps://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`
     : `https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`;
-  if (Capacitor.isNativePlatform()) {
+  if (isNative) {
     window.location.href = url; // external scheme handled by the shell
   } else {
     window.open(url, '_blank', 'noopener');
