@@ -434,6 +434,9 @@ export default function Calendar() {
   const [inviteRoster, setInviteRoster] = useState(null);
   const [inviteUrl, setInviteUrl] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
+  // Just-saved gathering offer ({id, title}) - see the save handler.
+  const [gatherOffer, setGatherOffer] = useState(null);
+  const [gatherBusy, setGatherBusy] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteRosterOpen, setInviteRosterOpen] = useState(false);
   const [formTitle, setFormTitle] = useState('');
@@ -1410,11 +1413,13 @@ export default function Calendar() {
         payload.end_time = new Date(`${formEndDate || formDate}T${formEnd}:00`).toISOString();
       }
 
+      let createdEvent = null;
       if (editingEvent) {
         await api.patch(`/calendar/events/${editingEvent.id}`, payload);
       } else {
         try {
-          await api.post('/calendar/events', payload);
+          const { data } = await api.post('/calendar/events', payload);
+          createdEvent = data?.event || null;
         } catch (err) {
           // Backend returns 409 when a matching event already exists for the
           // same date, to prevent silent duplicates. Ask the user whether to
@@ -1423,7 +1428,8 @@ export default function Calendar() {
             const existingMsg = err.response?.data?.message || 'A similar event already exists.';
             const confirmMsg = `${existingMsg}\n\nAdd it anyway?`;
             if (window.confirm(confirmMsg)) {
-              await api.post('/calendar/events', { ...payload, force: true });
+              const { data } = await api.post('/calendar/events', { ...payload, force: true });
+              createdEvent = data?.event || null;
             } else {
               setSaving(false);
               return; // keep the form open so the user can edit or cancel
@@ -1437,6 +1443,14 @@ export default function Calendar() {
       resetForm();
       invalidateMonthCache();
       await load();
+      // Creation-moment invite offer: the "🎈 Hosting a party?" card only
+      // lives inside the saved event's edit sheet, which most people never
+      // reopen - so a just-created gathering offers the RSVP link right
+      // here, at the moment of maximum intent. (The bot has had this
+      // parity since the party-invite loop shipped.)
+      if (createdEvent?.id && looksLikeGathering(createdEvent.title || payload.title) && !childMode) {
+        setGatherOffer({ id: createdEvent.id, title: createdEvent.title || payload.title });
+      }
     } catch (err) {
       // Surface the server's actual error message instead of swallowing
       // it behind a generic banner - previously a failing PATCH said
@@ -2412,6 +2426,14 @@ export default function Calendar() {
                             : (item.all_day
                                 ? 'All day'
                                 : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
+                          {/* Ambient discovery for the invite loop: gatherings
+                              show where the RSVP link lives (tap = the event
+                              sheet, where the 🎈 card sits). */}
+                          {item._type === 'event' && !childMode
+                            && item.category !== 'public_holiday' && item.category !== 'birthday'
+                            && looksLikeGathering(item.title) && (
+                            <span className="ml-1.5 font-semibold text-plum">🎈 Invite families</span>
+                          )}
                         </div>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
@@ -2750,6 +2772,11 @@ export default function Calendar() {
                         : (item.all_day
                             ? 'All day'
                             : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
+                      {item._type === 'event' && !childMode
+                        && item.category !== 'public_holiday' && item.category !== 'birthday'
+                        && looksLikeGathering(item.title) && (
+                        <span className="ml-1.5 font-semibold text-plum">🎈 Invite families</span>
+                      )}
                     </div>
                   </div>
                   <span
@@ -3801,6 +3828,47 @@ export default function Calendar() {
           onClose={() => setActivityEdit(null)}
           onChanged={refresh}
         />
+      )}
+
+      {/* Creation-moment invite offer for a just-saved gathering. Fixed
+          above the tab bar; one link taps straight into the share sheet. */}
+      {gatherOffer && (
+        <div className="fixed inset-x-4 z-40 md:left-auto md:right-6 md:w-[360px]" style={{ bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}>
+          <div className="bg-white rounded-2xl p-4" style={{ boxShadow: 'var(--shadow-lg)', border: '1px solid rgba(107,63,160,0.2)' }}>
+            <div className="text-[13.5px] font-semibold text-charcoal">🎈 Sounds like a gathering!</div>
+            <div className="text-[12.5px] text-warm-grey mt-1 leading-relaxed">
+              Share one link and the other families can RSVP - no app needed. Headcounts and allergy notes come back to you.
+            </div>
+            <div className="flex items-center gap-3 mt-3">
+              <button
+                type="button"
+                disabled={gatherBusy}
+                onClick={async () => {
+                  setGatherBusy(true);
+                  try {
+                    const { data } = await api.post(`/calendar/events/${gatherOffer.id}/invite-link`);
+                    if (navigator.share) {
+                      try { await navigator.share({ title: gatherOffer.title || 'You’re invited', url: data.url }); } catch { /* sheet closed */ }
+                    } else {
+                      await copyInviteUrl(data.url);
+                    }
+                    setGatherOffer(null);
+                  } catch {
+                    alert('Could not create the invite link — you can also do it from the event itself.');
+                  } finally {
+                    setGatherBusy(false);
+                  }
+                }}
+                className="h-10 px-4 rounded-xl bg-plum text-white text-[13px] font-semibold disabled:opacity-60"
+              >
+                {gatherBusy ? 'Creating…' : 'Create invite link'}
+              </button>
+              <button type="button" onClick={() => setGatherOffer(null)} className="text-[13px] font-semibold text-warm-grey">
+                Not now
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
