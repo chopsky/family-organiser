@@ -607,7 +607,7 @@ export default function LandingPage() {
             <div className="lv-tdchip" role="status">✓&nbsp;{termDatesRibbon} term dates included</div>
           )}
           <h1>Family life,<br />{organised} with AI.</h1>
-          <p className="lv-hero-sub">One home for the family calendar, school dates, meals, lists and chores, with an AI assistant you can message in WhatsApp.</p>
+          <p className="lv-hero-sub">School dates automatically in your calendar, the week’s meals planned, everyone’s chores sorted. Housemait manages it all, with an AI assistant you can message in WhatsApp.</p>
           <div className="lv-hero-ctas">
             {APP_STORE_CONFIGURED ? (
               <QrLink href={heroApp.href} className="lv-btn-shine" preferUp qrs={heroApp.qrs} ariaLabel="Get the Housemait app — hover to scan the App Store or Google Play code">
