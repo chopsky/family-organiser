@@ -13,7 +13,9 @@ import { IconSparkles } from './Icons';
 export default function AiConsentNotice({ onAgree, onNotNow, context = 'chat' }) {
   const whatGoes = context === 'school'
     ? 'the school website address, PDF or photo of the letter you provide'
-    : 'the messages you type and any photos or documents you share here';
+    : context === 'app'
+      ? 'the messages, photos and documents you share with the assistant - and anything you ask it to create, like meal ideas or an imported recipe'
+      : 'the messages you type and any photos or documents you share here';
 
   return (
     <div className="bg-white rounded-3xl p-6 max-w-sm w-full" style={{ boxShadow: 'var(--shadow-lg)' }}>

@@ -3,6 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChildMode } from '../context/ChildModeContext';
 import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
+import AiConsentGate from './AiConsentGate';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
 import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconList, IconGift, IconStar, IconMail, IconSchool } from './Icons';
@@ -447,6 +448,12 @@ export default function Layout({ children }) {
           inline composer, so ChatWidget shows the floating orb only on mobile
           there (isDashboard) — every other page shows it on both. */}
       {!childMode && <Suspense fallback={null}><ChatWidget isDashboard={isDashboard} /></Suspense>}
+
+      {/* App-level AI disclosure + permission (5.1.1(i)): unmissable on
+          first signed-in entry, and the imperative gate every AI feature
+          asks through. Child Mode never sees it - consent is an adult's
+          to give. */}
+      {!childMode && <AiConsentGate />}
 
       {/* Trial-ended overlay - only renders for expired households who
           haven't dismissed it this session. Scoped to Layout so it

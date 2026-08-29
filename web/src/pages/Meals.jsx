@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { ensureAiConsent } from '../lib/aiConsent';
 import { recordWin } from '../lib/appReview';
 import { loadCached } from '../lib/offlineCache';
 import { confirmDestructive } from '../lib/action-sheet';
@@ -286,6 +287,7 @@ function MealPlanView({ setError }) {
         setSuggesting(false);
         return;
       }
+      if (!(await ensureAiConsent())) { setSuggesting(false); return; }
       const res = await api.post('/meals/suggest', { category: 'dinner', count: emptySlots.length });
       const suggestions = res.data.suggestions ?? [];
       if (suggestions.length === 0) {
@@ -952,6 +954,7 @@ function MealPickerModal({ cell, existingMeal, onSelect, onClose, setError }) {
   }
 
   async function fetchAiSuggestions() {
+    if (!(await ensureAiConsent())) return;
     setAiLoading(true);
     try {
       const res = await api.post('/meals/suggest', { category: cell.category, count: 5 });
@@ -1225,6 +1228,7 @@ function RecipeBoxView({ setError }) {
   // Import from URL
   async function handleImportUrl() {
     if (!importUrl.trim()) return;
+    if (!(await ensureAiConsent())) return;
     setImportingUrl(true);
     try {
       const res = await api.post('/recipes/import-url', { url: importUrl.trim() });

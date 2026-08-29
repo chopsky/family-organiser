@@ -34,3 +34,32 @@ export function recordAiConsent() {
     // their own in-memory state after calling this.
   }
 }
+
+// Session-scoped "Not now" on the app-level modal: it comes back next
+// session (and immediately on any explicit AI action), never nags twice
+// in one sitting.
+const LATER_KEY = 'housemait_ai_consent_later';
+
+export function consentDeferredThisSession() {
+  try { return sessionStorage.getItem(LATER_KEY) === '1'; } catch { return false; }
+}
+export function deferConsentThisSession() {
+  try { sessionStorage.setItem(LATER_KEY, '1'); } catch { /* per-session nicety only */ }
+}
+
+// The app-level gate (AiConsentGate, mounted in Layout) registers here so
+// AI features anywhere in the shell can ask imperatively:
+//   if (!(await ensureAiConsent())) return;
+// Resolves true immediately when consent already stands; otherwise opens
+// the modal and resolves with the user's answer. With no gate mounted
+// (never the case inside the app shell) it refuses rather than leaks.
+let askGate = null;
+export function registerConsentGate(fn) {
+  askGate = fn;
+  return () => { if (askGate === fn) askGate = null; };
+}
+export function ensureAiConsent() {
+  if (hasAiConsent()) return Promise.resolve(true);
+  if (!askGate) return Promise.resolve(false);
+  return askGate();
+}
