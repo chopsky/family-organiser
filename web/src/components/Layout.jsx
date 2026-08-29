@@ -537,7 +537,12 @@ function MoreAIField({ onClose }) {
         }}
       >
         <div className="flex items-center gap-2 bg-white" style={{ borderRadius: 18.5, padding: '8px 8px 8px 14px' }}>
-          <IconSparkles className="shrink-0 text-plum" style={{ width: 17, height: 17 }} strokeWidth={1.8} aria-hidden="true" />
+          {/* Handoff's filled sparkle (icons.jsx), not the app's outline
+              variant - the reference JSX is the source of truth here. */}
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="var(--color-plum)" className="shrink-0" aria-hidden="true">
+            <path d="M12 2l1.8 4.7a4 4 0 0 0 2.5 2.5L21 11l-4.7 1.8a4 4 0 0 0-2.5 2.5L12 20l-1.8-4.7a4 4 0 0 0-2.5-2.5L3 11l4.7-1.8a4 4 0 0 0 2.5-2.5L12 2z" />
+            <path d="M19 2l.7 1.8a1.5 1.5 0 0 0 .8.8L22 5l-1.5.4a1.5 1.5 0 0 0-.8.8L19 8l-.7-1.8a1.5 1.5 0 0 0-.8-.8L16 5l1.5-.4a1.5 1.5 0 0 0 .8-.8L19 2z" />
+          </svg>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -555,41 +560,54 @@ function MoreAIField({ onClose }) {
             style={{ fontSize: 14.5, fontWeight: 400, padding: '6px 0' }}
           />
           {/* 30/34px visuals with padding insets for >=44pt effective targets. */}
+          {/* Hit wrappers are TRANSPARENT with padding/negative margin;
+              the visible tile inside stays at spec size - content-box
+              padding on the button itself painted the background across
+              the inset and inflated the visuals (founder catch). */}
           <button
             type="button"
             aria-label="Attach"
             onClick={() => routeToAssistant({ attach: true }, onClose)}
-            className="shrink-0 flex items-center justify-center text-warm-grey active:scale-95 transition-transform"
-            style={{ width: 30, height: 30, borderRadius: 10, padding: 7, margin: -7, boxSizing: 'content-box' }}
+            className="shrink-0 flex items-center justify-center active:scale-95 transition-transform"
+            style={{ padding: 7, margin: -7, background: 'transparent', border: 0 }}
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.83l8.49-8.48" /></svg>
+            <span className="flex items-center justify-center text-warm-grey" style={{ width: 30, height: 30, borderRadius: 10 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.83l8.49-8.48" /></svg>
+            </span>
           </button>
           {q.trim() ? (
             <button
               type="button"
               onClick={send}
               aria-label="Send"
-              className="shrink-0 flex items-center justify-center text-white active:scale-95"
-              style={{
-                width: 34, height: 34, borderRadius: 12, padding: 5, margin: -5, boxSizing: 'content-box',
-                background: 'linear-gradient(135deg, var(--color-plum) 0%, var(--color-plum-bright) 100%)',
-                boxShadow: '0 4px 12px rgba(109,56,173,0.35)', transition: 'all .15s ease',
-              }}
+              className="shrink-0 flex items-center justify-center active:scale-95"
+              style={{ padding: 5, margin: -5, background: 'transparent', border: 0 }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+              <span
+                className="flex items-center justify-center text-white"
+                style={{
+                  width: 34, height: 34, borderRadius: 12,
+                  background: 'linear-gradient(135deg, var(--color-plum) 0%, var(--color-plum-bright) 100%)',
+                  boxShadow: '0 4px 12px rgba(109,56,173,0.35)', transition: 'all .15s ease',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+              </span>
             </button>
           ) : (
             <button
               type="button"
               aria-label="Voice"
               onClick={() => routeToAssistant({ voice: true }, onClose)}
-              className="shrink-0 flex items-center justify-center text-plum active:scale-95"
-              style={{
-                width: 34, height: 34, borderRadius: 12, padding: 5, margin: -5, boxSizing: 'content-box',
-                background: 'var(--color-plum-light)', transition: 'all .15s ease',
-              }}
+              className="shrink-0 flex items-center justify-center active:scale-95"
+              style={{ padding: 5, margin: -5, background: 'transparent', border: 0 }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" /></svg>
+              <span
+                className="flex items-center justify-center text-plum"
+                style={{ width: 34, height: 34, borderRadius: 12, background: 'var(--color-plum-light)', transition: 'all .15s ease' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" /></svg>
+              </span>
             </button>
           )}
         </div>
