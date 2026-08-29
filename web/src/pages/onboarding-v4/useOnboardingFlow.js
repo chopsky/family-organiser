@@ -115,14 +115,16 @@ export default function useOnboardingFlow(initialPhase = 'splash') {
   }, [update, next, clearTimer]);
 
   /** Called once the account exists and queued connections have been
-   *  replayed. Straight to 'done' for everyone: the onboarding wall is
-   *  MOTHBALLED under the free-app model (no wall on any platform -
-   *  docs/spec-free-app-paid-assistant.md). PaywallScreen stays in the
-   *  codebase unreferenced-by-flow, not deleted. */
+   *  replayed. Lands on the post-auth WhatsApp pairing phase - the one
+   *  moment the pairing can actually run (an account now exists to bind
+   *  the number to); the screen advances itself to 'done' on link, skip,
+   *  or pairing being unavailable. The onboarding wall stays MOTHBALLED
+   *  under the free-app model (docs/spec-free-app-paid-assistant.md);
+   *  PaywallScreen remains unreferenced-by-flow, not deleted. */
   const finish = useCallback(() => {
     clearTimer();
     clearDraft();
-    setNav({ phase: 'done', i: 0 });
+    setNav({ phase: 'whatsapp', i: 0 });
   }, [clearTimer]);
 
   // Every consumer sees the effective index, never a skipped one.

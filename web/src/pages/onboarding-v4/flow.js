@@ -10,10 +10,8 @@ import { Capacitor } from '@capacitor/core';
 // Spec: STEPS drives the progress bar; advancing past the last sets phase
 // 'signup'. The per-provider calendar connect view lives INSIDE the 'cals'
 // step, deliberately NOT in this array, so progress doesn't jump to 100%.
-// 'inbox' sits between 'ask' and 'reminders' on purpose: the two
-// send-it-to-us channels belong together, and the copy reads as a
-// continuation ("Or just text it to us." -> "And an address for the
-// paperwork."). progressPct divides by STEPS.length, so the
+// 'inbox' sits between 'cals' and 'reminders': the send-it-to-us
+// channels cluster at the end of setup. progressPct divides by STEPS.length, so the
 // denominator renumbers itself.
 // 'kids' shows only when the shape answer says children are in the picture
 // (kids / single / multigen) - machine.js hops it otherwise. It exists
@@ -22,9 +20,15 @@ import { Capacitor } from '@capacitor/core';
 // hiding Child Mode, School and the star chart behind hasChildren gates
 // until someone wandered into Family Setup (and the App Review 2.3.6
 // rejection hit exactly that blindness).
-export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'kids', 'house', 'cals', 'ask', 'inbox', 'reminders'];
+// 'ask' (the pre-auth WhatsApp step) was REMOVED 2026-08-28: it could only
+// record intent (no account exists yet to bind a number to), the button read
+// as if it had connected, and ~70% of households never completed the deferred
+// pairing. The real, live pairing now happens in the post-auth 'whatsapp'
+// PHASE, between sign-up and the celebration - where the code exchange can
+// actually run and the UI can tell the truth.
+export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'kids', 'house', 'cals', 'inbox', 'reminders'];
 
-export const PHASES = ['splash', 'flow', 'login', 'signup', 'done'];
+export const PHASES = ['splash', 'flow', 'login', 'signup', 'whatsapp', 'done'];
 
 /**
  * v4 is iOS/Android ONLY for now (founder decision: app first, web later).

@@ -75,3 +75,7 @@
     transition-duration: .01ms !important;
   }
 }
+
+/* Soft breathing dot for the whatsapp phase's waiting card. */
+@keyframes obPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.8); } }
+.ob-v4 .ob-pulse { animation: obPulse 1.6s ease-in-out infinite; }

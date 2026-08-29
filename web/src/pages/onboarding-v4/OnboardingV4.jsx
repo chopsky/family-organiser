@@ -1,15 +1,16 @@
 /**
  * Onboarding v4 — flow shell.
  *
- * Value-first 12-screen flow from design_handoff_onboarding. Sign-up stays at
- * step 11 by design: everything before it is held client-side (see
- * lib/onboardingDraft) and replayed once the account exists, because a calendar
- * feed needs user_id + household_id and a WhatsApp link is a column on users.
+ * Value-first flow from design_handoff_onboarding. Sign-up stays last-but-one
+ * by design: everything before it is held client-side (see lib/onboardingDraft)
+ * and replayed once the account exists, because a calendar feed needs
+ * user_id + household_id. WhatsApp pairing is the exception: it happens LIVE
+ * in the post-auth 'whatsapp' phase (whatsappLinkScreen.jsx) between sign-up
+ * and the celebration - the one moment a number can actually be bound.
  *
- * All twelve screens are the designed ones and auth is live: providers come
- * from the shared useSocialAuth (the same hook behind the existing signup
- * page), and useV4Auth turns the resulting session into a finished household —
- * naming it, replaying the queued calendars, offering WhatsApp pairing.
+ * Providers come from the shared useSocialAuth (the same hook behind the
+ * existing signup page), and useV4Auth turns the resulting session into a
+ * finished household — naming it, replaying the queued calendars.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -23,13 +24,14 @@ import { Step, Cta, Ghost, ResumeNotice } from './ui';
 import {
   Splash, PainPicker, ShapePicker, NameStep, RoleStep, KidsStep, HouseStep, HouseSignOverlay,
 } from './screens';
-import { PlanBeat, AskBeat, WhatsAppFooter } from './chatBeats';
+import { PlanBeat } from './chatBeats';
 import { CalendarList, CalendarConnect } from './calendarScreens';
 import { RemindersBody, RemindersFooter } from './remindersScreen';
 import InboxStep, { InboxFooter } from './inboxScreen';
 import { askForNudges } from '../../lib/notificationPermission';
 import { SignUpScreen, LoginScreen, DoneScreen } from './authScreens';
 import PaywallScreen from './paywallScreen';
+import WhatsAppLinkScreen from './whatsappLinkScreen';
 import { setCalUrl, clearDraft } from '../../lib/onboardingDraft';
 import { trackOnboardingStep } from '../../lib/onboardingTelemetry';
 import useSocialAuth from '../../hooks/useSocialAuth';
@@ -148,13 +150,6 @@ export default function OnboardingV4({ initialPhase }) {
     setConnecting(null);
   };
 
-  // Taking the WhatsApp "yes" records intent only; the real pairing runs after
-  // sign-up (a WhatsApp link is a column on users, and there is no user yet).
-  const connectWhatsApp = () => {
-    update({ wa: true });
-    setTimeout(next, 900);
-  };
-
   // Held while the link-arrival resume runs, so the splash never flashes at
   // someone who has already finished signing up.
   if (resuming) {
@@ -223,6 +218,12 @@ export default function OnboardingV4({ initialPhase }) {
     );
   }
 
+  // Post-auth WhatsApp pairing - the account exists now, so the link can
+  // actually happen. The screen advances itself (link / skip / unavailable).
+  if (phase === 'whatsapp') {
+    return <WhatsAppLinkScreen reduced={reduced} onDone={() => goPhase('done')} />;
+  }
+
   if (phase === 'done') {
     return <DoneScreen d={d} reduced={reduced} outcome={v4.outcome} onEnter={() => navigate('/dashboard')} />;
   }
@@ -276,11 +277,7 @@ export default function OnboardingV4({ initialPhase }) {
         // Inside a provider's connect flow, back means "leave this provider",
         // not "leave the calendar step".
         onBack={connecting ? () => setConnecting(null) : back}
-        footer={connecting ? null : step === 'ask' ? (
-          // Screen 09 owns its footer entirely - a green WhatsApp button, not
-          // the standard CTA, and no skip once the answer is in.
-          <WhatsAppFooter on={d.wa} onConnect={connectWhatsApp} onSkip={skip} onContinue={next} />
-        ) : step === 'inbox' ? (
+        footer={connecting ? null : step === 'inbox' ? (
           // Step 10 owns its footer: the CTA becomes a green confirmation
           // box on success, and the skip disappears once claiming starts.
           <>
@@ -344,7 +341,6 @@ export default function OnboardingV4({ initialPhase }) {
         )}
 
         {step === 'plan' && <PlanBeat d={d} reduced={reduced} onDone={() => setPlanDone(true)} />}
-        {step === 'ask' && <AskBeat d={d} reduced={reduced} />}
 
         {step === 'cals' && (connecting ? (
           <CalendarConnect

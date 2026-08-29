@@ -21,8 +21,13 @@ const CONTEXTS = new Set(['onboarding', 'gate']);
 // error. 'invitecode' is the join-a-home overlay.
 const ONBOARDING_STEPS = new Set([
   'splash', 'pains', 'plan', 'shape', 'you', 'role', 'kids', 'house',
-  'cals', 'ask', 'inbox', 'reminders', 'signup', 'login', 'invitecode',
+  'cals', 'inbox', 'reminders', 'signup', 'login', 'invitecode',
   'paywall', 'done',
+  // 'ask' (pre-auth WhatsApp intent) retired 2026-08-28; kept accepted so
+  // stragglers on old builds don't punch a hole in their own funnels.
+  'ask',
+  // The post-auth pairing phase that replaced it.
+  'whatsapp',
 ]);
 const ONBOARDING_ACTIONS = new Set(['enter', 'skip', 'back']);
 

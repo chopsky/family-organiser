@@ -83,22 +83,6 @@ export async function replayCalendars(promised = {}) {
 }
 
 /**
- * Start WhatsApp pairing for someone who asked for it on screen 09.
- * Resolves { deepLink, code } or null if pairing isn't available — the caller
- * should simply not offer it rather than showing a broken button.
- */
-export async function startWhatsAppPairing() {
-  try {
-    const { data } = await api.post('/auth/whatsapp-init-pairing');
-    return data?.deep_link ? { deepLink: data.deep_link, code: data.code } : null;
-  } catch {
-    // 503 when WhatsApp isn't configured on this server, or a transient error.
-    // Either way the user can pair from Settings later.
-    return null;
-  }
-}
-
-/**
  * Everything queued, replayed in one call. Returns a summary the welcome screen
  * can speak to honestly.
  */
@@ -149,11 +133,10 @@ export async function replayKids(names) {
 
 export async function replayQueued(d) {
   const calendars = await replayCalendars(d?.cals || {});
-  const whatsapp = d?.wa ? await startWhatsAppPairing() : null;
   // A joiner skipped the inbox step, and the house inbox belongs to the
   // household they joined - never try to (re)claim it on their behalf.
   // Same for kids: the roster belongs to the household they joined.
   const inbox = d?.joining ? { claimed: false, conflict: false } : await replayInbox(d?.inbox);
   const kids = d?.joining ? [] : await replayKids(d?.kids);
-  return { calendars, whatsapp, inbox, kids };
+  return { calendars, inbox, kids };
 }

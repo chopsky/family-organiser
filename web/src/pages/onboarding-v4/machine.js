@@ -28,7 +28,6 @@ export const STEP_META = {
   kids:      { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
   house:     { required: true,  autoAdvance: false, skipLabel: null },
   cals:      { required: false, autoAdvance: false, skipLabel: "I'll do this later" },
-  ask:       { required: false, autoAdvance: false, skipLabel: "I don't use WhatsApp" },
   inbox:     { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
   reminders: { required: false, autoAdvance: false, skipLabel: 'Maybe later' },
 };
@@ -48,7 +47,7 @@ export const autoAdvances = (i) => Boolean(metaAt(i)?.autoAdvance);
  * personalise a paywall joiners never see, shape would duplicate members the
  * founder already created, and house naming + inbox claiming are founder
  * acts. Navigation hops over them; the joiner walks you → role → cals →
- * ask → reminders.
+ * reminders (WhatsApp pairing is a post-auth phase, not a step).
  */
 const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'kids', 'house', 'inbox']);
 // Shapes with children in the picture - the only households the kids step

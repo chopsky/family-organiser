@@ -537,22 +537,6 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
             That email address got taken while you signed up - pick another in Settings.
           </p>
         )}
-        {outcome?.whatsapp?.deepLink && (
-          <a
-            href={outcome.whatsapp.deepLink}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-              width: '100%', minHeight: 44, padding: 14, borderRadius: R.cta, marginBottom: 10,
-              background: T.green, color: '#fff', textDecoration: 'none',
-              font: '700 15.5px Inter, system-ui, sans-serif', boxShadow: SHADOW.whatsapp,
-            }}
-          >
-            <img src="/onboarding-v4/whatsapp-white.svg" alt="" aria-hidden="true" style={{ width: 22, height: 22 }} />
-            Finish linking WhatsApp
-          </a>
-        )}
         {invite && (
           <div
             className={reduced ? '' : 'ob-in'}
