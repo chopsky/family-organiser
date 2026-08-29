@@ -376,7 +376,11 @@ function HolidayPauseCard({ members }) {
           // resurrected cards the user had already dismissed. A dismissal
           // covers this gap and every earlier one; only a genuinely NEWER
           // term-end brings the card back.
-          const dismissedUpTo = localStorage.getItem('housemait_holiday_pause_dismissed') || '';
+          // Device memory OR the household's server-side answer - one
+          // adult dismissing on any device answers for everyone.
+          const localUpTo = localStorage.getItem('housemait_holiday_pause_dismissed') || '';
+          const serverUpTo = data?.holiday_pause_dismissed_upto || '';
+          const dismissedUpTo = localUpTo > serverUpTo ? localUpTo : serverUpTo;
           if (dismissedUpTo >= maxEnd) { setDismissed(true); return; }
           // Never-dismissed cards still retire themselves: after 14 days
           // on screen the question has been declined by inaction, and
@@ -425,6 +429,9 @@ function HolidayPauseCard({ members }) {
 
   function dismiss() {
     try { localStorage.setItem('housemait_holiday_pause_dismissed', gapKey); } catch { /* private mode */ }
+    // Record for the whole household too (fire-and-forget; pre-migration
+    // the server quietly no-ops and this stays per-device).
+    api.post('/schools/activities/holiday-pause-dismiss', { up_to: gapKey }).catch(() => {});
     setDismissed(true);
   }
 

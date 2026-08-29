@@ -1842,6 +1842,34 @@ async function createWhatsAppVerificationCode(userId, phone, code, expiresAt, db
   return data;
 }
 
+/**
+ * Holiday-pause card, household-wide dismissal. Both degrade silently
+ * before migration-holiday-pause-dismissal.sql runs: the getter returns
+ * null (card falls back to per-device localStorage), the setter no-ops.
+ */
+async function getHolidayPauseDismissedUpto(householdId) {
+  try {
+    const { data, error } = await supabase
+      .from('households')
+      .select('holiday_pause_dismissed_upto')
+      .eq('id', householdId)
+      .single();
+    if (error) return null;
+    return data?.holiday_pause_dismissed_upto || null;
+  } catch {
+    return null;
+  }
+}
+
+async function setHolidayPauseDismissedUpto(householdId, upTo) {
+  try {
+    await supabase
+      .from('households')
+      .update({ holiday_pause_dismissed_upto: upTo })
+      .eq('id', householdId);
+  } catch { /* pre-migration - the card still dismisses per-device */ }
+}
+
 async function getWhatsAppVerificationCode(userId, code, db = supabase) {
   const { data, error } = await db
     .from('whatsapp_verification_codes')
@@ -10889,6 +10917,8 @@ async function deleteRedemption(id, householdId, db = supabase) {
 }
 
 module.exports = {
+  getHolidayPauseDismissedUpto,
+  setHolidayPauseDismissedUpto,
   sanitizeOrFilterValue,
   // Chores + star economy
   addChoreDefinition,

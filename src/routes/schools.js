@@ -362,11 +362,30 @@ router.patch('/activities/:activityId', requireAuth, requireHousehold, requireAd
 router.get('/activities', requireAuth, requireHousehold, async (req, res) => {
   try {
     const activities = await db.getHouseholdActivities(req.householdId);
-    return res.json({ activities });
+    // Household-wide holiday-pause dismissal (null pre-migration - the
+    // dashboard card then falls back to its per-device localStorage).
+    const holiday_pause_dismissed_upto = await db.getHolidayPauseDismissedUpto(req.householdId);
+    return res.json({ activities, holiday_pause_dismissed_upto });
   } catch (err) {
     console.error('GET /api/schools/activities error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+/**
+ * POST /api/schools/activities/holiday-pause-dismiss  { up_to: 'YYYY-MM-DD' }
+ * One adult dismissing the keep-running card answers it for the whole
+ * household on every device. Any member may dismiss (shared day-to-day
+ * management). Best-effort: pre-migration this records nothing and the
+ * card stays per-device - never an error the user sees.
+ */
+router.post('/activities/holiday-pause-dismiss', requireAuth, requireHousehold, async (req, res) => {
+  const upTo = String(req.body?.up_to || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(upTo)) {
+    return res.status(400).json({ error: 'up_to must be a YYYY-MM-DD date' });
+  }
+  await db.setHolidayPauseDismissedUpto(req.householdId, upTo);
+  return res.json({ ok: true });
 });
 
 /**
