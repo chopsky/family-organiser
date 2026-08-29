@@ -199,6 +199,13 @@ export default function Privacy() {
               (see their enterprise/API terms).
             </p>
             <p>
+              The AI providers do not keep your content long-term either. Each retains API inputs and
+              outputs only briefly, solely for abuse and security monitoring, and then deletes them:
+              Anthropic within about 7 days, OpenAI within about 30 days, and Google within about
+              55 days (per their published API data policies, which control the exact periods).
+              Housemait itself stores your household's content as described in section 8.
+            </p>
+            <p>
               AI is not infallible. AI-generated responses may occasionally be inaccurate. You should
               verify important information before acting on it.
             </p>
