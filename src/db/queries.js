@@ -5841,7 +5841,7 @@ async function resolveActivityFilter(activity, db = supabase) {
 // unrecognised value falls back to created_at rather than reaching PostgREST.
 const HOUSEHOLD_SQL_SORTS = new Set(['name', 'created_at', 'join_code', 'timezone']);
 const HOUSEHOLD_DERIVED_SORTS = new Set([
-  'last_active_at', 'member_count', 'schools_count', 'documents_bytes', 'plan',
+  'last_active_at', 'last_seen_at', 'member_count', 'schools_count', 'documents_bytes', 'plan',
 ]);
 
 // Plan is categorical, so "ascending" needs a defined meaning. We order by
@@ -5864,7 +5864,7 @@ function planRank(h) {
 function compareDerived(sortKey, ascending) {
   const dir = ascending ? 1 : -1;
 
-  if (sortKey === 'last_active_at') {
+  if (sortKey === 'last_active_at' || sortKey === 'last_seen_at') {
     return (a, b) => {
       const ta = a.last_active_at;
       const tb = b.last_active_at;
@@ -5954,17 +5954,30 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
       h.member_count = countMap[h.id] || 0;
     }
 
-    // Bulk fetch last_active_at across all members, then take max per household
+    // Bulk fetch last_active_at (app/web sessions) and last inbound WhatsApp
+    // across all members, then take the max per household. last_seen_at is
+    // the BLEND - whichever channel touched Housemait most recently - because
+    // a WhatsApp-native family can go weeks without opening the app while
+    // using it daily; last_seen_channel says which signal won so the table
+    // can show a glyph.
     const allMemberIds = (users || []).map((u) => u.id);
-    const lastActiveMap = await fetchLastActiveByUserIds(allMemberIds, db);
+    const [lastActiveMap, lastWaMap] = await Promise.all([
+      fetchLastActiveByUserIds(allMemberIds, db),
+      fetchLastWhatsAppByUserIds(allMemberIds, db).catch(() => new Map()),
+    ]);
     for (const h of data) {
       const memberIds = membersByHousehold[h.id] || [];
-      let max = null;
+      let maxApp = null;
+      let maxWa = null;
       for (const mid of memberIds) {
         const ts = lastActiveMap.get(mid);
-        if (ts && (!max || ts > max)) max = ts;
+        if (ts && (!maxApp || ts > maxApp)) maxApp = ts;
+        const wa = lastWaMap.get(mid);
+        if (wa && (!maxWa || wa > maxWa)) maxWa = wa;
       }
-      h.last_active_at = max;
+      h.last_active_at = maxApp;
+      h.last_seen_at = maxWa && (!maxApp || maxWa > maxApp) ? maxWa : maxApp;
+      h.last_seen_channel = h.last_seen_at ? (h.last_seen_at === maxWa && h.last_seen_at !== maxApp ? 'whatsapp' : 'app') : null;
     }
 
     // Attach document counts + total bytes (single bulk fetch - same pattern as members)

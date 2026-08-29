@@ -208,7 +208,7 @@ export default function AdminHouseholds() {
                   <SortableHeader column="name" label="Name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <SortableHeader column="member_count" label="Members" sort={sort} sortDir={sortDir} onSort={handleSort} />
                   <SortableHeader column="plan" label="Plan" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden sm:table-cell" />
-                  <SortableHeader column="last_active_at" label="Last Active" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
+                  <SortableHeader column="last_seen_at" label="Last seen" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
                   <SortableHeader column="schools_count" label="School" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
                   <SortableHeader column="documents_bytes" label="Storage" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                   <SortableHeader column="join_code" label="Join Code" sort={sort} sortDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
@@ -233,10 +233,10 @@ export default function AdminHouseholds() {
                       <SubscriptionBadge household={h} />
                     </td>
                     <td
-                      className={`px-4 py-3 text-xs hidden md:table-cell ${staleness(h.last_active_at)}`}
-                      title={h.last_active_at ? new Date(h.last_active_at).toLocaleString() : ''}
+                      className={`px-4 py-3 text-xs hidden md:table-cell ${staleness(h.last_seen_at)}`}
+                      title={h.last_seen_at ? new Date(h.last_seen_at).toLocaleString() + (h.last_seen_channel === 'whatsapp' ? ' · via WhatsApp' : '') : ''}
                     >
-                      {formatRelativeTime(h.last_active_at)}
+                      {formatRelativeTime(h.last_seen_at)}{h.last_seen_channel === 'whatsapp' && <span className="ml-1" aria-label="via WhatsApp">💬</span>}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {(h.schools_count ?? 0) > 0 ? (
