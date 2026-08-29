@@ -1306,16 +1306,22 @@ export default function FamilySetup() {
                 return (
                   <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                     <span className="text-charcoal truncate">
-                      {inv.name || inv.email || 'Open invite (anyone with the link or code)'}
+                      {inv.name || inv.email || 'Your household code'}
                       {codeShown && (
                         <span className="block text-[11px] text-warm-grey mt-0.5">
-                          Invite code: <span className="font-semibold tracking-wider text-charcoal">{codeShown}</span>
+                          <span className="font-semibold tracking-wider text-charcoal">{codeShown}</span>
+                          {/* The open invite explains itself inline - and the expiry
+                              lives HERE so phones see it too (the right-hand meta
+                              column is hidden below sm, which made the open door
+                              look permanent). */}
+                          {!inv.name && !inv.email && ' · share it with your partner'}
+                          {` · expires ${new Date(inv.expires_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`}
                         </span>
                       )}
                     </span>
                     <div className="flex items-center gap-3 shrink-0">
                       <span className="text-xs text-warm-grey hidden sm:inline">
-                        {inv.name ? inv.email : ''} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                        {inv.name ? `${inv.email} · expires ${new Date(inv.expires_at).toLocaleDateString()}` : ''}
                       </span>
                       <a
                         href={waUrl}
