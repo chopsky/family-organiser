@@ -6,7 +6,7 @@ import { CHILD_VISIBLE_ROUTES } from '../lib/childMode';
 import AiConsentGate from './AiConsentGate';
 import api from '../lib/api';
 import { lazy, Suspense } from 'react';
-import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconList, IconGift, IconStar, IconMail, IconSchool } from './Icons';
+import { IconHome, IconCheck, IconCalendar, IconSettings, IconUsers, IconMore, IconUtensils, IconShield, IconFileText, IconX, IconList, IconGift, IconStar, IconMail, IconSchool, IconSparkles } from './Icons';
 import usePushNotifications from '../hooks/usePushNotifications';
 import { useAdAttribution } from '../lib/adAttribution';
 import { useSiriTokenSync } from '../lib/siriShortcuts';
@@ -661,6 +661,67 @@ function MoreSheet({ onClose }) {
                 </div>
               </NavLink>
             ))}
+          </div>
+
+          {/* Ask Housemait - the sheet's own door to the assistant. The
+              floating orb sits UNDER this sheet's scrim, which read as the
+              chat "disappearing" whenever More was open; the panel makes
+              the assistant a first-class resident here instead - wearing
+              the orb's exact gradient so it reads as the same thing. The
+              example chips are the discovery device: every one is a thing
+              the assistant genuinely does (shopping add, schedule answer,
+              recurring event, meal plan), aimed squarely at the majority
+              of households that have never tried it. Tapping a chip closes
+              the sheet and sends that message through the same
+              openChatWidget contract the dashboard composer uses - the
+              AI-consent gate intercepts pre-consent exactly as it does
+              there. */}
+          <div
+            className="mx-5 rounded-[20px] p-4 pb-3.5"
+            style={{
+              background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)',
+              boxShadow: '0 12px 28px rgba(109,56,173,0.35), inset 0 2px 0 rgba(255,255,255,0.25)',
+            }}
+          >
+            <div className="flex items-center gap-2 mb-0.5">
+              <IconSparkles className="h-[18px] w-[18px] text-white" aria-hidden="true" />
+              <span className="text-white text-[15px] font-bold">Ask Housemait</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent('openChatWidget', { detail: {} }));
+              }}
+              className="w-full flex items-center gap-2.5 bg-white rounded-full mt-3 pl-4 pr-1.5 py-1.5 text-left active:scale-[0.99] transition-transform"
+              aria-label="Open the Housemait assistant"
+            >
+              <span className="flex-1 text-[14px] text-warm-grey truncate">What can I help you with?</span>
+              <span className="w-[38px] h-[38px] rounded-full bg-plum flex items-center justify-center shrink-0">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
+              </span>
+            </button>
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {[
+                'Add milk to the list',
+                "What's on this week?",
+                'Swimming every Tuesday at 4',
+                'Plan dinners for this week',
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(new CustomEvent('openChatWidget', { detail: { message: prompt } }));
+                  }}
+                  className="text-[12px] font-semibold text-white rounded-full px-3 py-[7px] active:scale-[0.97] transition-transform"
+                  style={{ background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.28)' }}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
