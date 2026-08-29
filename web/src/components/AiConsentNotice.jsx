@@ -14,7 +14,7 @@ export default function AiConsentNotice({ onAgree, onNotNow, context = 'chat' })
   const whatGoes = context === 'school'
     ? 'the school website address, PDF or photo of the letter you provide'
     : context === 'app'
-      ? 'the messages, photos and documents you share with the assistant — and anything you ask it to create, like meal ideas or an imported recipe —'
+      ? 'the messages, photos, documents and requests you share with the assistant'
       : 'the messages you type and any photos or documents you share here';
 
   return (
@@ -29,9 +29,8 @@ export default function AiConsentNotice({ onAgree, onNotNow, context = 'chat' })
       <p className="text-[13.5px] text-warm-grey leading-relaxed mt-2">
         To work out what to add for your family, {whatGoes} are sent to our AI partners,{' '}
         <strong className="text-charcoal font-semibold">Google (Gemini)</strong> and{' '}
-        <strong className="text-charcoal font-semibold">Anthropic (Claude)</strong>. They process it only
-        to produce the answer, are contractually barred from training their models on it, and delete
-        it after short-lived security checks.
+        <strong className="text-charcoal font-semibold">Anthropic (Claude)</strong>. They use it only
+        to answer you — never to train their models — and delete it after brief security checks.
       </p>
       <p className="text-[13.5px] text-warm-grey leading-relaxed mt-2">
         The full detail is in our{' '}
