@@ -106,7 +106,7 @@
   display: flex; flex-direction: column; gap: 24px;
 }
 .lv-hero h1 { color: var(--lv-cream); color: #FAF6EF; font-size: clamp(40px, 6.4vw, 76px); line-height: 1.02; letter-spacing: -0.015em; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.05s both; }
-.lv-hero-sub { color: #FAF6EF; font-size: clamp(16px, 1.6vw, 19.5px); line-height: 1.6; margin: -10px 0 10px; max-width: 52ch; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.18s both; }
+.lv-hero-sub { color: #FAF6EF; font-size: clamp(16px, 1.6vw, 19.5px); line-height: 1.6; margin: -10px 0 10px; max-width: 55ch; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.18s both; }
 .lv-hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; animation: lvRise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s both; }
 /* Primary "Get the app": purple with a gleam that sweeps across on hover. */
 .lv-btn-shine {
