@@ -643,6 +643,8 @@ I'm always here if you need me!`;
   // always holds the latest instance.
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
+  const toggleMicRef = useRef(toggleMic);
+  toggleMicRef.current = toggleMic;
 
   // Listen for external "open chat with message" events (from dashboard AI input)
   useEffect(() => {
@@ -652,6 +654,7 @@ I'm always here if you need me!`;
       try { delete window.__housemaitPendingChatOpen; } catch { /* noop */ }
       const msg = e.detail?.message?.trim();
       const attach = e.detail?.attach;
+      const voice = e.detail?.voice;
       setShowHistory(false);
       setIsOpen(true);
 
@@ -666,6 +669,14 @@ I'm always here if you need me!`;
           // send sees CURRENT state, not the mount frame's.
           setTimeout(() => sendMessageRef.current(msg), 100);
         }
+      }
+      if (voice && hasAiConsent()) {
+        // More-sheet Voice affordance: open and start dictation once the
+        // composer is mounted. On iOS WKWebView SpeechRecognition doesn't
+        // exist and toggleMic silently no-ops - the user still lands in
+        // the chat with the composer ready, matching the in-chat mic's
+        // own behaviour there. Pre-consent just opens (the overlay asks).
+        setTimeout(() => toggleMicRef.current?.(), 350);
       }
       if (attach && hasAiConsent()) {
         // Open the native file picker once the composer has mounted — target

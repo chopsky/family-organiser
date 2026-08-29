@@ -509,6 +509,108 @@ export default function Layout({ children }) {
  * (start coords, timestamps). `dragOffset` lives in state because the
  * panel transform reads it on render.
  */
+// Routes a More-sheet AI action into the chat widget: stash first (the
+// widget is lazy-loaded - a cold-start dispatch had no listener), then
+// dispatch for the mounted case. The live listener clears the stash.
+function routeToAssistant(detail, onClose) {
+  onClose();
+  try { window.__housemaitPendingChatOpen = detail; } catch { /* noop */ }
+  window.dispatchEvent(new CustomEvent('openChatWidget', { detail }));
+}
+
+/** The More sheet's AI chat field (design_handoff_more_ai_field). */
+function MoreAIField({ onClose }) {
+  const [q, setQ] = useState('');
+  const send = () => {
+    const text = q.trim();
+    if (!text) return;
+    routeToAssistant({ message: text }, onClose);
+  };
+  return (
+    <div style={{ padding: '2px 20px 14px' }}>
+      {/* Gradient hairline ring - 1.5px of gradient showing around the bar. */}
+      <div
+        style={{
+          position: 'relative', borderRadius: 20, padding: 1.5,
+          background: 'linear-gradient(135deg, rgba(109,56,173,0.55), rgba(142,95,214,0.18) 40%, rgba(216,120,138,0.28))',
+          boxShadow: '0 10px 26px -10px rgba(109,56,173,0.35)',
+        }}
+      >
+        <div className="flex items-center gap-2 bg-white" style={{ borderRadius: 18.5, padding: '8px 8px 8px 14px' }}>
+          <IconSparkles className="shrink-0 text-plum" style={{ width: 17, height: 17 }} strokeWidth={1.8} aria-hidden="true" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+            onFocus={(e) => {
+              // Keyboard avoidance: the sheet body scrolls; nudge the field
+              // above the keyboard once it has settled.
+              const el = e.target;
+              setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* noop */ } }, 250);
+            }}
+            placeholder="Ask Housemait anything…"
+            aria-label="Ask Housemait"
+            enterKeyHint="send"
+            className="flex-1 min-w-0 border-0 outline-none bg-transparent text-charcoal placeholder:text-warm-grey"
+            style={{ fontSize: 14.5, fontWeight: 400, padding: '6px 0' }}
+          />
+          {/* 30/34px visuals with padding insets for >=44pt effective targets. */}
+          <button
+            type="button"
+            aria-label="Attach"
+            onClick={() => routeToAssistant({ attach: true }, onClose)}
+            className="shrink-0 flex items-center justify-center text-warm-grey active:scale-95 transition-transform"
+            style={{ width: 30, height: 30, borderRadius: 10, padding: 7, margin: -7, boxSizing: 'content-box' }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.83l8.49-8.48" /></svg>
+          </button>
+          {q.trim() ? (
+            <button
+              type="button"
+              onClick={send}
+              aria-label="Send"
+              className="shrink-0 flex items-center justify-center text-white active:scale-95"
+              style={{
+                width: 34, height: 34, borderRadius: 12, padding: 5, margin: -5, boxSizing: 'content-box',
+                background: 'linear-gradient(135deg, var(--color-plum) 0%, var(--color-plum-bright) 100%)',
+                boxShadow: '0 4px 12px rgba(109,56,173,0.35)', transition: 'all .15s ease',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label="Voice"
+              onClick={() => routeToAssistant({ voice: true }, onClose)}
+              className="shrink-0 flex items-center justify-center text-plum active:scale-95"
+              style={{
+                width: 34, height: 34, borderRadius: 12, padding: 5, margin: -5, boxSizing: 'content-box',
+                background: 'var(--color-plum-light)', transition: 'all .15s ease',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" /></svg>
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto" style={{ padding: '10px 2px 0', scrollbarWidth: 'none' }}>
+        {["What's for dinner?", 'Add milk to the list', "Who's free Saturday?"].map((sTxt) => (
+          <button
+            key={sTxt}
+            type="button"
+            onClick={() => routeToAssistant({ message: sTxt }, onClose)}
+            className="shrink-0 font-semibold active:scale-[0.97] transition-transform"
+            style={{ background: 'var(--color-sand)', border: 0, borderRadius: 99, padding: '7px 13px', fontSize: 12, color: '#4A4453' }}
+          >
+            {sTxt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MoreSheet({ onClose }) {
   const [mounted, setMounted] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -663,68 +765,15 @@ function MoreSheet({ onClose }) {
             ))}
           </div>
 
-          {/* Ask Housemait - the sheet's own door to the assistant. The
-              floating orb sits UNDER this sheet's scrim, which read as the
-              chat "disappearing" whenever More was open; the panel makes
-              the assistant a first-class resident here instead - wearing
-              the orb's exact gradient so it reads as the same thing. The
-              example chips are the discovery device: every one is a thing
-              the assistant genuinely does (shopping add, schedule answer,
-              recurring event, meal plan), aimed squarely at the majority
-              of households that have never tried it. Tapping a chip closes
-              the sheet and sends that message through the same
-              openChatWidget contract the dashboard composer uses - the
-              AI-consent gate intercepts pre-consent exactly as it does
-              there. */}
-          <div
-            className="mx-5 mb-4 rounded-[20px] p-4 pb-3.5"
-            style={{
-              background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)',
-              boxShadow: '0 12px 28px rgba(109,56,173,0.35), inset 0 2px 0 rgba(255,255,255,0.25)',
-            }}
-          >
-            <div className="flex items-center gap-2 mb-0.5">
-              <IconSparkles className="h-[18px] w-[18px] text-white" aria-hidden="true" />
-              <span className="text-white text-[15px] font-bold">Ask Housemait</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                try { window.__housemaitPendingChatOpen = {}; } catch { /* noop */ }
-                window.dispatchEvent(new CustomEvent('openChatWidget', { detail: {} }));
-              }}
-              className="w-full flex items-center gap-2.5 bg-white rounded-full mt-3 pl-4 pr-1.5 py-1.5 text-left active:scale-[0.99] transition-transform"
-              aria-label="Open the Housemait assistant"
-            >
-              <span className="flex-1 text-[14px] text-warm-grey truncate">What can I help you with?</span>
-              <span className="w-[38px] h-[38px] rounded-full bg-plum flex items-center justify-center shrink-0">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg>
-              </span>
-            </button>
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {[
-                'Add milk to the list',
-                "What's on this week?",
-                'Add dentist Thursday at 3pm',
-                'Plan dinners for this week',
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    try { window.__housemaitPendingChatOpen = { message: prompt }; } catch { /* noop */ }
-                    window.dispatchEvent(new CustomEvent('openChatWidget', { detail: { message: prompt } }));
-                  }}
-                  className="text-[12px] font-semibold text-white rounded-full px-3 py-[7px] active:scale-[0.97] transition-transform"
-                  style={{ background: 'rgba(255,255,255,0.24)', border: '1px solid rgba(255,255,255,0.35)', textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* AI chat field (design_handoff_more_ai_field): a compact
+              composer docked under the tile grid - typeable in place, with
+              attach + voice affordances and three suggestion chips. All
+              routing rides the existing openChatWidget contract (stash for
+              the lazy chunk, consent belt in ChatWidget.sendMessage), so
+              the AI-consent gate and conversation threading behave exactly
+              as the dashboard composer's. Spec purples map to the plum
+              ramp per the standing rule. */}
+          <MoreAIField onClose={onClose} />
         </div>
       </div>
     </div>
