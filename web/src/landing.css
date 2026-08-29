@@ -219,7 +219,7 @@
 .lv-cards { margin-top: 64px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 20px; }
 .lv-card { background: #fff; border: 1px solid var(--lv-border); border-radius: 30px; padding: 36px 36px 32px; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
 .lv-card.crop { padding-bottom: 0; }
-.lv-card h3 { font-size: 26px; }
+.lv-card h3 { font-size: 26px; line-height: 1.2; }
 .lv-card > p { color: var(--lv-ink-2); font-size: 15.5px; line-height: 1.6; margin: 0 0 24px; }
 .lv-chip { align-self: flex-start; background: var(--lv-tint); color: var(--lv-purple); font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; }
 .lv-rows { margin-top: auto; display: flex; flex-direction: column; gap: 9px; }

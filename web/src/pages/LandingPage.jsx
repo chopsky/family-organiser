@@ -47,7 +47,7 @@ const RECEIPTS = {
 function schoolCard(locale) {
   if (locale.code === 'gb') {
     return {
-      title: 'Term dates in one click',
+      title: 'School dates automatically',
       desc: 'Tell Housemait the school. Every term, half-term and inset day drops straight into the family calendar.',
       chip: 'St Mary’s Primary · synced ✓',
       rows: [['Autumn term begins', 'Wed 3 Sep'], ['Half term', '27–31 Oct'], ['Inset day · school closed', 'Mon 24 Nov']],
@@ -55,7 +55,7 @@ function schoolCard(locale) {
   }
   if (locale.code === 'za') {
     return {
-      title: 'Term dates in one click',
+      title: 'School dates automatically',
       desc: 'Tell Housemait the school. Every term date and school holiday drops straight into the family calendar.',
       chip: 'Westville Primary · synced ✓',
       rows: [['Term 1 begins', 'Wed 14 Jan'], ['School holiday', '28 Mar – 14 Apr'], ['Public holiday · school closed', 'Mon 27 Apr']],
