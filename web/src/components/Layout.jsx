@@ -677,7 +677,7 @@ function MoreSheet({ onClose }) {
               AI-consent gate intercepts pre-consent exactly as it does
               there. */}
           <div
-            className="mx-5 rounded-[20px] p-4 pb-3.5"
+            className="mx-5 mb-4 rounded-[20px] p-4 pb-3.5"
             style={{
               background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)',
               boxShadow: '0 12px 28px rgba(109,56,173,0.35), inset 0 2px 0 rgba(255,255,255,0.25)',
@@ -691,6 +691,7 @@ function MoreSheet({ onClose }) {
               type="button"
               onClick={() => {
                 onClose();
+                try { window.__housemaitPendingChatOpen = {}; } catch { /* noop */ }
                 window.dispatchEvent(new CustomEvent('openChatWidget', { detail: {} }));
               }}
               className="w-full flex items-center gap-2.5 bg-white rounded-full mt-3 pl-4 pr-1.5 py-1.5 text-left active:scale-[0.99] transition-transform"
@@ -705,7 +706,7 @@ function MoreSheet({ onClose }) {
               {[
                 'Add milk to the list',
                 "What's on this week?",
-                'Swimming every Tuesday at 4',
+                'Add dentist Thursday at 3pm',
                 'Plan dinners for this week',
               ].map((prompt) => (
                 <button
@@ -713,10 +714,11 @@ function MoreSheet({ onClose }) {
                   type="button"
                   onClick={() => {
                     onClose();
+                    try { window.__housemaitPendingChatOpen = { message: prompt }; } catch { /* noop */ }
                     window.dispatchEvent(new CustomEvent('openChatWidget', { detail: { message: prompt } }));
                   }}
                   className="text-[12px] font-semibold text-white rounded-full px-3 py-[7px] active:scale-[0.97] transition-transform"
-                  style={{ background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.28)' }}
+                  style={{ background: 'rgba(255,255,255,0.24)', border: '1px solid rgba(255,255,255,0.35)', textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}
                 >
                   {prompt}
                 </button>

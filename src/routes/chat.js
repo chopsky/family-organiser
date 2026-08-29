@@ -260,8 +260,31 @@ async function buildSystemPrompt(householdId, householdName, userId, currentMess
   const tasksStr = tasks.length > 0
     ? tasks.map(t => `- ${t.title}${formatWho(t)}${t.due_date ? ` due ${t.due_date}` : ''}`).join('\n')
     : '(none)';
+  // Weekday + local time per event (adversarial review of the promoted
+  // "What's on this week?" chip): dates alone forced the model to derive
+  // weekdays by arithmetic and left times unknowable-but-unmarked, so
+  // hallucinated times were plausible. All-day events deliberately keep
+  // their RAW stored date (naive UTC midnight is the canonical "this
+  // day" marker - tz-rendering it shifts the day in behind-UTC
+  // households); timed events render date AND time in the household tz.
+  const eventTz = household?.timezone || 'Europe/London';
+  const eventWhen = (e) => {
+    if (!e.start_time) return 'TBD';
+    try {
+      if (e.all_day) {
+        const ds = e.start_time.split('T')[0];
+        return new Date(`${ds}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      const d = new Date(e.start_time);
+      const date = d.toLocaleDateString('en-GB', { timeZone: eventTz, weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+      const time = d.toLocaleTimeString('en-GB', { timeZone: eventTz, hour: '2-digit', minute: '2-digit', hour12: false });
+      return `${date} at ${time}`;
+    } catch {
+      return e.start_time.split('T')[0];
+    }
+  };
   const eventsStr = events.length > 0
-    ? events.map(e => `- ${e.title} on ${e.start_time?.split('T')[0] || 'TBD'}${formatWho(e)}`).join('\n')
+    ? events.map(e => `- ${e.title} on ${eventWhen(e)}${formatWho(e)}`).join('\n')
     : '(none)';
 
   // Build school context

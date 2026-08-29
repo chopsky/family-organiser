@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import Sheet from './ui/Sheet';
 import AIComposer from './ui/AIComposer';
 import AiConsentNotice from './AiConsentNotice';
-import { hasAiConsent } from '../lib/aiConsent';
+import { hasAiConsent, ensureAiConsent } from '../lib/aiConsent';
 
 // TEMPORARY (App Store screenshots, 2026-07-10): hide the floating AI orb in
 // the native app until this timestamp so screenshots don't include it. It
@@ -458,6 +458,15 @@ I'm always here if you need me!`;
   // Send a message (creates conversation if needed)
   async function sendMessage(text) {
     if (!text?.trim() || loading) return;
+    // Consent belt (App Review 5.1.1(i)): nothing reaches the AI without an
+    // answered ask, whatever path called this - typed, chip, event replay.
+    // The overlay above is the visible pre-emptive ask; this is the
+    // guarantee that survives any future stacking/layout change.
+    if (!hasAiConsent()) {
+      const ok = await ensureAiConsent();
+      if (!ok) return;
+      setAiConsented(true);
+    }
     const trimmed = text.trim();
 
     const userMsg = { role: 'user', content: trimmed, created_at: new Date().toISOString() };
@@ -627,9 +636,20 @@ I'm always here if you need me!`;
     try { rec.start(); } catch { setMicOn(false); recognitionRef.current = null; }
   }
 
+  // The listener below registers ONCE, but sendMessage is a per-render
+  // closure over loading/activeConversationId - calling the mount-frame
+  // instance forked a NEW server conversation on every external send and
+  // ignored the in-flight guard (adversarial review of d8cb68d). The ref
+  // always holds the latest instance.
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
+
   // Listen for external "open chat with message" events (from dashboard AI input)
   useEffect(() => {
     function handleOpenChat(e) {
+      // A live-handled event must clear its own cold-start stash, or a
+      // future remount would replay it.
+      try { delete window.__housemaitPendingChatOpen; } catch { /* noop */ }
       const msg = e.detail?.message?.trim();
       const attach = e.detail?.attach;
       setShowHistory(false);
@@ -642,8 +662,9 @@ I'm always here if you need me!`;
           // nothing reaches the AI until they agree and press send.
           setInput(msg);
         } else {
-          // Send after a tick to let state settle
-          setTimeout(() => sendMessage(msg), 100);
+          // Send after a tick to let state settle - via the ref so the
+          // send sees CURRENT state, not the mount frame's.
+          setTimeout(() => sendMessageRef.current(msg), 100);
         }
       }
       if (attach && hasAiConsent()) {
@@ -659,6 +680,16 @@ I'm always here if you need me!`;
       }
     }
     window.addEventListener('openChatWidget', handleOpenChat);
+    // This component is lazy-loaded: a dispatch fired before the chunk
+    // mounted (e.g. a More-sheet chip on a cold start) had no listener and
+    // vanished. Dispatchers stash the detail; we drain it here.
+    try {
+      if (window.__housemaitPendingChatOpen) {
+        const pending = window.__housemaitPendingChatOpen;
+        delete window.__housemaitPendingChatOpen;
+        handleOpenChat({ detail: pending });
+      }
+    } catch { /* never let the drain break mounting */ }
     return () => window.removeEventListener('openChatWidget', handleOpenChat);
   }, []);
 
@@ -727,9 +758,13 @@ I'm always here if you need me!`;
 
       {/* AI disclosure + permission - sits above BOTH panel variants and
           blocks every input (composer, attachments, voice) until agreed.
-          "Not now" simply closes the chat; nothing has been sent. */}
+          "Not now" simply closes the chat; nothing has been sent.
+          z-[70], NOT 60: the mobile sheet is also fixed z-[60] and renders
+          LATER in this component, so equal z buried this overlay under the
+          sheet (adversarial review of d8cb68d) - the sendMessage consent
+          belt below is the guarantee; this is the visible ask. */}
       {isOpen && !aiConsented && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-5" style={{ background: 'rgba(26,22,32,0.42)' }}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-5" style={{ background: 'rgba(26,22,32,0.42)' }}>
           <AiConsentNotice
             onAgree={() => setAiConsented(true)}
             onNotNow={() => setIsOpen(false)}
