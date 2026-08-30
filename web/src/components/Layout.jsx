@@ -619,11 +619,9 @@ function MoreAIField({ onClose }) {
             rules + executor handlers + empty-household state. */}
         {[
           'Add milk to the list',
-          'Add dentist Thursday at 3pm',
-          'We need nappies, wipes and bananas',
-          'Remind me to buy a birthday card Friday',
-          'Plan an easy dinner for tomorrow',
-          'Gym every Tuesday at 7am',
+          'Give me 3 dinner ideas',
+          'Set up a family movie night',
+          'Suggest a pasta recipe',
         ].map((sTxt) => (
           <button
             key={sTxt}
