@@ -521,13 +521,30 @@ function routeToAssistant(detail, onClose) {
 /** The More sheet's AI chat field (design_handoff_more_ai_field). */
 function MoreAIField({ onClose }) {
   const [q, setQ] = useState('');
+  const [focused, setFocused] = useState(false);
+  const boxRef = useRef(null);
+  // Keyboard avoidance that follows reality instead of guessing timing:
+  // with Capacitor's Native resize the viewport shrinks AFTER focus, the
+  // sheet shortens, and the field drops below the body's scroll fold - a
+  // one-shot delayed scrollIntoView raced the resize and lost (founder
+  // repro: field hidden until typing forces a caret-scroll). While
+  // focused, nudge on a short schedule AND on every visualViewport
+  // resize, so however late the keyboard lands, the field surfaces.
+  useEffect(() => {
+    if (!focused) return undefined;
+    const nudge = () => { try { boxRef.current?.scrollIntoView({ block: 'end' }); } catch { /* noop */ } };
+    const timers = [150, 400, 750].map((ms) => setTimeout(nudge, ms));
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', nudge);
+    return () => { timers.forEach(clearTimeout); vv?.removeEventListener('resize', nudge); };
+  }, [focused]);
   const send = () => {
     const text = q.trim();
     if (!text) return;
     routeToAssistant({ message: text }, onClose);
   };
   return (
-    <div style={{ padding: '2px 20px 14px' }}>
+    <div ref={boxRef} style={{ padding: '2px 20px 14px' }}>
       {/* Gradient hairline ring - 1.5px of gradient showing around the bar. */}
       <div
         style={{
@@ -547,12 +564,8 @@ function MoreAIField({ onClose }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-            onFocus={(e) => {
-              // Keyboard avoidance: the sheet body scrolls; nudge the field
-              // above the keyboard once it has settled.
-              const el = e.target;
-              setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* noop */ } }, 250);
-            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder="Ask Housemait anything…"
             aria-label="Ask Housemait"
             enterKeyHint="send"
