@@ -546,6 +546,9 @@ function HolidayPauseCard({ members }) {
 // ── AI Chat Input ───────────────────────────────────────────────
 function DashboardAiInput() {
   const aiInputRef = useRef(null);
+  // Drives the right-hand button's mic <-> send swap (founder call:
+  // one purple action button, mic when empty, send once there's text).
+  const [aiHasText, setAiHasText] = useState(false);
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -556,6 +559,7 @@ function DashboardAiInput() {
     const text = aiInputRef.current?.value?.trim();
     if (!text) return;
     aiInputRef.current.value = '';
+    setAiHasText(false);
     window.dispatchEvent(new CustomEvent('openChatWidget', { detail: { message: text } }));
   }
 
@@ -622,6 +626,7 @@ function DashboardAiInput() {
         if (text && aiInputRef.current) {
           const cur = aiInputRef.current.value;
           aiInputRef.current.value = cur ? `${cur} ${text}` : text;
+          setAiHasText(true);
           aiInputRef.current.focus();
         }
       } catch (err) {
@@ -654,55 +659,60 @@ function DashboardAiInput() {
         className="flex items-center bg-white overflow-hidden"
         style={{ borderRadius: 16.5 }}
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="var(--color-plum)" className="ml-4 shrink-0" aria-hidden="true">
-          <path d="M12 2l1.8 4.7a4 4 0 0 0 2.5 2.5L21 11l-4.7 1.8a4 4 0 0 0-2.5 2.5L12 20l-1.8-4.7a4 4 0 0 0-2.5-2.5L3 11l4.7-1.8a4 4 0 0 0 2.5-2.5L12 2z" />
-          <path d="M19 2l.7 1.8a1.5 1.5 0 0 0 .8.8L22 5l-1.5.4a1.5 1.5 0 0 0-.8.8L19 8l-.7-1.8a1.5 1.5 0 0 0-.8-.8L16 5l1.5-.4a1.5 1.5 0 0 0 .8-.8L19 2z" />
-        </svg>
+        {/* Attach leads the bar (founder call - replaced the sparkle). */}
+        <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileSelect} />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="ml-2 p-2 shrink-0 text-warm-grey hover:text-primary rounded-lg hover:bg-plum-light/50 transition-colors"
+          title="Attach image or PDF"
+          aria-label="Attach image or PDF"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+        </button>
         <input
           ref={aiInputRef}
           type="text"
           placeholder="What can I help you with?"
-          className="flex-1 pl-2 pr-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
+          onChange={(e) => setAiHasText(Boolean(e.target.value.trim()))}
+          className="flex-1 pl-1 pr-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
-        <div className="flex items-center gap-1 pr-3">
-          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileSelect} />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-warm-grey hover:text-primary rounded-lg hover:bg-plum-light/50 transition-colors"
-            title="Attach image"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
-          </button>
-          {/* Voice input: record audio + transcribe server-side (Whisper).
-              Works in the iOS WKWebView, unlike the Web Speech API. */}
-          <button
-            type="button"
-            onClick={handleMicClick}
-            disabled={isTranscribing}
-            className={`p-2 rounded-lg transition-colors disabled:opacity-60 ${isRecording ? 'text-coral bg-coral/10' : 'text-warm-grey hover:text-primary hover:bg-plum-light/50'}`}
-            title={isTranscribing ? 'Transcribing…' : isRecording ? 'Stop recording' : 'Voice input'}
-            aria-pressed={isRecording}
-          >
-            {isTranscribing ? (
-              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-            ) : (
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="2" width="6" height="12" rx="3" />
-                <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="22" />
-              </svg>
-            )}
-          </button>
-          <button
-            type="submit"
-            className="p-2 text-white bg-plum hover:bg-plum/90 rounded-full transition-colors"
-            title="Send"
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-          </button>
+        <div className="flex items-center pr-3">
+          {/* One purple action button (founder call): mic when the field is
+              empty, send once there's text. Recording keeps its coral
+              state; transcription its spinner; return still submits. */}
+          {aiHasText && !isRecording && !isTranscribing ? (
+            <button
+              type="submit"
+              className="w-10 h-10 flex items-center justify-center text-white bg-plum hover:bg-plum/90 rounded-full transition-colors"
+              title="Send"
+              aria-label="Send"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleMicClick}
+              disabled={isTranscribing}
+              className={`w-10 h-10 flex items-center justify-center rounded-full transition-colors disabled:opacity-60 text-white ${isRecording ? 'bg-coral' : 'bg-plum hover:bg-plum/90'}`}
+              title={isTranscribing ? 'Transcribing…' : isRecording ? 'Stop recording' : 'Voice input'}
+              aria-pressed={isRecording}
+              aria-label={isRecording ? 'Stop recording' : 'Voice input'}
+            >
+              {isTranscribing ? (
+                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
       </div>
