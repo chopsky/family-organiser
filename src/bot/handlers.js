@@ -3183,7 +3183,25 @@ async function handleTextMessage(text, user, household, ctx = {}) {
   // router isn't certain about returns null and falls through to the full
   // pipeline below unchanged. Same early-return pattern as the weather
   // pre-classify above.
-  {
+  //
+  // EXCEPT when the bot just asked an open question. The router sees no
+  // history, so a short reply like "Today" (answering "what day is the
+  // padel?") read as a fresh calendar query and dumped the schedule while
+  // the padel event silently never got made (live repro, 2026-08-30).
+  // A short message right after an assistant turn ending in "?" is almost
+  // certainly the ANSWER - skip the fast-path and let the full pipeline,
+  // which reads history, resolve it. Conservative on both sides: long
+  // messages still take the fast-path, and the cost of a false skip is
+  // one slower (but correct) full-pipeline turn.
+  // "Contains a question mark" rather than "ends with one": the live ask
+  // ended '...on the calendar for 20:00.' with its question mid-message,
+  // and an end-anchored check would have sailed straight past it.
+  const lastAssistantTurn = [...history].reverse().find((t) => t.role === 'assistant');
+  const answeringOpenQuestion = Boolean(lastAssistantTurn)
+    && (lastAssistantTurn.content || '').includes('?')
+    && text.trim().length <= 40
+    && text.trim().split(/\s+/).length <= 6;
+  if (!answeringOpenQuestion) {
     const routed = await routeReadIntent(text, {
       timezone: user.timezone || household.timezone || 'Europe/London',
       householdId: household.id,
