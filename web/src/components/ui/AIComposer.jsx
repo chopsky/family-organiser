@@ -16,24 +16,41 @@ const Icon = {
   send: (p = {}) => (
     <svg width={p.s || 16} height={p.s || 16} viewBox="0 0 24 24" fill="currentColor"><path d="M3 11l18-8-8 18-2-7-8-3z" /></svg>
   ),
+  // The brand AI marker (design_handoff_dashboard_composer): filled
+  // four-point sparkle with its small companion star.
+  sparkle: (p = {}) => (
+    <svg width={p.s || 17} height={p.s || 17} viewBox="0 0 24 24" fill="var(--color-plum)" aria-hidden="true">
+      <path d="M12 2l1.8 4.7a4 4 0 0 0 2.5 2.5L21 11l-4.7 1.8a4 4 0 0 0-2.5 2.5L12 20l-1.8-4.7a4 4 0 0 0-2.5-2.5L3 11l4.7-1.8a4 4 0 0 0 2.5-2.5L12 2z" />
+      <path d="M19 2l.7 1.8a1.5 1.5 0 0 0 .8.8L22 5l-1.5.4a1.5 1.5 0 0 0-.8.8L19 8l-.7-1.8a1.5 1.5 0 0 0-.8-.8L16 5l1.5-.4a1.5 1.5 0 0 0 .8-.8L19 2z" />
+    </svg>
+  ),
 };
 
+/**
+ * `prominent` (design_handoff_dashboard_composer): the Dashboard-only
+ * treatment - gradient hairline ring (radius 18, 1.5px), soft purple glow
+ * replacing the card shadow, and a 17px brand sparkle leading the input.
+ * Layout, icons and behaviour are otherwise identical; every other
+ * instance keeps the default flat style. Spec purples map to the plum
+ * ramp (plum / plum-bright / rose alphas).
+ */
 export default function AIComposer({
   value, onChange, onSubmit, onMic, onAttach,
   attach = false, micOn = false, disabled = false, autoFocus = false,
-  placeholder = 'Ask me anything…',
+  placeholder = 'Ask me anything…', prominent = false,
 }) {
   const iconBtn = 'w-[34px] h-[34px] rounded-full flex items-center justify-center transition-colors';
-  return (
+  const bar = (
     <div
       className="flex items-center gap-2 bg-white"
       style={{
-        borderRadius: 18,
+        borderRadius: prominent ? 16.5 : 18,
         padding: '10px 10px 10px 16px',
-        boxShadow: '0 1px 0 rgba(45,42,51,0.04), 0 6px 18px rgba(45,42,51,0.05)',
-        border: '1px solid rgba(45,42,51,0.05)',
+        boxShadow: prominent ? 'none' : '0 1px 0 rgba(45,42,51,0.04), 0 6px 18px rgba(45,42,51,0.05)',
+        border: prominent ? 0 : '1px solid rgba(45,42,51,0.05)',
       }}
     >
+      {prominent && <Icon.sparkle />}
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -58,6 +75,19 @@ export default function AIComposer({
         style={{ boxShadow: '0 2px 8px rgba(107,63,160,0.3)' }}>
         <Icon.send />
       </button>
+    </div>
+  );
+  if (!prominent) return bar;
+  return (
+    <div
+      style={{
+        borderRadius: 18,
+        padding: 1.5,
+        background: 'linear-gradient(135deg, rgba(109,56,173,0.55), rgba(142,95,214,0.18) 40%, rgba(216,120,138,0.28))',
+        boxShadow: '0 10px 26px -10px rgba(109,56,173,0.35)',
+      }}
+    >
+      {bar}
     </div>
   );
 }

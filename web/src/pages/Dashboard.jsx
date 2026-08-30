@@ -638,18 +638,31 @@ function DashboardAiInput() {
 
   return (
     <form onSubmit={handleAiSubmit}>
+      {/* Prominent treatment (design_handoff_dashboard_composer): gradient
+          hairline ring + purple glow + leading brand sparkle - exactly
+          three additions; the bar's layout, inputs and behaviour are
+          untouched. Dashboard only; every other composer stays flat. */}
       <div
-        className="flex items-center bg-white rounded-2xl overflow-hidden"
         style={{
-          border: '1px solid rgba(26, 22, 32, 0.05)',
-          boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.05) 0px 6px 18px',
+          borderRadius: 18,
+          padding: 1.5,
+          background: 'linear-gradient(135deg, rgba(109,56,173,0.55), rgba(142,95,214,0.18) 40%, rgba(216,120,138,0.28))',
+          boxShadow: '0 10px 26px -10px rgba(109,56,173,0.35)',
         }}
       >
+      <div
+        className="flex items-center bg-white overflow-hidden"
+        style={{ borderRadius: 16.5 }}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="var(--color-plum)" className="ml-4 shrink-0" aria-hidden="true">
+          <path d="M12 2l1.8 4.7a4 4 0 0 0 2.5 2.5L21 11l-4.7 1.8a4 4 0 0 0-2.5 2.5L12 20l-1.8-4.7a4 4 0 0 0-2.5-2.5L3 11l4.7-1.8a4 4 0 0 0 2.5-2.5L12 2z" />
+          <path d="M19 2l.7 1.8a1.5 1.5 0 0 0 .8.8L22 5l-1.5.4a1.5 1.5 0 0 0-.8.8L19 8l-.7-1.8a1.5 1.5 0 0 0-.8-.8L16 5l1.5-.4a1.5 1.5 0 0 0 .8-.8L19 2z" />
+        </svg>
         <input
           ref={aiInputRef}
           type="text"
           placeholder="What can I help you with?"
-          className="flex-1 px-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
+          className="flex-1 pl-2 pr-4 py-4 text-base text-charcoal bg-transparent focus:outline-none placeholder:text-warm-grey"
         />
         <div className="flex items-center gap-1 pr-3">
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileSelect} />
@@ -691,6 +704,7 @@ function DashboardAiInput() {
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           </button>
         </div>
+      </div>
       </div>
     </form>
   );
