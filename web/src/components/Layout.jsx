@@ -613,13 +613,13 @@ function MoreAIField({ onClose }) {
         </div>
       </div>
       <div className="flex gap-1.5 overflow-x-auto" style={{ padding: '10px 2px 0', scrollbarWidth: 'none' }}>
-        {["What's for dinner?", 'Add milk to the list', "Who's free Saturday?"].map((sTxt) => (
+        {['Add milk to the list', 'Add dentist Thursday at 3pm', "What's on this week?"].map((sTxt) => (
           <button
             key={sTxt}
             type="button"
             onClick={() => routeToAssistant({ message: sTxt }, onClose)}
             className="shrink-0 font-semibold active:scale-[0.97] transition-transform"
-            style={{ background: 'var(--color-sand)', border: 0, borderRadius: 99, padding: '7px 13px', fontSize: 12, color: '#4A4453' }}
+            style={{ background: 'var(--color-warm-sand)', border: 0, borderRadius: 99, padding: '7px 13px', fontSize: 12, color: '#4A4453' }}
           >
             {sTxt}
           </button>

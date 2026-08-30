@@ -47,7 +47,9 @@
   --color-secondary: #F3EDFC;
   --color-accent: #E8724A;
   --color-oat: #FBF8F3;
-  --color-sand: #F3EEE5;
+  /* Warm app-surface from design_handoff_more_ai_field (chips). NB the
+     name 'sand' was taken - the legacy remap below holds #E8E5EC. */
+  --color-warm-sand: #F3EEE5;
   --color-linen: #FFFFFF;
   --color-sand: #E8E5EC;
   --color-cream-border: #E8E5EC;
