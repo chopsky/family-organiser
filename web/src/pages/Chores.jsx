@@ -749,13 +749,16 @@ export default function Chores() {
             {!isMobile && !childMode && (
             <div ref={filterRef} style={{ position: 'relative' }}>
               <button onClick={() => setFilterOpen((o) => !o)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 99, cursor: 'pointer', fontFamily: INTER, fontSize: 13.5, fontWeight: 600, background: visibleIds ? INK : BG_SOFT, color: visibleIds ? '#fff' : INK2, border: 0 }}>
-                <IcPeople s={16} c={visibleIds ? '#fff' : INK2} /> {visibleIds ? `${shown.length} of ${members.length}` : 'Everyone'}
+                <IcPeople s={16} c={visibleIds ? '#fff' : INK2} /> {visibleIds ? `${shown.length} of ${members.filter((m) => !isPetMember(m)).length}` : 'Everyone'}
               </button>
               {filterOpen && (
                 <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 40, background: '#fff', borderRadius: 14, padding: 6, width: 210, maxHeight: 340, overflowY: 'auto', border: `1px solid ${LINE}`, boxShadow: '0 14px 44px rgba(26,22,32,0.2)' }}>
                   <button onClick={() => setVisibleIds(null)} style={{ ...filterRow, color: visibleIds ? INK : BRAND, fontWeight: 700 }}><IcPeople s={18} c={visibleIds ? INK2 : BRAND} /> Everyone</button>
                   <div style={{ height: 1, background: LINE, margin: '4px 0' }} />
-                  {members.map((m) => {
+                  {/* Pets are members for avatars/food-related surfaces, but
+                      tasks can't be assigned to them - so they don't belong
+                      in the task visibility filter either. */}
+                  {members.filter((m) => !isPetMember(m)).map((m) => {
                     const on = !visibleIds || visibleIds.includes(m.id);
                     return (
                       <button key={m.id} onClick={() => toggleVisible(m.id)} style={filterRow}>
@@ -1022,7 +1025,7 @@ function TaskModal({ modal, members, onClose, onSave }) {
           <>
             <Field label="Who">
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {members.map((m) => {
+                {members.filter((m) => !isPetMember(m)).map((m) => {
                   const on = assignees.includes(m.id);
                   return (
                     <button key={m.id} onClick={() => toggleIn(assignees, setAssignees, m.id)} title={m.name}
