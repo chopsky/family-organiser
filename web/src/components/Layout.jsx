@@ -613,7 +613,18 @@ function MoreAIField({ onClose }) {
         </div>
       </div>
       <div className="flex gap-1.5 overflow-x-auto" style={{ padding: '10px 2px 0', scrollbarWidth: 'none' }}>
-        {['Add milk to the list', 'Add dentist Thursday at 3pm', "What's on this week?"].map((sTxt) => (
+        {/* New-household-safe by design: every chip CREATES something, so
+            none can whiff on an empty calendar (founder rule). Each
+            phrasing individually verified against the prompt's redirect
+            rules + executor handlers + empty-household state. */}
+        {[
+          'Add milk to the list',
+          'Add dentist Thursday at 3pm',
+          'We need nappies, wipes and bananas',
+          'Remind me to buy a birthday card Friday',
+          'Plan an easy dinner for tomorrow',
+          'Gym every Tuesday at 7am',
+        ].map((sTxt) => (
           <button
             key={sTxt}
             type="button"
