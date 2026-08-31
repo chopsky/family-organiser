@@ -24,9 +24,9 @@ import { readFileSync } from 'node:fs';
 
 // ── Config: EDIT THESE before a real send ───────────────────────────────
 const FROM = 'Housemait <updates@housemait.com>'; // must be on a verified Postmark domain
-const SUBJECT = 'Housemait just got a big update';
+const SUBJECT = 'Housemait is now free for your family';
 const STREAM = 'broadcast'; // your Postmark BROADCAST message stream ID (not "outbound"/transactional)
-const HTML_PATH = new URL('../../emails/announcement-2026-07.html', import.meta.url);
+const HTML_PATH = new URL('../../emails/announcement-2026-08-free.html', import.meta.url);
 // ─────────────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
@@ -41,7 +41,7 @@ if (!token) { console.error('Missing POSTMARK_SERVER_TOKEN env var'); process.ex
 
 const html = readFileSync(HTML_PATH, 'utf8');
 if (html.includes('REPLACE: your postal address')) {
-  console.error('✋ The footer still has the address placeholder — edit emails/announcement-2026-07.html first (legal requirement).');
+  console.error('✋ The footer still has the address placeholder — edit emails/announcement-2026-08-free.html first (legal requirement).');
   process.exit(1);
 }
 if (!html.includes('{{{ pm:unsubscribe }}}')) {
