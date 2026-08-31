@@ -92,7 +92,7 @@ function buildFaqs(locale) {
     { q: 'How does the WhatsApp assistant work?', a: 'Message Housemait like you’d message a friend: type, send a voice note, or snap a photo of a school letter. It adds events, updates lists and answers questions about the week, and everything appears in the app for the whole family, instantly.' },
     { q: 'Do both parents see the same thing?', a: 'Yes. Everyone in the family shares the same calendar, lists and plans, live. Add something on the school run and it’s on your partner’s phone before you’re home.' },
     { q: 'Is it safe for kids?', a: 'Child Mode is a separate, playful space with their quests, stars and countdowns, and nothing else. No ads, no messages from strangers, no social feed. You decide what they see.' },
-    { q: 'How much does it cost?', a: `Housemait is ${p.monthly} a month, or ${p.annual} a year (two months free). One subscription covers the whole household, and you can cancel anytime.` },
+    { q: 'How much does it cost?', a: `The family app is free forever: calendar, lists, chores, meals and school term dates, plus 10 free AI uses a month. Premium adds unlimited AI uses, calendar sync, uploads and daily briefs for ${p.monthly} a month or ${p.annual} a year (two months free), one subscription for the whole household. Every family starts with 14 days of full Premium, no card needed.` },
     { q: 'Which phones does it work on?', a: 'Housemait is on iPhone and Android, and the WhatsApp assistant works from any phone.' },
   ]
 }
@@ -260,6 +260,8 @@ function QrLink({ href, className, children, ariaLabel, preferUp = false, qr = '
 export default function LandingPage() {
   const locale = useLocale()
   const [openFaq, setOpenFaq] = useState(null)
+  // Pricing billing toggle (UPDATE-pricing.md) - ephemeral UI state only.
+  const [billing, setBilling] = useState('monthly')
 
   // Screenshot-only mode (?flat=1): the scroll story renders as normal
   // stacked sections so a full-page capture shows every chapter. Never
@@ -375,7 +377,7 @@ export default function LandingPage() {
           '@type': 'Offer',
           price,
           priceCurrency: locale.currency,
-          description: 'Free 14-day trial, then per household per month. Annual plan available.',
+          description: 'Free family app with 10 AI uses a month; Premium unlocks unlimited AI. Every household starts with 14 days of Premium.',
         } : undefined,
       },
     ])
@@ -621,7 +623,7 @@ export default function LandingPage() {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
             </a>
           </div>
-          <div className="lv-hero-trial">Free 14-day trial · No card to start&nbsp;<span style={{ letterSpacing: '0.27px' }}>· Cancel anytime</span></div>
+          <div className="lv-hero-trial">Free for the whole family · 14 days of Premium included · No card needed&nbsp;<span style={{ letterSpacing: '0.27px' }}>· Cancel anytime</span></div>
         </div>
       </section>
 
@@ -893,33 +895,61 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Pricing ── */}
+      {/* ── Pricing — Free + Premium (UPDATE-pricing.md) ── */}
       <section id="pricing" className="lv-pricing">
         <div className="lv-pricing-head" data-lv-reveal="0">
-          <h2 className="lv-h2">One plan, whole household.</h2>
-          <p className="lv-sub">Every feature, every family member, one subscription. Cancel anytime.</p>
+          <h2 className="lv-h2">Free for the whole family.</h2>
+          <p className="lv-sub">Calendar, meals, lists and chores are free forever, with 10 free AI uses a month. Premium unlocks the unlimited assistant and the automations that feed it.</p>
+        </div>
+        <div className="lv-billing-wrap" data-lv-reveal="0">
+          <div className="lv-billing" role="group" aria-label="Billing period">
+            <button type="button" className={billing === 'monthly' ? 'on' : ''} aria-pressed={billing === 'monthly'} onClick={() => setBilling('monthly')}>Monthly</button>
+            <button type="button" className={billing === 'annual' ? 'on' : ''} aria-pressed={billing === 'annual'} onClick={() => setBilling('annual')}>
+              Annually<span className="tag">2 MONTHS FREE</span>
+            </button>
+          </div>
         </div>
         <div className="lv-plans">
           <div className="lv-plan" data-lv-reveal="0">
-            <div className="plan-k">MONTHLY</div>
-            <div className="price-row"><span className="price">{p.monthly}</span><span className="per">/ month</span></div>
-            <p className="plan-sub">Billed monthly. Flexible if you&rsquo;re just settling in.</p>
-            <Link to={SIGNUP_URL} className="lv-plan-btn">Start monthly</Link>
+            <div className="plan-k">FREE</div>
+            <div className="price-row"><span className="price">{(p.monthly.match(/^[^0-9]+/) || ['£'])[0]}0</span><span className="per">forever</span></div>
+            <p className="plan-sub">The shared family app, for every member of the household.</p>
+            <ul className="plan-bullets">
+              <li><Check />Calendar, lists, to-dos &amp; notes</li>
+              <li><Check />Chores, routines &amp; rewards</li>
+              <li><Check />Child Mode</li>
+              <li><Check />Meal planner &amp; recipes</li>
+              <li><Check />School term dates built in</li>
+              <li><Check />Party invites &amp; RSVPs</li>
+              <li className="hl"><Check />10 AI uses a month included</li>
+            </ul>
+            <a href="#download" className="lv-plan-btn">Get started</a>
           </div>
-          <div className="lv-plan annual" data-lv-reveal="1">
-            <div className="lv-plan-badge">2 MONTHS FREE</div>
-            <div className="plan-k">ANNUAL</div>
-            <div className="price-row"><span className="price">{p.annual}</span><span className="per">/ year</span></div>
-            <p className="plan-sub">That&rsquo;s {p.monthlyEquivalent} a month, for the calmest year yet.</p>
-            <Link to={SIGNUP_URL} className="lv-plan-btn fill">Start annual</Link>
+          <div className="lv-plan premium" data-lv-reveal="1">
+            <div className="plan-k">PREMIUM</div>
+            <div aria-live="polite">
+              <div className="price-row"><span className="price">{billing === 'annual' ? p.annual : p.monthly}</span><span className="per">{billing === 'annual' ? '/ year' : '/ month'}</span></div>
+              <p className="price-note">{billing === 'annual' ? `Works out at ${p.monthlyEquivalent} a month` : `Or ${p.annual} a year (two months free)`}</p>
+            </div>
+            <p className="plan-sub">Your family&rsquo;s assistant, on WhatsApp and in the app.</p>
+            <ul className="plan-bullets">
+              <li className="hl"><Check />Unlimited AI uses - ask, add and plan by text, photo or voice</li>
+              <li><Check />Photograph or forward school letters, every date lands itself</li>
+              <li><Check />Morning and evening briefs before the day starts</li>
+              <li><Check />Your Google, Apple &amp; Outlook calendars, all in one place</li>
+              <li><Check />Document vault - store your family&rsquo;s paperwork and memories</li>
+              <li><Check />Voice notes become events, lists and reminders</li>
+            </ul>
+            <a href="#download" className="lv-plan-btn fill">Start 14 days free</a>
           </div>
         </div>
         <div className="lv-plan-notes" data-lv-reveal="2">
           <span><Check />Whole family included</span>
-          <span><Check />All features, no tiers</span>
-          <span><Check />WhatsApp assistant</span>
+          <span><Check />The app free forever</span>
+          <span><Check />No card needed</span>
           <span><Check />Cancel anytime</span>
         </div>
+        <p className="lv-plan-foot" data-lv-reveal="2">Free AI uses reset on the 1st of each month. Answering the assistant&rsquo;s questions never counts as a use.</p>
       </section>
 
       {/* ── FAQ ── */}
@@ -948,7 +978,7 @@ export default function LandingPage() {
           <img className="lv-cta-img" src="/landing/cta-family.jpg" alt="" loading="lazy" />
           <div className="lv-cta-scrim" />
           <h2>Ready for calmer weeks?</h2>
-          <p className="lv-cta-sub">Set Housemait up in just a few minutes. Free to get started. The {na ? 'coffee' : 'kettle'} will still be warm.</p>
+          <p className="lv-cta-sub">Set Housemait up in just a few minutes. Free for the whole family. The {na ? 'coffee' : 'kettle'} will still be warm.</p>
           <div className="lv-cta-btns">
             <QrLink href={APP_STORE_URL} className="lv-appstore" preferUp ariaLabel="Download Housemait on the App Store — or hover to scan the QR code">
               <svg width="22" height="22" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" /></svg>

@@ -302,20 +302,36 @@
 .lv-pricing-head { max-width: 650px; margin: 0 auto; text-align: center; }
 .lv-plans { margin-top: 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; max-width: 760px; margin-left: auto; margin-right: auto; }
 .lv-plan { background: #fff; border: 1px solid var(--lv-border); border-radius: 30px; padding: 38px 36px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.lv-plan.annual { position: relative; border: 1.5px solid var(--lv-purple); box-shadow: 0 24px 60px rgba(109, 56, 173, 0.13); }
+.lv-plan.premium { position: relative; border: 1.5px solid var(--lv-purple); box-shadow: 0 24px 60px rgba(109, 56, 173, 0.13); }
 .lv-plan .plan-k { font-size: 14px; font-weight: 700; color: var(--lv-muted); letter-spacing: 0.04em; }
-.lv-plan.annual .plan-k { color: var(--lv-purple); }
+.lv-plan.premium .plan-k { color: var(--lv-purple); }
+/* Billing toggle: white pill, active side fills plum; the Annually tag
+   flips palette with its button's state. */
+.lv-billing-wrap { margin-top: 34px; display: flex; justify-content: center; }
+.lv-billing { display: inline-flex; background: #fff; border: 1px solid rgba(36, 30, 51, 0.10); border-radius: 999px; padding: 5px; }
+.lv-billing button { display: inline-flex; align-items: center; gap: 8px; border: none; background: transparent; color: var(--lv-ink-2); font-family: inherit; font-size: 14.5px; font-weight: 700; padding: 10px 20px; border-radius: 999px; cursor: pointer; transition: background 0.25s ease, color 0.25s ease; }
+.lv-billing button.on { background: var(--lv-purple); color: var(--lv-cream-txt); }
+.lv-billing .tag { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 8px; border-radius: 999px; background: var(--lv-tint); color: var(--lv-purple); transition: background 0.25s ease, color 0.25s ease; }
+.lv-billing button.on .tag { background: rgba(252, 250, 246, 0.2); color: var(--lv-cream-txt); }
+/* Toggle-driven note under the Premium price - fixed height so the
+   monthly/annual swap never shifts the layout. */
+.lv-plan .price-note { font-size: 12.5px; font-weight: 600; color: var(--lv-muted); margin: 6px 0 0; min-height: 18px; }
+/* Plan bullet lists */
+.plan-bullets { list-style: none; margin: 0 0 26px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.plan-bullets li { display: flex; align-items: flex-start; gap: 9px; font-size: 14.5px; font-weight: 600; color: var(--lv-ink-2); line-height: 1.45; }
+.plan-bullets li svg { flex: none; margin-top: 2.5px; }
+.plan-bullets li.hl { color: var(--lv-purple); }
 .lv-plan .price-row { display: flex; align-items: baseline; gap: 8px; margin-top: 10px; }
 .lv-plan .price { font-family: var(--lv-serif); font-size: 52px; line-height: 1; color: var(--lv-ink); }
 .lv-plan .per { font-size: 15px; font-weight: 600; color: var(--lv-muted); }
 .lv-plan .plan-sub { color: var(--lv-ink-2); font-size: 14.5px; line-height: 1.6; margin: 10px 0 26px; }
-.lv-plan-badge { position: absolute; top: -13px; right: 26px; background: var(--lv-purple); color: var(--lv-cream-txt); font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; padding: 6px 13px; border-radius: 999px; }
 .lv-plan-btn { margin-top: auto; align-self: stretch; text-align: center; border: 1.5px solid rgba(36, 30, 51, 0.16); color: var(--lv-ink) !important; padding: 13px 24px; border-radius: 999px; font-size: 15px; font-weight: 700; text-decoration: none; transition: border-color 0.2s ease, color 0.2s ease; }
 .lv-plan-btn:hover { border-color: var(--lv-purple); color: var(--lv-purple) !important; }
 .lv-plan-btn.fill { background: var(--lv-purple); border: none; color: var(--lv-cream-txt) !important; padding: 14.5px 24px; transition: background 0.2s ease; }
 .lv-plan-btn.fill:hover { background: var(--lv-purple-deep); }
 .lv-plan-notes { margin-top: 28px; display: flex; justify-content: center; gap: 10px 28px; flex-wrap: wrap; }
 .lv-plan-notes span { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; color: var(--lv-ink-2); }
+.lv-plan-foot { margin: 18px auto 0; text-align: center; font-size: 13px; color: var(--lv-muted); max-width: 56ch; }
 
 /* ── FAQ ── */
 .lv-faq { padding: 100px clamp(18px, 5vw, 72px) 130px; max-width: 840px; margin: 0 auto; }
