@@ -395,6 +395,9 @@ export default function Calendar() {
   // the user scrolls, so the list crosses month boundaries instead of
   // stopping dead. Reset on month paging so chevrons stay cheap.
   const [scheduleMonthsAhead, setScheduleMonthsAhead] = useState(1);
+  // Floating "↑ Today" pill, shown once the schedule list is scrolled
+  // meaningfully off the top (the page scrolls the window in this view).
+  const [scheduleShowTop, setScheduleShowTop] = useState(false);
   const scheduleEndRef = useRef(null);
   // One extension in flight at a time: cleared when fresh events land, so a
   // still-visible sentinel re-fires only after the new month has rendered.
@@ -825,6 +828,20 @@ export default function Calendar() {
   useEffect(() => {
     scheduleExtendBusyRef.current = false;
   }, [events]);
+
+  // Schedule view: show the floating "↑ Today" pill after ~260px of window
+  // scroll; hide it again near the top. Passive listener, torn down (and
+  // the pill hidden) whenever the view changes.
+  useEffect(() => {
+    if (viewMode !== 'schedule') {
+      setScheduleShowTop(false);
+      return undefined;
+    }
+    const onScroll = () => setScheduleShowTop(window.scrollY > 260);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [viewMode]);
 
   // Close settings on click outside
   useEffect(() => {
@@ -2888,6 +2905,30 @@ export default function Calendar() {
           })()}
           {/* Scroll sentinel: nearing it loads another month into the list. */}
           <div ref={scheduleEndRef} style={{ height: 1 }} />
+          {/* Floating "↑ Today" - same centered black pill as the Documents
+              undo toast (the house above-the-tab-bar treatment). Fades with
+              opacity so it can transition both ways; pointer-events off while
+              hidden. If the user has paged to another month, "Today" also
+              means re-anchoring the list, not just scrolling. */}
+          <button
+            type="button"
+            aria-hidden={!scheduleShowTop}
+            tabIndex={scheduleShowTop ? 0 : -1}
+            onClick={() => {
+              const now = new Date();
+              if (currentMonth.getFullYear() !== now.getFullYear() || currentMonth.getMonth() !== now.getMonth()) {
+                goToday();
+              }
+              const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+              window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+            }}
+            className={`fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-2xl px-4 py-2.5 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
+              scheduleShowTop ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+            style={{ boxShadow: '0 8px 24px rgba(26,22,32,0.25)' }}
+          >
+            ↑ Today
+          </button>
         </div>
       )}
 
