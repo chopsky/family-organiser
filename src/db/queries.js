@@ -1870,6 +1870,19 @@ async function setHolidayPauseDismissedUpto(householdId, upTo) {
   } catch { /* pre-migration - the card still dismisses per-device */ }
 }
 
+/** Open (unchecked) items left on one list - the shopping-batch summary's
+ *  "N left" figure. list_id null counts the household's unlisted items. */
+async function countOpenShoppingItems(householdId, listId, db = supabase) {
+  let q = db.from('shopping_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('household_id', householdId)
+    .eq('completed', false);
+  q = listId ? q.eq('list_id', listId) : q.is('list_id', null);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+
 async function getWhatsAppVerificationCode(userId, code, db = supabase) {
   const { data, error } = await db
     .from('whatsapp_verification_codes')
@@ -10917,6 +10930,7 @@ async function deleteRedemption(id, householdId, db = supabase) {
 }
 
 module.exports = {
+  countOpenShoppingItems,
   getHolidayPauseDismissedUpto,
   setHolidayPauseDismissedUpto,
   sanitizeOrFilterValue,

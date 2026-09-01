@@ -5,6 +5,7 @@ const { AISLE_CATEGORIES, detectAisle } = require('../utils/aisle-detect');
 const cache = require('../services/cache');
 const push = require('../services/push');
 const broadcast = require('../services/broadcast');
+const shoppingBatch = require('../services/shopping-batch');
 
 const router = Router();
 
@@ -227,12 +228,26 @@ router.patch('/:id', requireAuth, requireHousehold, async (req, res) => {
         console.error('[shopping] purgePriorPurchases failed:', err.message);
       }
 
+      // One summary per shop, not one WhatsApp per tick (2026-08-31
+      // report: 12 items = 12 messages to an app-less partner). The
+      // batcher waits for a quiet period, or flushes at once when the
+      // list empties.
       try {
-        const members = await db.getHouseholdMembers(req.householdId);
-        broadcast.toHousehold(req.user.id, members, `✅ ${req.user.name} checked off: ${data.item}`);
+        shoppingBatch.noteCheckOff({
+          householdId: req.householdId,
+          senderId: req.user.id,
+          senderName: req.user.name,
+          itemName: data.item,
+          listId: data.list_id ?? null,
+        });
       } catch (err) {
-        console.error('[shopping] broadcast failed:', err.message);
+        console.error('[shopping] batch note failed:', err.message);
       }
+    }
+
+    // Un-check while a summary is pending: take the item back out.
+    if (completed === false) {
+      try { shoppingBatch.retractCheckOff(req.householdId, data.item); } catch { /* cosmetic */ }
     }
 
     cache.invalidate(`shopping-lists:${req.householdId}`);
