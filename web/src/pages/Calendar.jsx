@@ -2923,10 +2923,11 @@ export default function Calendar() {
               window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
             }}
             // Mobile bottom offset mirrors the floating nav's own inset
-            // formula (max(22px, safe-area+8px)) plus the ~60px pill height
-            // and a small gap, so this never sits ON the nav (bottom-24 did,
-            // on phones with a home indicator).
-            className={`fixed bottom-[calc(max(22px,env(safe-area-inset-bottom,0px)_+_8px)_+_70px)] md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-3xl px-4 py-2 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
+            // formula (max(22px, safe-area+8px)) plus the nav pill's real
+            // height (10+7+23+3+~15+6+10 padding/icon/gap/label ≈ 76px,
+            // measured from Layout's TabItem - a 70px guess still clipped
+            // it) and a 12px gap, so this floats clear of the nav.
+            className={`fixed bottom-[calc(max(22px,env(safe-area-inset-bottom,0px)_+_8px)_+_88px)] md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-3xl px-4 py-2 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
               scheduleShowTop ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
             style={{ boxShadow: '0 8px 24px rgba(26,22,32,0.25)' }}
