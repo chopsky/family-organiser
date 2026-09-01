@@ -16,6 +16,7 @@ const db = require('../db/queries');
 const { requireAuth, requireHousehold } = require('../middleware/auth');
 const { encryptToken } = require('../utils/calendar-token-crypto');
 const { localToUTC } = require('../utils/local-time');
+const { conflictLineForEvent } = require('../services/conflicts');
 const googleCal = require('../services/googleCalendar');
 const deviceCalendarSync = require('../services/deviceCalendarSync');
 const cache = require('../services/cache');
@@ -895,7 +896,14 @@ router.post('/events', async (req, res) => {
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
-    return res.status(201).json({ event });
+    // Same-person double-booking heads-up, as a response field the client
+    // may surface (chips render from calendar data regardless). Best-effort
+    // garnish - never worth delaying or failing the save over.
+    let conflict_warning = null;
+    try {
+      conflict_warning = await conflictLineForEvent(req.householdId, event);
+    } catch { conflict_warning = null; }
+    return res.status(201).json({ event, conflict_warning });
   } catch (err) {
     console.error('POST /api/calendar/events error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -989,7 +997,13 @@ router.patch('/events/:id', async (req, res) => {
     cache.invalidatePattern(`cal-events:${req.householdId}:`);
     cache.invalidatePattern(`cal-tasks:${req.householdId}:`);
     cache.invalidate(`digest:${req.householdId}`);
-    return res.json({ event });
+    // Time/assignee changes can create clashes just like creation - same
+    // best-effort heads-up field as POST.
+    let conflict_warning = null;
+    try {
+      conflict_warning = await conflictLineForEvent(req.householdId, event);
+    } catch { conflict_warning = null; }
+    return res.json({ event, conflict_warning });
   } catch (err) {
     console.error('PATCH /api/calendar/events/:id error:', err);
     return res.status(500).json({ error: 'Internal server error' });

@@ -23,6 +23,7 @@ import WeatherStrip from '../components/WeatherStrip';
 import AfterSchoolCard from '../components/AfterSchoolCard';
 import SetupNudges from '../components/SetupNudges';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { conflictedKeys, itemKey } from '../lib/conflicts';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 
@@ -867,6 +868,9 @@ export default function Dashboard() {
   const todayEvents = digest?.todayEvents ?? [];
   const eventCount = todayEvents.length;
   const members = digest?.members ?? [];
+  // Same-person double-bookings among today's events → amber ⚠️ chip on
+  // the schedule rows (client twin of services/conflicts.js).
+  const todayClashKeys = conflictedKeys(todayEvents, members);
 
   // "Up Next" card data: the soonest TIMED event today that hasn't started
   // yet. All-day events are excluded (no meaningful countdown). Hidden
@@ -1130,6 +1134,9 @@ export default function Dashboard() {
                             row shows up as "01:00" in BST. */}
                         <p className="text-xs text-cocoa truncate mt-0.5 leading-[1.45]">
                           {ev.all_day ? 'All day' : (ev.end_time ? `${formatTime(ev.start_time)} – ${formatTime(ev.end_time)}` : formatTime(ev.start_time))}{ev.location ? ` · ${ev.location}` : ''}
+                          {todayClashKeys.has(itemKey(ev)) && (
+                            <span className="ml-1.5 font-semibold" style={{ color: '#B45309' }}>⚠️ Clash</span>
+                          )}
                         </p>
                       </div>
                       {visibleAvatars.length > 0 && (

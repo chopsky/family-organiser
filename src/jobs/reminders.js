@@ -4,6 +4,7 @@ const push = require('../services/push');
 const assistantMeter = require('../services/assistant-meter');
 const { generateMorningBriefPush } = require('../services/morning-brief');
 const { pickDigestFooter } = require('../utils/whatsapp-tips');
+const conflicts = require('../services/conflicts');
 const { buildDigestWeatherLine } = require('../utils/weather-line');
 const { fetchTodayForecastForHousehold } = require('../services/digest-weather');
 
@@ -171,6 +172,7 @@ function buildDailyReminderParts(user, opts = {}) {
     todayEvents = [],
     shoppingCount = 0,
     schoolActivities = [],
+    clashLines = [],           // "⚠️ X double-booked: …" lines, prebuilt per household
     tz = 'Europe/London',
     linkedAt = null,
     weatherLine = null,
@@ -245,6 +247,13 @@ function buildDailyReminderParts(user, opts = {}) {
       const who = formatEventAssignee(ev);
       lines.push(`${startStr} - ${ev.title}${who ? ` _(${who})_` : ''}`);
     }
+    lines.push('');
+  }
+
+  // Double-bookings, right under the schedule they refer to. Prebuilt per
+  // household (same-person overlap only - see services/conflicts.js).
+  if (Array.isArray(clashLines) && clashLines.length > 0) {
+    for (const l of clashLines) lines.push(l);
     lines.push('');
   }
 
@@ -340,6 +349,7 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
     todayEvents = [],
     shoppingCount = 0,
     schoolActivities = [],
+    clashLines = [],
     tz = 'Europe/London',
     linkedAt = null,
     weatherLine = null,
@@ -399,6 +409,9 @@ function buildDailyReminderTemplateVars(user, opts = {}) {
       const timeStr = a.time_end ? ` until ${a.time_end.substring(0, 5)}` : '';
       return `${a.child_name} - ${a.activity}${timeStr}`;
     }),
+    // Double-bookings ride the events var - the template has no spare slot,
+    // and they belong beside the schedule anyway.
+    ...(Array.isArray(clashLines) ? clashLines.map(oneLine) : []),
   ];
   const events = eventStrings.length > 0
     ? oneLine(eventStrings.join(' · '))
@@ -702,6 +715,17 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
   // activity dependents below.
   const householdMembers = await db.getHouseholdMembers(householdId).catch(() => []);
 
+  // Same-person double-bookings on the anchor day - one probe per household,
+  // shared across every recipient (conflicts are household facts, like the
+  // events themselves). Garnish by design: any failure yields no lines.
+  let clashLines = [];
+  try {
+    const { pairs } = await conflicts.findConflictsForDate(householdId, today, {
+      members: householdMembers, timezone: tz,
+    });
+    clashLines = conflicts.briefConflictLines(pairs, tz);
+  } catch { clashLines = []; }
+
   // Today's weather one-liner - one fetch per household run, shared
   // across every member's digest. Cached 12h inside the helper so a
   // re-trigger / second cron tick doesn't re-fetch. Location precedence:
@@ -841,6 +865,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
       todayEvents,
       shoppingCount,
       schoolActivities,
+      clashLines,
       tz,
       linkedAt: member.whatsapp_linked_at || null,
       weatherLine,
@@ -855,7 +880,7 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
     // same digest data (parts.body) as the source, rewritten conversationally.
     if (channel === 'push') {
       const parts = buildDailyReminderParts(member, buildOpts);
-      const { title, body } = await generateMorningBriefPush(
+      const { title, body: generatedBody } = await generateMorningBriefPush(
         {
           name: parts.name,
           weekday: parts.weekday,
@@ -869,6 +894,12 @@ async function sendDailyReminders(householdId, singleMember, options = {}) {
         },
         { householdId, userId: member.id },
       );
+      // A double-booking must survive the LLM rewrite: the summary feeds the
+      // model, but nothing guarantees the warning makes the 280-char cut -
+      // append it deterministically unless the model already mentioned it.
+      const body = (clashLines.length > 0 && !generatedBody.includes('⚠️'))
+        ? `${generatedBody}\n${clashLines.join('\n')}`
+        : generatedBody;
       let pushSent = 0;
       // The durable in-app copy: the brief is the longest push we send and
       // the one most often truncated on the lock screen.

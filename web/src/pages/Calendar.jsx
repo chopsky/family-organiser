@@ -18,6 +18,7 @@ import { useAppForegroundRefresh } from '../hooks/useAppForegroundRefresh';
 import { confirmDestructive } from '../lib/action-sheet';
 import ActivityModal from '../components/ActivityModal';
 import { looksLikeGathering } from '../lib/partyDetect';
+import { conflictedKeys, itemKey } from '../lib/conflicts';
 import { isKidMember } from '../lib/kidsTheme';
 import { openInMaps } from '../lib/maps';
 
@@ -1877,6 +1878,12 @@ export default function Calendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, events, tasks, activeFilters, activeMemberFilters]);
 
+  // Same-person double-bookings among the selected day's EVENTS (tasks
+  // don't clash) - drives the amber ⚠️ chip. Cheap n² over one day.
+  const selectedDayClashKeys = conflictedKeys(
+    selectedDayItems.filter((i) => i._type === 'event'), members,
+  );
+
   // Helper to get member initials + color
   /**
    * Returns the household member objects assigned to an event/task, for the
@@ -2513,6 +2520,9 @@ export default function Calendar() {
                             : (item.all_day
                                 ? 'All day'
                                 : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
+                          {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
+                            <span className="ml-1.5 font-semibold" style={{ color: '#B45309' }}>⚠️ Clash</span>
+                          )}
                           {/* Ambient discovery for the invite loop: gatherings
                               show where the RSVP link lives (tap = the event
                               sheet, where the 🎈 card sits). */}
@@ -2842,6 +2852,7 @@ export default function Calendar() {
               <div className="flex flex-col" style={{ gap: 20 }}>
                 {days.map(({ date, evs }) => {
                   const isToday_ = isSameDay(date, now);
+                  const clashKeys = conflictedKeys(evs, members);
                   return (
                     <div key={toDateStr(date)}>
                       <button
@@ -2890,6 +2901,9 @@ export default function Calendar() {
                                 <div className="truncate" style={{ fontSize: 14, fontWeight: 600, color: M_INK }}>{ev.title}</div>
                                 {ev.location && (
                                   <div className="truncate" style={{ fontSize: 11.5, color: M_INK3, marginTop: 1 }}>{ev.location}</div>
+                                )}
+                                {clashKeys.has(itemKey(ev)) && (
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: '#B45309', marginTop: 1 }}>⚠️ Clash</div>
                                 )}
                               </div>
                               {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 22 : 26, ringColor: '#FFFFFF' })}
@@ -2990,6 +3004,9 @@ export default function Calendar() {
                         : (item.all_day
                             ? 'All day'
                             : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
+                      {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
+                        <span className="ml-1.5 font-semibold" style={{ color: '#B45309' }}>⚠️ Clash</span>
+                      )}
                       {item._type === 'event' && !childMode
                         && item.category !== 'public_holiday' && item.category !== 'birthday'
                         && looksLikeGathering(item.title) && (

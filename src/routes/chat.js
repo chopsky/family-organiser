@@ -10,6 +10,7 @@ const { getWeatherReport, composeWeatherAnswer, getCityFromTimezone, extractLoca
 const { messageMentionsLocation } = require('../utils/location-relevance');
 const { summariseSchoolTermDates } = require('../utils/school-term-summary');
 const { findExtractionDuplicates, skippedLine } = require('../services/event-dedupe');
+const { conflictLineForEvent } = require('../services/conflicts');
 const { parseRemindersFromMessage, messageMentionsReminder, snapToTaskNotification } = require('../utils/reminder-parser');
 const { transcribeVoice } = require('../services/transcribe');
 const assistantMeter = require('../services/assistant-meter');
@@ -1268,6 +1269,19 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
         console.error(`Action ${act.action} failed (non-fatal):`, actionErr.message);
       }
     }
+
+    // Same-person double-booking check on anything just created - an
+    // executor-warning appendix like the ones above (the user must see it,
+    // the model must remember it). One line, first clash wins; best-effort.
+    try {
+      const createdEvents = executedActions.filter((a) => a.type === 'event_created' && a.event?.id);
+      for (const created of createdEvents) {
+        const clashLine = await conflictLineForEvent(req.householdId, created.event, {
+          members, timezone: household?.timezone,
+        });
+        if (clashLine) { cleanContent += `\n\n${clashLine}`; break; }
+      }
+    } catch { /* garnish - never fail the reply */ }
 
     // Save both messages to DB
     await db.saveChatMessage(req.householdId, req.user.id, 'user', message.trim(), conversationId);

@@ -26,6 +26,7 @@ const { routeReadIntent } = require('../services/intent-router');
 const { messageMentionsMeals, messageMentionsShopping, messageMentionsStars } = require('../utils/context-relevance');
 const { buildDayView } = require('../services/chores');
 const { looksLikeParty } = require('../utils/party-detect');
+const { conflictLineForEvent } = require('../services/conflicts');
 const { findExtractionDuplicates, skippedLine } = require('../services/event-dedupe');
 
 // ─── Trivial-message short-circuit (no AI call) ───────────────────────────────
@@ -3762,6 +3763,13 @@ async function handleTextMessage(text, user, household, ctx = {}) {
       // name it. The helper no-ops when the user's message already carried
       // a reminder, or the event is all-day/birthday/too soon.
       const autoLine = await autoAddEventReminders([createdEv], household, actions);
+      // Same-person double-booking check (services/conflicts.js). A plain
+      // statement, never a question - it must not disturb the one-ask rule
+      // this branch enforces (the invite offer / reminder ladder owns any
+      // trailing "?"). Best-effort: null on any failure.
+      const clashLine = await conflictLineForEvent(household.id, createdEv, {
+        members: household.members, timezone: household.timezone,
+      }).catch(() => null);
       if (looksLikeParty(createdEv.title)) {
         // A party owns this turn: offer the shareable invite link. This branch
         // returns early (never reaching the reconciliation tail where the other
@@ -3773,6 +3781,7 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           const stripped = eventReply.replace(/\s*[^.?!\n]*\?["')\]]*\s*$/, '').trimEnd();
           if (stripped.length > 10) eventReply = stripped;
         }
+        if (clashLine) eventReply += `\n\n${clashLine}`;
         if (autoLine) eventReply += `\n\n${autoLine}`;
         eventReply += '\n\nWant to invite guests? Reply *yes* and I\'ll make a shareable RSVP link - they can reply with headcounts and any allergies, no app needed. 🎈';
         rememberInviteOffer(user.id, {
@@ -3796,6 +3805,11 @@ async function handleTextMessage(text, user, household, ctx = {}) {
           // would block arming and dangle unanswered).
           eventReply = stripped.length > 0 ? stripped : `**${createdEv.title}** is on the calendar.`;
         }
+        // Clash warning AFTER the question-strip (it's a statement, so it
+        // must never bury a trailing "?" mid-text where the strip can't
+        // see it) and BEFORE the reminder line, so the reply reads
+        // confirmation → heads-up → reminder.
+        if (clashLine) eventReply += `\n\n${clashLine}`;
         if (autoLine) {
           eventReply = appendAutoReminderLine(eventReply, autoLine);
           armAutoReminderAdjust(user, household, createdEv, eventReply);
