@@ -1059,6 +1059,14 @@ export default function Calendar() {
   // client-side from the roster's token - one source of truth for the path.
   const inviteUrlFromToken = (token) => `${window.location.origin}/p/${token}`;
 
+  // Invite actions have two hosts: the event editor (native events) and the
+  // read-only synced sheet (third-party calendar events - read-only content,
+  // but real rows, so links attach fine). The sheet wins when open: closing
+  // it always nulls syncedEvent, whereas editingEvent can linger after the
+  // editor closes (the convert-to-task path skips resetForm).
+  const inviteEventId = syncedEvent?.id || editingEvent?.id || null;
+  const inviteEventTitle = syncedEvent ? (syncedEvent.title || '') : formTitle;
+
   async function loadInviteRoster(eventId) {
     try {
       const { data } = await api.get(`/calendar/events/${eventId}/rsvps`);
@@ -1081,7 +1089,7 @@ export default function Calendar() {
   }
 
   async function revokeInviteLink() {
-    if (!editingEvent?.id || inviteBusy) return;
+    if (!inviteEventId || inviteBusy) return;
     const ok = await confirmDestructive({
       title: 'Turn off this invite link?',
       message: 'Anyone with the link won’t be able to open it or RSVP any more. RSVPs you’ve already received are kept.',
@@ -1090,8 +1098,8 @@ export default function Calendar() {
     if (!ok) return;
     setInviteBusy(true);
     try {
-      await api.delete(`/calendar/events/${editingEvent.id}/invite-link`);
-      await loadInviteRoster(editingEvent.id);
+      await api.delete(`/calendar/events/${inviteEventId}/invite-link`);
+      await loadInviteRoster(inviteEventId);
     } catch {
       alert('Could not turn off the link — try again in a moment.');
     } finally {
@@ -1100,17 +1108,17 @@ export default function Calendar() {
   }
 
   async function createInviteLink() {
-    if (!editingEvent?.id || inviteBusy) return;
+    if (!inviteEventId || inviteBusy) return;
     setInviteBusy(true);
     try {
-      const { data } = await api.post(`/calendar/events/${editingEvent.id}/invite-link`);
+      const { data } = await api.post(`/calendar/events/${inviteEventId}/invite-link`);
       setInviteUrl(data.url);
       setInviteRoster(prev => ({ ...(prev || { going: 0, declined: 0, kids: 0, adults: 0, dietary: [], rsvps: [] }), hasLink: true }));
       // On phones go straight to the share sheet - the whole flow is "make
       // link, paste into the class group chat".
       if (navigator.share) {
         try {
-          await navigator.share({ title: formTitle || 'You’re invited', url: data.url });
+          await navigator.share({ title: inviteEventTitle || 'You’re invited', url: data.url });
         } catch { /* user closed the sheet - the link row stays visible */ }
       } else {
         copyInviteUrl(data.url);
@@ -1179,9 +1187,18 @@ export default function Calendar() {
     // Synced copies (device sync / URL feeds) are READ-ONLY: an edit here
     // would silently revert on the next sync and a delete would resurrect -
     // the most confusing possible outcome. Show a detail sheet with
-    // provenance instead of the edit modal.
+    // provenance instead of the edit modal. The event CONTENT is read-only,
+    // but it's still a real calendar_events row in this household, so party
+    // invites attach fine - load the roster for the sheet's invite section
+    // (without it the 🎈 label promised a card this sheet never had - live
+    // report 2026-09-01, play date created in a third-party calendar).
     if (ev.external_feed_id) {
       setSyncedEvent(ev);
+      setInviteRoster(null);
+      setInviteUrl('');
+      setInviteCopied(false);
+      setInviteRosterOpen(false);
+      if (ev.id) loadInviteRoster(ev.id);
       return;
     }
     // School term dates are fabricated entries derived from the School
@@ -3627,6 +3644,125 @@ export default function Calendar() {
                     Read-only here - term dates (and each school&apos;s colour) are managed on the School page.
                   </p>
                 </div>
+              )}
+              {/* Party invites: "read-only" applies to the event CONTENT -
+                  the RSVP link hangs off the row id, which a synced event has
+                  like any native one. The editor's invite card lives in the
+                  edit modal this event can never open, so the sheet carries
+                  its own copy (keep in step with the modal's, same file).
+                  Child Mode reuses this sheet for native events - no invite
+                  actions for kids. Not for _school entries (no row behind
+                  them). */}
+              {!childMode && syncedEvent.external_feed_id && (
+                (inviteRoster?.hasLink || inviteRoster?.rsvps?.length > 0) ? (
+                  <div className="mt-4" style={{ borderRadius: 12, border: `1px solid ${M_LINE_STRONG}`, background: '#FBF8F3', padding: '12px 14px' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>
+                      {inviteRoster.going > 0
+                        ? `${inviteRoster.going} going${(inviteRoster.kids + inviteRoster.adults) > 0 ? ` · ${inviteRoster.adults} adult${inviteRoster.adults === 1 ? '' : 's'}, ${inviteRoster.kids} kid${inviteRoster.kids === 1 ? '' : 's'}` : ''}`
+                        : inviteRoster.hasLink
+                          ? 'No RSVPs yet — share the link below'
+                          : 'RSVPs received'}
+                      {inviteRoster.declined > 0 && (
+                        <span style={{ fontWeight: 400, color: M_INK3 }}> · {inviteRoster.declined} can’t make it</span>
+                      )}
+                    </div>
+                    {inviteRoster.dietary?.length > 0 && (
+                      <div style={{ marginTop: 8, borderRadius: 10, background: '#EDF5EE', border: '1px solid rgba(125,174,130,0.3)', padding: '8px 10px' }}>
+                        {inviteRoster.dietary.map((d, i) => (
+                          <div key={i} style={{ fontSize: 12.5, color: M_INK2, lineHeight: 1.5 }}>
+                            <strong>{d.family}:</strong> {d.note}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {inviteRoster.rsvps?.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setInviteRosterOpen(o => !o)}
+                        style={{ marginTop: 8, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: M_BRAND }}
+                      >
+                        {inviteRosterOpen ? 'Hide replies' : `See all replies (${inviteRoster.rsvps.length})`}
+                      </button>
+                    )}
+                    {inviteRosterOpen && (
+                      <ul style={{ margin: '6px 0 0', padding: 0, listStyle: 'none' }}>
+                        {inviteRoster.rsvps.map((r, i) => (
+                          <li key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, color: M_INK2, padding: '3px 0' }}>
+                            <span>{r.family_name}</span>
+                            <span style={{ color: r.status === 'yes' ? '#5B8A60' : M_INK3, fontWeight: 600 }}>
+                              {r.status === 'yes' ? `Yes · ${(r.kids_count || 0) + (r.adults_count || 0)} coming` : 'No'}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {inviteRoster.hasLink ? (
+                      <>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
+                          <input
+                            readOnly
+                            value={inviteUrl}
+                            onFocus={(e) => e.target.select()}
+                            style={{ ...mInput, flex: 1, width: 'auto', fontSize: 12.5, color: M_INK3, background: '#fff' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => (navigator.share ? navigator.share({ title: syncedEvent.title || 'You’re invited', url: inviteUrl }).catch(() => {}) : copyInviteUrl(inviteUrl))}
+                            style={{ flexShrink: 0, padding: '9px 14px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff' }}
+                          >
+                            {inviteCopied ? 'Copied!' : 'Share'}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={revokeInviteLink}
+                          disabled={inviteBusy}
+                          style={{ marginTop: 8, background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#C0562F', fontFamily: 'inherit' }}
+                        >
+                          Turn off link
+                        </button>
+                      </>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12.5, color: M_INK3 }}>The invite link is turned off.</span>
+                        <button
+                          type="button"
+                          onClick={createInviteLink}
+                          disabled={inviteBusy}
+                          style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: M_BRAND, fontFamily: 'inherit' }}
+                        >
+                          {inviteBusy ? 'Creating…' : 'Create a new link'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : looksLikeGathering(syncedEvent.title) ? (
+                  <div className="mt-4" style={{ borderRadius: 12, border: '1px solid rgba(107,63,160,0.25)', background: M_BRAND_SOFT, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: M_INK }}>🎈 Hosting a party?</div>
+                    <div style={{ fontSize: 12.5, color: M_INK2, marginTop: 3, lineHeight: 1.5 }}>
+                      Share one link with your guests — you’ll get RSVPs, headcounts and allergy notes back here.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={createInviteLink}
+                      disabled={inviteBusy}
+                      style={{ marginTop: 10, padding: '9px 16px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13, fontFamily: 'inherit', background: M_BRAND, color: '#fff', opacity: inviteBusy ? 0.6 : 1 }}
+                    >
+                      {inviteBusy ? 'Creating…' : 'Create invite link'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={createInviteLink}
+                      disabled={inviteBusy}
+                      style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: M_BRAND, fontFamily: 'inherit' }}
+                    >
+                      {inviteBusy ? 'Creating link…' : '+ Invite guests'}
+                    </button>
+                  </div>
+                )
               )}
             </div>
           </div>
