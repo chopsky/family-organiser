@@ -2859,10 +2859,10 @@ export default function Calendar() {
                             >
                               <div style={{ width: 44, flexShrink: 0 }}>
                                 {ev.all_day ? (
-                                  <div style={{ fontSize: 11, fontWeight: 700, color: M_INK, lineHeight: 1.3 }}>All day</div>
+                                  <div style={{ fontSize: 12, fontWeight: 500, color: M_INK, lineHeight: 1.3 }}>All day</div>
                                 ) : (
                                   <>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(ev.start_time)}</div>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(ev.start_time)}</div>
                                     {ev.end_time && (
                                       <div style={{ fontSize: 10.5, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>{formatTime(ev.end_time)}</div>
                                     )}
