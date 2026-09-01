@@ -2922,7 +2922,11 @@ export default function Calendar() {
               const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
               window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
             }}
-            className={`fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-3xl px-4 py-2 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
+            // Mobile bottom offset mirrors the floating nav's own inset
+            // formula (max(22px, safe-area+8px)) plus the ~60px pill height
+            // and a small gap, so this never sits ON the nav (bottom-24 did,
+            // on phones with a home indicator).
+            className={`fixed bottom-[calc(max(22px,env(safe-area-inset-bottom,0px)_+_8px)_+_70px)] md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-charcoal text-white rounded-3xl px-4 py-2 text-[13px] font-semibold transition-opacity duration-200 ease-out ${
               scheduleShowTop ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
             style={{ boxShadow: '0 8px 24px rgba(26,22,32,0.25)' }}
