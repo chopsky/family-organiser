@@ -125,6 +125,7 @@ const CAL_VIEWS = [
   { value: 'month', label: 'Month' },
   { value: 'week', label: 'Week' },
   { value: 'day', label: 'Day' },
+  { value: 'schedule', label: 'Schedule' },
 ];
 
 const REMINDER_OPTIONS = [
@@ -388,6 +389,16 @@ export default function Calendar() {
   const [viewMode, setViewMode] = useState('month');
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(new Date(today));
+  // Schedule view: how many months BEYOND currentMonth the agenda list
+  // extends. Starts at 1 (current + next month covers "the next couple of
+  // weeks" even late in a month); a sentinel at the list's end bumps it as
+  // the user scrolls, so the list crosses month boundaries instead of
+  // stopping dead. Reset on month paging so chevrons stay cheap.
+  const [scheduleMonthsAhead, setScheduleMonthsAhead] = useState(1);
+  const scheduleEndRef = useRef(null);
+  // One extension in flight at a time: cleared when fresh events land, so a
+  // still-visible sentinel re-fires only after the new month has rendered.
+  const scheduleExtendBusyRef = useRef(false);
   const [morePopup, setMorePopup] = useState(null); // { date, items, rect }
   // Cache-first seed: paint the last-persisted current month instantly on a cold
   // launch so the calendar never opens blank (within-session month navigation is
@@ -580,6 +591,12 @@ export default function Calendar() {
         monthsToFetch = getMonthsForRange(weekStart, weekEnd);
       } else if (viewMode === 'day') {
         monthsToFetch = [monthParam(selectedDate)];
+      } else if (viewMode === 'schedule') {
+        // The agenda list runs from currentMonth through however far the
+        // user has scrolled; the school-event scoping below already handles
+        // a contiguous multi-month range (proven by week view spanning two).
+        monthsToFetch = Array.from({ length: scheduleMonthsAhead + 1 }, (_, i) =>
+          monthParam(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + i, 1)));
       } else {
         monthsToFetch = [monthParam(currentMonth)];
       }
@@ -718,7 +735,7 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [currentMonth, selectedDate, viewMode, members, childMode]);
+  }, [currentMonth, selectedDate, viewMode, members, childMode, scheduleMonthsAhead]);
 
   useEffect(() => {
     // No setLoading(true) here: keep the current (stale) events visible while
@@ -781,6 +798,34 @@ export default function Calendar() {
     }
   }, [viewMode]);
 
+  // Schedule view: paging months resets the scroll-extension so chevrons
+  // always land on a cheap one-extra-month window.
+  useEffect(() => {
+    setScheduleMonthsAhead(1);
+  }, [currentMonth]);
+
+  // Schedule view: extend across month boundaries as the user scrolls. A
+  // sentinel under the list bumps monthsAhead when it nears the viewport;
+  // the busy ref serialises extensions (cleared below when fresh events
+  // land), and the 12-month cap makes an event-free future stop asking.
+  useEffect(() => {
+    if (viewMode !== 'schedule') return undefined;
+    const el = scheduleEndRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const obs = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      if (scheduleExtendBusyRef.current) return;
+      scheduleExtendBusyRef.current = true;
+      setScheduleMonthsAhead((n) => Math.min(n + 1, 12));
+    }, { rootMargin: '400px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [viewMode, scheduleMonthsAhead]);
+
+  useEffect(() => {
+    scheduleExtendBusyRef.current = false;
+  }, [events]);
+
   // Close settings on click outside
   useEffect(() => {
     if (!showSettings) return;
@@ -828,7 +873,7 @@ export default function Calendar() {
   // ── Navigation ────────────────────────────────────────────
 
   function navigatePrev() {
-    if (viewMode === 'month') {
+    if (viewMode === 'month' || viewMode === 'schedule') {
       setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
     } else if (viewMode === 'week') {
       const d = new Date(selectedDate);
@@ -844,7 +889,7 @@ export default function Calendar() {
   }
 
   function navigateNext() {
-    if (viewMode === 'month') {
+    if (viewMode === 'month' || viewMode === 'schedule') {
       setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
     } else if (viewMode === 'week') {
       const d = new Date(selectedDate);
@@ -876,6 +921,13 @@ export default function Calendar() {
   const navigationLabel = useMemo(() => {
     if (viewMode === 'month') {
       return currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    }
+    if (viewMode === 'schedule') {
+      const now = new Date();
+      const isThisMonth = currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() === now.getMonth();
+      return isThisMonth
+        ? `Coming up · ${currentMonth.toLocaleDateString('en-GB', { month: 'short' })}`
+        : currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     }
     if (viewMode === 'week') {
       const weekStart = getWeekStart(selectedDate);
@@ -2106,6 +2158,7 @@ export default function Calendar() {
               { value: 'month', label: 'Month' },
               { value: 'week', label: 'Week' },
               { value: 'day', label: 'Day' },
+              { value: 'schedule', label: 'Schedule' },
             ]}
           />
 
@@ -2733,6 +2786,108 @@ export default function Calendar() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Schedule View (continuous agenda - skips empty days) ──────────
+            Design: design_handoff_schedule_view. Full-width day sections from
+            today (or the 1st when paged to another month) through
+            scheduleMonthsAhead extra months; the sentinel below the list
+            extends it as the user scrolls. Events only (the reference spec) -
+            tasks keep their own page; header tap opens the day, card tap the
+            event's own sheet per each category's existing pattern. ── */}
+      {viewMode === 'schedule' && (
+        <div {...swipe.bindings}>
+          {(() => {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const isThisMonth = currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() === now.getMonth();
+            const start = isThisMonth ? now : new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+            const end = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + scheduleMonthsAhead + 1, 0);
+            const days = [];
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const evs = eventsForDate(d);
+              if (evs.length === 0) continue; // skip empty days entirely
+              const sorted = [...evs].sort((a, b) => {
+                if (!!a.all_day !== !!b.all_day) return a.all_day ? -1 : 1;
+                return new Date(a.start_time) - new Date(b.start_time);
+              });
+              days.push({ date: new Date(d), evs: sorted });
+            }
+            if (days.length === 0) {
+              return (
+                <div className="text-center" style={{ padding: '48px 0', color: M_INK3, fontFamily: M_SERIF, fontSize: 20 }}>
+                  Nothing coming up
+                </div>
+              );
+            }
+            return (
+              <div className="flex flex-col" style={{ gap: 20 }}>
+                {days.map(({ date, evs }) => {
+                  const isToday_ = isSameDay(date, now);
+                  return (
+                    <div key={toDateStr(date)}>
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedDate(new Date(date)); setViewMode('day'); }}
+                        className="flex items-baseline bg-transparent border-0 cursor-pointer"
+                        style={{ gap: 7, marginBottom: 9, padding: '0 2px', fontFamily: 'inherit' }}
+                      >
+                        <span style={{ fontSize: 13, fontWeight: 700, color: isToday_ ? 'var(--color-plum)' : M_INK }}>
+                          {isToday_ ? 'Today' : date.toLocaleDateString('en-GB', { weekday: 'long' })}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>
+                          {date.toLocaleDateString('en-GB', { month: 'short' })} {date.getDate()}
+                        </span>
+                      </button>
+                      <div className="flex flex-col" style={{ gap: 8 }}>
+                        {evs.map((ev) => {
+                          const hex = getEventHex(ev);
+                          const eventMembers = getEventMembers(ev);
+                          return (
+                            <div
+                              key={ev.occurrence_key || ev.id}
+                              className="flex items-center bg-white cursor-pointer"
+                              style={{
+                                gap: 12,
+                                borderRadius: 16,
+                                padding: '11px 14px',
+                                borderLeft: `4px solid ${hex}`,
+                                boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)',
+                              }}
+                              onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                            >
+                              <div style={{ width: 44, flexShrink: 0 }}>
+                                {ev.all_day ? (
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: M_INK, lineHeight: 1.3 }}>All day</div>
+                                ) : (
+                                  <>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(ev.start_time)}</div>
+                                    {ev.end_time && (
+                                      <div style={{ fontSize: 10.5, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>{formatTime(ev.end_time)}</div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="truncate" style={{ fontSize: 14, fontWeight: 600, color: M_INK }}>{ev.title}</div>
+                                {ev.location && (
+                                  <div className="truncate" style={{ fontSize: 11.5, color: M_INK3, marginTop: 1 }}>{ev.location}</div>
+                                )}
+                              </div>
+                              {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 22 : 26, ringColor: '#FFFFFF' })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {/* Scroll sentinel: nearing it loads another month into the list. */}
+          <div ref={scheduleEndRef} style={{ height: 1 }} />
         </div>
       )}
 
