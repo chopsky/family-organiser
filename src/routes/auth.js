@@ -2,6 +2,7 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../db/queries');
+const { normaliseInviteCode, isValidInviteCodeShape } = require('../utils/invite-code');
 const { signToken, signSiriToken, requireAuth } = require('../middleware/auth');
 const { requireTurnstile } = require('../middleware/turnstile');
 const email = require('../services/email');
@@ -625,22 +626,43 @@ router.post('/attach-to-household', requireAuth, async (req, res) => {
   }
 
   try {
-    const household = await db.getHouseholdByCode(code.trim().toUpperCase());
+    // Two code systems answer here: the LEGACY households.join_code
+    // (what this endpoint always knew) and the NEW invites.code that
+    // the invite landing page and native onboarding teach ("type
+    // 4QK-4UD"). Web signup's join screen is where invite-link users
+    // land when they choose the browser over the app, so it must
+    // accept both - live repro: the Chesler household's husband typed
+    // a perfectly valid new-style code into this endpoint and was told
+    // it didn't match anything.
+    const raw = String(code).trim();
+    let invite = null;
+    let household = await db.getHouseholdByCode(raw.toUpperCase());
+    if (!household) {
+      const norm = normaliseInviteCode(raw);
+      if (isValidInviteCodeShape(norm)) {
+        invite = await db.getInviteByCode(norm);
+        if (invite) household = await db.getHouseholdById(invite.household_id);
+      }
+    }
     if (!household) {
       return res.status(404).json({ error: "That code didn't match a household. Double-check with the admin who shared it." });
     }
 
     // Assign as a regular member (admin is reserved for the household
-    // creator + anyone the admin promotes from the Family page). Pick
-    // the first colour not yet used by existing members so the new
-    // joiner gets a distinct avatar without admin effort - mirrors
-    // the invite-accept and create-household flows.
-    const color_theme = await db.pickColorForNewMember(household.id);
-    const user = await db.updateUser(req.user.id, {
+    // creator + anyone the admin promotes from the Family page). Via an
+    // invite, honour the inviter's pre-filled profile fields (same as
+    // the token-accept path); either way pick a distinct avatar colour
+    // when the inviter didn't choose one.
+    const profileUpdates = {
       household_id: household.id,
       role: 'member',
-      color_theme,
-    });
+      color_theme: invite?.color_theme || await db.pickColorForNewMember(household.id),
+    };
+    if (invite?.family_role) profileUpdates.family_role = invite.family_role;
+    if (invite?.birthday) profileUpdates.birthday = invite.birthday;
+    if (invite?.school_id) profileUpdates.school_id = invite.school_id;
+    const user = await db.updateUser(req.user.id, profileUpdates);
+    if (invite) await db.markInviteAccepted(invite.id);
 
     const response = await authResponse(user, req);
     return res.status(200).json(response);
