@@ -133,8 +133,8 @@ function kindOf(e) {
 // coral holiday pair - the prototype has no INSET example, but INSET means
 // school closed to pupils, which is the coral family).
 const TAG = {
-  start: ['Term starts', '#F3EEFB', '#6C3DD9'],
-  end: ['Term ends', '#F3EEFB', '#6C3DD9'],
+  start: ['Term starts', '#F3EFF8', '#6D38AD'],
+  end: ['Term ends', '#F3EFF8', '#6D38AD'],
   half: ['Half term', '#FBF1DE', '#936314'],
   break: ['Holiday', '#FDF0EB', '#B8431F'],
   bank: ['Bank holiday', '#FDF0EB', '#B8431F'],
@@ -756,7 +756,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>
 
 
@@ -768,22 +768,22 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
     .nc-title { font-family: 'Recoleta', Georgia, serif; font-size: 29px; color: #1E1A2E; line-height: 1.15; margin-top: 4px; }
     .nc-sub { font-size: 14px; color: #7A7390; margin-top: 4px; }
     .nc-then { font-size: 13px; color: #7A7390; margin-top: 10px; }
-    .nc-stat { text-align: center; background: #F3EEFB; border-radius: 14px; padding: 14px 22px; min-width: 92px; }
-    .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6C3DD9; }
-    .nc-unit { font-size: 12px; font-weight: 600; color: #6C3DD9; margin-top: 5px; }
+    .nc-stat { text-align: center; background: #F3EFF8; border-radius: 14px; padding: 14px 22px; min-width: 92px; }
+    .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6D38AD; }
+    .nc-unit { font-size: 12px; font-weight: 600; color: #6D38AD; margin-top: 5px; }
 
     .nearby { margin-top: 34px; }
     .nearby h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 24px; color: #1E1A2E; margin: 0 0 12px; }
     .nearby-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-    .nearby-grid a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); font-size: 13.5px; font-weight: 600; color: #6C3DD9; text-decoration: none; }
-    .nearby-grid a:hover { border-color: #6C3DD9; }
+    .nearby-grid a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); font-size: 13.5px; font-weight: 600; color: #6D38AD; text-decoration: none; }
+    .nearby-grid a:hover { border-color: #6D38AD; }
     .nearby-all { margin: 12px 0 0; font-size: 13.5px; }
-    .nearby-all a { color: #6C3DD9; font-weight: 600; text-decoration: none; }
+    .nearby-all a { color: #6D38AD; font-weight: 600; text-decoration: none; }
     .ics-note { font-size: 12.5px; color: #7A7390; max-width: 64ch; margin: 0 0 6px; }
 
     .yearcard { background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); border-radius: 18px; padding: 22px 24px 14px; margin-top: 18px; box-shadow: 0 2px 8px rgba(30,26,46,.06); }
     .yearhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 18px; }
-    .yearhead h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6C3DD9; margin: 0; letter-spacing: -0.01em; }
+    .yearhead h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6D38AD; margin: 0; letter-spacing: -0.01em; }
     .legend { display: flex; gap: 14px; font-size: 11.5px; color: #7A7390; align-items: center; flex-wrap: wrap; }
     .legend > span { display: inline-flex; align-items: center; gap: 5px; }
     .legend .sq { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
@@ -799,7 +799,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
 
     .perschool { margin-top: 14px; border-top: 1px dashed rgba(30,26,46,.1); padding-top: 12px; }
     .perschool summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: #7A7390; }
-    .perschool summary:hover { color: #6C3DD9; }
+    .perschool summary:hover { color: #6D38AD; }
     .perschool .ps-note { font-size: 12.5px; color: #7A7390; margin: 10px 0 4px; }
     .srcline { font-size: 12.5px; color: #7A7390; margin: 14px 0 0; }
 
@@ -1015,7 +1015,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1053,7 +1053,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1185,7 +1185,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1219,7 +1219,7 @@ function bankHolidayPage(annotated, defs) {
 
   const badge = {
     'extra-day': ['Extra day off school', '#EDF5EE', '#3E7444'],
-    'already-off': ['Schools already closed', '#F3EEFB', '#6C3DD9'],
+    'already-off': ['Schools already closed', '#F3EFF8', '#6D38AD'],
     mixed: ['Depends on your council', '#FBF1DE', '#936314'],
   };
   const rows = annotated.map((h) => {
@@ -1264,10 +1264,10 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
-    .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6C3DD9; margin-top: 2px; }
+    .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6D38AD; margin-top: 2px; }
     .gcards.one-col { grid-template-columns: 1fr; }
   </style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
@@ -1311,13 +1311,13 @@ const FINES_CSS = `
     .calc .f-council { grid-column: 1 / -1; }
     .calc label { display: block; font-size: 13px; font-weight: 500; color: #1E1A2E; margin-bottom: 6px; }
     .calc select, .calc input { width: 100%; height: 48px; border: 1.5px solid rgba(30,26,46,.1); border-radius: 10px; background: #FAF8F4; padding: 0 14px; font-size: 15px; font-family: inherit; color: #1E1A2E; }
-    .calc select:focus, .calc input:focus { outline: none; border-color: #6C3DD9; box-shadow: 0 0 0 3px #F3EEFB; }
+    .calc select:focus, .calc input:focus { outline: none; border-color: #6D38AD; box-shadow: 0 0 0 3px #F3EFF8; }
     .calc .actions { margin-top: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-    .calc button { height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #6C3DD9; color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .calc button:hover { background: #5A2FC4; }
-    .calc button:focus-visible { outline: 3px solid #F3EEFB; outline-offset: 1px; }
+    .calc button { height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #6D38AD; color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .calc button:hover { background: #5B2E92; }
+    .calc button:focus-visible { outline: 3px solid #F3EFF8; outline-offset: 1px; }
     .calc .hint { font-size: 12.5px; color: #7A7390; }
-    .result { border-left: 4px solid #6C3DD9; margin-top: 14px; }
+    .result { border-left: 4px solid #6D38AD; margin-top: 14px; }
     .result.fine { border-left-color: #E8724A; }
     .result.clear { border-left-color: #7DAE82; }
     .result.err { border-left-color: #E0A458; }
@@ -1326,23 +1326,23 @@ const FINES_CSS = `
     .result p { font-size: 15px; color: #5B5470; margin: 0 0 10px; max-width: 78ch; }
     .result p.small { font-size: 13px; color: #7A7390; }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
-    .chips span { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; background: #F3EEFB; color: #6C3DD9; }
+    .chips span { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; background: #F3EFF8; color: #6D38AD; }
     .chips span.warm { background: #FDF0EB; color: #B5502D; }
     .chips span.soft { background: #EDF5EE; color: #3E7444; }
     .chips span.grey { background: #F3F1EE; color: #7A7390; }
     .money { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 14px; }
     .money div { background: #FAF8F4; border-radius: 12px; padding: 12px 14px; }
-    .money .amt { font-family: 'Recoleta', Georgia, serif; font-size: 26px; color: #6C3DD9; line-height: 1.1; }
+    .money .amt { font-family: 'Recoleta', Georgia, serif; font-size: 26px; color: #6D38AD; line-height: 1.1; }
     .money .lab { font-size: 12px; color: #7A7390; margin-top: 4px; }
     .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
-    .rules .gcard h3 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 21px; color: #6C3DD9; margin: 0 0 8px; }
+    .rules .gcard h3 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 21px; color: #6D38AD; margin: 0 0 8px; }
     .rules .gcard p { font-size: 14px; color: #5B5470; margin: 0 0 8px; }
     .rules .gcard p:last-child { margin-bottom: 0; }
     .gcards.stats { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-    .gcard.stat .amt { font-family: 'Recoleta', Georgia, serif; font-size: 30px; color: #6C3DD9; line-height: 1.1; }
+    .gcard.stat .amt { font-family: 'Recoleta', Georgia, serif; font-size: 30px; color: #6D38AD; line-height: 1.1; }
     .gcard.stat .lab { font-size: 13px; color: #5B5470; margin-top: 6px; }
     .src { font-size: 12.5px; color: #7A7390; line-height: 1.7; }
-    .src a { color: #6C3DD9; }
+    .src a { color: #6D38AD; }
     @media print { .calc { display: none; } }`;
 
 const FINES_ERRORS = {
@@ -1601,7 +1601,7 @@ function finesPage({ authorities, defs, form, outcome }) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}${FINES_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1771,15 +1771,15 @@ function dataPage(stats, rowCount) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=17" />
   <style>${SEASONAL_CSS}
     .dl { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
     .dl a { display: inline-flex; flex-direction: column; gap: 2px; background: #fff; border: 1.5px solid rgba(30,26,46,.1); border-radius: 14px; padding: 14px 20px; text-decoration: none; min-width: 190px; }
-    .dl a:hover { border-color: #6C3DD9; }
-    .dl .fmt { font-weight: 600; font-size: 15px; color: #6C3DD9; }
+    .dl a:hover { border-color: #6D38AD; }
+    .dl .fmt { font-weight: 600; font-size: 15px; color: #6D38AD; }
     .dl .meta { font-size: 12.5px; color: #7A7390; }
-    code { background: #F3EEFB; color: #4E27A8; border-radius: 6px; padding: 1px 6px; font-size: 13.5px; }
-    pre { background: #1E1A2E; color: #F3EEFB; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+    code { background: #F3EFF8; color: #4B2478; border-radius: 6px; padding: 1px 6px; font-size: 13.5px; }
+    pre { background: #1E1A2E; color: #F3EFF8; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
   </style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>

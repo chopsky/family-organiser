@@ -232,7 +232,7 @@
       btn.type = 'button';
       btn.textContent = '↻';
       btn.title = 'Re-import ' + slug;
-      btn.style.cssText = 'border:0;background:transparent;color:#6C3DD9;font-size:14px;cursor:pointer;padding:0 4px';
+      btn.style.cssText = 'border:0;background:transparent;color:#6D38AD;font-size:14px;cursor:pointer;padding:0 4px';
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();

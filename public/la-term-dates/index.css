@@ -6,8 +6,8 @@
  */
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
-.hero { position: relative; overflow: hidden; background: linear-gradient(180deg, #F3EEFB 0%, #FAF8F4 100%); }
-.hero-glow { position: absolute; inset: auto -120px -160px auto; width: 560px; height: 560px; border-radius: 50%; background: radial-gradient(circle, rgba(108,61,217,.16), rgba(108,61,217,0) 70%); pointer-events: none; }
+.hero { position: relative; overflow: hidden; background: linear-gradient(180deg, #F3EFF8 0%, #FAF8F4 100%); }
+.hero-glow { position: absolute; inset: auto -120px -160px auto; width: 560px; height: 560px; border-radius: 50%; background: radial-gradient(circle, rgba(109,56,173,.16), rgba(109,56,173,0) 70%); pointer-events: none; }
 .hero-in { position: relative; max-width: 1200px; margin: 0 auto; padding: 72px 32px 56px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 56px; align-items: center; }
 .hero-copy { display: flex; flex-direction: column; gap: 26px; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--purple); }
@@ -24,8 +24,8 @@
 .find { background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; padding: 12px 20px; border-radius: 11px; border: 0; cursor: pointer; flex: none; }
 .find:hover { background: var(--purple); }
 .popular { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding-left: 6px; flex-wrap: wrap; }
-.chip { border: 0; background: rgba(108,61,217,.08); color: var(--purple-text-dark); font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer; }
-.chip:hover { background: rgba(108,61,217,.16); }
+.chip { border: 0; background: rgba(109,56,173,.08); color: var(--purple-text-dark); font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer; }
+.chip:hover { background: rgba(109,56,173,.16); }
 
 /* Coming-up card */
 .coming { background: #fff; border-radius: 24px; padding: 22px 22px 16px; min-width: 0; box-shadow: 0 30px 60px -30px rgba(30,26,46,.35), 0 0 0 1px var(--line-6); animation: hmFade .6s ease both; }
@@ -47,7 +47,7 @@
 .keydates { padding-top: 20px; padding-bottom: 48px; }
 .kd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .kd { display: flex; flex-direction: column; gap: 10px; background: #fff; border: 1px solid var(--line-8); border-radius: 16px; padding: 18px; color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.3; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
-.kd:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -18px rgba(108,61,217,.5); border-color: rgba(108,61,217,.35); color: var(--ink); }
+.kd:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -18px rgba(109,56,173,.5); border-color: rgba(109,56,173,.35); color: var(--ink); }
 .kd-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--purple); background: var(--tint); }
 .kd-ic svg { width: 17px; height: 17px; }
 
@@ -84,7 +84,7 @@
 /* ── Promo ──────────────────────────────────────────────────────────────── */
 .promo-wrap { padding-top: 72px; padding-bottom: 72px; }
 .promo { background: var(--ink); border-radius: 28px; padding: 56px 60px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px; align-items: center; position: relative; overflow: hidden; }
-.promo-glow { position: absolute; right: -80px; top: -120px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(108,61,217,.55), rgba(108,61,217,0) 70%); pointer-events: none; }
+.promo-glow { position: absolute; right: -80px; top: -120px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(109,56,173,.55), rgba(109,56,173,0) 70%); pointer-events: none; }
 .promo-copy { display: flex; flex-direction: column; gap: 20px; position: relative; }
 .eyebrow-promo { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--purple-dark-on); }
 .promo h2 { font-size: clamp(28px, 4.5vw, 38px); line-height: 1.1; letter-spacing: -.02em; color: #fff; text-wrap: balance; }
@@ -101,7 +101,7 @@
 .regions-note { font-size: 14px; color: var(--muted); }
 .region-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .rcard { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; min-height: 110px; background: #fff; border: 1px solid var(--line-8); border-radius: 16px; padding: 18px; color: var(--ink); transition: border-color .15s ease; }
-.rcard:hover { border-color: rgba(108,61,217,.4); color: var(--purple); }
+.rcard:hover { border-color: rgba(109,56,173,.4); color: var(--purple); }
 .rcard .rname { font-size: 15px; font-weight: 700; line-height: 1.3; }
 .rcard .rcount { font-size: 13px; color: var(--muted); }
 
