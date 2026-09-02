@@ -79,6 +79,26 @@ async function listAllEntries() {
   }
 }
 
+/**
+ * Open state schools in a council area, from the GIAS directory, for the
+ * "schools in this area" listing on council pages. NAMES ONLY, grouped by
+ * phase - deliberately no addresses and no per-school dates: the listing
+ * exists so a parent searching their school's name finds the council's
+ * calendar, not to republish anything a school keeps to itself.
+ * Matches on the GIAS "LA (name)" string, which is what both tables key on.
+ */
+async function listSchoolsForAuthorityName(localAuthority) {
+  if (!localAuthority) return [];
+  const { data, error } = await supabase
+    .from('schools_directory')
+    .select('name, phase')
+    .ilike('local_authority', localAuthority.trim())
+    .eq('status', 'open')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
 async function getEntriesForLA(laId) {
   const { data, error } = await supabase
     .from('la_term_date_entries')
@@ -282,6 +302,7 @@ module.exports = {
   getAuthorityBySlug,
   getEntriesForLA,
   listAllEntries,
+  listSchoolsForAuthorityName,
   getDirectoryTermDatesByName,
   getStats,
   replaceEntriesForLA,

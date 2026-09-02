@@ -14,6 +14,7 @@ jest.mock('../services/bankHolidays', () => {
 
 jest.mock('../db/laTermDates', () => ({
   listAllAuthorities: jest.fn(),
+  listSchoolsForAuthorityName: jest.fn(),
   listAuthoritySchools: jest.fn(),
   getAuthorityBySlug: jest.fn(),
   getEntriesForLA: jest.fn(),
@@ -28,6 +29,7 @@ const router = require('./termDatesSsr');
 
 beforeEach(() => {
   laDb.listAllEntries.mockResolvedValue([]);
+  laDb.listSchoolsForAuthorityName.mockResolvedValue([]);
   laDb.getStats.mockResolvedValue({ total: 176, dateCount: 4800, lastRun: { started_at: '2026-08-16T07:43:00Z' } });
 });
 
@@ -572,5 +574,84 @@ describe('regional coverage', () => {
       expect(res.status).toBe(301);
       expect(res.headers.location).toMatch(/^\/school-term-dates\/(north-west|yorkshire-and-the-humber)$/);
     }
+  });
+});
+
+
+describe('open data', () => {
+  beforeEach(() => {
+    laDb.listAllAuthorities.mockResolvedValue([
+      { id: 'a', name: 'Aleshire', slug: 'aleshire', region: 'England', import_status: 'ok', date_count: 2 },
+    ]);
+    laDb.listAllEntries.mockResolvedValue([
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: 'Autumn term' },
+      { la_id: 'a', academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-10-26', end_date: '2026-10-30', label: 'Half, term' },
+    ]);
+  });
+
+  it('the data page documents downloads, licence and API', async () => {
+    const res = await request(app()).get('/school-term-dates/data');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('CC BY 4.0');
+    expect(res.text).toContain('/school-term-dates/term-dates.csv');
+    expect(res.text).toContain('api.housemait.com/api/la-term-dates/authorities');
+    expect(res.text).toContain('"@type":"Dataset"');
+  });
+
+  it('CSV exports a header plus one row per date, quoting commas', async () => {
+    const res = await request(app()).get('/school-term-dates/term-dates.csv');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+    const lines = res.text.trim().split('\n');
+    expect(lines[0]).toBe('council,council_slug,country,academic_year,event_type,start_date,end_date,label');
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toContain('"Half, term"'); // comma-bearing label is quoted
+  });
+
+  it('JSON export carries licence and provenance', async () => {
+    const res = await request(app()).get('/school-term-dates/term-dates.json');
+    expect(res.status).toBe(200);
+    const body = JSON.parse(res.text);
+    expect(body.licence).toBe('CC BY 4.0');
+    expect(body.rows).toBe(2);
+    expect(body.data[0]).toMatchObject({ council: 'Aleshire', council_slug: 'aleshire' });
+  });
+});
+
+describe('schools listing on council pages', () => {
+  beforeEach(() => {
+    laDb.getAuthorityBySlug.mockResolvedValue({
+      id: 'la1', name: 'Barnet', slug: 'barnet', region: 'England',
+      import_status: 'ok', date_count: 40, source_url: 'https://barnet.gov.uk/terms',
+    });
+    laDb.getEntriesForLA.mockResolvedValue([
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2026-09-01', end_date: null, label: null },
+    ]);
+    laDb.listAllAuthorities.mockResolvedValue([]);
+  });
+
+  it('lists school NAMES grouped by phase, with the academy caveat', async () => {
+    laDb.listSchoolsForAuthorityName.mockResolvedValue([
+      { name: 'Ashmole Academy', phase: 'Secondary' },
+      { name: 'Akiva School', phase: 'Primary' },
+      { name: 'Pavilion Study Centre', phase: 'Not applicable' },
+    ]);
+    const res = await request(app()).get('/school-term-dates/barnet');
+    expect(res.text).toContain('Ashmole Academy');
+    expect(res.text).toContain('Primary schools');
+    expect(res.text).toContain('Special schools and other settings'); // 'Not applicable' relabelled
+    expect(res.text).toContain("We don't publish individual schools' calendars");
+  });
+
+  it('renders nothing when the area has no schools, and survives a lookup failure', async () => {
+    laDb.listSchoolsForAuthorityName.mockResolvedValue([]);
+    let res = await request(app()).get('/school-term-dates/barnet');
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('class="schools"');
+
+    laDb.listSchoolsForAuthorityName.mockRejectedValue(new Error('db down'));
+    res = await request(app()).get('/school-term-dates/barnet');
+    expect(res.status).toBe(200); // fail-open: dates still render
   });
 });

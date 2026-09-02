@@ -623,13 +623,17 @@ const CSP_HEADER = [
   "font-src 'self' https: data:",
   "form-action 'self'",
   "frame-ancestors 'self'",
-  "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com",
+  // pagead2/doubleclick are the Google Ads conversion + remarketing endpoints.
+  // The Ads tag arrives automatically through the GA4 <-> Google Ads account
+  // link, and without these it is silently blocked on exactly the pages the
+  // term-dates ad campaign pays to land on.
+  "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
   "object-src 'none'",
   `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}' 'sha256-${NAV_JS_HASH}'`,
   "script-src-attr 'none'",
   "style-src 'self' https: 'unsafe-inline'",
   // postcodes.io powers the index's find-my-council postcode lookup.
-  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.postcodes.io",
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.postcodes.io https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
   'upgrade-insecure-requests',
 ].join(';');
 
@@ -652,6 +656,7 @@ const FOOTER_HTML = `
         <a href="/school-term-dates/summer-holidays">Summer holidays</a>
         <a href="/school-term-dates/bank-holidays">Bank holidays</a>
         <a href="/school-term-dates/about-this-data">About this data</a>
+        <a href="/school-term-dates/data">Download the data</a>
       </nav>
       <nav class="guides" aria-label="Compare term dates by region">
         <a href="/school-term-dates/london">London</a>
@@ -673,8 +678,45 @@ const FOOTER_HTML = `
       <p class="copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
     </footer>`;
 
+
+/**
+ * "Schools in this area" - open GIAS schools for the council, NAMES ONLY.
+ *
+ * Why names but never dates: parents search their school's name far more than
+ * their council's, and this is how they find the right calendar. School names
+ * are public record (GIAS/DfE publish them, as does every rival site); what
+ * stays out is any school-specific calendar, which is the thing schools may
+ * keep to themselves. So this section publishes nothing a school hasn't, and
+ * it points every visitor at the COUNCIL's dates with the academy caveat
+ * attached.
+ */
+const SCHOOL_PHASE_ORDER = ['Primary', 'Secondary', 'All-through', 'Nursery', '16 plus'];
+function buildSchoolsSection(authority, schools) {
+  if (!schools.length) return '';
+  const groups = new Map();
+  for (const s of schools) {
+    const phase = SCHOOL_PHASE_ORDER.includes(s.phase) ? s.phase : 'Other';
+    if (!groups.has(phase)) groups.set(phase, []);
+    groups.get(phase).push(s.name);
+  }
+  const order = SCHOOL_PHASE_ORDER.filter((p) => groups.has(p)).concat(groups.has('Other') ? ['Other'] : []);
+  const blocks = order.map((phase) => {
+    const names = groups.get(phase);
+    const label = phase === '16 plus' ? 'Sixth form and 16+' : phase === 'Other' ? 'Special schools and other settings' : `${phase} schools`;
+    return `<h3>${esc(label)} <span class="cnt">${names.length}</span></h3><p class="slist">${names.map(esc).join(' &middot; ')}</p>`;
+  }).join('');
+  return `
+    <details class="schools">
+      <summary>Schools in ${esc(authority.name)} <span class="cnt">${schools.length}</span></summary>
+      <div class="prose">
+        <p>These are the ${schools.length} open state schools in ${esc(authority.name)}, from the Department for Education's register. The dates above are the council's, which formally apply to community and voluntary-controlled schools; academies, free schools and foundation schools set their own, usually within a day or two. We don't publish individual schools' calendars - check your school's own website for its dates and INSET days.</p>
+        ${blocks}
+      </div>
+    </details>`;
+}
+
 /** The redesigned per-council page (design handoff: Council Term Dates). */
-function detailPage({ title, description, canonicalPath, h1, sub, years, contentHtml = '', nearbyHtml = '', jsonLd, faqLd = null, slugForCta = '', authority = null }) {
+function detailPage({ title, description, canonicalPath, h1, sub, years, contentHtml = '', nearbyHtml = '', schoolsHtml = '', jsonLd, faqLd = null, slugForCta = '', authority = null }) {
   const yearBlocks = years.map(buildYearCard).join('');
   const countdownHtml = authority ? buildCountdown(authority, years) : '';
   const srcDomain = authority && authority.source_url
@@ -708,7 +750,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
   <style>
 
 
@@ -805,7 +847,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
       </div>
       <a class="btn-white" href="https://housemait.com/gb?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
-    ${contentHtml}${nearbyHtml}${FOOTER_HTML}
+    ${contentHtml}${schoolsHtml}${nearbyHtml}${FOOTER_HTML}
   </div>
 </body>
 </html>`;
@@ -934,7 +976,7 @@ function guidesStrip(exceptSlug) {
     .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].navLabel)}</a>`)
     .join('');
   const hubs = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`).join('');
-  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/bank-holidays">Bank holidays</a><a href="/school-term-dates/about-this-data">About this data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
+  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/bank-holidays">Bank holidays</a><a href="/school-term-dates/about-this-data">About this data</a><a href="/school-term-dates/data">Download the data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
 }
 
 function seasonalPage(slug, result) {
@@ -977,7 +1019,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1014,7 +1056,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1145,7 +1187,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1223,7 +1265,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
@@ -1274,6 +1316,127 @@ function navBar(active, activeSlug) {
     </nav>`;
 }
 
+
+
+// ── Open data ───────────────────────────────────────────────────────────────
+// The whole directory as one CSV/JSON download, plus a page documenting the
+// existing JSON API. Published so other people can build on it: that earns
+// links from data directories, civic-tech projects and journalists without
+// any outreach, and it is the honest end-point of a dataset assembled from
+// public council calendars.
+
+const DATA_LICENCE = 'CC BY 4.0';
+
+function csvCell(v) {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Flat rows: one line per dated entry, joined to its council. */
+function buildDataRows(authorities, entries) {
+  const byId = new Map(authorities.map((a) => [a.id, a]));
+  return entries
+    .map((e) => {
+      const la = byId.get(e.la_id);
+      if (!la) return null;
+      return {
+        council: la.name,
+        council_slug: la.slug,
+        country: la.region || '',
+        academic_year: e.academic_year,
+        event_type: e.event_type,
+        start_date: e.date,
+        end_date: e.end_date || '',
+        label: e.label || '',
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.council.localeCompare(b.council)
+      || a.academic_year.localeCompare(b.academic_year)
+      || a.start_date.localeCompare(b.start_date));
+}
+
+const DATA_COLS = ['council', 'council_slug', 'country', 'academic_year', 'event_type', 'start_date', 'end_date', 'label'];
+
+function dataPage(stats, rowCount) {
+  const canonical = `${CANONICAL_BASE}/data`;
+  const title = 'Download UK School Term Dates Data (CSV, JSON, API) | Housemait';
+  const description = `Free, open data: term dates for all ${stats ? stats.total : 176} local education authorities in England and Wales, as CSV, JSON or a public API. ${DATA_LICENCE}.`;
+  const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: 'UK School Term & Holiday Dates',
+    description: 'Term and holiday dates for every local education authority in England and Wales, compiled from each council\'s own published calendar and rebuilt monthly.',
+    url: canonical,
+    license: 'https://creativecommons.org/licenses/by/4.0/',
+    isAccessibleForFree: true,
+    creator: { '@type': 'Organization', name: 'Housemait', url: 'https://housemait.com' },
+    spatialCoverage: 'England and Wales',
+    distribution: [
+      { '@type': 'DataDownload', encodingFormat: 'text/csv', contentUrl: `${CANONICAL_BASE}/term-dates.csv` },
+      { '@type': 'DataDownload', encodingFormat: 'application/json', contentUrl: `${CANONICAL_BASE}/term-dates.json` },
+    ],
+  };
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}" />
+  <link rel="canonical" href="${esc(canonical)}" />
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${esc(canonical)}" />
+  <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
+  <script type="application/ld+json">${JSON.stringify(ld)}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <style>${SEASONAL_CSS}
+    .dl { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
+    .dl a { display: inline-flex; flex-direction: column; gap: 2px; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 14px; padding: 14px 20px; text-decoration: none; min-width: 190px; }
+    .dl a:hover { border-color: #6B3FA0; }
+    .dl .fmt { font-weight: 600; font-size: 15px; color: #6B3FA0; }
+    .dl .meta { font-size: 12.5px; color: #6B6774; }
+    code { background: #F3EDFC; color: #4A2C73; border-radius: 6px; padding: 1px 6px; font-size: 13.5px; }
+    pre { background: #2D2A33; color: #F3EDFC; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+  </style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}${navBar('about')}
+    <h1>Download the data</h1>
+    <p class="sub">Term dates for every local education authority in England and Wales, free to download and free to build on.</p>
+    <div class="prose">
+      <p>This is the same dataset behind every page on this site: <strong>${stats ? stats.total : 176} councils</strong>, <strong>${rowCount} dated entries</strong>, compiled from each council's own published calendar and rebuilt monthly. It is released under <strong>${esc(DATA_LICENCE)}</strong> - use it commercially or otherwise, just credit Housemait and link back.</p>
+    </div>
+    <div class="dl">
+      <a href="/school-term-dates/term-dates.csv"><span class="fmt">CSV &darr;</span><span class="meta">${rowCount} rows, one per date</span></a>
+      <a href="/school-term-dates/term-dates.json"><span class="fmt">JSON &darr;</span><span class="meta">same rows, machine-readable</span></a>
+    </div>
+    <h2>Columns</h2>
+    <div class="prose">
+      <p><code>council</code> the authority's GIAS name &middot; <code>council_slug</code> its page on this site &middot; <code>country</code> England or Wales &middot; <code>academic_year</code> e.g. 2026-2027 &middot; <code>event_type</code> term_start, term_end, half_term_start, bank_holiday or inset_day &middot; <code>start_date</code> and <code>end_date</code> ISO dates (end_date is blank for single days) &middot; <code>label</code> the council's own wording.</p>
+    </div>
+    <h2>API</h2>
+    <div class="prose">
+      <p>No key, no signup, JSON over HTTPS. Please cache responses rather than polling - the underlying data changes monthly at most.</p>
+    </div>
+    <pre>GET https://api.housemait.com/api/la-term-dates/stats
+GET https://api.housemait.com/api/la-term-dates/authorities
+GET https://api.housemait.com/api/la-term-dates/authorities/barnet</pre>
+    <div class="prose">
+      <p>Each council also publishes a calendar file at <code>/school-term-dates/&lt;council&gt;/term-dates.ics</code>, which imports into Google Calendar, Apple Calendar or Outlook.</p>
+      <h2>What you should know before using it</h2>
+      <p>Council dates formally apply to community and voluntary-controlled schools. Academies, free schools and foundation schools set their own, usually within a day or two. INSET days are chosen school by school and are mostly not in council calendars. Councils publish the same week in different notations - some list the holiday week, others the break-up and return days - so derive spans from term structure rather than comparing labels across councils.</p>
+      <p>Corrections are welcome: <a href="mailto:hello@housemait.com">hello@housemait.com</a>. More on method and provenance on the <a href="/school-term-dates/about-this-data">About this data</a> page.</p>
+    </div>
+    ${guidesStrip(null)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
 
 // GA-aware CSP for every term-dates response (harmless on .ics/xml).
 router.use((req, res, next) => {
@@ -1386,6 +1549,46 @@ router.get('/bank-holidays', async (req, res, next) => {
   }
 });
 
+router.get('/data', async (req, res, next) => {
+  try {
+    let stats = null;
+    try { stats = await laDb.getStats(); } catch { stats = null; }
+    const authorities = (await laDb.listAllAuthorities()).filter(isListable);
+    const rows = buildDataRows(authorities, await laDb.listAllEntries());
+    res.set('Cache-Control', CACHE_HEADER).type('html').send(dataPage(stats, rows.length));
+  } catch (err) {
+    console.error('[term-dates-ssr] data page failed:', err.message);
+    next();
+  }
+});
+
+router.get(['/term-dates.csv', '/term-dates.json'], async (req, res, next) => {
+  try {
+    const authorities = (await laDb.listAllAuthorities()).filter(isListable);
+    const rows = buildDataRows(authorities, await laDb.listAllEntries());
+    if (!rows.length) return next();
+    const wantsCsv = req.path.endsWith('.csv');
+    res.set('Cache-Control', CACHE_HEADER)
+      .set('Access-Control-Allow-Origin', '*') // open data: usable from any page
+      .set('Content-Disposition', `attachment; filename="uk-school-term-dates.${wantsCsv ? 'csv' : 'json'}"`);
+    if (wantsCsv) {
+      const lines = [DATA_COLS.join(',')].concat(rows.map((r) => DATA_COLS.map((c) => csvCell(r[c])).join(',')));
+      return res.type('text/csv; charset=utf-8').send(lines.join('\n') + '\n');
+    }
+    return res.type('application/json').send(JSON.stringify({
+      licence: DATA_LICENCE,
+      source: 'https://housemait.com/school-term-dates/',
+      generated_at: new Date().toISOString(),
+      councils: authorities.length,
+      rows: rows.length,
+      data: rows,
+    }));
+  } catch (err) {
+    console.error('[term-dates-ssr] data export failed:', err.message);
+    next();
+  }
+});
+
 router.get('/about-this-data', async (req, res, next) => {
   try {
     let stats = null;
@@ -1410,6 +1613,7 @@ router.get('/sitemap.xml', async (req, res) => {
       ...HUB_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
       `${CANONICAL_BASE}/bank-holidays`,
       `${CANONICAL_BASE}/about-this-data`,
+      `${CANONICAL_BASE}/data`,
       ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
     ];
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}\n</urlset>`;
@@ -1473,6 +1677,14 @@ router.get('/:slug', async (req, res, next) => {
     } catch (err) {
       console.error('[term-dates-ssr] nearby fetch failed:', err.message);
     }
+    // GIAS schools for the area. Fail-open like the mesh: the dates are the
+    // page's job, the school list is a finding aid.
+    let schools = [];
+    try {
+      schools = await laDb.listSchoolsForAuthorityName(authority.name);
+    } catch (err) {
+      console.error('[term-dates-ssr] schools fetch failed:', err.message);
+    }
     const yearsLabel = years.map((y) => y.year).join(' and ');
     const title = `${authority.name} School Term Dates${yearsLabel ? ` ${yearsLabel}` : ''} & Holidays | Housemait`;
     const description = `Official ${authority.name} school term dates${yearsLabel ? ` for ${yearsLabel}` : ''} — term starts and ends, half terms and holidays, sourced from the council's own published calendar and refreshed monthly.`;
@@ -1486,6 +1698,7 @@ router.get('/:slug', async (req, res, next) => {
       sub: `Council-published term and holiday dates for schools in ${authority.name}${authority.region ? ` (${authority.region})` : ''}. Academies and independents may differ — check with your school.`,
       years,
       contentHtml: content.contentHtml,
+      schoolsHtml: buildSchoolsSection(authority, schools),
       nearbyHtml: buildNearbyHtml(authority, allLive),
       jsonLd: breadcrumbLd(`${authority.name} school term dates`, `/${authority.slug}`),
       faqLd: content.faqLd,
