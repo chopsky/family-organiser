@@ -658,7 +658,7 @@ describe('schools listing on council pages', () => {
 
 describe('term-time holiday fines page', () => {
   const bh = require('../services/bankHolidays');
-  const FINES = '/school-term-dates/term-time-holiday-fines';
+  const FINES = '/school-term-dates/school-fines';
   const yr = (event_type, date, extra = {}) => ({ la_id: 'x', academic_year: '2026-2027', event_type, date, end_date: null, label: null, ...extra });
   const ROWS = [
     yr('term_start', '2026-09-02'), yr('term_end', '2026-10-23'),
@@ -685,13 +685,13 @@ describe('term-time holiday fines page', () => {
   it('renders the checker with every listable council, indexable, with the rules', async () => {
     const res = await request(app()).get(FINES);
     expect(res.status).toBe(200);
-    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/term-time-holiday-fines"');
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/school-fines"');
     expect(res.text).not.toContain('noindex');
     expect(res.text).toContain('<option value="aleshire"');
     expect(res.text).toContain('<optgroup label="Wales"><option value="cardiff"');
     expect(res.text).not.toContain('nevershire');
-    expect(res.text).toContain('action="/school-term-dates/term-time-holiday-fines#result"');
-    expect(res.text).toContain('href="/school-term-dates/term-time-holiday-fines" aria-current="page">Term-time fines</a>');
+    expect(res.text).toContain('action="/school-term-dates/school-fines#result"');
+    expect(res.text).toContain('href="/school-term-dates/school-fines" aria-current="page">School fines</a>');
     expect(res.text).toContain('10 sessions</strong>');
     expect(res.text).toContain('"@type":"FAQPage"');
     // Bare page: no result block, no stray error.
@@ -711,7 +711,7 @@ describe('term-time holiday fines page', () => {
     // Result pages consolidate onto the bare URL via the canonical alone
     // (noindex + a canonical elsewhere are conflicting signals).
     expect(res.text).not.toContain('noindex');
-    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/term-time-holiday-fines"');
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/school-fines"');
     expect(res.headers['cache-control']).toBe('public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
     // Form keeps the visitor's choices.
     expect(res.text).toContain('<option value="aleshire" selected>');
@@ -790,11 +790,29 @@ describe('term-time holiday fines page', () => {
     expect(silly.text).toContain('<option value="6" selected>6</option>');
   });
 
+  it('301s the launch slug to the new one, query string intact', async () => {
+    const res = await request(app()).get('/school-term-dates/term-time-holiday-fines?council=aleshire&from=2026-11-09&to=2026-11-13');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('/school-term-dates/school-fines?council=aleshire&from=2026-11-09&to=2026-11-13');
+  });
+
+  it('targets the head terms parents actually search and links in from council pages', async () => {
+    const res = await request(app()).get(FINES);
+    expect(res.text).toMatch(/<title>School Fines for Holidays \d{4}: How Much Is the Fine for Taking a Child Out of School\? \| Housemait<\/title>/);
+    expect(res.text).toContain('<h1>School fines for term-time holidays: how much you\'d actually pay</h1>');
+    expect(res.text).toContain('<h2 class="calc-h">School fine calculator</h2>');
+    expect(res.text).toContain('Is the fine per day?');
+    expect(res.text).toContain('Reception children');
+    const council = await request(app()).get('/school-term-dates/aleshire');
+    expect(council.status).toBe(200);
+    expect(council.text).toContain('href="/school-term-dates/school-fines?council=aleshire"');
+  });
+
   it('is linked from the sitemap, the Key dates menu and the footer, and the footer lists live regions only', async () => {
     const sm = await request(app()).get('/school-term-dates/sitemap.xml');
-    expect(sm.text).toContain('<loc>https://housemait.com/school-term-dates/term-time-holiday-fines</loc>');
+    expect(sm.text).toContain('<loc>https://housemait.com/school-term-dates/school-fines</loc>');
     const page = await request(app()).get('/school-term-dates/bank-holidays');
-    expect(page.text).toContain('href="/school-term-dates/term-time-holiday-fines">Term-time fines</a>');
+    expect(page.text).toContain('href="/school-term-dates/school-fines">School fines</a>');
     expect(page.text).not.toContain('/school-term-dates/greater-manchester"');
     expect(page.text).toContain('href="/school-term-dates/yorkshire-and-the-humber">Yorkshire and the Humber</a>');
   });
