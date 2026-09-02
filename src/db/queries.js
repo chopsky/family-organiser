@@ -1316,6 +1316,20 @@ async function getActivitiesByChildIds(childIds, db = supabase) {
   return data || [];
 }
 
+/**
+ * Every weekly activity in the estate with its child's name + household,
+ * for the activity-reminder sweep (jobs/activity-reminders.js). One flat
+ * query per cron tick - the table is a few rows per family with kids.
+ */
+async function getAllActivitiesWithChild(db = supabase) {
+  const { data, error } = await db
+    .from('child_weekly_schedule')
+    .select('*, child:users!child_id(id, name, household_id)')
+    .order('day_of_week');
+  if (error) throw error;
+  return data || [];
+}
+
 async function deleteSchoolTermDate(dateId, db = supabase) {
   const { error } = await db
     .from('school_term_dates')
@@ -11202,6 +11216,7 @@ module.exports = {
   getChildActivities,
   getHouseholdActivities,
   getActivitiesByChildIds,
+  getAllActivitiesWithChild,
   deleteChildActivity,
   addActivitySkip,
   removeActivitySkip,

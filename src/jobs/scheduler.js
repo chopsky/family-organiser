@@ -11,6 +11,7 @@ const { sendDailyReminders } = require('./reminders');
 const { sendWeeklyDigest, sendWeeklyDigestEmail } = require('./digest');
 const { sendOverdueNudges } = require('./overdue-nudge');
 const { processEventReminders } = require('./event-reminders');
+const { runActivityReminderCheck } = require('./activity-reminders');
 const { runRetentionCleanup } = require('./retention');
 const { runTrialEmailCheck } = require('./trial-emails');
 const { checkAiHealth } = require('./ai-health');
@@ -808,6 +809,10 @@ function startScheduler() {
   // ── Event reminders: check every minute ────────────────────────────────────
   cron.schedule('* * * * *', () => processEventReminders());
   console.log('✓ Event reminder scheduler started (checks every minute)');
+
+  // ── Activity reminders: 30-min-before pings for weekly extracurriculars ────
+  cron.schedule('* * * * *', () => runActivityReminderCheck());
+  console.log('✓ Activity reminder scheduler started (30 min before, per household timezone)');
 
   // ── Evening school prep reminders: check every minute (fires at 19:00) ─────
   cron.schedule('* * * * *', () => runEveningSchoolPrepCheck());

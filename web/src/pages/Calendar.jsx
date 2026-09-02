@@ -1065,7 +1065,11 @@ export default function Calendar() {
     setFormAssignee('');
     setFormAssignees([]);
     setFormRecurrence('');
-    setFormReminders([]);
+    // New timed events default to one 30-min reminder (a removable chip) -
+    // parity with the bot's auto-reminder. Real near-miss 2026-09-01: an
+    // app-created event defaulted to NO reminders and went silent. Edits
+    // never pass here (openEditForm loads the event's own reminders).
+    setFormReminders([{ time: '30', unit: 'minutes' }]);
     setShowMoreOptions(false);
     setEventAttachments([]);
     setInviteRoster(null);
@@ -3131,7 +3135,19 @@ export default function Calendar() {
                         type="button"
                         role="switch"
                         aria-checked={formAllDay}
-                        onClick={() => setFormAllDay(!formAllDay)}
+                        onClick={() => {
+                          const next = !formAllDay;
+                          setFormAllDay(next);
+                          // A 30-min-before reminder is meaningless for an
+                          // all-day event: toggling ON clears the untouched
+                          // default chip (user-added sets are kept); toggling
+                          // OFF restores it when none remain.
+                          if (next) {
+                            setFormReminders((prev) => (prev.length === 1 && prev[0].time === '30' && prev[0].unit === 'minutes') ? [] : prev);
+                          } else {
+                            setFormReminders((prev) => (prev.length === 0 ? [{ time: '30', unit: 'minutes' }] : prev));
+                          }
+                        }}
                         style={{ width: 34, height: 20, borderRadius: 99, border: 0, cursor: 'pointer', background: formAllDay ? M_BRAND : M_LINE_STRONG, position: 'relative', transition: 'background .15s', padding: 0 }}
                       >
                         <span style={{ position: 'absolute', top: 2, left: formAllDay ? 16 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
