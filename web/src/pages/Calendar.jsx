@@ -2819,7 +2819,7 @@ export default function Calendar() {
                     <div
                       key={item.occurrence_key || `${item._type}-${item.id}`}
                       className="flex items-center bg-white"
-                      style={{ gap: 12, borderRadius: 18, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${hex}`, boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+                      style={{ gap: 12, borderRadius: 16, padding: '11px 14px', marginBottom: 8, borderLeft: `4px solid ${hex}`, boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
                       onClick={() => {
                         if (item._type === 'task') openTaskEditForm(item);
                         else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
@@ -2830,8 +2830,11 @@ export default function Calendar() {
                           checkbox-less list needs the type distinction
                           somewhere. Typography matches the Schedule view's
                           cards exactly (founder, 2026-09-02): 13/500 start,
-                          10.5 end, 14/600 title, 11.5 location. */}
-                      <div style={{ width: 56, flexShrink: 0 }}>
+                          10.5 end, 14/600 title, 11.5 location - and the
+                          same card metrics too (radius 16, 11x14 padding,
+                          8px between cards, 44px time column, 26/22
+                          avatars), so the two agenda surfaces are one. */}
+                      <div style={{ width: 44, flexShrink: 0 }}>
                         {item._type === 'task' ? (
                           <>
                             <div style={{ fontSize: 13, fontWeight: 500, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>
@@ -2851,7 +2854,7 @@ export default function Calendar() {
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold truncate" style={{ fontSize: 14, color: M_INK }}>{item.title}</div>
                         {(item.location || (item._type === 'event' && (selectedDayClashKeys.has(itemKey(item)) || (!childMode && item.category !== 'public_holiday' && item.category !== 'birthday' && looksLikeGathering(item.title))))) && (
-                          <div className="truncate" style={{ fontSize: 11.5, color: M_INK3, marginTop: 2 }}>
+                          <div className="truncate" style={{ fontSize: 11.5, color: M_INK3, marginTop: 1 }}>
                             {item.location}
                             {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
                               <span className={`font-semibold ${item.location ? 'ml-1.5' : ''}`} style={{ color: '#B45309' }}>⚠️ Clash</span>
@@ -2867,7 +2870,7 @@ export default function Calendar() {
                           </div>
                         )}
                       </div>
-                      {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 26 : 32, ringColor: '#FFFFFF' })}
+                      {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 22 : 26, ringColor: '#FFFFFF' })}
                     </div>
                   );
                 })}
