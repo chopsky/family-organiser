@@ -123,7 +123,7 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
         />
         <span
           style={{
-            font: '600 13px Inter, sans-serif', color: T.ink3, padding: '10px 12px',
+            font: '600 13px var(--font-sans)', color: T.ink3, padding: '10px 12px',
             borderRadius: 12, background: 'rgba(26,22,32,.04)', whiteSpace: 'nowrap',
           }}
         >
@@ -132,13 +132,13 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
       </div>
 
       {valid && claim === 'idle' && avail === true && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, font: '600 13px Inter, sans-serif', color: T.okInk }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, font: '600 13px var(--font-sans)', color: T.okInk }}>
           <Tick size={14} color="#3F8E52" />Available
         </div>
       )}
       {valid && claim === 'idle' && avail === false && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ font: '600 13px Inter, sans-serif', color: T.danger }}>{error || 'Taken - try another'}</div>
+          <div style={{ font: '600 13px var(--font-sans)', color: T.danger }}>{error || 'Taken - try another'}</div>
           {suggestions.length > 0 && (
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               {suggestions.map((s) => (
@@ -149,7 +149,7 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
                   style={{
                     padding: '7px 12px', borderRadius: 99, cursor: 'pointer',
                     border: `1.5px solid ${T.line2}`, background: T.surface,
-                    font: '600 12.5px Inter, sans-serif', color: T.ink2,
+                    font: '600 12.5px var(--font-sans)', color: T.ink2,
                   }}
                 >
                   {s}
@@ -168,13 +168,13 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
             </svg>
           </span>
           <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', font: '700 13.5px Inter, sans-serif', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'block', font: '700 13.5px var(--font-sans)', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Fwd: Year 3 trip — Science Museum
             </span>
             <span style={{ display: 'block', fontSize: 12, color: T.ink3, marginTop: 1 }}>from Oakfield Primary</span>
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${T.line}`, font: '600 12.5px Inter, sans-serif', color: T.okInk }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 11, paddingTop: 11, borderTop: `1px solid ${T.line}`, font: '600 12.5px var(--font-sans)', color: T.okInk }}>
           <Tick size={14} color="#3F8E52" />Trip filed · 14 Oct · permission slip due Friday
         </div>
       </div>
@@ -193,7 +193,7 @@ export default function InboxStep({ d, update, onNext, onState, claimRef }) {
 export function InboxFooter({ value, claim, onClaim }) {
   if (claim === 'done') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 16, borderRadius: 17, background: T.okBg, color: T.okInk, font: '700 15.5px Inter, sans-serif', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 16, borderRadius: 17, background: T.okBg, color: T.okInk, font: '700 15.5px var(--font-sans)', overflow: 'hidden' }}>
         <Tick size={17} color="#3F8E52" />
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {value}@{INBOUND_EMAIL_DOMAIN} is yours

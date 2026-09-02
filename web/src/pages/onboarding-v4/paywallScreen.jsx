@@ -77,14 +77,14 @@ function PlanChoice({ label, price, per, badge, note, selected, onPick }) {
         <span style={{
           position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)',
           whiteSpace: 'nowrap', padding: '2px 8px', borderRadius: 99,
-          background: T.okBg, color: T.okInk, font: '700 9.5px Inter, sans-serif',
+          background: T.okBg, color: T.okInk, font: '700 9.5px var(--font-sans)',
           letterSpacing: '.05em', textTransform: 'uppercase',
         }}>
           {badge}
         </span>
       )}
-      <span style={{ display: 'block', font: '600 13px Inter, sans-serif', color: T.ink }}>{label}</span>
-      <span style={{ display: 'block', font: '700 15px Inter, sans-serif', color: T.ink, marginTop: 3 }}>{price}</span>
+      <span style={{ display: 'block', font: '600 13px var(--font-sans)', color: T.ink }}>{label}</span>
+      <span style={{ display: 'block', font: '700 15px var(--font-sans)', color: T.ink, marginTop: 3 }}>{price}</span>
       <span style={{ display: 'block', fontSize: 11.5, color: T.ink3, marginTop: 1 }}>{per}</span>
       {note && <span style={{ display: 'block', fontSize: 10.5, color: T.okInk, marginTop: 2 }}>{note}</span>}
     </button>
@@ -289,7 +289,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut, context 
         {trialLabel && (
           <span style={{
             display: 'inline-block', padding: '6px 13px', borderRadius: 99,
-            background: T.okBg, color: T.okInk, font: '700 11.5px Inter, sans-serif',
+            background: T.okBg, color: T.okInk, font: '700 11.5px var(--font-sans)',
             letterSpacing: '.07em', textTransform: 'uppercase',
           }}>
             {trialLabel}
@@ -309,7 +309,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut, context 
                 fontSize: 15, flexShrink: 0,
               }}>{b.emoji}</span>
               <span>
-                <span style={{ display: 'block', font: '600 14px Inter, sans-serif', color: T.ink }}>{b.t}</span>
+                <span style={{ display: 'block', font: '600 14px var(--font-sans)', color: T.ink }}>{b.t}</span>
                 <span style={{ display: 'block', fontSize: 12.5, lineHeight: 1.35, color: T.ink3, marginTop: 1 }}>{b.d}</span>
               </span>
             </div>
@@ -391,7 +391,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut, context 
           disabled={state === 'buying' || state === 'restoring'}
           style={{
             width: '100%', minHeight: 40, marginTop: 8, border: 0, background: 'none',
-            color: T.ink3, font: '600 13px Inter, sans-serif', cursor: 'pointer',
+            color: T.ink3, font: '600 13px var(--font-sans)', cursor: 'pointer',
           }}
         >
           {state === 'restoring' ? 'Restoring…' : 'Restore purchases'}
@@ -407,7 +407,7 @@ export default function PaywallScreen({ householdId, onDone, onSignOut, context 
             onClick={onSignOut}
             style={{
               width: '100%', minHeight: 36, marginTop: 2, border: 0, background: 'none',
-              color: T.ink3, font: '500 12.5px Inter, sans-serif', cursor: 'pointer',
+              color: T.ink3, font: '500 12.5px var(--font-sans)', cursor: 'pointer',
             }}
           >
             Sign out

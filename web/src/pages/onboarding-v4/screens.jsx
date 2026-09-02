@@ -26,7 +26,7 @@ const H1 = {
 const EM = { color: T.purple, fontStyle: 'normal' };
 const SUB = { fontSize: 15, lineHeight: 1.45, color: T.ink2, textWrap: 'pretty' };
 const EYEBROW = {
-  font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em',
+  font: '700 11.5px var(--font-sans)', letterSpacing: '.16em',
   textTransform: 'uppercase', color: T.purple,
 };
 const rise = (delay, reduced) => ({
@@ -66,7 +66,7 @@ export function Splash({ onStart, onLogin, reduced }) {
               transform: `rotate(${n.r}deg)`,
               animation: reduced ? 'none' : `obRiseR .5s ${0.12 + i * 0.09}s cubic-bezier(.22,.8,.2,1) backwards`,
               background: '#fff', borderRadius: 14, padding: '9px 13px',
-              font: '500 13.5px Inter, system-ui, sans-serif', color: T.ink,
+              font: '500 13.5px var(--font-sans)', color: T.ink,
               boxShadow: SHADOW.note, whiteSpace: 'nowrap',
             }}
           >
@@ -102,7 +102,7 @@ export function Splash({ onStart, onLogin, reduced }) {
           <Tick size={15} color="#3F8E52" />
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', font: '700 14.5px Inter, system-ui, sans-serif', color: T.ink }}>All handled</span>
+          <span style={{ display: 'block', font: '700 14.5px var(--font-sans)', color: T.ink }}>All handled</span>
           <span style={{ display: 'block', fontSize: 12, color: T.ink3 }}>5 things, shared with 3 people</span>
         </span>
         <span style={{ display: 'flex', flexShrink: 0 }}>
@@ -243,7 +243,7 @@ export function KidsStep({ d, update }) {
           style={{
             flex: 1, minWidth: 0, padding: '15px 17px', borderRadius: 16,
             border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
-            font: '600 16.5px Inter, sans-serif', color: T.ink,
+            font: '600 16.5px var(--font-sans)', color: T.ink,
           }}
         />
         <button
@@ -253,7 +253,7 @@ export function KidsStep({ d, update }) {
           style={{
             padding: '0 22px', borderRadius: 16, border: 0, cursor: draft.trim() ? 'pointer' : 'default',
             background: draft.trim() ? T.purple : 'rgba(26,22,32,.08)',
-            color: draft.trim() ? '#fff' : T.ink3, font: '600 15px Inter, sans-serif',
+            color: draft.trim() ? '#fff' : T.ink3, font: '600 15px var(--font-sans)',
           }}
         >
           Add
@@ -267,7 +267,7 @@ export function KidsStep({ d, update }) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7,
                 padding: '9px 9px 9px 14px', borderRadius: 99,
-                background: T.purpleSoft, color: T.purpleDeep, font: '600 14px Inter, sans-serif',
+                background: T.purpleSoft, color: T.purpleDeep, font: '600 14px var(--font-sans)',
               }}
             >
               {k}
@@ -277,7 +277,7 @@ export function KidsStep({ d, update }) {
                 aria-label={`Remove ${k}`}
                 style={{
                   width: 22, height: 22, borderRadius: 99, border: 0, cursor: 'pointer',
-                  background: 'rgba(26,22,32,.10)', color: T.ink2, font: '600 13px Inter, sans-serif',
+                  background: 'rgba(26,22,32,.10)', color: T.ink2, font: '600 13px var(--font-sans)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                 }}
               >
@@ -352,7 +352,7 @@ export function SchoolStep({ d, update }) {
   const inputStyle = {
     width: '100%', padding: '15px 17px', borderRadius: 16,
     border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
-    font: '600 16.5px Inter, sans-serif', color: T.ink,
+    font: '600 16.5px var(--font-sans)', color: T.ink,
   };
 
   // Non-GB: a plain name is the whole answer - it lands in the draft as
@@ -404,8 +404,8 @@ export function SchoolStep({ d, update }) {
                     border: `1.5px solid ${on ? T.purple : T.line2}`, background: on ? T.purpleSoft : T.surface,
                   }}
                 >
-                  <div style={{ font: '600 15px Inter, sans-serif', color: on ? T.purpleDeep : T.ink }}>{o.label}</div>
-                  <div style={{ font: '500 12.5px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{o.note}</div>
+                  <div style={{ font: '600 15px var(--font-sans)', color: on ? T.purpleDeep : T.ink }}>{o.label}</div>
+                  <div style={{ font: '500 12.5px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{o.note}</div>
                 </button>
               );
             })}
@@ -429,13 +429,13 @@ export function SchoolStep({ d, update }) {
         >
           <span style={{ fontSize: 22 }} aria-hidden="true">🏫</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ font: '600 15.5px Inter, sans-serif', color: T.purpleDeep }}>{picked.name}</div>
-            {meta(picked) && <div style={{ font: '500 13px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{meta(picked)}</div>}
+            <div style={{ font: '600 15.5px var(--font-sans)', color: T.purpleDeep }}>{picked.name}</div>
+            {meta(picked) && <div style={{ font: '500 13px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{meta(picked)}</div>}
           </div>
           <button
             type="button"
             onClick={() => update({ school: null })}
-            style={{ border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.purpleDeep, padding: '6px 2px' }}
+            style={{ border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.purpleDeep, padding: '6px 2px' }}
           >
             Change
           </button>
@@ -466,8 +466,8 @@ export function SchoolStep({ d, update }) {
                     border: `1.5px solid ${T.line2}`, background: T.surface,
                   }}
                 >
-                  <div style={{ font: '600 15px Inter, sans-serif', color: T.ink }}>{r.name}</div>
-                  {meta(r) && <div style={{ font: '500 12.5px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{meta(r)}</div>}
+                  <div style={{ font: '600 15px var(--font-sans)', color: T.ink }}>{r.name}</div>
+                  {meta(r) && <div style={{ font: '500 12.5px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{meta(r)}</div>}
                 </button>
               ))}
             </div>
@@ -541,7 +541,7 @@ export function HouseSignOverlay({ name, onDone, reduced }) {
         <p style={{ fontFamily: T.title, fontWeight: 400, fontSize: 28, color: T.ink, marginTop: 12 }}>{name}</p>
         <p
           style={{
-            font: '700 10.5px Inter, system-ui, sans-serif', letterSpacing: '.14em',
+            font: '700 10.5px var(--font-sans)', letterSpacing: '.14em',
             textTransform: 'uppercase', color: T.ink3, marginTop: 8,
           }}
         >

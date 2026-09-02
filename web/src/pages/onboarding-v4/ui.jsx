@@ -131,7 +131,7 @@ export function ResumeNotice({ onStartFresh }) {
         display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
         padding: '10px 14px', borderRadius: 14,
         background: 'rgba(107,63,160,.07)',
-        font: '500 13px Inter, system-ui, sans-serif', color: T.ink2,
+        font: '500 13px var(--font-sans)', color: T.ink2,
       }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>Picked up where you left off.</span>
@@ -140,7 +140,7 @@ export function ResumeNotice({ onStartFresh }) {
         onClick={onStartFresh}
         style={{
           border: 0, background: 'transparent', padding: 0, cursor: 'pointer',
-          font: '600 13px Inter, system-ui, sans-serif', color: T.purple,
+          font: '600 13px var(--font-sans)', color: T.purple,
           flexShrink: 0,
         }}
       >
@@ -185,7 +185,7 @@ export function Cta({ children, onClick, disabled, type = 'button' }) {
       disabled={disabled}
       style={{
         width: '100%', padding: 17, borderRadius: R.cta, border: 0,
-        font: '700 17px Inter, system-ui, sans-serif',
+        font: '700 17px var(--font-sans)',
         background: disabled ? 'rgba(26,22,32,.12)' : T.purple,
         color: disabled ? 'rgba(26,22,32,.35)' : '#fff',
         boxShadow: disabled ? 'none' : SHADOW.cta,
@@ -204,7 +204,7 @@ export function Ghost({ children, onClick }) {
       onClick={onClick}
       style={{
         width: '100%', minHeight: 44, padding: 13, border: 0, background: 'transparent',
-        font: '600 14.5px Inter, system-ui, sans-serif', color: T.ink2, cursor: 'pointer',
+        font: '600 14.5px var(--font-sans)', color: T.ink2, cursor: 'pointer',
       }}
     >
       {children}
@@ -238,7 +238,7 @@ export function OptionRow({ emoji, label, note, onClick, i = 0, selected, compac
         {emoji}
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', font: `700 ${compact ? 15 : 15.5}px Inter, system-ui, sans-serif` }}>{label}</span>
+        <span style={{ display: 'block', font: `700 ${compact ? 15 : 15.5}px var(--font-sans)` }}>{label}</span>
         {note && <span style={{ display: 'block', fontSize: 12.5, color: T.ink3, marginTop: 1 }}>{note}</span>}
       </span>
       {selected ? (
@@ -275,7 +275,7 @@ export function ChipGrid({ options, value, onPick }) {
             style={{
               animationDelay: `${0.05 + i * 0.04}s`,
               minHeight: 44, padding: '15px 12px', borderRadius: R.chip, cursor: 'pointer',
-              font: '600 15.5px Inter, system-ui, sans-serif',
+              font: '600 15.5px var(--font-sans)',
               background: on ? T.purple : T.surface,
               color: on ? '#fff' : T.ink,
               border: on ? `1.5px solid ${T.purple}` : '1.5px solid rgba(26,22,32,.09)',
@@ -325,7 +325,7 @@ export function Field({ value, onChange, onEnter, placeholder, suggestions, onSu
                 animationDelay: `${0.1 + i * 0.06}s`,
                 minHeight: 44, padding: '9px 14px', borderRadius: R.pill,
                 border: '1.5px dashed rgba(109,56,173,.4)', background: 'rgba(242,236,250,.7)',
-                color: T.purpleDeep, font: '600 13.5px Inter, system-ui, sans-serif',
+                color: T.purpleDeep, font: '600 13.5px var(--font-sans)',
                 cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >

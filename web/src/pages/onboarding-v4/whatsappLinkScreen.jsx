@@ -40,7 +40,7 @@ const H1 = {
   letterSpacing: '-.015em', textWrap: 'balance', color: T.ink, marginTop: 8,
 };
 const EYEBROW = {
-  font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em',
+  font: '700 11.5px var(--font-sans)', letterSpacing: '.16em',
   textTransform: 'uppercase', color: T.purple,
 };
 
@@ -275,7 +275,7 @@ export default function WhatsAppLinkScreen({ onDone, reduced }) {
         {stage === 'linked' ? (
           <div
             role="status"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 16, borderRadius: 17, background: T.okBg, color: T.okInk, font: '700 16px Inter, system-ui, sans-serif' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 16, borderRadius: 17, background: T.okBg, color: T.okInk, font: '700 16px var(--font-sans)' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6" /></svg>
             WhatsApp linked — say hi anytime
@@ -295,7 +295,7 @@ export default function WhatsAppLinkScreen({ onDone, reduced }) {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               width: '100%', padding: 16, borderRadius: 17, textDecoration: 'none',
-              background: T.green, color: '#fff', font: '700 16.5px Inter, system-ui, sans-serif',
+              background: T.green, color: '#fff', font: '700 16.5px var(--font-sans)',
               boxShadow: SHADOW.whatsapp, opacity: busyLabel ? 0.75 : 1,
               pointerEvents: busyLabel ? 'none' : 'auto',
             }}
@@ -308,12 +308,12 @@ export default function WhatsAppLinkScreen({ onDone, reduced }) {
           <button
             type="button"
             onClick={finish}
-            style={{ width: '100%', padding: 12, marginTop: 3, border: 0, background: 'transparent', font: '600 14.5px Inter, system-ui, sans-serif', color: T.ink2, cursor: 'pointer' }}
+            style={{ width: '100%', padding: 12, marginTop: 3, border: 0, background: 'transparent', font: '600 14.5px var(--font-sans)', color: T.ink2, cursor: 'pointer' }}
           >
             Maybe later
           </button>
         )}
-        <div style={{ font: '500 12px Inter, system-ui, sans-serif', color: T.ink3, textAlign: 'center', marginTop: stage === 'linked' ? 12 : 0 }}>
+        <div style={{ font: '500 12px var(--font-sans)', color: T.ink3, textAlign: 'center', marginTop: stage === 'linked' ? 12 : 0 }}>
           Opens WhatsApp · takes 20 seconds · unlink anytime
         </div>
       </div>

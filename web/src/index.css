@@ -36,9 +36,12 @@
 }
 
 @theme {
-  /* Inter (loaded in index.html) is the app's default UI face - same as the
-     Tasks/Rewards pages - with a system + emoji fallback. */
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  /* The app's UI face is the SYSTEM font - SF Pro on iPhone/Mac, Roboto on
+     Android, Segoe on Windows (founder call 2026-09-02: Inter's tabular
+     figures looked wrong in the calendar's time columns; SF's are the ones
+     every native calendar uses, and the app should feel native anyway).
+     Inter stays loaded for the marketing pages and as a distant fallback. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Inter', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* ── Remapped legacy tokens (pages reference these) ── */

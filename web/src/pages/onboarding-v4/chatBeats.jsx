@@ -68,7 +68,7 @@ export function PlanBeat({ d, reduced, onDone }) {
                   {b.emoji}
                 </span>
                 <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', font: '700 14.5px Inter, system-ui, sans-serif', color: T.ink }}>{b.ben.t}</span>
+                  <span style={{ display: 'block', font: '700 14.5px var(--font-sans)', color: T.ink }}>{b.ben.t}</span>
                   <span style={{ display: 'block', fontSize: 13, color: T.ink2, marginTop: 1, lineHeight: 1.4 }}>{b.ben.d}</span>
                 </span>
               </div>

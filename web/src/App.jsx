@@ -75,7 +75,7 @@ function AlreadyHome({ household, onSignOut }) {
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 48,
             marginTop: 20, borderRadius: 12, background: '#6B3FA0', color: '#fff',
-            textDecoration: 'none', font: '600 14px Inter, system-ui, sans-serif',
+            textDecoration: 'none', font: '600 14px var(--font-sans)',
           }}
         >
           Go to my home
@@ -85,7 +85,7 @@ function AlreadyHome({ household, onSignOut }) {
           onClick={onSignOut}
           style={{
             width: '100%', minHeight: 44, marginTop: 6, border: 0, background: 'transparent',
-            cursor: 'pointer', font: '600 13px Inter, system-ui, sans-serif', color: '#6B3FA0',
+            cursor: 'pointer', font: '600 13px var(--font-sans)', color: '#6B3FA0',
           }}
         >
           Sign out and join with a different account

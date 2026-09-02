@@ -96,17 +96,17 @@ export default function InviteCodeOverlay({ onJoined, onCancel }) {
             marginTop: 22, width: '100%', boxSizing: 'border-box', padding: '15px 18px',
             borderRadius: 16, border: `1.5px solid ${state === 'notfound' ? T.danger : T.line2}`,
             background: T.surface, outline: 'none', textAlign: 'center',
-            font: '600 22px Inter, sans-serif', letterSpacing: '4px', color: T.ink,
+            font: '600 22px var(--font-sans)', letterSpacing: '4px', color: T.ink,
           }}
         />
 
         {state === 'notfound' && (
-          <p style={{ margin: '10px 0 0', font: '600 13px Inter, sans-serif', color: T.danger }}>
+          <p style={{ margin: '10px 0 0', font: '600 13px var(--font-sans)', color: T.danger }}>
             That code doesn&rsquo;t match an open invite. Codes expire after 7 days - ask them to send a fresh one from the Family screen.
           </p>
         )}
         {state === 'trouble' && (
-          <p style={{ margin: '10px 0 0', font: '600 13px Inter, sans-serif', color: T.ink2 }}>
+          <p style={{ margin: '10px 0 0', font: '600 13px var(--font-sans)', color: T.ink2 }}>
             Couldn&rsquo;t check that just now - give it another go in a moment.
           </p>
         )}

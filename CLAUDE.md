@@ -45,7 +45,7 @@ Warm but not twee. Organised but not rigid. Modern but not cold. The UI should f
 
 ### Typography
 
-The brand uses **Instrument Serif** for display/headings and **Inter** for body and UI. The in-app surfaces (`web/`) ship a system font stack as the default body face for native feel, with Instrument Serif + Inter loaded from Google Fonts for headings and for parity with the marketing landing page (`website/`), which uses Inter as its body face throughout.
+The brand uses **Instrument Serif** for display/headings and **Inter** for body and UI on the marketing site. The in-app surfaces (`web/`) use the **system font** as the UI face (`--font-sans`: SF Pro on iPhone/Mac, Roboto on Android, Segoe on Windows; founder decision 2026-09-02, after Inter's tabular figures looked wrong in the calendar's time columns). Inter stays loaded from Google Fonts for the marketing landing page (`website/`), which uses it as its body face throughout, and as a distant in-app fallback. Never hard-code a family in component styles; use `var(--font-sans)`.
 
 | Role      | Font family       | Weight     | Size range            | Usage                                  |
 | --------- | ----------------- | ---------- | --------------------- | -------------------------------------- |

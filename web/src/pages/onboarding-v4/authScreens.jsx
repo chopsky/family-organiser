@@ -42,7 +42,7 @@ function AuthStack({ onPick, auth, intent }) {
   const opts = intent ? { intent } : undefined;
   const base = {
     width: '100%', minHeight: 44, padding: 15, borderRadius: R.auth,
-    font: '600 15.5px Inter, system-ui, sans-serif', cursor: 'pointer',
+    font: '600 15.5px var(--font-sans)', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
   };
   return (
@@ -255,10 +255,10 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               {rows.map((r) => (
                 <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' }}>
                   <span style={{ fontSize: 14 }}>{r.icon}</span>
-                  <span style={{ width: 74, flexShrink: 0, font: '600 12.5px Inter, system-ui, sans-serif', color: T.ink3 }}>{r.label}</span>
+                  <span style={{ width: 74, flexShrink: 0, font: '600 12.5px var(--font-sans)', color: T.ink3 }}>{r.label}</span>
                   <span
                     style={{
-                      flex: 1, textAlign: 'right', font: '600 13.5px Inter, system-ui, sans-serif',
+                      flex: 1, textAlign: 'right', font: '600 13.5px var(--font-sans)',
                       color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}
                   >
@@ -274,7 +274,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 13px',
                 borderRadius: R.pill, background: T.okBg, color: T.okInk,
-                font: '600 12.5px Inter, system-ui, sans-serif',
+                font: '600 12.5px var(--font-sans)',
               }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.okInk }} />
@@ -367,7 +367,7 @@ export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn, onForgot, 
         New to Housemait?{' '}
         <button
           type="button" onClick={onCreate}
-          style={{ background: 'none', border: 0, color: T.purple, font: '700 13.5px Inter, system-ui, sans-serif', cursor: 'pointer', minHeight: 44 }}
+          style={{ background: 'none', border: 0, color: T.purple, font: '700 13.5px var(--font-sans)', cursor: 'pointer', minHeight: 44 }}
         >
           Create an account
         </button>
@@ -487,7 +487,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
         className={reduced ? '' : 'ob-pop'}
         style={{ width: 78, height: 62, objectFit: 'contain' }}
       />
-      <p style={{ font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple, marginTop: 18 }}>
+      <p style={{ font: '700 11.5px var(--font-sans)', letterSpacing: '.16em', textTransform: 'uppercase', color: T.purple, marginTop: 18 }}>
         All set
       </p>
       {/* Two explicit lines, and textWrap back to normal for this one heading.
@@ -574,7 +574,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
               marginBottom: 14, boxShadow: SHADOW.card, animationDelay: reduced ? undefined : '.35s',
             }}
           >
-            <p style={{ font: '700 11px Inter, system-ui, sans-serif', letterSpacing: '.1em', textTransform: 'uppercase', color: T.ink3, margin: 0 }}>
+            <p style={{ font: '700 11px var(--font-sans)', letterSpacing: '.1em', textTransform: 'uppercase', color: T.ink3, margin: 0 }}>
               Bring the others in
             </p>
             <button
@@ -584,7 +584,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
                 width: '100%', minHeight: 46, marginTop: 12, borderRadius: 14, border: 0,
                 cursor: 'pointer', background: T.green, color: '#fff',
-                font: '700 15px Inter, system-ui, sans-serif',
+                font: '700 15px var(--font-sans)',
                 boxShadow: '0 8px 18px -8px rgba(31,175,84,.6)',
               }}
             >
@@ -604,10 +604,10 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
                 }}
               >
                 {copied ? (
-                  <span style={{ font: '600 13px Inter, system-ui, sans-serif', color: T.okInk }}>✓ Code copied</span>
+                  <span style={{ font: '600 13px var(--font-sans)', color: T.okInk }}>✓ Code copied</span>
                 ) : (
                   <>
-                    <span style={{ font: '600 13px Inter, system-ui, sans-serif', color: T.ink2 }}>or share the code</span>
+                    <span style={{ font: '600 13px var(--font-sans)', color: T.ink2 }}>or share the code</span>
                     <span style={{ font: '700 14px ui-monospace, SFMono-Regular, Menlo, monospace', letterSpacing: '.14em', color: T.purpleDeep }}>{codeShown}</span>
                   </>
                 )}

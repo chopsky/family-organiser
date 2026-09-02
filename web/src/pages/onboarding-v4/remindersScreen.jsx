@@ -24,7 +24,7 @@ const H1 = {
 };
 const SUB = { fontSize: 15, lineHeight: 1.45, color: T.ink2, textWrap: 'pretty' };
 const EYEBROW = {
-  font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em',
+  font: '700 11.5px var(--font-sans)', letterSpacing: '.16em',
   textTransform: 'uppercase', color: T.purple,
 };
 
@@ -42,7 +42,7 @@ function Notif({ time, title, body, delay = 0, reduced }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         <Mark size={26} />
-        <span style={{ flex: 1, font: '700 13px Inter, system-ui, sans-serif', color: T.ink }}>{title}</span>
+        <span style={{ flex: 1, font: '700 13px var(--font-sans)', color: T.ink }}>{title}</span>
         <span style={{ fontSize: 11.5, color: T.ink3 }}>{time}</span>
       </div>
       <div style={{ fontSize: 13.5, lineHeight: 1.4, color: T.ink2, marginTop: 6 }}>{body}</div>

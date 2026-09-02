@@ -32,7 +32,7 @@ const H1 = {
 };
 const SUB = { fontSize: 15, lineHeight: 1.45, color: T.ink2, textWrap: 'pretty' };
 const EYEBROW = {
-  font: '700 11.5px Inter, system-ui, sans-serif', letterSpacing: '.16em',
+  font: '700 11.5px var(--font-sans)', letterSpacing: '.16em',
   textTransform: 'uppercase', color: T.purple,
 };
 
@@ -88,13 +88,13 @@ export function CalendarList({ d, onConnect }) {
                 <ProviderLogo id={p.id} size={24} />
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', font: '700 15px Inter, system-ui, sans-serif', color: T.ink }}>{p.label}</span>
+                <span style={{ display: 'block', font: '700 15px var(--font-sans)', color: T.ink }}>{p.label}</span>
                 <span style={{ display: 'block', fontSize: 12, color: T.ink3 }}>
                   {on ? `${cals[p.id].eventCount ?? 0} events found` : p.sub}
                 </span>
               </span>
               {on ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: '700 13px Inter, system-ui, sans-serif', color: T.okInk }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: '700 13px var(--font-sans)', color: T.okInk }}>
                   <span style={{ width: 21, height: 21, borderRadius: '50%', background: '#6BA368', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Tick size={12} />
                   </span>
@@ -107,7 +107,7 @@ export function CalendarList({ d, onConnect }) {
                   style={{
                     minHeight: 44, padding: '9px 18px', borderRadius: R.pill, border: 0,
                     background: T.purpleSoft, color: T.purpleDeep,
-                    font: '700 13px Inter, system-ui, sans-serif', cursor: 'pointer',
+                    font: '700 13px var(--font-sans)', cursor: 'pointer',
                   }}
                 >
                   Connect
@@ -173,7 +173,7 @@ export function CalendarConnect({ providerId, onDone, onCancel }) {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 14, minHeight: 44,
           padding: '12px 16px', borderRadius: R.field, border: '1.5px solid rgba(109,56,173,.28)',
-          background: T.surface, color: T.purpleDeep, font: '700 15px Inter, system-ui, sans-serif',
+          background: T.surface, color: T.purpleDeep, font: '700 15px var(--font-sans)',
           textDecoration: 'none', boxShadow: '0 8px 20px -14px rgba(26,22,32,.45)',
         }}
       >
@@ -190,7 +190,7 @@ export function CalendarConnect({ providerId, onDone, onCancel }) {
             <span
               style={{
                 width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: T.purple,
-                color: '#fff', font: '700 12px Inter, system-ui, sans-serif',
+                color: '#fff', font: '700 12px var(--font-sans)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
@@ -223,7 +223,7 @@ export function CalendarConnect({ providerId, onDone, onCancel }) {
           onClick={paste}
           style={{
             flexShrink: 0, minHeight: 44, padding: '0 18px', borderRadius: R.field, border: 0,
-            background: T.ink, color: '#fff', font: '700 14.5px Inter, system-ui, sans-serif', cursor: 'pointer',
+            background: T.ink, color: '#fff', font: '700 14.5px var(--font-sans)', cursor: 'pointer',
           }}
         >
           Paste

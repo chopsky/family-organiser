@@ -335,7 +335,7 @@ export default function OnboardingV4({ initialPhase }) {
                 onClick={openJoin}
                 style={{
                   marginTop: 12, padding: '6px 0', border: 0, background: 'transparent',
-                  cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,
+                  cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.ink2,
                   textDecoration: 'underline', textUnderlineOffset: 3, textAlign: 'left',
                 }}
               >
@@ -375,7 +375,7 @@ export default function OnboardingV4({ initialPhase }) {
             onClick={openJoin}
             style={{
               marginTop: 18, padding: '10px 0', border: 0, background: 'transparent',
-              cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.ink2,
+              cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.ink2,
               textDecoration: 'underline', textUnderlineOffset: 3, textAlign: 'left',
             }}
           >
