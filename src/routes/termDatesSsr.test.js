@@ -655,3 +655,135 @@ describe('schools listing on council pages', () => {
     expect(res.status).toBe(200); // fail-open: dates still render
   });
 });
+
+describe('term-time holiday fines page', () => {
+  const bh = require('../services/bankHolidays');
+  const FINES = '/school-term-dates/term-time-holiday-fines';
+  const yr = (event_type, date, extra = {}) => ({ la_id: 'x', academic_year: '2026-2027', event_type, date, end_date: null, label: null, ...extra });
+  const ROWS = [
+    yr('term_start', '2026-09-02'), yr('term_end', '2026-10-23'),
+    yr('term_start', '2026-11-02'), yr('term_end', '2026-12-18'),
+    yr('term_start', '2027-01-05'), yr('term_end', '2027-02-12'),
+    yr('term_start', '2027-02-22'), yr('term_end', '2027-03-26'),
+    yr('term_start', '2027-04-12'), yr('term_end', '2027-05-28'),
+    yr('term_start', '2027-06-07'), yr('term_end', '2027-07-21'),
+    yr('inset_day', '2026-11-27', { label: 'INSET day' }),
+  ];
+  const ALESHIRE = { id: 'a', name: 'Aleshire', slug: 'aleshire', region: 'England', import_status: 'ok', date_count: 10, last_imported_at: '2026-08-20T05:00:00Z' };
+  const CARDIFF = { id: 'w', name: 'Cardiff', slug: 'cardiff', region: 'Wales', import_status: 'ok', date_count: 10 };
+
+  beforeEach(() => {
+    laDb.listAllAuthorities.mockResolvedValue([
+      ALESHIRE, CARDIFF,
+      { id: 'z', name: 'Nevershire', slug: 'nevershire', region: 'England', import_status: 'pending', date_count: 0 },
+    ]);
+    laDb.getAuthorityBySlug.mockImplementation(async (slug) => ({ aleshire: ALESHIRE, cardiff: CARDIFF }[slug] || null));
+    laDb.getEntriesForLA.mockResolvedValue(ROWS);
+    bh.fetchBankHolidaysEnglandWales.mockResolvedValue([{ date: '2027-05-03', title: 'Early May bank holiday', notes: '' }]);
+  });
+
+  it('renders the checker with every listable council, indexable, with the rules', async () => {
+    const res = await request(app()).get(FINES);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/term-time-holiday-fines"');
+    expect(res.text).not.toContain('noindex');
+    expect(res.text).toContain('<option value="aleshire"');
+    expect(res.text).toContain('<optgroup label="Wales"><option value="cardiff"');
+    expect(res.text).not.toContain('nevershire');
+    expect(res.text).toContain('action="/school-term-dates/term-time-holiday-fines#result"');
+    expect(res.text).toContain('href="/school-term-dates/term-time-holiday-fines" aria-current="page">Term-time fines</a>');
+    expect(res.text).toContain('10 sessions</strong>');
+    expect(res.text).toContain('"@type":"FAQPage"');
+    // Bare page: no result block, no stray error.
+    expect(res.text).not.toContain('id="result"');
+  });
+
+  it('counts school days and prices the notices per parent per child', async () => {
+    const res = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-09&to=2026-11-13&children=2&parents=2`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('5 school days (10 sessions) in Aleshire');
+    expect(res.text).toContain('Meets the national threshold');
+    expect(res.text).toContain('4 notices');
+    expect(res.text).toContain('<div class="amt">£320</div>');
+    expect(res.text).toContain('<div class="amt">£640</div>');
+    expect(res.text).toContain('October half term');
+    expect(res.text).toContain('checked Thu 20 Aug 2026');
+    // Result pages never compete with the bare URL in the index.
+    expect(res.text).toContain('<meta name="robots" content="noindex,follow" />');
+    expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/term-time-holiday-fines"');
+    // Form keeps the visitor's choices.
+    expect(res.text).toContain('<option value="aleshire" selected>');
+    expect(res.text).toContain('value="2026-11-09"');
+  });
+
+  it('removes half term, INSET and bank holidays before counting', async () => {
+    const res = await request(app()).get(`${FINES}?council=aleshire&from=2026-10-23&to=2026-11-02`);
+    expect(res.text).toContain('2 school days (4 sessions)');
+    expect(res.text).toContain('5 school holiday');
+    expect(res.text).toContain('Below the national threshold');
+    const inset = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-23&to=2026-11-27`);
+    expect(inset.text).toContain('4 school days');
+    expect(inset.text).toContain('1 INSET/closure');
+    const may = await request(app()).get(`${FINES}?council=aleshire&from=2027-05-03&to=2027-05-07`);
+    expect(may.text).toContain('4 school days');
+    expect(may.text).toContain('1 bank holiday');
+  });
+
+  it('says so when the dates are all holiday', async () => {
+    const res = await request(app()).get(`${FINES}?council=aleshire&from=2026-10-26&to=2026-10-30`);
+    expect(res.text).toContain('0 school days');
+    expect(res.text).toContain('nothing to fine');
+    expect(res.text).toContain('class="result clear"');
+  });
+
+  it('uses the Welsh framework for Welsh councils', async () => {
+    const res = await request(app()).get(`${FINES}?council=cardiff&from=2026-11-09&to=2026-11-13&children=1&parents=1`);
+    expect(res.text).toContain('<div class="amt">£60</div>');
+    expect(res.text).toContain('<div class="amt">£120</div>');
+    expect(res.text).toContain('no single national trigger');
+    expect(res.text).not.toContain('Meets the national threshold');
+  });
+
+  it('explains bad input instead of failing', async () => {
+    const rev = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-13&to=2026-11-09`);
+    expect(rev.status).toBe(200);
+    expect(rev.text).toContain('before the first day');
+    const unknown = await request(app()).get(`${FINES}?council=atlantis&from=2026-11-09&to=2026-11-13`);
+    expect(unknown.text).toContain('term dates for that council yet');
+    const hidden = await request(app()).get(`${FINES}?council=nevershire&from=2026-11-09&to=2026-11-13`);
+    expect(hidden.text).toContain('term dates for that council yet');
+    const partial = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-09`);
+    expect(partial.text).toContain('Choose a council and both dates');
+    const long = await request(app()).get(`${FINES}?council=aleshire&from=2026-09-07&to=2026-12-11`);
+    expect(long.text).toContain('more than 60 days');
+    laDb.getEntriesForLA.mockResolvedValue([]);
+    const unresolved = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-09&to=2026-11-13`);
+    expect(unresolved.status).toBe(200);
+    expect(unresolved.text).toContain('term structure');
+    expect(unresolved.text).toContain('href="/school-term-dates/aleshire"');
+  });
+
+  it('escapes hostile query values', async () => {
+    const res = await request(app()).get(`${FINES}?council=%3Cscript%3E&from=2026-11-09&to=2026-11-13`);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('<script>alert');
+    expect(res.text).not.toContain('value="<script>');
+  });
+
+  it('still answers when gov.uk bank holidays are unavailable', async () => {
+    bh.fetchBankHolidaysEnglandWales.mockRejectedValue(new Error('gov.uk down'));
+    const res = await request(app()).get(`${FINES}?council=aleshire&from=2027-05-03&to=2027-05-07`);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('5 school days');
+    expect(res.text).toContain('Bank holidays could not be checked');
+  });
+
+  it('is linked from the sitemap, the Key dates menu and the footer, and the footer lists live regions only', async () => {
+    const sm = await request(app()).get('/school-term-dates/sitemap.xml');
+    expect(sm.text).toContain('<loc>https://housemait.com/school-term-dates/term-time-holiday-fines</loc>');
+    const page = await request(app()).get('/school-term-dates/bank-holidays');
+    expect(page.text).toContain('href="/school-term-dates/term-time-holiday-fines">Term-time fines</a>');
+    expect(page.text).not.toContain('/school-term-dates/greater-manchester"');
+    expect(page.text).toContain('href="/school-term-dates/yorkshire-and-the-humber">Yorkshire and the Humber</a>');
+  });
+});

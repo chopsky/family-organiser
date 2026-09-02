@@ -26,6 +26,7 @@ const laDb = require('../db/laTermDates');
 const { academicYearsForCountry } = require('../services/term-date-extract');
 const { summariseSeason } = require('../services/termDatesSeasonal');
 const { fetchBankHolidaysEnglandWales, classifyBankHolidays } = require('../services/bankHolidays');
+const fines = require('../services/termTimeFines');
 
 const CANONICAL_BASE = 'https://housemait.com/school-term-dates';
 const INDEX_HTML = path.join(__dirname, '..', '..', 'public', 'la-term-dates', 'index.html');
@@ -655,17 +656,20 @@ const FOOTER_HTML = `
         <a href="/school-term-dates/easter-holidays">Easter holidays</a>
         <a href="/school-term-dates/summer-holidays">Summer holidays</a>
         <a href="/school-term-dates/bank-holidays">Bank holidays</a>
+        <a href="/school-term-dates/term-time-holiday-fines">Term-time fines</a>
         <a href="/school-term-dates/about-this-data">About this data</a>
         <a href="/school-term-dates/data">Download the data</a>
       </nav>
       <nav class="guides" aria-label="Compare term dates by region">
-        <a href="/school-term-dates/london">London</a>
-        <a href="/school-term-dates/greater-manchester">Greater Manchester</a>
-        <a href="/school-term-dates/west-midlands">West Midlands</a>
-        <a href="/school-term-dates/merseyside">Merseyside</a>
-        <a href="/school-term-dates/west-yorkshire">West Yorkshire</a>
-        <a href="/school-term-dates/south-yorkshire">South Yorkshire</a>
         <a href="/school-term-dates/north-east">North East</a>
+        <a href="/school-term-dates/north-west">North West</a>
+        <a href="/school-term-dates/yorkshire-and-the-humber">Yorkshire and the Humber</a>
+        <a href="/school-term-dates/east-midlands">East Midlands</a>
+        <a href="/school-term-dates/west-midlands">West Midlands</a>
+        <a href="/school-term-dates/east-of-england">East of England</a>
+        <a href="/school-term-dates/london">London</a>
+        <a href="/school-term-dates/south-east">South East</a>
+        <a href="/school-term-dates/south-west">South West</a>
         <a href="/school-term-dates/wales">Wales</a>
       </nav>
       <nav>
@@ -976,7 +980,11 @@ function guidesStrip(exceptSlug) {
     .map((s) => `<a href="/school-term-dates/${s}">${esc(defs.pages[s].navLabel)}</a>`)
     .join('');
   const hubs = HUB_SLUGS.map((s) => `<a href="/school-term-dates/${s}">${esc(HUB_DEFS[s].name)}</a>`).join('');
-  return `<h2>More term-date guides</h2><div class="guides-strip">${links}<a href="/school-term-dates/bank-holidays">Bank holidays</a><a href="/school-term-dates/about-this-data">About this data</a><a href="/school-term-dates/data">Download the data</a></div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
+  const fixed = [['bank-holidays', 'Bank holidays'], [FINES_SLUG, 'Term-time fines'], ['about-this-data', 'About this data'], ['data', 'Download the data']]
+    .filter(([slug]) => slug !== exceptSlug)
+    .map(([slug, label]) => `<a href="/school-term-dates/${slug}">${label}</a>`)
+    .join('');
+  return `<h2>More term-date guides</h2><div class="guides-strip">${links}${fixed}</div><div class="guides-strip" style="margin-top:8px">${hubs}</div>`;
 }
 
 function seasonalPage(slug, result) {
@@ -1288,6 +1296,321 @@ function bankHolidayPage(annotated, defs) {
 }
 
 
+// ── Term-time holiday fines ─────────────────────────────────────────────────
+// The one question every term-dates visitor with a holiday in mind actually
+// has, answered against THEIR council's calendar: how many school days would
+// the trip cover, does that meet the national penalty-notice threshold, and
+// what would the notices add up to per parent per child. Pure HTML GET form,
+// server-rendered result (no new inline script, CSP untouched). Result pages
+// carry noindex + a canonical to the bare URL so the index never fills with
+// query-string variants.
+
+const FINES_SLUG = 'term-time-holiday-fines';
+const gbp = (n) => `£${Number(n).toLocaleString('en-GB')}`;
+const plural = (n, one, many) => (n === 1 ? one : (many || `${one}s`));
+
+const FINES_CSS = `
+    .calc, .result { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); padding: 20px; margin: 18px 0 8px; }
+    .calc .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
+    .calc .f-council { grid-column: 1 / -1; }
+    .calc label { display: block; font-size: 13px; font-weight: 500; color: #2D2A33; margin-bottom: 6px; }
+    .calc select, .calc input { width: 100%; height: 48px; border: 1.5px solid #E8E5EC; border-radius: 10px; background: #FBF8F3; padding: 0 14px; font-size: 15px; font-family: inherit; color: #2D2A33; }
+    .calc select:focus, .calc input:focus { outline: none; border-color: #6B3FA0; box-shadow: 0 0 0 3px #F3EDFC; }
+    .calc .actions { margin-top: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+    .calc button { height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #6B3FA0; color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .calc button:hover { background: #5A3488; }
+    .calc button:focus-visible { outline: 3px solid #F3EDFC; outline-offset: 1px; }
+    .calc .hint { font-size: 12.5px; color: #6B6774; }
+    .result { border-left: 4px solid #6B3FA0; margin-top: 14px; }
+    .result.fine { border-left-color: #E8724A; }
+    .result.clear { border-left-color: #7DAE82; }
+    .result.err { border-left-color: #E0A458; }
+    .result h2 { margin: 0 0 6px; font-size: 24px; }
+    .result .headline { font-size: 17px; font-weight: 600; color: #2D2A33; margin: 0 0 10px; }
+    .result p { font-size: 15px; color: #4A4552; margin: 0 0 10px; max-width: 78ch; }
+    .result p.small { font-size: 13px; color: #6B6774; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .chips span { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; background: #F3EDFC; color: #6B3FA0; }
+    .chips span.warm { background: #FDF0EB; color: #B5502D; }
+    .chips span.soft { background: #EDF5EE; color: #3E7444; }
+    .chips span.grey { background: #F1EFF4; color: #6B6774; }
+    .money { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 14px; }
+    .money div { background: #FBF8F3; border-radius: 12px; padding: 12px 14px; }
+    .money .amt { font-family: 'Recoleta', Georgia, serif; font-size: 26px; color: #6B3FA0; line-height: 1.1; }
+    .money .lab { font-size: 12px; color: #6B6774; margin-top: 4px; }
+    .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+    .rules .gcard h3 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 21px; color: #6B3FA0; margin: 0 0 8px; }
+    .rules .gcard p { font-size: 14px; color: #4A4552; margin: 0 0 8px; }
+    .rules .gcard p:last-child { margin-bottom: 0; }
+    .gcards.stats { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .gcard.stat .amt { font-family: 'Recoleta', Georgia, serif; font-size: 30px; color: #6B3FA0; line-height: 1.1; }
+    .gcard.stat .lab { font-size: 13px; color: #4A4552; margin-top: 6px; }
+    .src { font-size: 12.5px; color: #6B6774; line-height: 1.7; }
+    .src a { color: #6B3FA0; }
+    @media print { .calc { display: none; } }`;
+
+const FINES_ERRORS = {
+  missing: 'Choose a council and both dates, then check again.',
+  invalid_dates: 'Those dates don\'t look right. Use the date pickers, or type them as YYYY-MM-DD.',
+  reversed: 'The last day is before the first day. Swap them round.',
+  too_long: `That's more than ${fines.MAX_RANGE_DAYS} days. This tool is for holidays, not long absences: talk to the school directly.`,
+  unresolved: 'We can\'t read this council\'s term structure well enough to count school days. Its own page shows every published date.',
+  unknown_council: 'We don\'t have term dates for that council yet.',
+};
+
+/**
+ * Resolve the GET form into an outcome. Null when the form hasn't been used;
+ * { error } for anything we can't count; the full result otherwise. Fetches
+ * fail open where the page can still be useful without them (bank holidays).
+ */
+async function computeFinesOutcome(form) {
+  const one = (v) => (Array.isArray(v) ? v[0] : (v == null ? '' : String(v))).trim();
+  const council = one(form.council); const from = one(form.from); const to = one(form.to);
+  if (!council && !from && !to) return null;
+  if (!council || !from || !to) return { error: 'missing' };
+  if (!/^[a-z0-9-]+$/.test(council)) return { error: 'unknown_council' };
+  const authority = await laDb.getAuthorityBySlug(council);
+  if (!authority || !isListable(authority)) return { error: 'unknown_council' };
+  const rows = await laDb.getEntriesForLA(authority.id);
+  let bankHolidayDates = []; let bankApplied = true;
+  try {
+    bankHolidayDates = (await fetchBankHolidaysEnglandWales()).map((e) => e.date);
+  } catch (err) {
+    bankApplied = false;
+    console.error('[term-dates-ssr] fines: bank holidays unavailable:', err.message);
+  }
+  const absence = fines.classifyAbsence({ fromIso: from, toIso: to, rows, bankHolidayDates });
+  if (!absence.ok) return { error: absence.reason, authority };
+  const country = fines.countryOf(authority);
+  const money = fines.estimateFines({ country, parents: one(form.parents), children: one(form.children) });
+  return {
+    ok: true, authority, country, absence, money, bankApplied,
+    threshold: fines.meetsThreshold(country, absence.sessions),
+    nearest: fines.nearestBreak({ fromIso: from, rows }),
+    from, to,
+  };
+}
+
+function finesResultHtml(o) {
+  if (!o) return '';
+  if (o.error) {
+    const councilLink = o.authority ? ` <a href="/school-term-dates/${esc(o.authority.slug)}">${esc(o.authority.name)} term dates →</a>` : '';
+    return `<div class="result err" id="result"><h2>We couldn't check that</h2><p>${esc(FINES_ERRORS[o.error] || FINES_ERRORS.missing)}${councilLink}</p></div>`;
+  }
+  const { authority, country, absence, money, threshold, nearest } = o;
+  const r = money.rules;
+  const n = absence.schoolDays;
+  const k = absence.byKind;
+  const cls = n === 0 ? 'clear' : (threshold ? 'fine' : '');
+  const chips = [
+    `<span class="${n ? 'warm' : 'soft'}">${n} school ${plural(n, 'day')}</span>`,
+    k.holiday ? `<span class="soft">${k.holiday} school holiday</span>` : '',
+    k.closure ? `<span class="soft">${k.closure} INSET/closure</span>` : '',
+    k.bankHoliday ? `<span class="soft">${k.bankHoliday} bank holiday</span>` : '',
+    k.weekend ? `<span class="grey">${k.weekend} weekend</span>` : '',
+    k.unknown ? `<span class="grey">${k.unknown} not yet published</span>` : '',
+  ].filter(Boolean);
+  // A breakdown only earns its row when there is something to break down.
+  const chipsHtml = chips.length > 1 ? `<div class="chips">${chips.join('')}</div>` : '';
+
+  let verdict;
+  if (n === 0) {
+    verdict = `<p>These dates fall entirely outside ${esc(authority.name)}'s school days, so there is nothing to authorise and nothing to fine. Enjoy it.</p>`;
+  } else if (country === 'England') {
+    verdict = threshold
+      ? `<p><strong>Meets the national threshold.</strong> ${absence.sessions} sessions of unauthorised absence is at or over the ${r.thresholdSessions} sessions (${r.thresholdSessions / 2} school days) in a rolling ${r.thresholdWeeks} school weeks at which a school must consider a penalty notice. If the school doesn't authorise the trip, expect one.</p>`
+      : `<p><strong>Below the national threshold on its own.</strong> ${absence.sessions} of the ${r.thresholdSessions} sessions in a rolling ${r.thresholdWeeks} school weeks at which a penalty notice must be considered. Any other unauthorised absence in that window counts towards it, and the school can still refuse to authorise the days.</p>`;
+  } else {
+    verdict = `<p><strong>Wales sets no single national trigger.</strong> Each council's code of conduct decides when a fixed penalty notice is issued, so check ${esc(authority.name)}'s code. Unauthorised absence of ${absence.sessions} sessions is well inside the range councils act on.</p>`;
+  }
+
+  const who = `${money.parents} ${plural(money.parents, 'parent')} and ${money.children} ${plural(money.children, 'child', 'children')}`;
+  let moneyHtml = '';
+  if (n > 0) {
+    const cells = [
+      `<div><div class="amt">${gbp(money.firstEarlyTotal)}</div><div class="lab">${gbp(r.firstEarly)} per notice, paid within ${r.earlyDays} days</div></div>`,
+      `<div><div class="amt">${gbp(money.firstLateTotal)}</div><div class="lab">${gbp(r.firstLate)} per notice, paid within ${r.lateDays} days</div></div>`,
+    ];
+    if (money.secondTotal != null) cells.push(`<div><div class="amt">${gbp(money.secondTotal)}</div><div class="lab">second notice for the same child within ${r.repeatWindowYears} years, no reduced rate</div></div>`);
+    moneyHtml = `<p>Notices are issued <strong>per parent, per child</strong>. For ${who} that is ${money.notices} ${plural(money.notices, 'notice')}:</p><div class="money">${cells.join('')}</div>`
+      + (country === 'England'
+        ? `<p class="small">Unpaid after ${r.lateDays} days, the council must prosecute or withdraw the notice; there is no appeal. A third time within ${r.repeatWindowYears} years no notice is issued at all and prosecution follows instead: a court fine of up to £1,000 (up to £2,500 for the aggravated offence), and a criminal record.</p>`
+        : '<p class="small">Unpaid notices can lead to prosecution under the Education Act 1996.</p>');
+  }
+
+  let nearestHtml = '';
+  if (n > 0 && nearest) {
+    const away = nearest.distanceDays === 0
+      ? 'and your dates already overlap it'
+      : `${nearest.distanceDays} ${plural(nearest.distanceDays, 'day')} from your dates`;
+    nearestHtml = `<p><strong>The legal alternative:</strong> ${esc(authority.name)}'s nearest school holiday is ${esc(nearest.name)}, ${esc(fmtDate(nearest.firstOff))} to ${esc(fmtDate(nearest.lastOff))} (${nearest.weekdays} weekdays), ${away}. <a href="/school-term-dates/${esc(authority.slug)}">Every ${esc(authority.name)} holiday →</a></p>`;
+  }
+
+  const notes = [];
+  if (!absence.coveredByCalendar) notes.push(`${esc(authority.name)} hasn't published dates for ${k.unknown} of these ${plural(k.unknown, 'day')} yet, so they aren't counted.`);
+  if (!o.bankApplied) notes.push('Bank holidays could not be checked just now, so any that fall in these dates are counted as school days.');
+  notes.push(`Counted against ${esc(authority.name)}'s published council calendar${authority.last_imported_at ? `, checked ${esc(fmtDate(authority.last_imported_at.slice(0, 10)))}` : ''}. Academies and individual schools set their own INSET days and can differ, and only the school decides whether an absence is authorised. This is an estimate of the national framework, not legal advice.`);
+
+  return `<div class="result ${cls}" id="result">
+      <h2>${esc(fmtRange(o.from, o.to))}</h2>
+      <p class="headline">${n} school ${plural(n, 'day')} (${absence.sessions} ${plural(absence.sessions, 'session')}) in ${esc(authority.name)}</p>
+      ${chipsHtml}
+      ${verdict}${moneyHtml}${nearestHtml}
+      <p class="small">${notes.join(' ')}</p>
+    </div>`;
+}
+
+/**
+ * The rules as prose. Amounts and thresholds come from termTimeFines.RULES so
+ * the calculator and the copy cannot drift apart. Every figure below was
+ * checked against its primary source on 2026-09-02 (DfE statutory guidance,
+ * July 2026 edition; SI 2024/210; s444 Education Act 1996; DfE "Parental
+ * responsibility measures 2024/25"; Welsh Government 2013 guidance; gov.scot
+ * IEI Part 1, March 2026; NI Department of Education, December 2025).
+ */
+function finesProse(defs) {
+  const E = fines.RULES.England; const W = fines.RULES.Wales;
+  const stat = (n, lab) => `<div class="gcard stat"><div class="amt">${esc(n)}</div><div class="lab">${lab}</div></div>`;
+  return `
+    <h2>The rules in England</h2>
+    <div class="rules">
+      <div class="gcard"><h3>How much</h3>
+        <p>A penalty notice is <strong>${gbp(E.firstEarly)}</strong> if paid within ${E.earlyDays} days of receiving it, rising to <strong>${gbp(E.firstLate)}</strong> if paid within ${E.lateDays} days. Still unpaid after ${E.lateDays} days, the council must either prosecute for the original offence or withdraw the notice. There is no right of appeal against a notice.</p>
+        <p>The amounts went up from £60 and £120 on 19 August 2024, when the national framework in the Department for Education's statutory guidance <em>Working together to improve school attendance</em> and the Education (Penalty Notices) (England) (Amendment) Regulations 2024 came into force.</p></div>
+      <div class="gcard"><h3>Per parent, per child</h3>
+        <p>A notice can go to each parent liable for the absence, for each child. Two parents taking two children out is four notices: ${gbp(E.firstEarly * 4)} paid promptly, ${gbp(E.firstLate * 4)} if not.</p>
+        <p>"Parent" in the Education Act means anyone with parental responsibility or day-to-day care of the child, so step-parents and partners can be fined too. Notices should normally go to the parent or parents who allowed the absence.</p></div>
+      <div class="gcard"><h3>Second and third time</h3>
+        <p>A second notice to the same parent for the same child within ${E.repeatWindowYears} years is <strong>${gbp(E.second)}</strong>, with no reduced rate for paying early.</p>
+        <p>A third time within ${E.repeatWindowYears} years, no notice can be issued at all. The council must consider other action instead, which in practice usually means prosecution.</p></div>
+      <div class="gcard"><h3>The threshold</h3>
+        <p>Schools must consider a penalty notice once a child has <strong>${E.thresholdSessions} sessions</strong> of unauthorised absence in any ${E.thresholdWeeks} consecutive school weeks. A session is a morning or an afternoon, so that is ${E.thresholdSessions / 2} school days. They don't have to be consecutive, they don't have to be for the same trip, the window can span terms and school years, and late marks after the register closes count.</p>
+        <p>Reaching the threshold means the school must consider a notice case by case, not that one is automatic. Below it, the days still count towards the total for the rest of the window.</p></div>
+      <div class="gcard"><h3>Who decides</h3>
+        <p>Only the headteacher can authorise absence, and term-time leave may be granted only in <strong>exceptional circumstances</strong>, requested in advance. The DfE does not regard a holiday as exceptional, and the July 2026 edition of the guidance bans blanket policies that grant leave automatically. If leave is refused and you go anyway, the absence is unauthorised and everything above applies.</p></div>
+      <div class="gcard"><h3>If it reaches court</h3>
+        <p>Prosecution is under section 444 of the Education Act 1996. The basic offence carries a fine of up to £1,000; the aggravated offence, where a parent knows the child isn't attending and fails to act, up to £2,500, a community order or up to three months in prison. A conviction is a criminal record. In 2017 the Supreme Court ruled in the Isle of Wight case that attending "regularly" means attending in line with the school's rules, so a high attendance percentage is no defence.</p></div>
+    </div>
+
+    <h2>The rules in Wales</h2>
+    <div class="rules">
+      <div class="gcard"><h3>How much</h3>
+        <p>A fixed penalty notice is <strong>${gbp(W.firstEarly)}</strong> if paid within ${W.earlyDays} days of receiving it, rising to <strong>${gbp(W.firstLate)}</strong> if paid within ${W.lateDays} days, under the Education (Penalty Notices) (Wales) Regulations 2013. Also per parent, per child. Unpaid after ${W.lateDays} days, the council must prosecute or withdraw the notice.</p>
+        <p>Some council websites quote England's 21- and 28-day windows. The Welsh regulations and Welsh Government guidance say ${W.earlyDays} and ${W.lateDays}.</p></div>
+      <div class="gcard"><h3>Who decides</h3>
+        <p>There is no national threshold in Wales. Each council publishes a code of conduct setting when it issues notices, and headteachers keep discretion to authorise up to 10 days of term-time leave in exceptional circumstances. The Welsh Government has said notices are meant for regular unauthorised absence rather than a single holiday in itself, but councils apply that differently, so check yours. Wales publishes no national count of notices issued.</p></div>
+    </div>
+
+    <h2>Scotland and Northern Ireland</h2>
+    <div class="rules">
+      <div class="gcard"><h3>Scotland</h3>
+        <p>No penalty notices. Under the Education (Scotland) Act 1980 a council can require a parent to explain an absence and then make an attendance order; breaching that order can end in court, with a fine of up to £1,000, up to a month in prison, or both. Scotland's new attendance guidance (March 2026) says term-time holidays should be authorised only in exceptional circumstances linked to a parent's work, and recorded as unauthorised otherwise. Unauthorised holidays made up 1.1% of all school openings in 2024/25, the highest since records began in 2009/10.</p></div>
+      <div class="gcard"><h3>Northern Ireland</h3>
+        <p>No fixed penalty system either, as the Department of Education itself puts it. Schools may record a holiday as unauthorised; persistent cases go to the Education Authority's Education Welfare Service, and prosecution, with a court fine of up to £1,000 per child, is a last resort. A consultation on a new attendance strategy closed in March 2026 and did not propose fines.</p></div>
+    </div>
+
+    <h2>How many parents are fined?</h2>
+    <p class="sub">England, 2024/25 school year, the first full year of the ${gbp(E.firstEarly)}/${gbp(E.firstLate)} framework. Department for Education, <em>Parental responsibility measures</em>, published 29 January 2026.</p>
+    <div class="gcards stats">
+      ${stat('492,800', 'penalty notices issued, up 1% on 487,300 the year before and from 398,800 in 2022/23')}
+      ${stat('459,300', 'of them for unauthorised family holidays: 93% of all notices, up 4% year on year')}
+      ${stat('353,857', `paid at ${gbp(E.firstEarly)} within ${E.earlyDays} days; a further 26,057 paid the ${gbp(E.firstLate)} rate in days 22 to 28`)}
+      ${stat('28,909', 'prosecutions for non-payment, about 6% of notices; 35,089 notices were withdrawn')}
+      ${stat('9,972', `second notices at the flat ${gbp(E.second)} rate; 148 prosecutions because the two-in-three-years limit had been reached`)}
+      ${stat('10.3%', 'of enrolments received a notice in Yorkshire and the Humber, the highest regional rate; London was lowest at 3.6%')}
+    </div>
+    <div class="prose"><p>Holidays are a small share of missed school and a very large share of fines: the Education Policy Institute found family holidays accounted for 7.1% of all absence but 93% of penalty notices in 2024/25.</p></div>
+
+    <h2>Has anything changed for ${esc(defs.ayLabel)}?</h2>
+    <div class="prose">
+      <p>No. Checked on 2 September 2026: the most recent penalty-notice regulations for England are still the August 2024 ones. The statutory guidance was re-issued on 9 July 2026 with technical clarifications, and its amounts, three-year limit and ten-session threshold are unchanged. The Children's Wellbeing and Schools Act 2026, which received Royal Assent in April 2026, does not touch penalty notices; its attendance changes concern school attendance orders and are not yet in force. In April 2026 the Government told Parliament it has no plans to scrap fines or prosecutions, having rejected a petition for ten fine-free term-time days in December 2024.</p>
+      <p>Wales: no change to the 2013 amounts was found. We re-check this page each term.</p>
+    </div>`;
+}
+
+function finesPage({ authorities, defs, form, outcome }) {
+  const canonical = `${CANONICAL_BASE}/${FINES_SLUG}`;
+  const E = fines.RULES.England;
+  const title = `Term-Time Holiday Fines ${defs.y1}/${defs.y2}: How Much, Per Child, and When | Housemait`;
+  const description = `Check how many school days a term-time holiday would cover in your council's ${defs.ayLabel} calendar, whether it meets the ${E.thresholdSessions}-session threshold, and what the ${gbp(E.firstEarly)} to ${gbp(E.firstLate)} penalty notices add up to per parent per child.`;
+  const used = !!outcome;
+  const one = (v) => esc((Array.isArray(v) ? v[0] : (v == null ? '' : String(v))).trim());
+  const sel = (a, b) => (String(a) === String(b) ? ' selected' : '');
+
+  const eng = authorities.filter((a) => a.region !== 'Wales');
+  const wal = authorities.filter((a) => a.region === 'Wales');
+  const opt = (a) => `<option value="${esc(a.slug)}"${sel(a.slug, one(form.council))}>${esc(a.name)}</option>`;
+  const options = `<option value="">Choose your council…</option>`
+    + `<optgroup label="England">${eng.map(opt).join('')}</optgroup>`
+    + (wal.length ? `<optgroup label="Wales">${wal.map(opt).join('')}</optgroup>` : '');
+  const children = one(form.children) || '1';
+  const parents = one(form.parents) || '2';
+
+  const faq = [
+    { q: 'How much is the fine for taking a child out of school in England?', a: `${gbp(E.firstEarly)} per parent per child if paid within ${E.earlyDays} days, rising to ${gbp(E.firstLate)} if paid within ${E.lateDays} days. A second notice for the same child within ${E.repeatWindowYears} years is ${gbp(E.second)} with no reduced rate, and a third time leads to prosecution rather than another notice.` },
+    { q: 'Is the fine per child or per family?', a: `Per parent, per child. Two parents and two children means four separate notices, so ${gbp(E.firstEarly * 4)} paid promptly or ${gbp(E.firstLate * 4)} if not. Anyone with parental responsibility or care of the child counts as a parent, and notices normally go to whoever allowed the absence.` },
+    { q: 'Is the fine per day?', a: 'No. A penalty notice is a fixed amount however long the absence, so a five-day trip and a ten-day trip cost the same per notice. What changes with length is whether the ten-session threshold is met, and how much of the rolling ten-week allowance the trip uses up.' },
+    { q: 'How many days can I take my child out of school before I am fined?', a: `In England a school must consider a penalty notice once a child has ${E.thresholdSessions} sessions (${E.thresholdSessions / 2} school days) of unauthorised absence within any ${E.thresholdWeeks} consecutive school weeks. Fewer days can still be refused, still count towards the threshold, and some councils act below it. Wales has no national threshold; each council sets its own code.` },
+    { q: 'Can the headteacher authorise a term-time holiday?', a: 'Only in exceptional circumstances, requested in advance. Cost, availability and a parent\'s work pattern are not normally accepted, and schools may not run blanket policies either way. If leave is refused and the child is taken out anyway, the absence is unauthorised.' },
+    { q: 'Do weekends, bank holidays and INSET days count?', a: 'No. Only sessions when the school is open to pupils count, so a trip that straddles a half term, a bank holiday or an INSET day covers fewer school days than its length suggests. The checker on this page works that out from the council calendar.' },
+    { q: 'What happens if I refuse to pay?', a: `After ${E.lateDays} days the council must either prosecute you for the original offence or withdraw the notice. There is no appeal against a notice itself. In court the basic offence carries a fine of up to £1,000 and the aggravated offence up to £2,500, a community order or up to three months in prison, and a conviction is a criminal record. In 2024/25 there were 28,909 prosecutions for non-payment in England.` },
+    { q: 'Do private schools fine parents for term-time holidays?', a: 'Penalty notices are issued for pupils at state-funded schools, so independent schools cannot issue them. The legal duty to make sure your child attends regularly still applies.' },
+    { q: 'Are the fines the same in Wales?', a: `No. Wales uses fixed penalty notices of ${gbp(fines.RULES.Wales.firstEarly)} within ${fines.RULES.Wales.earlyDays} days rising to ${gbp(fines.RULES.Wales.firstLate)} within ${fines.RULES.Wales.lateDays} days, with each council's code of conduct deciding when they are issued and headteachers able to authorise up to 10 days in exceptional circumstances.` },
+    { q: 'Do Scotland and Northern Ireland fine parents for term-time holidays?', a: 'No. Neither has a penalty-notice system. A holiday is recorded as unauthorised absence, persistent cases can be escalated through attendance orders or the Education Welfare Service, and only a court can fine, up to £1,000, as a last resort.' },
+  ];
+  const faqLd = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) };
+  const crumbLd = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'UK School Term Dates', item: `${CANONICAL_BASE}/` },
+    { '@type': 'ListItem', position: 2, name: 'Term-time holiday fines', item: canonical },
+  ] };
+
+  return `<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}" />
+  <link rel="canonical" href="${esc(canonical)}" />${used ? '\n  <meta name="robots" content="noindex,follow" />' : ''}
+  <meta property="og:title" content="${esc(title)}" />
+  <meta property="og:description" content="${esc(description)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${esc(canonical)}" />
+  <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
+  <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
+  <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <style>${SEASONAL_CSS}${FINES_CSS}</style>${GA_SNIPPET}
+  <script>${NAV_JS}</script>
+</head>
+<body>
+  <div class="wrap">${HEADER_HTML}${navBar('dates', FINES_SLUG)}
+    <h1>Term-time holiday fines: what you'd actually pay</h1>
+    <p class="sub">Pick your council and the dates you have in mind. We count the school days the trip really covers, using the council's own ${defs.ayLabel} calendar, then set that against the penalty-notice rules for England and Wales.</p>
+    <form class="calc" method="get" action="/school-term-dates/${FINES_SLUG}#result" aria-label="Check a term-time holiday">
+      <div class="grid">
+        <div class="f-council"><label for="council">Council</label><select id="council" name="council" required>${options}</select></div>
+        <div><label for="from">First day away</label><input id="from" name="from" type="date" required value="${one(form.from)}" /></div>
+        <div><label for="to">Last day away</label><input id="to" name="to" type="date" required value="${one(form.to)}" /></div>
+        <div><label for="children">Children at school</label><select id="children" name="children">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}"${sel(n, children)}>${n}</option>`).join('')}</select></div>
+        <div><label for="parents">Parents</label><select id="parents" name="parents">${[1, 2].map((n) => `<option value="${n}"${sel(n, parents)}>${n}</option>`).join('')}</select></div>
+      </div>
+      <div class="actions"><button type="submit">Check my dates</button><span class="hint">Nothing is stored. The answer is worked out from the council calendar on this site.</span></div>
+    </form>
+    ${finesResultHtml(outcome)}
+    ${finesProse(defs)}
+    <h2>Common questions</h2>
+    <div class="prose">${faq.map((f) => `<p><strong>${esc(f.q)}</strong><br/>${esc(f.a)}</p>`).join('')}</div>
+    <h2>Sources</h2>
+    <p class="src">England: <a href="https://www.gov.uk/school-attendance-absence/legal-action-to-enforce-school-attendance" rel="noopener">GOV.UK, legal action to enforce school attendance</a> · <a href="https://www.gov.uk/government/publications/working-together-to-improve-school-attendance" rel="noopener">DfE, Working together to improve school attendance (statutory guidance, July 2026 edition)</a> · <a href="https://www.legislation.gov.uk/uksi/2024/210/made" rel="noopener">Education (Penalty Notices) (England) (Amendment) Regulations 2024</a> · <a href="https://www.legislation.gov.uk/uksi/2024/208/regulation/11/made" rel="noopener">School Attendance (Pupil Registration) (England) Regulations 2024, reg 11</a> · <a href="https://www.legislation.gov.uk/ukpga/1996/56/section/444" rel="noopener">Education Act 1996, s444</a> · <a href="https://explore-education-statistics.service.gov.uk/find-statistics/parental-responsibility-measures/2024-25" rel="noopener">DfE, Parental responsibility measures 2024/25</a> · <a href="https://epi.org.uk/publications-and-research/the-postcode-lottery-of-absence-fines/" rel="noopener">Education Policy Institute, April 2026</a>. Wales: <a href="https://www.legislation.gov.uk/wsi/2013/1983/made" rel="noopener">Education (Penalty Notices) (Wales) Regulations 2013</a> · <a href="https://www.gov.wales/sites/default/files/publications/2018-03/guidance-on-penalty-notices-for-regular-non-attendance-at-school.pdf" rel="noopener">Welsh Government guidance on penalty notices</a> · <a href="https://www.gov.wales/written-statement-clarification-school-attendance-regulations-wales-relating-holidays-term-time-and" rel="noopener">Welsh Government written statement on term-time holidays</a>. Scotland: <a href="https://www.gov.scot/publications/included-engaged-involved-part-1-improving-attendance-scotlands-schools/" rel="noopener">Included, Engaged and Involved Part 1 (March 2026)</a> · <a href="https://www.legislation.gov.uk/ukpga/1980/44/section/43" rel="noopener">Education (Scotland) Act 1980, s43</a>. Northern Ireland: <a href="https://www.nidirect.gov.uk/articles/school-attendance-and-absence" rel="noopener">nidirect, school attendance and absence</a> · <a href="https://www.education-ni.gov.uk/sites/default/files/2025-12/ATTENDANCE%20MATTERS-CONSULTATION.pdf" rel="noopener">Department of Education NI, Attendance Matters consultation (December 2025)</a>. Council calendars from each authority's published term dates. Always confirm with your school.</p>
+    ${guidesStrip(FINES_SLUG)}
+    ${FOOTER_HTML}
+  </div>
+</body>
+</html>`;
+}
+
+
 // ── Site navigation ─────────────────────────────────────────────────────────
 // One slim bar on every page: All councils · Key dates ▾ · Regions ▾ · About.
 // The dropdowns are native <details> disclosures - no JS, keyboard and mobile
@@ -1299,7 +1622,8 @@ function navBar(active, activeSlug) {
   const cur = (k) => (active === k ? ' aria-current="page"' : '');
   const curLink = (s) => (activeSlug === s ? ' aria-current="page"' : '');
   const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].navLabel)}</a>`).join('')
-    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`;
+    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`
+    + `<a href="/school-term-dates/${FINES_SLUG}"${curLink(FINES_SLUG)}>Term-time fines</a>`;
   const regionLinks = REGION_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(HUB_DEFS[s].name)}</a>`).join('');
   return `
     <nav class="sitenav" aria-label="Term dates sections">
@@ -1549,6 +1873,20 @@ router.get('/bank-holidays', async (req, res, next) => {
   }
 });
 
+router.get(`/${FINES_SLUG}`, async (req, res, next) => {
+  try {
+    const defs = seasonalDefs();
+    const authorities = (await laDb.listAllAuthorities()).filter(isListable)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const form = req.query || {};
+    const outcome = await computeFinesOutcome(form);
+    res.set('Cache-Control', CACHE_HEADER).type('html').send(finesPage({ authorities, defs, form, outcome }));
+  } catch (err) {
+    console.error('[term-dates-ssr] fines page failed:', err.message);
+    next();
+  }
+});
+
 router.get('/data', async (req, res, next) => {
   try {
     let stats = null;
@@ -1612,6 +1950,7 @@ router.get('/sitemap.xml', async (req, res) => {
       ...SEASONAL_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
       ...HUB_SLUGS.map((s) => `${CANONICAL_BASE}/${s}`),
       `${CANONICAL_BASE}/bank-holidays`,
+      `${CANONICAL_BASE}/${FINES_SLUG}`,
       `${CANONICAL_BASE}/about-this-data`,
       `${CANONICAL_BASE}/data`,
       ...authorities.filter(isListable).map((a) => `${CANONICAL_BASE}/${a.slug}`),
@@ -1711,6 +2050,6 @@ router.get('/:slug', async (req, res, next) => {
 
 // Exported for tests only - lets the suite assert regional coverage without
 // duplicating the mapping.
-router.__testables = { HUB_DEFS, REGION_SLUGS, SEASONAL_SLUGS };
+router.__testables = { HUB_DEFS, REGION_SLUGS, SEASONAL_SLUGS, FINES_SLUG };
 
 module.exports = router;
