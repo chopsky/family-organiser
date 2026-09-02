@@ -59,10 +59,15 @@ a:hover { color: #54317E; }
      own row. Tighter padding plus the short label ("Councils") brings the row
      back to one line without shrinking the tap targets below 34px. */
   .sitenav { gap: 2px; }
-  .sitenav > a, .sitenav summary { padding: 0 10px; font-size: 12.5px; }
+  .sitenav > a, .sitenav summary { padding: 0 8px; font-size: 12.5px; }
+  .sitenav summary::after { margin-left: 4px; }
   .lbl-full { display: none; }
   .lbl-short { display: inline; }
   .btn-try { padding: 0 13px; font-size: 13px; }
+}
+/* Five nav items must stay on one line down to 360px-wide phones. */
+@media (max-width: 370px) {
+  .sitenav > a, .sitenav summary { padding: 0 6px; font-size: 12px; }
 }
 
 /* ── Typography ──

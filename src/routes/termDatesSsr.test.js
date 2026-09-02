@@ -530,7 +530,7 @@ describe('site navigation', () => {
   it('council pages carry the nav bar with both dropdowns', async () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
     expect(res.text).toContain('class="sitenav"');
-    expect(res.text).toContain('<summary>Key dates</summary>');
+    expect(res.text).toContain('<summary><span class="lbl-full">Key dates</span><span class="lbl-short">Dates</span></summary>');
     expect(res.text).toContain('<summary>Regions</summary>');
     expect(res.text).toContain('href="/school-term-dates/london"');
   });
@@ -691,7 +691,10 @@ describe('term-time holiday fines page', () => {
     expect(res.text).toContain('<optgroup label="Wales"><option value="cardiff"');
     expect(res.text).not.toContain('nevershire');
     expect(res.text).toContain('action="/school-term-dates/school-fines#result"');
-    expect(res.text).toContain('href="/school-term-dates/school-fines" aria-current="page">School fines</a>');
+    // Top-level nav item (it is a guide, not a key date), with the phone-width short label.
+    expect(res.text).toContain('href="/school-term-dates/school-fines" aria-current="page"><span class="lbl-full">School fines</span><span class="lbl-short">Fines</span></a>');
+    const keyDatesPanel = res.text.match(/<summary>[^]*?Key dates[^]*?<\/summary>\s*<div class="panel">([^]*?)<\/div>/)[1];
+    expect(keyDatesPanel).not.toContain('school-fines');
     expect(res.text).toContain('10 sessions</strong>');
     expect(res.text).toContain('"@type":"FAQPage"');
     // Bare page: no result block, no stray error.
@@ -808,7 +811,7 @@ describe('term-time holiday fines page', () => {
     expect(council.text).toContain('href="/school-term-dates/school-fines?council=aleshire"');
   });
 
-  it('is linked from the sitemap, the Key dates menu and the footer, and the footer lists live regions only', async () => {
+  it('is linked from the sitemap, the top-level nav and the footer, and the footer lists live regions only', async () => {
     const sm = await request(app()).get('/school-term-dates/sitemap.xml');
     expect(sm.text).toContain('<loc>https://housemait.com/school-term-dates/school-fines</loc>');
     const page = await request(app()).get('/school-term-dates/bank-holidays');

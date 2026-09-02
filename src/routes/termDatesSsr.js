@@ -754,7 +754,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>
 
 
@@ -1028,7 +1028,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1065,7 +1065,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1196,7 +1196,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1274,7 +1274,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
@@ -1610,12 +1610,12 @@ function finesPage({ authorities, defs, form, outcome }) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}${FINES_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('dates', FINES_SLUG)}
+  <div class="wrap">${HEADER_HTML}${navBar('fines')}
     <h1>School fines for term-time holidays: how much you'd actually pay</h1>
     <p class="sub">How much is the fine for taking your child out of school? Pick your council and the dates you have in mind. We count the school days the trip really covers, using the council's own ${defs.ayLabel} calendar, then set that against the penalty-notice rules for England and Wales, per parent and per child.</p>
     <h2 class="calc-h">School fine calculator</h2>
@@ -1644,7 +1644,7 @@ function finesPage({ authorities, defs, form, outcome }) {
 
 
 // ── Site navigation ─────────────────────────────────────────────────────────
-// One slim bar on every page: All councils · Key dates ▾ · Regions ▾ · About.
+// One slim bar on every page: All councils · Key dates ▾ · Regions ▾ · School fines · About.
 // The dropdowns are native <details> disclosures - no JS, keyboard and mobile
 // friendly - grouping what used to be a 15-pill blob into its two natural
 // families. Active page gets the plum-light pill (the app's nav convention).
@@ -1654,20 +1654,20 @@ function navBar(active, activeSlug) {
   const cur = (k) => (active === k ? ' aria-current="page"' : '');
   const curLink = (s) => (activeSlug === s ? ' aria-current="page"' : '');
   const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].navLabel)}</a>`).join('')
-    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`
-    + `<a href="/school-term-dates/${FINES_SLUG}"${curLink(FINES_SLUG)}>School fines</a>`;
+    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`;
   const regionLinks = REGION_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(HUB_DEFS[s].name)}</a>`).join('');
   return `
     <nav class="sitenav" aria-label="Term dates sections">
       <a href="/school-term-dates/"${cur('councils')}><span class="lbl-full">All councils</span><span class="lbl-short">Councils</span></a>
       <details class="navdrop"${active === 'dates' ? ' data-active="1"' : ''}>
-        <summary>Key dates</summary>
+        <summary><span class="lbl-full">Key dates</span><span class="lbl-short">Dates</span></summary>
         <div class="panel">${dateLinks}</div>
       </details>
       <details class="navdrop"${active === 'regions' ? ' data-active="1"' : ''}>
         <summary>Regions</summary>
         <div class="panel">${regionLinks}</div>
       </details>
+      <a href="/school-term-dates/${FINES_SLUG}"${cur('fines')}><span class="lbl-full">School fines</span><span class="lbl-short">Fines</span></a>
       <a href="/school-term-dates/about-this-data"${cur('about')}>About</a>
     </nav>`;
 }
@@ -1747,7 +1747,7 @@ function dataPage(stats, rowCount) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=11" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
   <style>${SEASONAL_CSS}
     .dl { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
     .dl a { display: inline-flex; flex-direction: column; gap: 2px; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 14px; padding: 14px 20px; text-decoration: none; min-width: 190px; }
