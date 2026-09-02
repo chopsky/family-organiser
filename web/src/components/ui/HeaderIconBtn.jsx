@@ -1,7 +1,8 @@
 /**
- * HeaderIconBtn - THE page-top icon button (design_handoff_calendar, the
- * newest approved chrome language). A 34px visual circle centred inside a
- * 44px hit target, so every page's header actions read identically:
+ * HeaderIconBtn - THE page-top icon button (design_handoff_calendar's
+ * chrome language; circle bumped 34 → 38px, founder call 2026-09-02). A
+ * 38px visual circle centred inside a 44px hit target, so every page's
+ * header actions read identically:
  *
  *   default  - white circle, 1px hairline ring, soft lift, ink-2 icon
  *   primary  - plum fill, white icon (the "+" button; flat - no glow,
@@ -20,11 +21,11 @@ export default function HeaderIconBtn({ primary, active, badge, className = '', 
   return (
     <button
       type="button"
-      className={`shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent relative cursor-pointer active:scale-[0.97] transition-transform disabled:opacity-50 ${className}`}
+      className={`shrink-0 w-11 h-11 -m-[3px] flex items-center justify-center bg-transparent relative cursor-pointer active:scale-[0.97] transition-transform disabled:opacity-50 ${className}`}
       style={style}
       {...rest}
     >
-      <span className="w-[34px] h-[34px] rounded-full flex items-center justify-center" style={face}>
+      <span className="w-[38px] h-[38px] rounded-full flex items-center justify-center" style={face}>
         {children}
       </span>
       {badge > 0 && (
