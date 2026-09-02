@@ -1119,6 +1119,24 @@ export default function Calendar() {
     return ids;
   }
 
+  // Person-filter fallback for UNASSIGNED events: match member first names
+  // in the title, word-bounded ("Mason Dermatologist" → Mason; "Garden
+  // bin" → nobody). Device-synced feeds carry no assignment (real data:
+  // the founder's week is ~85% such events), so without this the person
+  // filter looked inert - everything stayed via the fail-open rule.
+  // Filter-only: Child Mode's visibility gate keeps using real assignees.
+  function titleMemberIds(title, membersList) {
+    const ids = new Set();
+    if (!title) return ids;
+    for (const m of membersList) {
+      const first = String(m.name || '').trim().split(/\s+/)[0];
+      if (first.length < 3) continue; // "Jo"/initials: too collision-prone
+      const re = new RegExp(`\\b${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (re.test(title)) ids.add(m.id);
+    }
+    return ids;
+  }
+
   function eventsForDate(date) {
     const ds = toDateStr(date);
     const memberIdSet = new Set(members.map((m) => m.id));
@@ -1147,10 +1165,12 @@ export default function Calendar() {
       }
       // Member filter by IDENTITY (member id), and FAIL OPEN: hide only when the
       // item is assigned to current member(s) who are ALL toggled off. An item
-      // resolving to no current member is treated as household-wide and shown -
+      // resolving to no current member falls back to name-in-title matching
+      // (unassigned synced events), and only then counts as household-wide -
       // so a drifted/stale stored name can never silently hide it.
       if (activeMemberFilters) {
-        const ids = assigneeMemberIds(e, nameToId, memberIdSet);
+        let ids = assigneeMemberIds(e, nameToId, memberIdSet);
+        if (ids.size === 0) ids = titleMemberIds(e.title, members);
         if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
       }
       return true;
@@ -2109,7 +2129,8 @@ export default function Calendar() {
       if (cat === 'school' && !activeFilters.has('school')) return false;
       if (mobileKindFilter && eventKind(e) !== mobileKindFilter) return false;
       if (activeMemberFilters) {
-        const ids = assigneeMemberIds(e, nameToId, memberIdSetAll);
+        let ids = assigneeMemberIds(e, nameToId, memberIdSetAll);
+        if (ids.size === 0) ids = titleMemberIds(e.title, members);
         if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
       }
       return true;
