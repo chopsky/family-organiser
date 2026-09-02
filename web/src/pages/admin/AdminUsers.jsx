@@ -16,6 +16,8 @@ const STATUS_OPTIONS = [
   { value: 'disabled', label: 'Disabled' },
   { value: 'platform_admin', label: 'Platform admins' },
   { value: 'unverified', label: 'Unverified email' },
+  { value: 'has_email', label: 'Has email' },
+  { value: 'no_email', label: 'No email (profile only)' },
 ];
 
 export default function AdminUsers() {

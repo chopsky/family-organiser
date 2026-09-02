@@ -5665,6 +5665,10 @@ function applyUserStatusFilter(query, status) {
   if (status === 'active') return query.is('disabled_at', null);
   if (status === 'platform_admin') return query.eq('is_platform_admin', true);
   if (status === 'unverified') return query.eq('email_verified', false);
+  // Account holders vs profile-only members (kids, added family without
+  // their own login). "Has email" is the mailable/contactable set.
+  if (status === 'has_email') return query.not('email', 'is', null);
+  if (status === 'no_email') return query.is('email', null);
   return query;
 }
 
