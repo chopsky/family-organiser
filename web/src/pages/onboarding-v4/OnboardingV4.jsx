@@ -183,6 +183,9 @@ export default function OnboardingV4({ initialPhase }) {
         // never through the welcome screen, which is for new households. Any
         // abandoned draft from an earlier run on this device dies here too.
         onLoggedIn={() => { clearDraft(); navigate('/dashboard'); }}
+        // The existing reset page works inside the app: Turnstile bypasses
+        // native origins, and the reset link opens the web page with a code.
+        onForgot={() => navigate('/forgot-password')}
       />
     );
   }

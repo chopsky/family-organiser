@@ -76,7 +76,7 @@ function AuthStack({ onPick, auth }) {
  * Email + password. v4 already knows their name from step 05, so this asks for
  * the two things it can't infer and nothing more.
  */
-function EmailForm({ mode, busy, error, onSubmit, onBack }) {
+function EmailForm({ mode, busy, error, onSubmit, onBack, onForgot }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const field = {
@@ -113,6 +113,12 @@ function EmailForm({ mode, busy, error, onSubmit, onBack }) {
       <Cta type="submit" disabled={!ready || busy}>
         {busy ? 'One moment…' : mode === 'signup' ? 'Create my account' : 'Log in'}
       </Cta>
+      {/* The legacy login page always had this; the v4 screen shipped without
+          it, so someone who couldn't remember a password had nowhere to go
+          ("it doesn't allow me to reset", real support email 2026-09-02). */}
+      {mode === 'login' && onForgot && (
+        <Ghost onClick={onForgot}>Forgot password?</Ghost>
+      )}
       <Ghost onClick={onBack}>Use something else</Ghost>
     </form>
   );
@@ -303,7 +309,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
 }
 
 /* ── Login (from the splash) ─ no Terms line: they agreed at sign-up. */
-export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn }) {
+export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn, onForgot }) {
   const [face, setFace] = useState('pick');
   return (
     <div
@@ -333,6 +339,7 @@ export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn }) {
               mode="login" busy={v4.busy} error={v4.error}
               onSubmit={async (creds) => { if (await v4.logIn(creds)) onLoggedIn(); }}
               onBack={() => { v4.setError(''); setFace('pick'); }}
+              onForgot={onForgot}
             />
           ) : (
             <AuthStack onPick={() => setFace('email')} auth={auth} />
