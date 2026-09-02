@@ -267,6 +267,63 @@ async function listAllAuthorities({ onlyPending = false, onlyStale = false, slug
   return data || [];
 }
 
+/**
+ * Instrumentation: one row per council-year per import saying whether the
+ * published dates changed (see services/laTermDatesDiff). Fail-open on
+ * purpose - the table may not be migrated in yet, and a missing diff must
+ * never fail an import. Returns the number of rows written.
+ */
+let changesTableMissingWarned = false;
+async function recordTermDateChanges(rows) {
+  if (!rows || !rows.length) return 0;
+  const { error } = await supabase.from('la_term_date_changes').insert(rows.map((r) => ({
+    la_id: r.la_id,
+    run_id: r.run_id || null,
+    academic_year: r.academic_year,
+    kind: r.kind,
+    added_count: r.added.length,
+    removed_count: r.removed.length,
+    unchanged_count: r.unchanged || 0,
+    added: r.added,
+    removed: r.removed,
+  })));
+  if (error) {
+    if (!changesTableMissingWarned) {
+      changesTableMissingWarned = true;
+      console.warn('[la-import] could not record term-date changes (run supabase/migration-la-term-date-changes.sql?):', error.message);
+    }
+    return 0;
+  }
+  return rows.length;
+}
+
+/**
+ * Operator read for the same table: recent diffs newest first, with the
+ * council name, plus a tally by kind over the window. `includeIdentical`
+ * defaults to false so the interesting rows surface first.
+ */
+async function listTermDateChanges({ sinceDays = 120, limit = 200, includeIdentical = false } = {}) {
+  const since = new Date(Date.now() - Math.max(1, sinceDays) * 86400000).toISOString();
+  let q = supabase
+    .from('la_term_date_changes')
+    .select('id, la_id, run_id, academic_year, kind, added_count, removed_count, unchanged_count, added, removed, detected_at, la_directory(name, slug)')
+    .gte('detected_at', since)
+    .order('detected_at', { ascending: false })
+    .limit(Math.min(1000, Math.max(1, limit)));
+  if (!includeIdentical) q = q.neq('kind', 'identical');
+  const { data, error } = await q;
+  if (error) throw error;
+  const { data: all, error: tallyErr } = await supabase
+    .from('la_term_date_changes')
+    .select('kind')
+    .gte('detected_at', since)
+    .range(0, 9999);
+  if (tallyErr) throw tallyErr;
+  const tally = {};
+  for (const r of all || []) tally[r.kind] = (tally[r.kind] || 0) + 1;
+  return { since, tally, rows: (data || []).map((r) => ({ ...r, council: r.la_directory ? r.la_directory.name : null, slug: r.la_directory ? r.la_directory.slug : null, la_directory: undefined })) };
+}
+
 async function createImportRun(trigger = 'manual') {
   const { data, error } = await supabase
     .from('la_import_runs')
@@ -306,6 +363,8 @@ module.exports = {
   getDirectoryTermDatesByName,
   getStats,
   replaceEntriesForLA,
+  recordTermDateChanges,
+  listTermDateChanges,
   updateAuthorityStatus,
   listAllAuthorities,
   createImportRun,

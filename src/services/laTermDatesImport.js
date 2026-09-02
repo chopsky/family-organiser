@@ -19,6 +19,7 @@ const { findOfficialTermDatesUrl, extractTermDatesViaSearch } = require('./ai');
 const { fetchTermDatesPageText, extractTermDatesPreview, academicYearsForCountry } = require('./term-date-extract');
 const { validateTermDates } = require('./termDateValidator');
 const laDb = require('../db/laTermDates');
+const { diffTermDates, describeDiff } = require('./laTermDatesDiff');
 
 // Polite + rate-limit-friendly: a handful of councils in flight at once. Each
 // authority costs a web search + a page fetch + an ~8k-token extraction, so we
@@ -48,7 +49,7 @@ function dedupeDates(dates) {
  * many councils whose pages sit behind a WAF that 403s direct bots but lets
  * search engines through).
  */
-async function importAuthority(la, { currentAY, nextAY } = {}) {
+async function importAuthority(la, { currentAY, nextAY, runId = null } = {}) {
   const ays = currentAY && nextAY ? { currentAY, nextAY } : academicYearsForCountry('GB');
   const attemptedAt = new Date().toISOString();
   const attempts = (la.import_attempts || 0) + 1;
@@ -159,6 +160,18 @@ async function importAuthority(la, { currentAY, nextAY } = {}) {
     });
     const inserted = entries.filter((e) => yearsToReplace.includes(e.academic_year));
     if (yearsToReplace.length) {
+      // Instrumentation first, then the write: what did this import actually
+      // change? One row per replaced year, kind identical/changed/new_year.
+      // Fail-open - a diff problem must never block the import itself.
+      try {
+        const diffs = diffTermDates(yearsToReplace, existingEntries, inserted);
+        for (const d of diffs) {
+          if (d.kind !== 'identical') console.log(`[la-import] diff ${la.name} ${d.academic_year}: ${describeDiff(d)}`);
+        }
+        await laDb.recordTermDateChanges(diffs.map((d) => ({ ...d, la_id: la.id, run_id: runId })));
+      } catch (err) {
+        console.warn(`[la-import] ${la.name}: diff not recorded - ${err.message}`);
+      }
       await laDb.replaceEntriesForLA(la.id, yearsToReplace, inserted);
     }
     // What the row now holds: untouched years we kept + the fresh insert.
@@ -222,7 +235,7 @@ async function importAllAuthorities({
     while (cursor < authorities.length) {
       const idx = cursor++;
       const la = authorities[idx];
-      const res = await importAuthority(la, { currentAY, nextAY });
+      const res = await importAuthority(la, { currentAY, nextAY, runId: run.id });
       if (res.status === 'ok') tally.succeeded += 1;
       else if (res.status === 'partial') tally.partial += 1;
       else tally.failed += 1;

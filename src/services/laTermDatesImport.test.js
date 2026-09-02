@@ -68,6 +68,12 @@ describe('importAuthority', () => {
     // Per-year replacement: only years the fresh import actually found are
     // touched (2026-2027 had no fresh data, so it must not be wiped).
     expect(laDb.replaceEntriesForLA).toHaveBeenCalledWith('la-1', ['2025-2026'], expect.any(Array));
+    // Instrumentation: one diff row per replaced year, written before the replace.
+    expect(laDb.recordTermDateChanges).toHaveBeenCalledTimes(1);
+    const [diffRows] = laDb.recordTermDateChanges.mock.calls[0];
+    expect(diffRows).toHaveLength(1);
+    expect(diffRows[0]).toMatchObject({ la_id: 'la-1', academic_year: '2025-2026', kind: 'new_year' });
+    expect(laDb.recordTermDateChanges.mock.invocationCallOrder[0]).toBeLessThan(laDb.replaceEntriesForLA.mock.invocationCallOrder[0]);
     expect(lastStatus()).toMatchObject({ status: 'ok', import_method: 'direct', date_count: 2 });
     expect(lastStatus().last_imported_at).toBeDefined();
   });

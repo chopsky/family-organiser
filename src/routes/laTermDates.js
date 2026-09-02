@@ -5,6 +5,7 @@
  *   GET  /api/la-term-dates/authorities            paginated, searchable, A→Z
  *   GET  /api/la-term-dates/authorities/:slug      one authority + its dates
  *   GET  /api/la-term-dates/failures               the "needs a remedy" list
+ *   GET  /api/la-term-dates/changes                per-council import diffs (key-gated)
  *   POST /api/la-term-dates/import                  trigger an import (key-gated)
  *
  * The GETs are public (no PII - just published council dates) and are mounted
@@ -115,6 +116,22 @@ function requireImportKey(req, res, next) {
   }
   next();
 }
+
+// Operator read of the import-diff instrumentation (services/laTermDatesDiff):
+// ?sinceDays=120&limit=200&includeIdentical=1. Answers "how often do councils
+// actually change published dates?" before anyone builds alerts on it.
+router.get('/changes', requireImportKey, async (req, res) => {
+  try {
+    const sinceDays = parseInt(req.query.sinceDays, 10) || 120;
+    const limit = parseInt(req.query.limit, 10) || 200;
+    const includeIdentical = ['1', 'true'].includes(String(req.query.includeIdentical || ''));
+    res.set('X-Robots-Tag', 'noindex');
+    res.json(await laDb.listTermDateChanges({ sinceDays, limit, includeIdentical }));
+  } catch (err) {
+    console.error('[la-term-dates] changes failed:', err.message);
+    res.status(500).json({ error: 'Could not load term-date changes (has migration-la-term-date-changes.sql been run?).' });
+  }
+});
 
 router.post('/import', requireImportKey, async (req, res) => {
   const { slug, onlyPending, onlyStale } = req.body || {};
