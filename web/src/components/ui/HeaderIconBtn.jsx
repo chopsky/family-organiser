@@ -4,7 +4,8 @@
  * 44px hit target, so every page's header actions read identically:
  *
  *   default  - white circle, 1px hairline ring, soft lift, ink-2 icon
- *   primary  - plum fill, white icon, the purple glow (the "+" button)
+ *   primary  - plum fill, white icon (the "+" button; flat - no glow,
+ *              founder call 2026-09-02)
  *   active   - ink fill, white icon (a toggled state, e.g. filters open)
  *
  * `badge` renders a small plum count bubble top-right (active filters).
@@ -12,7 +13,7 @@
  */
 export default function HeaderIconBtn({ primary, active, badge, className = '', style, children, ...rest }) {
   const face = primary
-    ? { background: 'var(--color-plum)', color: '#fff', boxShadow: '0 4px 12px rgba(108,61,217,0.35)' }
+    ? { background: 'var(--color-plum)', color: '#fff' }
     : active
       ? { background: '#1A1620', color: '#fff' }
       : { background: '#fff', border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: 'var(--ink-2)' };

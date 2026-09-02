@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import api from '../lib/api';
 import Spinner from '../components/Spinner';
 import ErrorBanner from '../components/ErrorBanner';
@@ -841,6 +841,30 @@ export default function Calendar() {
     }
   }, [showForm]);
 
+  // Real layout containment for the week/day grid cards: scroll the page
+  // to the top, measure where the card actually starts, and cap it to the
+  // space remaining above the floating nav - instead of guessing chrome
+  // heights (the guessed --grid-cap constants broke the moment a variable-
+  // height all-day strip appeared above the card; live report 2026-09-02).
+  // env() stays inside the calc so the safe-area works without JS needing
+  // to read it. Re-measures on anything that can move the card's top.
+  useLayoutEffect(() => {
+    if (viewMode !== 'week' && viewMode !== 'day') return undefined;
+    const apply = () => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+      const top = Math.round(el.getBoundingClientRect().top + window.scrollY);
+      const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+      el.style.maxHeight = isDesktop
+        ? `calc(100dvh - ${top}px - 24px)`
+        : `calc(100dvh - ${top}px - max(22px, env(safe-area-inset-bottom, 0px) + 8px) - 88px)`;
+    };
+    window.scrollTo(0, 0);
+    const raf = requestAnimationFrame(apply);
+    window.addEventListener('resize', apply);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', apply); };
+  }, [viewMode, showMobileFilters, mobileFilterCount, mobileSearchActive, events, members, currentMonth, selectedDate]);
+
   // Scroll to current time in day/week view. The grids start at 07:00
   // (design_handoff_calendar) with 60px/50px hours - land the now-line a
   // little below the card's top edge.
@@ -1060,9 +1084,6 @@ export default function Calendar() {
     setMobileFilterWho(null);
     setMobileKindFilter(null);
   };
-  // Vertical space the filter chrome occupies - keeps the week/day grid
-  // caps honest instead of the prototype's magic constants.
-  const mobileFilterChromePx = showMobileFilters ? 96 : (mobileFilterCount > 0 ? 40 : 0);
   const mobileSearchActive = mobileSearching && searchQuery.trim().length > 0;
 
   // ── Items for a given date ─────────────────────────────
@@ -2931,8 +2952,8 @@ export default function Calendar() {
             return (
               <div
                 ref={scrollContainerRef}
-                className="overflow-y-auto bg-white max-h-[calc(100dvh_-_var(--grid-cap)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_240px)]"
-                style={{ '--grid-cap': `${318 + mobileFilterChromePx}px`, borderRadius: 18, padding: '10px 10px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+                className="overflow-y-auto bg-white"
+                style={{ borderRadius: 18, padding: '10px 10px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
               >
                 <div className="relative" style={{ height: totalH, marginBottom: 20 }}>
                   {Array.from({ length: hourCount + 1 }, (_, i) => start / 60 + i).map((h, i) => (
@@ -3039,8 +3060,8 @@ export default function Calendar() {
             return (
               <div
                 ref={scrollContainerRef}
-                className="overflow-y-auto bg-white max-h-[calc(100dvh_-_var(--grid-cap)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_220px)]"
-                style={{ '--grid-cap': `${262 + mobileFilterChromePx}px`, borderRadius: 18, padding: '12px 14px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+                className="overflow-y-auto bg-white"
+                style={{ borderRadius: 18, padding: '12px 14px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
               >
                 {dayEvents.length === 0 && allDayEventsForDate(selectedDate).length === 0 ? (
                   <div className="text-center" style={{ padding: '48px 0 68px', color: M_INK3, fontFamily: M_SERIF, fontSize: 20 }}>
