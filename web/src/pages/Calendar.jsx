@@ -888,25 +888,6 @@ export default function Calendar() {
     }
   }, [members]);
 
-  // ── Avatar filter row taps ──
-  // Different semantics from the filter sheet's chips, on the SAME state:
-  // the sheet's chips toggle one member in/out of the all-on set; tapping
-  // an avatar while everyone is shown means "show me just them" (the
-  // Cozi-style read), further taps add/remove, and emptying the set snaps
-  // back to everyone. The sheet's isOn maths reads either shape fine.
-  const allMembersOn = !activeMemberFilters || activeMemberFilters.size === members.length;
-  function tapMemberFilter(id) {
-    setActiveMemberFilters(prev => {
-      const allIds = members.map(x => x.id);
-      const cur = prev || new Set(allIds);
-      if (cur.size === allIds.length) return new Set([id]);
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      if (next.size === 0) return new Set(allIds);
-      return next;
-    });
-  }
-
   // ── Navigation ────────────────────────────────────────────
 
   function navigatePrev() {
@@ -2333,57 +2314,6 @@ export default function Calendar() {
           </button>
         </div>
       </div>
-
-      {/* ── Member filter row ────────────────────────────────
-          Tappable avatars: tap a person to see just their calendar, tap
-          again (or All) to go back to everyone. This is ALSO the mobile
-          app's only reachable member filter - the filter sheet lost its
-          opener in the header redesign (mobileFiltersOpen had no trigger;
-          real report 2026-09-02), so the sliders button at the end
-          restores access to the full sheet on phones. */}
-      {!childMode && members.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          <button
-            type="button"
-            onClick={() => setActiveMemberFilters(new Set(members.map(m => m.id)))}
-            className={`shrink-0 h-8 px-3 rounded-full text-xs font-semibold border-[1.5px] transition-colors ${
-              allMembersOn ? 'bg-plum text-white border-plum' : 'bg-white text-charcoal border-light-grey'
-            }`}
-          >
-            All
-          </button>
-          {members.map((m) => {
-            const isOn = allMembersOn || activeMemberFilters?.has(m.id);
-            const hex = COLOR_HEX[m.color_theme] || COLOR_HEX.sage;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                title={m.name}
-                aria-label={`Show ${m.name}'s calendar`}
-                aria-pressed={!allMembersOn && isOn}
-                onClick={() => tapMemberFilter(m.id)}
-                className="shrink-0 rounded-full transition-opacity"
-                style={{
-                  opacity: isOn ? 1 : 0.35,
-                  boxShadow: !allMembersOn && isOn ? `0 0 0 2px #fff, 0 0 0 4px ${hex}` : 'none',
-                  borderRadius: '50%',
-                }}
-              >
-                <Avatar member={m} size={30} />
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            aria-label="Calendar filters"
-            onClick={() => setMobileFiltersOpen(true)}
-            className="md:hidden shrink-0 w-8 h-8 ml-1 rounded-full border-[1.5px] border-light-grey bg-white flex items-center justify-center text-warm-grey active:bg-plum-light"
-          >
-            <SettingsIcon />
-          </button>
-        </div>
-      )}
 
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && (
