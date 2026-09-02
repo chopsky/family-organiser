@@ -49,6 +49,28 @@
         "tmp/view-app.js"
       ],
       "port": 4600
+    },
+    {
+      "name": "maple-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5177"
+      ],
+      "port": 5177,
+      "cwd": "tmp/maple-site"
+    },
+    {
+      "name": "design-termdates",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5178"
+      ],
+      "port": 5178,
+      "cwd": "design_handoff_term_dates_redesign"
     }
   ]
 }

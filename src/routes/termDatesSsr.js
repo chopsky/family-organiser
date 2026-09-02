@@ -133,14 +133,14 @@ function kindOf(e) {
 // coral holiday pair - the prototype has no INSET example, but INSET means
 // school closed to pupils, which is the coral family).
 const TAG = {
-  start: ['Term starts', '#F3EDFC', '#6B3FA0'],
-  end: ['Term ends', '#F3EDFC', '#6B3FA0'],
+  start: ['Term starts', '#F3EEFB', '#6C3DD9'],
+  end: ['Term ends', '#F3EEFB', '#6C3DD9'],
   half: ['Half term', '#FBF1DE', '#936314'],
   break: ['Holiday', '#FDF0EB', '#B8431F'],
   bank: ['Bank holiday', '#FDF0EB', '#B8431F'],
   inset: ['INSET day', '#FDF0EB', '#B8431F'],
 };
-const STRIP_COL = { term: '#E7DDF3', half: '#E0A458', break: '#E8724A', bank: '#E8724A', inset: '#E8724A' };
+const STRIP_COL = { term: '#E9E1FA', half: '#E0A458', break: '#E8724A', bank: '#E8724A', inset: '#E8724A' };
 
 /**
  * Barking & Dagenham (uniquely, so far) publishes a PER-SCHOOL INSET table on
@@ -210,7 +210,7 @@ function buildYearCard({ year, dates: allDates }) {
       <div class="yearhead">
         <h2>${esc(year)}</h2>
         <div class="legend">
-          <span><span class="sq" style="background:#E7DDF3"></span>Term time</span>
+          <span><span class="sq" style="background:#E9E1FA"></span>Term time</span>
           <span><span class="sq" style="background:#E0A458"></span>Half term</span>
           <span><span class="sq" style="background:#E8724A"></span>Holiday</span>
         </div>
@@ -593,6 +593,13 @@ const NAV_JS = `
         d.addEventListener('mouseleave', function () { d.open = false; });
       });
     });
+    // The mobile menu (details.mob) is deliberately not hover-opened; close it
+    // when the tap lands anywhere else.
+    document.addEventListener('click', function (e) {
+      document.querySelectorAll('details.mob[open]').forEach(function (d) {
+        if (!d.contains(e.target)) d.open = false;
+      });
+    });
     // Outbound CTA clicks. GA runs cookieless here (consent denied, no
     // banner), so these arrive as aggregate event counts rather than user
     // journeys - enough to compare pages and give signup_source a
@@ -638,49 +645,44 @@ const CSP_HEADER = [
   'upgrade-insecure-requests',
 ].join(';');
 
-/** Shared header row + footer used by index (static) and council pages. */
-const HEADER_HTML = `
-    <div class="topbar">
-      <a class="brand" href="/school-term-dates/" aria-label="School term dates home"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
-      <a class="btn-try" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
-    </div>`;
+/**
+ * Site chrome shared by every server-rendered page. The header (sticky, with
+ * the Key dates / Regions dropdowns and the mobile menu) is built by navBar()
+ * below; the footer is static apart from the year. Both mirror index.html,
+ * which is the design's home - keep the three in step.
+ */
+const HEADER_HTML = '';
 
 const FOOTER_HTML = `
-    <footer class="site-footer">
-      <a href="https://housemait.com" aria-label="Housemait — family organiser app" style="display:inline-flex"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
-      <p class="tag">Housemait is the family organiser app for busy households — a shared family calendar with school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
-      <nav class="guides">
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <div class="foot-brand">
+        <a href="https://housemait.com" aria-label="Housemait — family organiser app"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
+        <p>Housemait is the family organiser app for busy households — a shared family calendar with school term dates built in, plus meal plans, shopping lists, tasks and a WhatsApp assistant.</p>
+      </div>
+      <div class="foot-col">
+        <span class="eyebrow-sm">Key dates</span>
         <a href="/school-term-dates/when-do-schools-go-back">When do schools go back?</a>
         <a href="/school-term-dates/october-half-term">October half term</a>
         <a href="/school-term-dates/february-half-term">February half term</a>
         <a href="/school-term-dates/easter-holidays">Easter holidays</a>
         <a href="/school-term-dates/summer-holidays">Summer holidays</a>
         <a href="/school-term-dates/bank-holidays">Bank holidays</a>
+      </div>
+      <div class="foot-col">
+        <span class="eyebrow-sm">Housemait</span>
+        <a href="https://housemait.com">Family organiser app</a>
+        <a href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
         <a href="/school-term-dates/school-fines">School fines</a>
         <a href="/school-term-dates/about-this-data">About this data</a>
         <a href="/school-term-dates/data">Download the data</a>
-      </nav>
-      <nav class="guides" aria-label="Compare term dates by region">
-        <a href="/school-term-dates/north-east">North East</a>
-        <a href="/school-term-dates/north-west">North West</a>
-        <a href="/school-term-dates/yorkshire-and-the-humber">Yorkshire and the Humber</a>
-        <a href="/school-term-dates/east-midlands">East Midlands</a>
-        <a href="/school-term-dates/west-midlands">West Midlands</a>
-        <a href="/school-term-dates/east-of-england">East of England</a>
-        <a href="/school-term-dates/london">London</a>
-        <a href="/school-term-dates/south-east">South East</a>
-        <a href="/school-term-dates/south-west">South West</a>
-        <a href="/school-term-dates/wales">Wales</a>
-      </nav>
-      <nav>
-        <a href="https://housemait.com">Family organiser app</a>
-        <a href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
         <a href="https://housemait.com/support">Support</a>
         <a href="https://housemait.com/privacy">Privacy</a>
         <a href="https://housemait.com/terms">Terms</a>
-      </nav>
-      <p class="copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</p>
-    </footer>`;
+      </div>
+    </div>
+    <div class="wrap foot-copy">© ${new Date().getFullYear()} Housemait. Term dates are sourced from official council calendars — always confirm with your school.</div>
+  </footer>`;
 
 
 /**
@@ -754,74 +756,57 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>
 
 
     .crumb { font-size: 13.5px; font-weight: 600; text-decoration: none; }
 
-    .nextcard { display: flex; align-items: center; gap: 22px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 18px; padding: 20px 24px; box-shadow: 0 4px 16px rgba(107,63,160,0.08); margin: 24px 0 4px; flex-wrap: wrap; }
+    .nextcard { display: flex; align-items: center; gap: 22px; background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); border-radius: 18px; padding: 20px 24px; box-shadow: 0 4px 16px rgba(30,26,46,.08); margin: 24px 0 4px; flex-wrap: wrap; }
     .nc-left { flex: 1; min-width: 230px; }
     .nc-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #E8724A; }
-    .nc-title { font-family: 'Recoleta', Georgia, serif; font-size: 29px; color: #2D2A33; line-height: 1.15; margin-top: 4px; }
-    .nc-sub { font-size: 14px; color: #6B6774; margin-top: 4px; }
-    .nc-then { font-size: 13px; color: #6B6774; margin-top: 10px; }
-    .nc-stat { text-align: center; background: #F3EDFC; border-radius: 14px; padding: 14px 22px; min-width: 92px; }
-    .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6B3FA0; }
-    .nc-unit { font-size: 12px; font-weight: 600; color: #6B3FA0; margin-top: 5px; }
+    .nc-title { font-family: 'Recoleta', Georgia, serif; font-size: 29px; color: #1E1A2E; line-height: 1.15; margin-top: 4px; }
+    .nc-sub { font-size: 14px; color: #7A7390; margin-top: 4px; }
+    .nc-then { font-size: 13px; color: #7A7390; margin-top: 10px; }
+    .nc-stat { text-align: center; background: #F3EEFB; border-radius: 14px; padding: 14px 22px; min-width: 92px; }
+    .nc-big { font-family: 'Recoleta', Georgia, serif; font-size: 42px; line-height: 1; color: #6C3DD9; }
+    .nc-unit { font-size: 12px; font-weight: 600; color: #6C3DD9; margin-top: 5px; }
 
     .nearby { margin-top: 34px; }
-    .nearby h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 24px; color: #2D2A33; margin: 0 0 12px; }
+    .nearby h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 24px; color: #1E1A2E; margin: 0 0 12px; }
     .nearby-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-    .nearby-grid a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid #E8E5EC; font-size: 13.5px; font-weight: 600; color: #6B3FA0; text-decoration: none; }
-    .nearby-grid a:hover { border-color: #6B3FA0; }
+    .nearby-grid a { display: inline-flex; padding: 9px 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); font-size: 13.5px; font-weight: 600; color: #6C3DD9; text-decoration: none; }
+    .nearby-grid a:hover { border-color: #6C3DD9; }
     .nearby-all { margin: 12px 0 0; font-size: 13.5px; }
-    .nearby-all a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 8px; }
-    .btn-ics { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; background: #6B3FA0; color: #FFFFFF; font-weight: 600; font-size: 14px; text-decoration: none; }
-    .btn-ics:hover { background: #5A3488; color: #FFFFFF; }
-    .btn-wa { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; border: 1.5px solid #6B3FA0; background: #FFFFFF; color: #6B3FA0; font-weight: 600; font-size: 14px; text-decoration: none; }
-    .btn-wa:hover { background: #F3EDFC; color: #6B3FA0; }
-    .ics-note { font-size: 12.5px; color: #6B6774; max-width: 64ch; margin: 0 0 6px; }
+    .nearby-all a { color: #6C3DD9; font-weight: 600; text-decoration: none; }
+    .ics-note { font-size: 12.5px; color: #7A7390; max-width: 64ch; margin: 0 0 6px; }
 
-    .yearcard { background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 18px; padding: 22px 24px 14px; margin-top: 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
+    .yearcard { background: #FFFFFF; border: 1px solid rgba(30,26,46,.1); border-radius: 18px; padding: 22px 24px 14px; margin-top: 18px; box-shadow: 0 2px 8px rgba(30,26,46,.06); }
     .yearhead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 18px; }
-    .yearhead h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 0; letter-spacing: -0.01em; }
-    .legend { display: flex; gap: 14px; font-size: 11.5px; color: #6B6774; align-items: center; flex-wrap: wrap; }
+    .yearhead h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6C3DD9; margin: 0; letter-spacing: -0.01em; }
+    .legend { display: flex; gap: 14px; font-size: 11.5px; color: #7A7390; align-items: center; flex-wrap: wrap; }
     .legend > span { display: inline-flex; align-items: center; gap: 5px; }
     .legend .sq { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-    .strip { display: flex; height: 30px; border-radius: 9px; overflow: hidden; margin: 14px 0 5px; border: 1px solid #E8E5EC; }
-    .months { display: flex; justify-content: space-between; font-size: 11px; color: #9B96A4; margin-bottom: 4px; }
+    .strip { display: flex; height: 30px; border-radius: 9px; overflow: hidden; margin: 14px 0 5px; border: 1px solid rgba(30,26,46,.1); }
+    .months { display: flex; justify-content: space-between; font-size: 11px; color: #9A93AB; margin-bottom: 4px; }
     .rows { margin-top: 10px; }
-    .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 9px 0; border-bottom: 1px solid #F0EDF3; }
+    .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; padding: 9px 0; border-bottom: 1px solid rgba(30,26,46,.07); }
     .row:last-child { border-bottom: none; }
     .row .when { width: 205px; flex-shrink: 0; font-weight: 600; font-size: 14px; }
     .row .lbl { flex: 1; min-width: 200px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .row .pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
-    .row .wdays { font-size: 12.5px; color: #6B6774; }
+    .row .wdays { font-size: 12.5px; color: #7A7390; }
 
-    .perschool { margin-top: 14px; border-top: 1px dashed #E8E5EC; padding-top: 12px; }
-    .perschool summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: #6B6774; }
-    .perschool summary:hover { color: #6B3FA0; }
-    .perschool .ps-note { font-size: 12.5px; color: #6B6774; margin: 10px 0 4px; }
-    .srcline { font-size: 12.5px; color: #6B6774; margin: 14px 0 0; }
+    .perschool { margin-top: 14px; border-top: 1px dashed rgba(30,26,46,.1); padding-top: 12px; }
+    .perschool summary { cursor: pointer; font-size: 13.5px; font-weight: 600; color: #7A7390; }
+    .perschool summary:hover { color: #6C3DD9; }
+    .perschool .ps-note { font-size: 12.5px; color: #7A7390; margin: 10px 0 4px; }
+    .srcline { font-size: 12.5px; color: #7A7390; margin: 14px 0 0; }
 
-    .ctaband { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; background: #6B3FA0; border-radius: 20px; padding: 28px 30px; margin-top: 36px; }
-    .ctaband > div { flex: 1; min-width: 260px; }
-    .ctaband h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #FFFFFF; margin: 0 0 6px; letter-spacing: -0.01em; }
-    .ctaband p { font-size: 14.5px; color: rgba(255,255,255,0.85); margin: 0; max-width: 56ch; }
-    .ctaband p.trial { font-weight: 600; color: #FFFFFF; margin-top: 8px; font-size: 13.5px; }
-    .ctaband .btn-white { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 12px; background: #FFFFFF; color: #6B3FA0; font-weight: 600; font-size: 14.5px; text-decoration: none; white-space: nowrap; }
-    .ctaband .btn-white:hover { background: #F3EDFC; color: #6B3FA0; }
-
-    .prose { margin-top: 40px; max-width: 68ch; }
-    .prose h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 0 0 10px; letter-spacing: -0.01em; }
-    .prose h2:not(:first-child) { margin-top: 30px; }
-    .prose h3 { font-size: 16px; font-weight: 600; color: #2D2A33; margin: 20px 0 4px; }
-    .prose p { font-size: 14.5px; color: #4A4552; margin: 0 0 10px; }
+    .prose { margin-top: 40px; }
 
     @media print {
-      .topbar .btn-try, .crumb, .actions, .ctaband, .nearby, .prose, .site-footer { display: none !important; }
+      .hdr, .crumb, .actions, .ctaband, .nearby, .prose, .foot { display: none !important; }
       .yearcard { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
       .srcline { margin-top: 16px; }
     }
@@ -829,7 +814,8 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('councils')}
+  ${navBar('councils')}
+  <main class="wrap page-main">
     <h1>${esc(h1)}</h1>
     <p class="sub">${esc(sub)}</p>
     ${countdownHtml}
@@ -852,8 +838,9 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
       </div>
       <a class="btn-white" href="https://housemait.com/gb?src=termdates${slugForCta ? `&amp;la=${esc(slugForCta)}` : ''}">Try Housemait free</a>
     </div>
-    ${contentHtml}${schoolsHtml}${nearbyHtml}${FOOTER_HTML}
-  </div>
+    ${contentHtml}${schoolsHtml}${nearbyHtml}
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1028,12 +1015,13 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('dates', slug)}
+  ${navBar('dates', slug)}
+  <main class="wrap page-main">
     <h1>${esc(def.h1)}</h1>
     <p class="sub">${esc(def.sub)}</p>
     <div class="prose">${intro}</div>
@@ -1047,8 +1035,8 @@ ${tableRows}
     <h2>Common questions</h2>
     <div class="prose">${faq.map((f) => `<p><strong>${esc(f.q)}</strong><br/>${esc(f.a)}</p>`).join('')}</div>
     ${guidesStrip(slug)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1065,12 +1053,13 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('about')}
+  ${navBar('about')}
+  <main class="wrap page-main">
     <h1>About this data</h1>
     <p class="sub">What this directory is, where every date comes from, and what you should still double-check.</p>
     <div class="prose">
@@ -1088,8 +1077,8 @@ function aboutPage(stats) {
       <p>This directory is built and maintained by <a href="https://housemait.com">Housemait</a>, a family organiser app for UK households. It is free to use, free to link to, and has no signup wall - the same data powers the term-dates features inside the app.</p>
     </div>
     ${guidesStrip(null)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1196,12 +1185,13 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('regions', hubSlug)}
+  ${navBar('regions', hubSlug)}
+  <main class="wrap page-main">
     <h1>${esc(def.name)} school term dates</h1>
     <p class="sub">The ${esc(defs.ayLabel)} school year for ${esc(def.label)}, compared in one table - from each council's own published calendar.</p>
     <div class="prose"><p>${aligned}${def.note ? ` ${esc(def.note)}` : ''} Council dates formally apply to community and voluntary-controlled schools - academies and free schools set their own, usually close by. Click any council for its full calendar, source link and free add-to-phone download.</p></div>
@@ -1210,8 +1200,8 @@ ${rows}
     </tbody></table></div>
     <p class="note">A dash means that answer could not be derived from the council's published structure - check the council's own page via its link.</p>
     ${guidesStrip(null)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1229,7 +1219,7 @@ function bankHolidayPage(annotated, defs) {
 
   const badge = {
     'extra-day': ['Extra day off school', '#EDF5EE', '#3E7444'],
-    'already-off': ['Schools already closed', '#F3EDFC', '#6B3FA0'],
+    'already-off': ['Schools already closed', '#F3EEFB', '#6C3DD9'],
     mixed: ['Depends on your council', '#FBF1DE', '#936314'],
   };
   const rows = annotated.map((h) => {
@@ -1274,24 +1264,25 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
-    .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
+    .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6C3DD9; margin-top: 2px; }
     .gcards.one-col { grid-template-columns: 1fr; }
   </style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('dates', 'bank-holidays')}
+  ${navBar('dates', 'bank-holidays')}
+  <main class="wrap page-main">
     <h1>Bank holidays and the school year</h1>
     <p class="sub">Every England &amp; Wales bank holiday to summer ${defs.y2} - and whether it's a genuine extra day off school, or falls when children are on holiday anyway. Dates from GOV.UK; school calendars from each council's own published dates.</p>
     <div class="gcards one-col">${rows}</div>
     <h2>Common questions</h2>
     <div class="prose">${faq.map((f) => `<p><strong>${esc(f.q)}</strong><br/>${esc(f.a)}</p>`).join('')}</div>
     ${guidesStrip(null)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1315,43 +1306,43 @@ const plural = (n, one, many) => (n === 1 ? one : (many || `${one}s`));
 
 const FINES_CSS = `
     .calc-h { margin: 22px 0 0; font-size: 22px; }
-    .calc, .result { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); padding: 20px; margin: 18px 0 8px; }
+    .calc, .result { background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(30,26,46,.06); padding: 20px; margin: 18px 0 8px; }
     .calc .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
     .calc .f-council { grid-column: 1 / -1; }
-    .calc label { display: block; font-size: 13px; font-weight: 500; color: #2D2A33; margin-bottom: 6px; }
-    .calc select, .calc input { width: 100%; height: 48px; border: 1.5px solid #E8E5EC; border-radius: 10px; background: #FBF8F3; padding: 0 14px; font-size: 15px; font-family: inherit; color: #2D2A33; }
-    .calc select:focus, .calc input:focus { outline: none; border-color: #6B3FA0; box-shadow: 0 0 0 3px #F3EDFC; }
+    .calc label { display: block; font-size: 13px; font-weight: 500; color: #1E1A2E; margin-bottom: 6px; }
+    .calc select, .calc input { width: 100%; height: 48px; border: 1.5px solid rgba(30,26,46,.1); border-radius: 10px; background: #FAF8F4; padding: 0 14px; font-size: 15px; font-family: inherit; color: #1E1A2E; }
+    .calc select:focus, .calc input:focus { outline: none; border-color: #6C3DD9; box-shadow: 0 0 0 3px #F3EEFB; }
     .calc .actions { margin-top: 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-    .calc button { height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #6B3FA0; color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .calc button:hover { background: #5A3488; }
-    .calc button:focus-visible { outline: 3px solid #F3EDFC; outline-offset: 1px; }
-    .calc .hint { font-size: 12.5px; color: #6B6774; }
-    .result { border-left: 4px solid #6B3FA0; margin-top: 14px; }
+    .calc button { height: 48px; padding: 0 22px; border: 0; border-radius: 12px; background: #6C3DD9; color: #fff; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .calc button:hover { background: #5A2FC4; }
+    .calc button:focus-visible { outline: 3px solid #F3EEFB; outline-offset: 1px; }
+    .calc .hint { font-size: 12.5px; color: #7A7390; }
+    .result { border-left: 4px solid #6C3DD9; margin-top: 14px; }
     .result.fine { border-left-color: #E8724A; }
     .result.clear { border-left-color: #7DAE82; }
     .result.err { border-left-color: #E0A458; }
     .result h2 { margin: 0 0 6px; font-size: 24px; }
-    .result .headline { font-size: 17px; font-weight: 600; color: #2D2A33; margin: 0 0 10px; }
-    .result p { font-size: 15px; color: #4A4552; margin: 0 0 10px; max-width: 78ch; }
-    .result p.small { font-size: 13px; color: #6B6774; }
+    .result .headline { font-size: 17px; font-weight: 600; color: #1E1A2E; margin: 0 0 10px; }
+    .result p { font-size: 15px; color: #5B5470; margin: 0 0 10px; max-width: 78ch; }
+    .result p.small { font-size: 13px; color: #7A7390; }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
-    .chips span { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; background: #F3EDFC; color: #6B3FA0; }
+    .chips span { font-size: 12px; font-weight: 600; border-radius: 8px; padding: 3px 9px; background: #F3EEFB; color: #6C3DD9; }
     .chips span.warm { background: #FDF0EB; color: #B5502D; }
     .chips span.soft { background: #EDF5EE; color: #3E7444; }
-    .chips span.grey { background: #F1EFF4; color: #6B6774; }
+    .chips span.grey { background: #F3F1EE; color: #7A7390; }
     .money { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 14px; }
-    .money div { background: #FBF8F3; border-radius: 12px; padding: 12px 14px; }
-    .money .amt { font-family: 'Recoleta', Georgia, serif; font-size: 26px; color: #6B3FA0; line-height: 1.1; }
-    .money .lab { font-size: 12px; color: #6B6774; margin-top: 4px; }
+    .money div { background: #FAF8F4; border-radius: 12px; padding: 12px 14px; }
+    .money .amt { font-family: 'Recoleta', Georgia, serif; font-size: 26px; color: #6C3DD9; line-height: 1.1; }
+    .money .lab { font-size: 12px; color: #7A7390; margin-top: 4px; }
     .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
-    .rules .gcard h3 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 21px; color: #6B3FA0; margin: 0 0 8px; }
-    .rules .gcard p { font-size: 14px; color: #4A4552; margin: 0 0 8px; }
+    .rules .gcard h3 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 21px; color: #6C3DD9; margin: 0 0 8px; }
+    .rules .gcard p { font-size: 14px; color: #5B5470; margin: 0 0 8px; }
     .rules .gcard p:last-child { margin-bottom: 0; }
     .gcards.stats { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-    .gcard.stat .amt { font-family: 'Recoleta', Georgia, serif; font-size: 30px; color: #6B3FA0; line-height: 1.1; }
-    .gcard.stat .lab { font-size: 13px; color: #4A4552; margin-top: 6px; }
-    .src { font-size: 12.5px; color: #6B6774; line-height: 1.7; }
-    .src a { color: #6B3FA0; }
+    .gcard.stat .amt { font-family: 'Recoleta', Georgia, serif; font-size: 30px; color: #6C3DD9; line-height: 1.1; }
+    .gcard.stat .lab { font-size: 13px; color: #5B5470; margin-top: 6px; }
+    .src { font-size: 12.5px; color: #7A7390; line-height: 1.7; }
+    .src a { color: #6C3DD9; }
     @media print { .calc { display: none; } }`;
 
 const FINES_ERRORS = {
@@ -1610,12 +1601,13 @@ function finesPage({ authorities, defs, form, outcome }) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}${FINES_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('fines')}
+  ${navBar('fines')}
+  <main class="wrap page-main">
     <h1>School fines for term-time holidays: how much you'd actually pay</h1>
     <p class="sub">How much is the fine for taking your child out of school? Pick your council and the dates you have in mind. We count the school days the trip really covers, using the council's own ${defs.ayLabel} calendar, then set that against the penalty-notice rules for England and Wales, per parent and per child.</p>
     <h2 class="calc-h">School fine calculator</h2>
@@ -1636,41 +1628,73 @@ function finesPage({ authorities, defs, form, outcome }) {
     <h2>Sources</h2>
     <p class="src">England: <a href="https://www.gov.uk/school-attendance-absence/legal-action-to-enforce-school-attendance" rel="noopener">GOV.UK, legal action to enforce school attendance</a> · <a href="https://www.gov.uk/government/publications/working-together-to-improve-school-attendance" rel="noopener">DfE, Working together to improve school attendance (statutory guidance, July 2026 edition)</a> · <a href="https://www.legislation.gov.uk/uksi/2024/210/made" rel="noopener">Education (Penalty Notices) (England) (Amendment) Regulations 2024</a> · <a href="https://www.legislation.gov.uk/uksi/2024/208/regulation/11/made" rel="noopener">School Attendance (Pupil Registration) (England) Regulations 2024, reg 11</a> · <a href="https://www.legislation.gov.uk/ukpga/1996/56/section/444" rel="noopener">Education Act 1996, ss444 to 444B</a> · <a href="https://explore-education-statistics.service.gov.uk/find-statistics/parental-responsibility-measures/2024-25" rel="noopener">DfE, Parental responsibility measures 2024/25</a> · <a href="https://epi.org.uk/publications-and-research/the-postcode-lottery-of-absence-fines/" rel="noopener">Education Policy Institute, April 2026</a>. Wales: <a href="https://www.legislation.gov.uk/wsi/2013/1983/made" rel="noopener">Education (Penalty Notices) (Wales) Regulations 2013</a> · <a href="https://www.gov.wales/sites/default/files/publications/2018-03/guidance-on-penalty-notices-for-regular-non-attendance-at-school.pdf" rel="noopener">Welsh Government guidance on penalty notices</a> · <a href="https://www.gov.wales/written-statement-clarification-school-attendance-regulations-wales-relating-holidays-term-time-and" rel="noopener">Welsh Government written statement on term-time holidays (2014)</a> · <a href="https://research.senedd.wales/research-articles/pupil-absence-for-holidays-during-school-term-time/" rel="noopener">Senedd Research, pupil absence for holidays during term time</a>. Scotland: <a href="https://www.gov.scot/publications/included-engaged-involved-part-1-improving-attendance-scotlands-schools/" rel="noopener">Included, Engaged and Involved Part 1 (March 2026)</a> · <a href="https://www.legislation.gov.uk/ukpga/1980/44/section/43" rel="noopener">Education (Scotland) Act 1980, ss35 to 43</a>. Northern Ireland: <a href="https://www.nidirect.gov.uk/articles/school-attendance-and-absence" rel="noopener">nidirect, school attendance and absence</a> · <a href="https://www.education-ni.gov.uk/sites/default/files/2025-12/ATTENDANCE%20MATTERS-CONSULTATION.pdf" rel="noopener">Department of Education NI, Attendance Matters consultation (December 2025)</a>. Council calendars from each authority's published term dates. Always confirm with your school.</p>
     ${guidesStrip(FINES_SLUG)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
 
 
-// ── Site navigation ─────────────────────────────────────────────────────────
-// One slim bar on every page: All councils · Key dates ▾ · Regions ▾ · School fines · About.
-// The dropdowns are native <details> disclosures - no JS, keyboard and mobile
-// friendly - grouping what used to be a 15-pill blob into its two natural
-// families. Active page gets the plum-light pill (the app's nav convention).
+// ── Site header ─────────────────────────────────────────────────────────────
+// The sticky header on every page: Councils · Key dates ▾ · Regions ▾ ·
+// School fines · About the data · CTA, collapsing to a hamburger under 860px.
+// Dropdowns and the mobile menu are native <details> (keyboard and no-JS
+// friendly); the shared NAV_JS adds click-away close and hover-open. The
+// Regions panel shows live council counts once any route has loaded the
+// directory (rememberRegionCounts), the same numbers as the region cards.
+
+let REGION_COUNTS = null;
+function rememberRegionCounts(authorities) {
+  REGION_COUNTS = Object.fromEntries(REGION_SLUGS.map((slug) => [slug, hubMembers(HUB_DEFS[slug], authorities).length]));
+}
 
 function navBar(active, activeSlug) {
   const defs = seasonalDefs();
   const cur = (k) => (active === k ? ' aria-current="page"' : '');
-  const curLink = (s) => (activeSlug === s ? ' aria-current="page"' : '');
-  const dateLinks = SEASONAL_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(defs.pages[s].navLabel)}</a>`).join('')
-    + `<a href="/school-term-dates/bank-holidays"${curLink('bank-holidays')}>Bank holidays</a>`;
-  const regionLinks = REGION_SLUGS.map((s) => `<a href="/school-term-dates/${s}"${curLink(s)}>${esc(HUB_DEFS[s].name)}</a>`).join('');
+  const curLink = (slug) => (activeSlug === slug ? ' aria-current="page"' : '');
+  const keyDates = [...SEASONAL_SLUGS.map((slug) => [slug, defs.pages[slug].navLabel]), ['bank-holidays', 'Bank holidays']];
+  const dateLinks = keyDates.map(([slug, label]) => `<a href="/school-term-dates/${slug}"${curLink(slug)}>${esc(label)}</a>`).join('');
+  const regionLinks = REGION_SLUGS.map((slug) => {
+    const count = REGION_COUNTS ? `<span class="cnt">${REGION_COUNTS[slug]}</span>` : '';
+    return `<a href="/school-term-dates/${slug}"${curLink(slug)}><span>${esc(HUB_DEFS[slug].name)}</span>${count}</a>`;
+  }).join('');
+  const mobDates = keyDates.map(([slug, label]) => `<a href="/school-term-dates/${slug}">${esc(label)}</a>`).join('');
+  const mobRegions = REGION_SLUGS.map((slug) => `<a href="/school-term-dates/${slug}">${esc(HUB_DEFS[slug].name)}</a>`).join('');
   return `
-    <nav class="sitenav" aria-label="Term dates sections">
-      <a href="/school-term-dates/"${cur('councils')}><span class="lbl-full">All councils</span><span class="lbl-short">Councils</span></a>
-      <details class="navdrop"${active === 'dates' ? ' data-active="1"' : ''}>
-        <summary><span class="lbl-full">Key dates</span><span class="lbl-short">Dates</span></summary>
-        <div class="panel">${dateLinks}</div>
-      </details>
-      <details class="navdrop"${active === 'regions' ? ' data-active="1"' : ''}>
-        <summary>Regions</summary>
-        <div class="panel">${regionLinks}</div>
-      </details>
-      <a href="/school-term-dates/${FINES_SLUG}"${cur('fines')}><span class="lbl-full">School fines</span><span class="lbl-short">Fines</span></a>
-      <a href="/school-term-dates/about-this-data"${cur('about')}>About</a>
-    </nav>`;
+  <header class="hdr">
+    <div class="hdr-in">
+      <a class="logo" href="/school-term-dates/" aria-label="School term dates home"><img src="/school-term-dates/housemait-logo.svg" alt="Housemait" /></a>
+      <nav class="nav" aria-label="Term dates sections">
+        <a href="/school-term-dates/#directory"${cur('councils')}>Councils</a>
+        <details class="navdrop dd"${active === 'dates' ? ' data-active="1"' : ''}>
+          <summary>Key dates <span class="caret">▾</span></summary>
+          <div class="panel">${dateLinks}</div>
+        </details>
+        <details class="navdrop dd"${active === 'regions' ? ' data-active="1"' : ''}>
+          <summary>Regions <span class="caret">▾</span></summary>
+          <div class="panel panel-regions">${regionLinks}</div>
+        </details>
+        <a href="/school-term-dates/${FINES_SLUG}"${cur('fines')}>School fines</a>
+        <a href="/school-term-dates/about-this-data"${cur('about')}>About the data</a>
+      </nav>
+      <div class="hdr-right">
+        <a class="cta" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
+        <details class="mob">
+          <summary class="burger" aria-label="Menu"><span></span><span></span><span></span></summary>
+          <div class="mob-panel">
+            <a class="mob-all" href="/school-term-dates/#directory">All councils</a>
+            <div class="mob-group"><span class="eyebrow-sm">Key dates</span>${mobDates}</div>
+            <div class="mob-group"><span class="eyebrow-sm">Regions</span><div class="mob-regions">${mobRegions}</div></div>
+            <a class="mob-link" href="/school-term-dates/${FINES_SLUG}">School fines</a>
+            <a class="mob-link" href="/school-term-dates/about-this-data">About the data</a>
+            <a class="cta cta-wide" href="https://housemait.com/gb?src=termdates">Try Housemait free</a>
+          </div>
+        </details>
+      </div>
+    </div>
+  </header>`;
 }
+
 
 
 
@@ -1747,20 +1771,21 @@ function dataPage(stats, rowCount) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(ld)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=14" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=16" />
   <style>${SEASONAL_CSS}
     .dl { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0 6px; }
-    .dl a { display: inline-flex; flex-direction: column; gap: 2px; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 14px; padding: 14px 20px; text-decoration: none; min-width: 190px; }
-    .dl a:hover { border-color: #6B3FA0; }
-    .dl .fmt { font-weight: 600; font-size: 15px; color: #6B3FA0; }
-    .dl .meta { font-size: 12.5px; color: #6B6774; }
-    code { background: #F3EDFC; color: #4A2C73; border-radius: 6px; padding: 1px 6px; font-size: 13.5px; }
-    pre { background: #2D2A33; color: #F3EDFC; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
+    .dl a { display: inline-flex; flex-direction: column; gap: 2px; background: #fff; border: 1.5px solid rgba(30,26,46,.1); border-radius: 14px; padding: 14px 20px; text-decoration: none; min-width: 190px; }
+    .dl a:hover { border-color: #6C3DD9; }
+    .dl .fmt { font-weight: 600; font-size: 15px; color: #6C3DD9; }
+    .dl .meta { font-size: 12.5px; color: #7A7390; }
+    code { background: #F3EEFB; color: #4E27A8; border-radius: 6px; padding: 1px 6px; font-size: 13.5px; }
+    pre { background: #1E1A2E; color: #F3EEFB; border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; }
   </style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
 <body>
-  <div class="wrap">${HEADER_HTML}${navBar('about')}
+  ${navBar('about')}
+  <main class="wrap page-main">
     <h1>Download the data</h1>
     <p class="sub">Term dates for every local education authority in England and Wales, free to download and free to build on.</p>
     <div class="prose">
@@ -1788,8 +1813,8 @@ GET https://api.housemait.com/api/la-term-dates/authorities/barnet</pre>
       <p>Corrections are welcome: <a href="mailto:hello@housemait.com">hello@housemait.com</a>. More on method and provenance on the <a href="/school-term-dates/about-this-data">About this data</a> page.</p>
     </div>
     ${guidesStrip(null)}
-    ${FOOTER_HTML}
-  </div>
+  </main>
+  ${FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -1804,33 +1829,58 @@ router.use((req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const html = fs.readFileSync(INDEX_HTML, 'utf-8');
-    const authorities = (await laDb.listAllAuthorities()).filter(isListable);
+    const authorities = (await laDb.listAllAuthorities()).filter(isListable)
+      .sort((x, y) => x.name.localeCompare(y.name));
+    const total = authorities.length;
+    rememberRegionCounts(authorities);
 
-    // Group by first letter for the letter-headed grid + jump nav.
+    // A-Z groups. Council links keep .ccard + data-name/data-region: app.js
+    // filters by showing/hiding these, and the ?key= admin path decorates them.
     const byLetter = new Map();
     for (const a of authorities) {
       const L = a.name[0].toUpperCase();
       if (!byLetter.has(L)) byLetter.set(L, []);
       byLetter.get(L).push(a);
     }
-    const letters = [...byLetter.keys()];
-    const lettersHtml = letters
-      .map((L) => `<a href="#letter-${L}">${L}</a>`)
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const lettersHtml = alphabet
+      .map((L) => `<a href="#letter-${L}" data-letter="${L}"${byLetter.has(L) ? '' : ' class="off" aria-disabled="true"'}>${L}</a>`)
       .join('');
-    const gridHtml = letters.map((L) => `
-      <section class="letterSec" data-letter="${L}">
-        <div class="letterHead" id="letter-${L}"><h2>${L}</h2><div class="rule"></div></div>
-        <div class="cgrid">
-          ${byLetter.get(L).map((a) => `<a class="ccard" data-name="${esc(a.name.toLowerCase())}" data-region="${esc(a.region || 'England')}" href="/school-term-dates/${esc(a.slug)}"><span class="cname">${esc(a.name)}</span><span class="csub">${esc(a.region || 'England')} · term dates &amp; holidays</span></a>`).join('\n          ')}
+    const gridHtml = [...byLetter.keys()].sort().map((L) => `
+      <div class="lgroup" id="letter-${L}" data-letter="${L}">
+        <div class="lletter" aria-hidden="true">${L}</div>
+        <div class="lgrid">
+          ${byLetter.get(L).map((a) => `<a class="ccard" data-name="${esc(a.name.toLowerCase())}" data-region="${esc(a.region || 'England')}" href="/school-term-dates/${esc(a.slug)}"><span class="cname">${esc(a.name)}</span>${a.region === 'Wales' ? '<span class="badge-wales">Wales</span>' : ''}</a>`).join('\n          ')}
         </div>
-      </section>`).join('');
-    const countText = `${authorities.length} councils, A to Z — click one for its term dates`;
+      </div>`).join('');
+    const countText = `${total} local education authorities — pick yours for term dates, half terms and holidays`;
+
+    // Regions with LIVE member counts (the hub pages' own membership).
+    const regions = REGION_SLUGS.map((slug) => ({ slug, name: HUB_DEFS[slug].name, count: hubMembers(HUB_DEFS[slug], authorities).length }));
+    const regionMenu = regions.map((r) => `<a href="/school-term-dates/${r.slug}"><span>${esc(r.name)}</span><span class="cnt">${r.count}</span></a>`).join('');
+    const regionMobile = regions.map((r) => `<a href="/school-term-dates/${r.slug}">${esc(r.name)}</a>`).join('');
+    const regionCards = regions.map((r) => `<a class="rcard" href="/school-term-dates/${r.slug}"><span class="rname">${esc(r.name)}</span><span class="rcount">${r.count} council${r.count === 1 ? '' : 's'} →</span></a>`).join('');
+
+    // "Coming up this year": the next key dates, derived from the real data
+    // (the most common pattern across councils, like the seasonal pages).
+    // Fail-open: the hero renders without the card if the derivation fails.
+    let comingUp = '';
+    try {
+      comingUp = comingUpCard(authorities, await laDb.listAllEntries());
+    } catch (err) {
+      console.error('[term-dates-ssr] coming-up card failed:', err.message);
+    }
 
     // Server-inject the crawlable content; app.js only shows/hides it.
     const injected = html
+      .split('<!--SSR:TOTAL-->').join(String(total))
       .replace('<!--SSR:COUNT-->', esc(countText))
       .replace('<!--SSR:LETTERS-->', lettersHtml)
       .replace('<!--SSR:GRID-->', gridHtml)
+      .replace('<!--SSR:REGION_MENU-->', regionMenu)
+      .replace('<!--SSR:REGION_MOBILE-->', regionMobile)
+      .replace('<!--SSR:REGION_CARDS-->', regionCards)
+      .replace('<!--SSR:COMING_UP-->', comingUp)
       .replace('</head>', `${GA_SNIPPET}\n  <script>${NAV_JS}</script>\n</head>`);
     res.set('Cache-Control', CACHE_HEADER).type('html').send(injected);
   } catch (err) {
@@ -1838,6 +1888,52 @@ router.get('/', async (req, res, next) => {
     next(); // fall through to plain static
   }
 });
+
+// The hero's "Coming up this year" card: up to four upcoming key dates, each
+// the modal date across councils (summariseSeason, the same derivation the
+// seasonal pages use), linking to the matching guide. Returns '' when there is
+// nothing upcoming to show, so the hero simply renders single-column.
+const COMING_UP_TITLES = {
+  'when-do-schools-go-back': 'Autumn term begins',
+  'october-half-term': 'October half term',
+  'february-half-term': 'February half term',
+  'easter-holidays': 'Easter holidays',
+  'summer-holidays': 'Summer holidays',
+};
+function comingUpCard(authorities, entries) {
+  const defs = seasonalDefs();
+  const today = new Date().toISOString().slice(0, 10);
+  const shortRange = (g) => {
+    if (!g.last || g.last === g.first) return fmtNoDow(g.first);
+    const [, m1, d1] = g.first.split('-').map(Number);
+    const [, m2, d2] = g.last.split('-').map(Number);
+    return m1 === m2 ? `${d1}–${d2} ${MONTHS[m1 - 1]}` : `${d1} ${MONTHS[m1 - 1]} – ${d2} ${MONTHS[m2 - 1]}`;
+  };
+  const rows = [];
+  for (const slug of SEASONAL_SLUGS) {
+    const def = defs.pages[slug];
+    const r = summariseSeason(authorities, entries, def.cfg);
+    const g = r.groups[0];
+    if (!g || !g.first) continue;
+    const n = r.perCouncil.length;
+    let note;
+    if (def.cfg.mode === 'start') note = `${g.count} of ${n} councils go back on ${fmtNoDow(g.first)}`;
+    else if (def.cfg.mode === 'end') note = `${g.count} of ${n} councils break up on ${fmtNoDow(g.first)}`;
+    else note = `${shortRange(g)} in ${g.count} of ${n} councils`;
+    rows.push({ slug, date: g.first, title: COMING_UP_TITLES[slug], note });
+  }
+  const upcoming = rows.filter((r) => r.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
+  if (!upcoming.length) return '';
+  const rowsHtml = upcoming.map((r) => {
+    const [, m, d] = r.date.split('-').map(Number);
+    return `<a class="crow" href="/school-term-dates/${r.slug}"><div class="tile"><div class="mo">${MONTHS[m - 1]}</div><div class="dy">${d}</div></div><div><div class="ttl">${esc(r.title)}</div><div class="nt">${esc(r.note)}</div></div><span class="arr" aria-hidden="true">→</span></a>`;
+  }).join('');
+  return `<aside class="coming" aria-label="Coming up this year">
+        <div class="coming-head"><h2>Coming up this year</h2><span>${esc(defs.ayLabel)}</span></div>
+        <div class="coming-rows">${rowsHtml}</div>
+        <p class="coming-foot">Dates shown are the most common pattern across councils — pick your council for exact dates.</p>
+      </aside>`;
+}
 
 // ── Seasonal guides + about ─────────────────────────────────────────────────
 // Registered before /:slug so these literal paths are never treated as
@@ -1914,6 +2010,7 @@ router.get(`/${FINES_SLUG}`, async (req, res, next) => {
     const defs = seasonalDefs();
     const authorities = (await laDb.listAllAuthorities()).filter(isListable)
       .sort((a, b) => a.name.localeCompare(b.name));
+    rememberRegionCounts(authorities);
     const form = req.query || {};
     const outcome = await computeFinesOutcome(form);
     // A fail-open answer (bank holidays unreachable) is knowingly incomplete;
@@ -2052,6 +2149,7 @@ router.get('/:slug', async (req, res, next) => {
     let allLive = [];
     try {
       allLive = (await laDb.listAllAuthorities() || []).filter(isListable);
+      rememberRegionCounts(allLive);
     } catch (err) {
       console.error('[term-dates-ssr] nearby fetch failed:', err.message);
     }

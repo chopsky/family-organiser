@@ -88,6 +88,75 @@ describe('GET /school-term-dates/ (SSR index)', () => {
     expect(res.text).toContain('&lt;script&gt;');
   });
 
+  it('renders the redesign shell: A-Z groups, Wales badges, a 26-letter rail with dead letters off', async () => {
+    const res = await request(app()).get('/school-term-dates/');
+    expect(res.text).toContain('<div class="lgroup" id="letter-H" data-letter="H">');
+    expect(res.text).toContain('<span class="cname">Cardiff</span><span class="badge-wales">Wales</span>');
+    expect(res.text).not.toContain('<span class="cname">Hertfordshire</span><span class="badge-wales">');
+    expect(res.text).toContain('<a href="#letter-H" data-letter="H">H</a>');
+    expect(res.text).toContain('<a href="#letter-Z" data-letter="Z" class="off" aria-disabled="true">Z</a>');
+    expect(res.text).toContain('3 local education authorities — pick yours');
+    expect(res.text).toContain('3 councils · England &amp; Wales · refreshed monthly');
+    // SEO surface preserved verbatim.
+    expect(res.text).toContain('<link rel="canonical" href="https://housemait.com/school-term-dates/" />');
+    expect(res.text).toContain('"@type":"Dataset"');
+    expect(res.text).toContain('"@type":"FAQPage"');
+    expect(res.text).toContain('<title>School Term &amp; Holiday Dates for UK Schools - Housemait</title>');
+    // No placeholder left behind.
+    expect(res.text).not.toContain('<!--SSR:');
+  });
+
+  it('fills the region menu and cards with live member counts', async () => {
+    const res = await request(app()).get('/school-term-dates/');
+    // Wales hub: membership by region -> Cardiff counts, nothing else does.
+    expect(res.text).toContain('<a class="rcard" href="/school-term-dates/wales"><span class="rname">Wales</span><span class="rcount">1 council →</span></a>');
+    expect(res.text).toContain('<a href="/school-term-dates/wales"><span>Wales</span><span class="cnt">1</span></a>');
+    // A slug-listed hub with no live members still renders, at zero.
+    expect(res.text).toContain('<span class="rname">London</span><span class="rcount">0 councils →</span>');
+  });
+
+  it('derives the "Coming up" card from real dates and drops it when nothing is upcoming', async () => {
+    jest.useFakeTimers({ doNotFake: ['setImmediate', 'setTimeout'] }).setSystemTime(new Date('2026-09-02T12:00:00Z'));
+    try {
+      const row = (la, event_type, date, end_date = null) => ({ la_id: la, academic_year: '2026-2027', event_type, date, end_date, label: null });
+      laDb.listAllAuthorities.mockResolvedValue([
+        { id: 'a', name: 'Aleshire', slug: 'aleshire', region: 'England', import_status: 'ok', date_count: 10 },
+        { id: 'b', name: 'Beeshire', slug: 'beeshire', region: 'England', import_status: 'ok', date_count: 10 },
+      ]);
+      laDb.listAllEntries.mockResolvedValue(['a', 'b'].flatMap((la) => [
+        row(la, 'term_start', '2026-09-02'), row(la, 'term_end', '2026-10-23'),
+        row(la, 'term_start', '2026-11-02'), row(la, 'term_end', '2026-12-18'),
+        row(la, 'term_start', '2027-01-04'), row(la, 'term_end', '2027-02-12'),
+        row(la, 'term_start', '2027-02-22'), row(la, 'term_end', '2027-03-26'),
+        row(la, 'term_start', '2027-04-12'), row(la, 'term_end', '2027-05-28'),
+        row(la, 'term_start', '2027-06-07'), row(la, 'term_end', '2027-07-21'),
+      ]));
+      const res = await request(app()).get('/school-term-dates/');
+      expect(res.text).toContain('<aside class="coming" aria-label="Coming up this year">');
+      expect(res.text).toContain('<span>2026/27</span>');
+      // Today IS the first day back, so it still counts as upcoming, then October half term.
+      expect(res.text).toContain('<div class="mo">Sep</div><div class="dy">2</div>');
+      expect(res.text).toContain('2 of 2 councils go back on 2 Sep 2026');
+      expect(res.text).toContain('<div class="mo">Oct</div><div class="dy">26</div>');
+      expect(res.text).toContain('26–30 Oct in 2 of 2 councils');
+      expect(res.text).toContain('href="/school-term-dates/february-half-term"');
+      // Four rows max.
+      expect((res.text.match(/class="crow"/g) || []).length).toBe(4);
+
+      laDb.listAllEntries.mockResolvedValue([]);
+      const bare = await request(app()).get('/school-term-dates/');
+      expect(bare.status).toBe(200);
+      expect(bare.text).not.toContain('class="coming"');
+
+      laDb.listAllEntries.mockRejectedValue(new Error('db down'));
+      const failOpen = await request(app()).get('/school-term-dates/');
+      expect(failOpen.status).toBe(200);
+      expect(failOpen.text).toContain('href="/school-term-dates/aleshire"');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('still serves the page when the directory query fails', async () => {
     // next() falls through to the plain static file in prod; in this harness
     // there is no static layer, so the contract is simply "no 500 HTML error".
@@ -195,7 +264,7 @@ describe('GET /school-term-dates/:slug (council page)', () => {
 
   it('links back to housemait.com from every council page (footer)', async () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
-    expect(res.text).toContain('class="site-footer"');
+    expect(res.text).toContain('class="foot"');
     expect(res.text).toContain('href="https://housemait.com"');
     expect(res.text).toContain('housemait-logo.svg');
     expect(res.text).toContain('© ');
@@ -529,9 +598,11 @@ describe('site navigation', () => {
 
   it('council pages carry the nav bar with both dropdowns', async () => {
     const res = await request(app()).get('/school-term-dates/hertfordshire');
-    expect(res.text).toContain('class="sitenav"');
-    expect(res.text).toContain('<summary><span class="lbl-full">Key dates</span><span class="lbl-short">Dates</span></summary>');
-    expect(res.text).toContain('<summary>Regions</summary>');
+    expect(res.text).toContain('<header class="hdr">');
+    expect(res.text).toContain('<summary>Key dates <span class="caret">▾</span></summary>');
+    expect(res.text).toContain('<summary>Regions <span class="caret">▾</span></summary>');
+    // Mobile menu is a plain <details>, not hover-opened.
+    expect(res.text).toContain('<details class="mob">');
     expect(res.text).toContain('href="/school-term-dates/london"');
   });
 
@@ -692,7 +763,7 @@ describe('term-time holiday fines page', () => {
     expect(res.text).not.toContain('nevershire');
     expect(res.text).toContain('action="/school-term-dates/school-fines#result"');
     // Top-level nav item (it is a guide, not a key date), with the phone-width short label.
-    expect(res.text).toContain('href="/school-term-dates/school-fines" aria-current="page"><span class="lbl-full">School fines</span><span class="lbl-short">Fines</span></a>');
+    expect(res.text).toContain('href="/school-term-dates/school-fines" aria-current="page">School fines</a>');
     const keyDatesPanel = res.text.match(/<summary>[^]*?Key dates[^]*?<\/summary>\s*<div class="panel">([^]*?)<\/div>/)[1];
     expect(keyDatesPanel).not.toContain('school-fines');
     expect(res.text).toContain('10 sessions</strong>');

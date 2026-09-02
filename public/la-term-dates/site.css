@@ -1,114 +1,177 @@
 /*
- * Shared design system for the term-dates site - the ONE source of truth for
- * everything that appears on more than one page. The index and the SSR
- * templates all <link> this before their own <style> block, so page-specific
- * rules can override it but shared values cannot drift again (2026-08-19:
- * three inline copies had diverged to three page widths and two h1 colours).
+ * Shared design system for the term-dates site (design_handoff_term_dates_redesign),
+ * the ONE source of truth for everything that appears on more than one page:
+ * tokens, base type, the sticky header with its dropdowns and mobile menu, the
+ * footer, and the shared content components (cards, tables, prose, chips).
+ * Pages <link> this first, then their own stylesheet or <style> block.
  *
- * Bump the ?v= query on the <link> tags when this file changes - pages are
- * CDN-cached and the version pin keeps HTML/CSS in step.
+ * Headings are Recoleta (brand licence), body is the system stack; every other
+ * value is lifted from the design file. Bump the ?v= on every <link> when this
+ * file changes - pages are CDN-cached and the pin keeps HTML/CSS in step.
  */
 
 @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Recoleta'; src: url('/school-term-dates/fonts/Recoleta-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
 
+:root {
+  --ink: #1E1A2E; --body: #5B5470; --muted: #7A7390; --faint: #9A93AB; --disabled: #CFC9DC;
+  --bg: #FAF8F4; --tint: #F3EEFB; --tint-hover: #F7F4FD; --control: #F3F1EE;
+  --purple: #6C3DD9; --purple-hover: #5A2FC4; --purple-light: #8257F0; --purple-dark-on: #B79BFF; --purple-text-dark: #4E27A8;
+  --wales: #B0432F; --wales-bg: #FBEDE9;
+  --line-6: rgba(30,26,46,.06); --line-7: rgba(30,26,46,.07); --line-8: rgba(30,26,46,.08); --line-10: rgba(30,26,46,.1); --line-12: rgba(30,26,46,.12);
+  --shadow-card: 0 2px 8px rgba(30,26,46,.06);
+  --serif: 'Recoleta', Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --hdr: 68px;
+}
+
 * { box-sizing: border-box; }
-/* .ccard's display:flex would otherwise beat the UA's [hidden] rule,
-   silently breaking every show/hide filter. */
 [hidden] { display: none !important; }
-html, body { margin: 0; padding: 0; background: #FBF8F3; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif; color: #2D2A33; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-a { color: #6B3FA0; }
-a:hover { color: #54317E; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+html, body { margin: 0; padding: 0; background: var(--bg); }
+body { font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; line-height: 1.5; }
+a { color: var(--purple); text-decoration: none; }
+a:hover { color: var(--purple-text-dark); }
+input::placeholder { color: var(--faint); }
+input:focus { outline: none; }
+button { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--purple); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; }
+h1, h2, .serif { font-family: var(--serif); font-weight: 400; }
+.page { min-height: 100vh; display: flex; flex-direction: column; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: 32px; padding-right: 32px; width: 100%; }
+.page-main { padding-top: 44px; padding-bottom: 72px; flex: 1; }
+.eyebrow-sm { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+@keyframes hmFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.wrap { max-width: 980px; margin: 0 auto; padding: 26px 20px 72px; }
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.hdr { position: sticky; top: 0; z-index: 20; background: rgba(250,248,244,.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line-8); }
+.hdr-in { max-width: 1200px; margin: 0 auto; padding: 0 32px; height: var(--hdr); display: flex; align-items: center; gap: 24px; }
+.logo { display: flex; align-items: center; flex: none; }
+.logo img { height: 28px; width: auto; display: block; }
+.nav { display: flex; gap: 4px; margin-left: 8px; align-items: center; font-size: 14px; font-weight: 600; }
+.nav > a, .nav summary { display: flex; align-items: center; gap: 6px; color: var(--ink); padding: 8px 12px; border-radius: 9px; cursor: pointer; list-style: none; font: inherit; }
+.nav summary::-webkit-details-marker { display: none; }
+.nav .caret { font-size: 10px; opacity: .7; }
+.nav > a:hover, .nav summary:hover, .nav .dd[open] summary, .nav > a[aria-current], .nav .dd[data-active] summary { color: var(--purple); background: var(--tint); }
+.dd { position: relative; }
+/* Invisible bridge across the gap below the trigger, so hovering down into
+   the panel never counts as leaving the dropdown. */
+.dd[open]::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 12px; }
+.dd .panel { position: absolute; top: calc(100% + 10px); left: 0; background: #fff; border-radius: 16px; padding: 8px; min-width: 250px; box-shadow: 0 24px 50px -20px rgba(30,26,46,.35), 0 0 0 1px var(--line-6); display: flex; flex-direction: column; animation: hmFade .18s ease both; z-index: 30; }
+.dd .panel a { padding: 10px 12px; border-radius: 9px; color: var(--ink); font-size: 14px; font-weight: 600; }
+.dd .panel a:hover, .dd .panel a[aria-current] { background: var(--tint); color: var(--purple); }
+.dd .panel-regions { width: 460px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.dd .panel-regions a { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dd .panel-regions .cnt { font-size: 12px; color: var(--faint); font-weight: 600; }
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.cta { display: inline-flex; align-items: center; justify-content: center; background: var(--purple); color: #fff; font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 999px; box-shadow: 0 1px 0 rgba(0,0,0,.05), 0 6px 16px -8px rgba(108,61,217,.6); white-space: nowrap; }
+.cta:hover { background: var(--purple-hover); color: #fff; }
+.cta-lg { font-size: 15px; padding: 14px 24px; box-shadow: none; }
+.cta-lg:hover { background: var(--purple-light); }
+.cta-wide { font-size: 15px; padding: 14px 20px; box-shadow: none; }
 
-/* ── Header ── */
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
-.topbar img { height: 26px; width: auto; display: block; }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.btn-try { display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 10px; background: #6B3FA0; color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none; }
-.btn-try:hover { background: #5A3488; color: #FFFFFF; }
+/* Mobile hamburger + panel (a <details>, so it works without JS). */
+.mob { display: none; position: static; }
+.burger { width: 44px; height: 44px; border: 0; background: var(--tint); border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; list-style: none; }
+.burger::-webkit-details-marker { display: none; }
+.burger span { width: 18px; height: 2px; background: var(--ink); border-radius: 2px; display: block; }
+.mob-panel { position: absolute; top: 100%; left: 0; right: 0; border-top: 1px solid var(--line-8); background: var(--bg); padding: 20px 20px 24px; display: flex; flex-direction: column; gap: 22px; max-height: calc(100vh - var(--hdr)); overflow: auto; animation: hmFade .2s ease both; z-index: 30; }
+.mob-all { font-size: 18px; font-weight: 700; color: var(--ink); }
+.mob-group { display: flex; flex-direction: column; gap: 10px; }
+.mob-group .eyebrow-sm { font-size: 11px; letter-spacing: .1em; }
+.mob-group > a { font-size: 16px; font-weight: 600; color: var(--ink); padding: 4px 0; }
+.mob-regions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+.mob-regions a { font-size: 15px; font-weight: 600; color: var(--ink); padding: 4px 0; }
+.mob-link { font-size: 16px; font-weight: 600; color: var(--ink); }
 
-/* ── Site navigation ── */
-.sitenav { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 30px; padding: 6px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 14px; }
-.sitenav > a, .sitenav summary { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 13px; font-weight: 600; color: #6B6774; text-decoration: none; cursor: pointer; list-style: none; }
-.sitenav summary::-webkit-details-marker { display: none; }
-.sitenav summary::after { content: '\25BE'; margin-left: 6px; font-size: 9px; opacity: 0.7; }
-.sitenav > a:hover, .sitenav summary:hover { color: #6B3FA0; background: #F3EDFC; }
-.sitenav > a[aria-current], .navdrop[data-active] summary { background: #F3EDFC; color: #6B3FA0; }
-.navdrop { position: relative; }
-/* Invisible bridge across the 6px gap below the label, so hovering from the
-   label down to the panel never counts as leaving the dropdown. */
-.navdrop[open]::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
-.navdrop .panel { position: absolute; top: calc(100% + 6px); left: 0; min-width: 250px; background: #FFFFFF; border: 1px solid #E8E5EC; border-radius: 12px; box-shadow: 0 8px 24px rgba(107,63,160,0.10); padding: 8px; z-index: 30; display: flex; flex-direction: column; }
-.navdrop .panel a { padding: 8px 12px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: #2D2A33; text-decoration: none; }
-.navdrop .panel a:hover { background: #FBF8F3; color: #6B3FA0; }
-.navdrop .panel a[aria-current] { background: #F3EDFC; color: #6B3FA0; }
-.lbl-short { display: none; }
-@media (max-width: 640px) {
-  /* Anchor the panel to the NAV BAR, not the <details>. A static panel
-     becomes a flex item inside the row, so opening one shoved the other
-     items around it (real bug, seen on-device). Anchoring to .sitenav makes
-     it a full-width card below the bar, leaving the row untouched. */
-  .sitenav { position: relative; }
-  .navdrop { position: static; }
-  .navdrop .panel { top: calc(100% + 6px); left: 0; right: 0; min-width: 0; }
-  .navdrop[open]::after { display: none; }
-  /* Four items overflow a 375px viewport by ~50px and wrap 'About' onto its
-     own row. Tighter padding plus the short label ("Councils") brings the row
-     back to one line without shrinking the tap targets below 34px. */
-  .sitenav { gap: 2px; }
-  .sitenav > a, .sitenav summary { padding: 0 8px; font-size: 12.5px; }
-  .sitenav summary::after { margin-left: 4px; }
-  .lbl-full { display: none; }
-  .lbl-short { display: inline; }
-  .btn-try { padding: 0 13px; font-size: 13px; }
-}
-/* Five nav items must stay on one line down to 360px-wide phones. */
-@media (max-width: 370px) {
-  .sitenav > a, .sitenav summary { padding: 0 6px; font-size: 12px; }
-}
+/* ── Typography (sub-pages) ─────────────────────────────────────────────── */
+h1 { font-size: clamp(34px, 5.5vw, 52px); line-height: 1.05; letter-spacing: -.02em; color: var(--ink); margin: 0 0 12px; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--purple); }
+h2 { font-size: 28px; color: var(--ink); margin: 40px 0 14px; letter-spacing: -.02em; }
+.sub, .lede { font-size: clamp(16px, 2vw, 18px); line-height: 1.55; color: var(--body); max-width: 68ch; margin: 0 0 26px; text-wrap: pretty; }
+.prose p { font-size: 15px; line-height: 1.65; color: var(--body); max-width: 78ch; margin: 0 0 12px; text-wrap: pretty; }
+.prose h2 { margin-top: 32px; }
+.prose h3 { font-size: 17px; font-weight: 700; color: var(--ink); margin: 20px 0 6px; }
+.prose strong { color: var(--ink); }
+.note { font-size: 13px; color: var(--muted); margin-top: 12px; max-width: 88ch; line-height: 1.55; }
+code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: var(--tint); color: var(--purple-text-dark); padding: 2px 6px; border-radius: 6px; }
+pre { background: var(--ink); color: #fff; border-radius: 16px; padding: 18px 20px; font-size: 13px; line-height: 1.6; overflow-x: auto; }
 
-/* ── Typography ──
-   .sub (16px) and .prose p (15px) carry different ch counts to land on the
-   SAME rendered width (~730px, about 75% of the container): ch is the width
-   of the "0" glyph, so it scales with font-size and is NOT a character count. */
-h1 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: clamp(32px, 5.5vw, 46px); line-height: 1.08; letter-spacing: -0.02em; color: #6B3FA0; margin: 12px 0 8px; }
-h2 { font-family: 'Recoleta', Georgia, serif; font-weight: 400; font-size: 26px; color: #6B3FA0; margin: 34px 0 12px; letter-spacing: -0.01em; }
-.sub, .lede { font-size: 16px; color: #6B6774; max-width: 72ch; margin: 0 0 26px; }
-.prose p { font-size: 15px; color: #4A4552; max-width: 78ch; margin: 0 0 12px; }
-.note { font-size: 13px; color: #6B6774; margin-top: 12px; max-width: 88ch; }
-
-/* ── Shared components (guide, hub and bank-holiday pages) ── */
-.gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 18px 0 8px; }
+/* ── Shared components ──────────────────────────────────────────────────── */
+.gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 18px 0 8px; }
 .gcards.one-col { grid-template-columns: 1fr; }
-.gcard { background: #fff; border-radius: 16px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); }
-.gcard .when { font-weight: 600; font-size: 15px; color: #2D2A33; }
-.gcard .count { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 600; color: #6B3FA0; background: #F3EDFC; border-radius: 8px; padding: 2px 9px; }
-.gcard .who { margin-top: 8px; font-size: 12.5px; color: #6B6774; }
-.tableWrap { overflow-x: auto; background: #fff; border-radius: 16px; box-shadow: 0 2px 8px rgba(107,63,160,0.06); margin-top: 14px; }
+.gcard { background: #fff; border: 1px solid var(--line-8); border-radius: 16px; padding: 18px; }
+.gcard .when { font-weight: 700; font-size: 15px; color: var(--ink); }
+.gcard .count { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 700; color: var(--purple); background: var(--tint); border-radius: 999px; padding: 3px 10px; }
+.gcard .who { margin-top: 8px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.tableWrap { overflow-x: auto; background: #fff; border: 1px solid var(--line-8); border-radius: 16px; margin-top: 14px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #6B6774; padding: 12px 16px; border-bottom: 1px solid #E8E5EC; }
-td { padding: 10px 16px; border-bottom: 1px solid #F3F1F6; }
-td a { color: #6B3FA0; font-weight: 600; text-decoration: none; }
-td a:hover { text-decoration: underline; }
+th { text-align: left; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 14px 18px; border-bottom: 1px solid var(--line-10); }
+td { padding: 11px 18px; border-bottom: 1px solid var(--line-7); color: var(--ink); }
+td a { color: var(--ink); font-weight: 600; }
+td a:hover { color: var(--purple); }
 tr:last-child td { border-bottom: none; }
 
-/* ── Guide pill strips (both historical spellings) ── */
+/* Guide pill strips (both historical spellings) */
 .guides-strip, .guidesStrip { display: flex; flex-wrap: wrap; gap: 8px 10px; }
-.guides-strip a, .guidesStrip a { font-size: 13px; font-weight: 600; color: #6B3FA0; background: #fff; border: 1.5px solid #E8E5EC; border-radius: 24px; padding: 8px 16px; text-decoration: none; }
-.guides-strip a:hover, .guidesStrip a:hover { border-color: #6B3FA0; }
+.guides-strip a, .guidesStrip a { font-size: 13px; font-weight: 600; color: var(--purple-text-dark); background: rgba(108,61,217,.08); border-radius: 999px; padding: 7px 14px; }
+.guides-strip a:hover, .guidesStrip a:hover { background: rgba(108,61,217,.16); color: var(--purple-text-dark); }
 
-/* ── Footer ── */
-.site-footer { margin-top: 48px; padding-top: 28px; border-top: 1px solid #E8E5EC; }
-.site-footer img { display: block; height: 26px; width: auto; margin-bottom: 12px; }
-.site-footer .tag { font-size: 13.5px; color: #6B6774; max-width: 62ch; margin: 0 0 10px; }
-.site-footer nav { font-size: 13px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
-.site-footer nav a { font-weight: 600; text-decoration: none; }
-.site-footer .copy { font-size: 12px; color: #6B6774; margin: 0; }
+/* Buttons used on council + fines pages */
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 8px; align-items: center; }
+.btn-ics { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 999px; background: var(--purple); color: #fff; font-weight: 700; font-size: 14px; }
+.btn-ics:hover { background: var(--purple-hover); color: #fff; }
+.btn-wa { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 999px; border: 1.5px solid var(--line-12); background: #fff; color: var(--ink); font-weight: 600; font-size: 14px; }
+.btn-wa:hover { border-color: var(--purple); color: var(--purple); }
+
+/* Collapsible school list + per-school INSET details (council pages) */
+.schools { margin-top: 28px; background: #fff; border: 1px solid var(--line-8); border-radius: 16px; padding: 0 20px; }
+.schools summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 12px; padding: 16px 0; font-weight: 700; font-size: 16px; color: var(--ink); }
+.schools summary::-webkit-details-marker { display: none; }
+.schools summary::before { content: '+'; width: 28px; height: 28px; border-radius: 50%; background: var(--tint); color: var(--purple); display: grid; place-items: center; font-size: 18px; line-height: 1; flex: none; }
+.schools[open] summary::before { content: '\2212'; }
+.schools summary:hover { color: var(--purple); }
+.schools .cnt { font-size: 12px; font-weight: 700; color: var(--purple); background: var(--tint); border-radius: 999px; padding: 2px 9px; }
+.schools .prose { margin-top: 0; padding-bottom: 12px; }
+.schools h3 { font-size: 14px; font-weight: 700; color: var(--ink); margin: 16px 0 6px; display: flex; align-items: center; gap: 8px; }
+.schools .slist { font-size: 13.5px; line-height: 1.7; color: var(--body); max-width: none; }
+
+/* Dark promo band (council pages) - same voice as the index promo card */
+.ctaband { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; background: var(--ink); border-radius: 28px; padding: 40px 44px; margin-top: 44px; position: relative; overflow: hidden; }
+.ctaband::before { content: ''; position: absolute; right: -80px; top: -120px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(108,61,217,.55), rgba(108,61,217,0) 70%); pointer-events: none; }
+.ctaband > div { flex: 1; min-width: 260px; position: relative; }
+.ctaband h2 { font-size: clamp(26px, 4vw, 34px); color: #fff; margin: 0 0 10px; line-height: 1.1; letter-spacing: -.02em; }
+.ctaband p { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,.72); margin: 0; max-width: 56ch; }
+.ctaband p.trial { color: rgba(255,255,255,.55); margin-top: 10px; font-size: 13px; }
+.ctaband .btn-white { display: inline-flex; align-items: center; height: 48px; padding: 0 24px; border-radius: 999px; background: var(--purple); color: #fff; font-weight: 700; font-size: 15px; white-space: nowrap; position: relative; }
+.ctaband .btn-white:hover { background: var(--purple-light); color: #fff; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.foot { background: #fff; border-top: 1px solid var(--line-8); margin-top: auto; }
+.foot-in { padding-top: 48px; padding-bottom: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 40px; }
+.foot-brand { display: flex; flex-direction: column; gap: 14px; }
+.foot-brand img { height: 26px; width: auto; display: block; }
+.foot-brand p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--body); max-width: 360px; }
+.foot-col { display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
+.foot-col .eyebrow-sm { margin-bottom: 4px; }
+.foot-col a { color: var(--ink); }
+.foot-col a:hover { color: var(--purple); }
+.foot-copy { padding-bottom: 32px; font-size: 13px; color: var(--faint); }
+
+/* ── The one breakpoint ─────────────────────────────────────────────────── */
+@media (max-width: 860px) {
+  :root { --hdr: 60px; }
+  .hdr-in { height: 68px; padding: 0 20px; }
+  .nav, .hdr-right > .cta { display: none; }
+  .mob { display: block; }
+  .wrap { padding-left: 20px; padding-right: 20px; }
+  .page-main { padding-top: 32px; padding-bottom: 56px; }
+  .ctaband { padding: 30px 24px; border-radius: 20px; }
+}
 
 @media print {
   body { background: #fff; }
-  .topbar .btn-try, .sitenav, .guides-strip, .guidesStrip, .site-footer { display: none !important; }
+  .hdr, .guides-strip, .guidesStrip, .foot, .ctaband, .actions { display: none !important; }
 }
