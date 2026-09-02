@@ -11,6 +11,7 @@ import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
 import PillBtn from '../components/ui/PillBtn';
+import HeaderIconBtn from '../components/ui/HeaderIconBtn';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { isPetMember } from '../lib/kidsTheme';
@@ -449,7 +450,7 @@ export default function Lists() {
     <div style={{ height: '100%', minHeight: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', fontFamily: INTER, color: INK }}>
       <PageHeader kicker={isMobile ? `${lists.length} list${lists.length === 1 ? '' : 's'}` : (active ? `${openCount} open` : '')} title="Lists"
         actions={isMobile
-          ? <PillBtn primary aria-label="New list" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setNewList(true)} />
+          ? <HeaderIconBtn primary aria-label="New list" onClick={() => setNewList(true)}><IcPlus s={16} w={2.4} c="#fff" /></HeaderIconBtn>
           : <PillBtn primary icon={<IcPlus s={14} w={2.4} c="#fff" />} onClick={() => setNewList(true)}>New list</PillBtn>} />
 
       {loading ? (

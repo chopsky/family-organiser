@@ -8,7 +8,8 @@ import api from '../lib/api';
 import { loadCached } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
-import PillBtn from '../components/ui/PillBtn';
+import HeaderIconBtn from '../components/ui/HeaderIconBtn';
+import Segmented from '../components/ui/Segmented';
 import Avatar from '../components/ui/Avatar';
 import { hexFor } from '../lib/memberColors';
 import { isKidMember, isPetMember } from '../lib/kidsTheme';
@@ -222,12 +223,12 @@ export default function Rewards() {
         title="Rewards"
         actions={(
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <div style={{ display: 'inline-flex', background: BG_SOFT, borderRadius: 10, padding: 3, gap: 3 }}>
-              {viewOpts.map((o) => (
-                <button key={o.value} onClick={() => setView(o.value)} style={{ padding: '7px 14px', borderRadius: 8, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 600, background: effView === o.value ? '#fff' : 'transparent', color: effView === o.value ? INK : INK3, boxShadow: effView === o.value ? '0 1px 3px rgba(26,22,32,0.1)' : 'none' }}>{o.label}</button>
-              ))}
-            </div>
-            {!childMode && <PillBtn primary aria-label="Add reward" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal('add')} />}
+            <Segmented ariaLabel="Rewards view" value={effView} onChange={setView} options={viewOpts} />
+            {!childMode && (
+              <HeaderIconBtn primary aria-label="Add reward" onClick={() => setModal('add')}>
+                <IcPlus s={16} w={2.4} c="#fff" />
+              </HeaderIconBtn>
+            )}
           </div>
         )}
       />

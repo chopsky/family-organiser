@@ -8,6 +8,7 @@ import Avatar from '../components/ui/Avatar';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Segmented from '../components/ui/Segmented';
+import HeaderIconBtn from '../components/ui/HeaderIconBtn';
 import { useCanWrite } from '../context/SubscriptionContext';
 import useSwipeNavigate from '../hooks/useSwipeNavigate';
 import { useChildMode } from '../context/ChildModeContext';
@@ -2498,35 +2499,19 @@ export default function Calendar() {
                 </button>
               )}
               {!childMode && (
-                <button type="button" aria-label="Search" onClick={() => setMobileSearching(true)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent">
-                  <span className="w-[34px] h-[34px] rounded-full bg-white flex items-center justify-center" style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}>
-                    <IconSearch className="w-4 h-4" />
-                  </span>
-                </button>
+                <HeaderIconBtn aria-label="Search" onClick={() => setMobileSearching(true)}>
+                  <IconSearch className="w-4 h-4" />
+                </HeaderIconBtn>
               )}
               {!childMode && (
-                <button type="button" aria-label="Filters" aria-expanded={showMobileFilters} onClick={() => setShowMobileFilters((s) => !s)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent relative">
-                  <span
-                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center"
-                    style={showMobileFilters
-                      ? { background: M_INK, color: '#fff' }
-                      : { background: '#fff', border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h9M19 7h1M4 17h1M11 17h9" /><circle cx="16" cy="7" r="2.6" /><circle cx="8" cy="17" r="2.6" /></svg>
-                  </span>
-                  {mobileFilterCount > 0 && (
-                    <span className="absolute flex items-center justify-center rounded-full text-white font-extrabold" style={{ top: 2, right: 2, minWidth: 16, height: 16, background: 'var(--color-plum)', fontSize: 9.5, padding: '0 4px' }}>
-                      {mobileFilterCount}
-                    </span>
-                  )}
-                </button>
+                <HeaderIconBtn aria-label="Filters" aria-expanded={showMobileFilters} active={showMobileFilters} badge={mobileFilterCount} onClick={() => setShowMobileFilters((s) => !s)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h9M19 7h1M4 17h1M11 17h9" /><circle cx="16" cy="7" r="2.6" /><circle cx="8" cy="17" r="2.6" /></svg>
+                </HeaderIconBtn>
               )}
               {canWrite && !childMode && (
-                <button type="button" aria-label="New event" onClick={() => openAddForm(selectedDate)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent">
-                  <span className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-white" style={{ background: 'var(--color-plum)', boxShadow: '0 4px 12px rgba(108,61,217,0.35)' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-                  </span>
-                </button>
+                <HeaderIconBtn primary aria-label="New event" onClick={() => openAddForm(selectedDate)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </HeaderIconBtn>
               )}
             </>
           )}
@@ -2578,25 +2563,14 @@ export default function Calendar() {
                 <ChevronLeft />
               </span>
             </button>
-            <div className="flex-1 flex" style={{ background: 'var(--color-warm-sand)', borderRadius: 12, padding: 3 }}>
-              {CAL_VIEWS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setViewMode(value)}
-                  className="flex-1 font-semibold"
-                  style={{
-                    padding: '7px 0', borderRadius: 9, fontSize: 12.5,
-                    background: viewMode === value ? '#fff' : 'transparent',
-                    color: viewMode === value ? M_INK : M_INK3,
-                    boxShadow: viewMode === value ? '0 1px 3px rgba(26,22,32,0.12)' : 'none',
-                    transition: 'all .15s ease',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              fluid
+              ariaLabel="Calendar view"
+              value={viewMode}
+              onChange={setViewMode}
+              options={CAL_VIEWS}
+              className="flex-1"
+            />
             <button type="button" aria-label="Next" onClick={navigateNext} className="shrink-0 w-11 h-11 -m-[6px] flex items-center justify-center bg-transparent">
               <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center" style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}>
                 <ChevronRight />

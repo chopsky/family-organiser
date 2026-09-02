@@ -9,7 +9,8 @@ import api from '../lib/api';
 import { loadCached, readCache } from '../lib/offlineCache';
 import PageHeader from '../components/ui/PageHeader';
 import { BottomSheet } from '../components/BottomSheet';
-import PillBtn from '../components/ui/PillBtn';
+import HeaderIconBtn from '../components/ui/HeaderIconBtn';
+import Segmented from '../components/ui/Segmented';
 import Avatar from '../components/ui/Avatar';
 import { isKidMember, isPetMember } from '../lib/kidsTheme';
 import { hexFor } from '../lib/memberColors';
@@ -773,11 +774,12 @@ export default function Chores() {
             )}
             {/* Day/Week toggle — desktop only (the 7-day grid needs the width). */}
             {isDesktop && !childMode && (
-              <div style={{ display: 'inline-flex', background: BG_SOFT, borderRadius: 99, padding: 3 }}>
-                {['day', 'week'].map((v) => (
-                  <button key={v} onClick={() => setView(v)} style={{ padding: '6px 15px', borderRadius: 99, border: 0, cursor: 'pointer', fontFamily: INTER, fontSize: 13, fontWeight: 700, textTransform: 'capitalize', background: view === v ? '#fff' : 'transparent', color: view === v ? INK : INK2, boxShadow: view === v ? '0 1px 4px rgba(26,22,32,0.12)' : 'none' }}>{v}</button>
-                ))}
-              </div>
+              <Segmented
+                ariaLabel="Tasks view"
+                value={view}
+                onChange={setView}
+                options={[{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]}
+              />
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               {weekMode ? (
@@ -794,9 +796,10 @@ export default function Chores() {
                 </>
               )}
             </div>
-            {!childMode && (isMobile
-              ? <PillBtn primary aria-label="Add task" className="h-11 w-11 justify-center px-0! rounded-full!" icon={<IcPlus s={18} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add', date: selDateStr })} />
-              : <PillBtn primary aria-label="Add task" className="w-9 justify-center px-0!" icon={<IcPlus s={16} w={2.4} c="#fff" />} onClick={() => setModal({ mode: 'add', date: selDateStr })} />
+            {!childMode && (
+              <HeaderIconBtn primary aria-label="Add task" onClick={() => setModal({ mode: 'add', date: selDateStr })}>
+                <IcPlus s={16} w={2.4} c="#fff" />
+              </HeaderIconBtn>
             )}
           </div>
         )}
