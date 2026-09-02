@@ -11,6 +11,9 @@
 import { useEffect, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import api from '../../lib/api';
+import { detectCountryFromLocaleRegion, detectCountryFromLocaleCookie, detectCountryFromTimezone } from '../../lib/country';
+import { readLocaleCookie } from '../../hooks/useLocale';
+import { getStorefrontCountry } from '../../lib/revenuecat';
 import { NOTES, PAINS, SHAPES, ROLES, houseSuggestions } from './content';
 import { Lockup, Cta, Ghost, OptionRow, ChipGrid, Field, Tick } from './ui';
 
@@ -289,20 +292,39 @@ export function KidsStep({ d, update }) {
 }
 
 /* ── 06b School ─ right after the kids step, only when a child was named
-   (machine.js hops it otherwise). Searches the GIAS directory pre-auth
-   (the search endpoint is public); the pick is created at signup by
-   replay.js, which also pulls the council's term dates - so a family with
-   kids reaches the dashboard with term dates already on the calendar.
-   Launch-week data (2026-09-02): 3 of 13 kid-households had added a
-   school, because nothing had ever asked. */
+   (machine.js hops it otherwise). The ask takes the household's shape by
+   COUNTRY, using the same detection cascade create-household will use:
+   GB searches the England schools directory (GIAS, public endpoint, so it
+   works pre-auth); every other country types a plain name - the directory
+   is England-only, and a wrong pick would import English council dates -
+   with South Africa additionally getting the national term dates at
+   replay. The pick is created at signup by replay.js. Launch-week data
+   (2026-09-02): 3 of 13 kid-households had added a school, because
+   nothing had ever asked. */
 export function SchoolStep({ d, update }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [country, setCountry] = useState(() => (
+    detectCountryFromLocaleRegion()
+    || detectCountryFromLocaleCookie(readLocaleCookie())
+    || detectCountryFromTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+    || 'GB'
+  ));
+  // The App Store / Play storefront is the strongest signal on a device,
+  // but it's async - refine once it answers.
+  useEffect(() => {
+    let on = true;
+    getStorefrontCountry().then((c) => { if (on && c) setCountry(c); }).catch(() => {});
+    return () => { on = false; };
+  }, []);
+  const isGb = country === 'GB';
+  const isZa = country === 'ZA';
   const kids = d.kids || [];
   const picked = d.school || null;
 
   useEffect(() => {
+    if (!isGb) return undefined;
     const q = query.trim();
     if (q.length < 2) { setResults([]); setSearching(false); return undefined; }
     let cancelled = false;
@@ -318,15 +340,51 @@ export function SchoolStep({ d, update }) {
       }
     }, 300);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [query]);
+  }, [query, isGb]);
 
   const pick = (r) => {
-    update({ school: { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null } });
+    update({ school: { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null, country } });
     setResults([]);
   };
   const who = kids.length === 1 ? kids[0] : kids.length === 2 ? `${kids[0]} and ${kids[1]}` : 'the kids';
   const verb = kids.length === 1 ? 'does' : 'do';
   const meta = (r) => [r.local_authority, r.postcode].filter(Boolean).join(' · ');
+  const inputStyle = {
+    width: '100%', padding: '15px 17px', borderRadius: 16,
+    border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
+    font: '600 16.5px Inter, sans-serif', color: T.ink,
+  };
+
+  // Non-GB: a plain name is the whole answer - it lands in the draft as
+  // they type (no pick step), so the CTA reads "Add this school" once
+  // there's a name.
+  if (!isGb) {
+    return (
+      <>
+        <p style={EYEBROW}>Step 4 of 6</p>
+        <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Where {verb} {who} go to school?</h1>
+        <p style={{ ...SUB, marginTop: 10 }}>
+          {isZa
+            ? 'Type the school’s name. We’ll add the national term dates and holidays to your calendar.'
+            : 'Type the school’s name. Once you’re in, you can add its term dates from the school’s website or a photo of the letter.'}
+        </p>
+        <div style={{ marginTop: 18 }}>
+          <input
+            value={picked?.name || ''}
+            onChange={(e) => {
+              const name = e.target.value;
+              update({ school: name.trim() ? { urn: null, name, type: null, local_authority: null, postcode: null, country, freeText: true } : null });
+            }}
+            placeholder={isZa ? 'e.g. Sandown Primary' : 'e.g. Lincoln Elementary'}
+            autoCapitalize="words"
+            autoCorrect="off"
+            aria-label="School name"
+            style={inputStyle}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -364,11 +422,7 @@ export function SchoolStep({ d, update }) {
               autoCapitalize="words"
               autoCorrect="off"
               aria-label="School name"
-              style={{
-                width: '100%', padding: '15px 17px', borderRadius: 16,
-                border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
-                font: '600 16.5px Inter, sans-serif', color: T.ink,
-              }}
+              style={inputStyle}
             />
           </div>
           {results.length > 0 && (

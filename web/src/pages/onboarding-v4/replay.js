@@ -164,13 +164,25 @@ export async function replaySchool(school) {
 
   let termDates = null;
   const independent = /independent|private/i.test(String(school.type || ''));
-  if (!independent && (school.local_authority || school.urn)) {
+  if (school.country === 'ZA') {
+    // South Africa: one national calendar, no council lookup - the same
+    // import the School page offers SA households.
+    try {
+      const { data } = await api.post(`/schools/${created.id}/import-sa-term-dates`, {});
+      const n = Number(data?.count ?? 0);
+      termDates = Number.isFinite(n) && n > 0 ? n : null;
+    } catch { termDates = null; }
+  } else if (!independent && (school.local_authority || school.urn)) {
+    // England/Wales: the council's dates via the shared directory.
     try {
       const { data } = await api.post(`/schools/${created.id}/import-la-dates`);
       const n = Number(data?.imported ?? data?.count ?? 0);
       termDates = Number.isFinite(n) && n > 0 ? n : null;
     } catch { termDates = null; }
   }
+  // Anywhere else (a free-text name, no urn): the school exists; term dates
+  // come from the website/photo/PDF routes on the School page, and the Done
+  // screen says exactly that.
   return { id: created.id, name: created.school_name || school.name, termDates };
 }
 
