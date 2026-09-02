@@ -708,9 +708,11 @@ describe('term-time holiday fines page', () => {
     expect(res.text).toContain('<div class="amt">£640</div>');
     expect(res.text).toContain('October half term');
     expect(res.text).toContain('checked Thu 20 Aug 2026');
-    // Result pages never compete with the bare URL in the index.
-    expect(res.text).toContain('<meta name="robots" content="noindex,follow" />');
+    // Result pages consolidate onto the bare URL via the canonical alone
+    // (noindex + a canonical elsewhere are conflicting signals).
+    expect(res.text).not.toContain('noindex');
     expect(res.text).toContain('rel="canonical" href="https://housemait.com/school-term-dates/term-time-holiday-fines"');
+    expect(res.headers['cache-control']).toBe('public, max-age=300, s-maxage=3600, stale-while-revalidate=86400');
     // Form keeps the visitor's choices.
     expect(res.text).toContain('<option value="aleshire" selected>');
     expect(res.text).toContain('value="2026-11-09"');
@@ -770,12 +772,22 @@ describe('term-time holiday fines page', () => {
     expect(res.text).not.toContain('value="<script>');
   });
 
-  it('still answers when gov.uk bank holidays are unavailable', async () => {
+  it('still answers when gov.uk bank holidays are unavailable, but is not cached', async () => {
     bh.fetchBankHolidaysEnglandWales.mockRejectedValue(new Error('gov.uk down'));
     const res = await request(app()).get(`${FINES}?council=aleshire&from=2027-05-03&to=2027-05-07`);
     expect(res.status).toBe(200);
     expect(res.text).toContain('5 school days');
     expect(res.text).toContain('Bank holidays could not be checked');
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('prices the same defaults the form shows, and echoes clamped counts', async () => {
+    const bare = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-09&to=2026-11-13`);
+    expect(bare.text).toContain('For 2 parents and 1 child that is 2 notices');
+    expect(bare.text).toContain('<option value="2" selected>2</option>');
+    const silly = await request(app()).get(`${FINES}?council=aleshire&from=2026-11-09&to=2026-11-13&children=99&parents=7`);
+    expect(silly.text).toContain('For 2 parents and 6 children that is 12 notices');
+    expect(silly.text).toContain('<option value="6" selected>6</option>');
   });
 
   it('is linked from the sitemap, the Key dates menu and the footer, and the footer lists live regions only', async () => {

@@ -1,5 +1,5 @@
 const {
-  classifyAbsence, estimateFines, meetsThreshold, nearestBreak, countryOf, RULES, MAX_RANGE_DAYS,
+  classifyAbsence, estimateFines, meetsThreshold, nearestBreak, countryOf, RULES, MAX_RANGE_DAYS, clampCounts, ayOf,
 } = require('./termTimeFines');
 
 // A split-notation council: each term published as two intervals around half
@@ -83,6 +83,59 @@ describe('classifyAbsence', () => {
     expect(classifyAbsence({ fromIso: '2026-09-01', toIso: '2026-12-01', rows: ROWS }).reason).toBe('too_long');
     expect(classifyAbsence({ fromIso: '2026-11-09', toIso: '2026-11-10', rows: [] }).reason).toBe('unresolved');
     expect(MAX_RANGE_DAYS).toBe(60);
+  });
+});
+
+describe('data-shape edge cases from review', () => {
+  const pair = (ay, s, e) => [
+    { academic_year: ay, event_type: 'term_start', date: s, end_date: null, label: null },
+    { academic_year: ay, event_type: 'term_end', date: e, end_date: null, label: null },
+  ];
+
+  it('marks a sandwiched unresolvable year as unpublished, never as holiday', () => {
+    const rows = [
+      ...pair('2025-2026', '2025-09-02', '2025-12-19'), ...pair('2025-2026', '2026-01-05', '2026-03-27'), ...pair('2025-2026', '2026-04-13', '2026-07-17'),
+      // 2026-27 published badly: three starts, two ends -> cannot pair
+      ...pair('2026-2027', '2026-09-02', '2026-12-18'), ...pair('2026-2027', '2027-01-04', '2027-03-26'),
+      { academic_year: '2026-2027', event_type: 'term_start', date: '2027-04-12', end_date: null, label: null },
+      ...pair('2027-2028', '2027-09-01', '2027-12-17'), ...pair('2027-2028', '2028-01-04', '2028-03-31'), ...pair('2027-2028', '2028-04-17', '2028-07-20'),
+    ];
+    const r = classifyAbsence({ fromIso: '2026-11-09', toIso: '2026-11-13', rows });
+    expect(r.ok).toBe(true);
+    expect(r.schoolDays).toBe(0);
+    expect(r.byKind.unknown).toBe(5);
+    expect(r.byKind.holiday).toBe(0);
+    expect(r.coveredByCalendar).toBe(false);
+    // ...and the gap across the missing year is not offered as a "break".
+    const b = nearestBreak({ fromIso: '2026-11-09', toIso: '2026-11-13', rows });
+    expect(b.weekdays).toBeLessThan(50);
+  });
+
+  it('pairs half_term_start / half_term_end single-day rows into a break', () => {
+    const rows = [
+      ...pair('2026-2027', '2026-09-01', '2026-12-18'),
+      { academic_year: '2026-2027', event_type: 'half_term_start', date: '2026-10-26', end_date: null, label: 'Half term begins' },
+      { academic_year: '2026-2027', event_type: 'half_term_end', date: '2026-10-30', end_date: null, label: 'Half term ends' },
+      ...pair('2026-2027', '2027-01-04', '2027-03-26'),
+    ];
+    const r = classifyAbsence({ fromIso: '2026-10-26', toIso: '2026-10-30', rows });
+    expect(r.schoolDays).toBe(0);
+    expect(r.byKind.holiday).toBe(5);
+    const b = nearestBreak({ fromIso: '2026-10-19', toIso: '2026-10-23', rows });
+    expect([b.firstOff, b.lastOff]).toEqual(['2026-10-26', '2026-10-30']);
+  });
+
+  it('measures distance to the nearest break against the whole range, not just its start', () => {
+    const b = nearestBreak({ fromIso: '2026-10-23', toIso: '2026-11-02', rows: ROWS });
+    expect(b.name).toBe('October half term');
+    expect(b.distanceDays).toBe(0);
+  });
+
+  it('clamps counts the same way everywhere', () => {
+    expect(clampCounts({ parents: '', children: '' })).toEqual({ parents: 1, children: 1 });
+    expect(clampCounts({ parents: 2, children: 99 })).toEqual({ parents: 2, children: 6 });
+    expect(ayOf('2026-08-31')).toBe('2025-2026');
+    expect(ayOf('2026-09-01')).toBe('2026-2027');
   });
 });
 

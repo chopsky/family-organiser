@@ -76,6 +76,22 @@ function shiftDays(iso, n) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Academic-year label ("2026-2027") a date belongs to: years run Sept-Aug. */
+function ayOf(iso) {
+  const [y, m] = iso.split('-').map(Number);
+  const start = m >= 9 ? y : y - 1;
+  return `${start}-${start + 1}`;
+}
+const ayStart = (ay) => Number(String(ay).split('-')[0]);
+
+/** The counts the page accepts: 1-2 parents, 1-6 children; anything else clamps. */
+function clampCounts({ parents, children } = {}) {
+  return {
+    parents: Math.min(2, Math.max(1, parseInt(parents, 10) || 1)),
+    children: Math.min(6, Math.max(1, parseInt(children, 10) || 1)),
+  };
+}
+
 /**
  * Council-wide (not school-scoped) rows that mean "no pupils in today":
  * published break ranges, single-day closures and INSET days.
@@ -83,13 +99,23 @@ function shiftDays(iso, n) {
 function closureSets(rows) {
   const ranges = [];
   const singles = new Set();
-  for (const r of rows) {
-    if (isSchoolScoped(r)) continue;
-    if (['half_term_start', 'bank_holiday', 'inset_day'].includes(r.event_type)) {
-      if (r.end_date && r.end_date !== r.date) ranges.push([r.date, r.end_date]);
-      else singles.add(r.date);
+  // Some councils publish half term as a start row and an end row on
+  // separate single dates rather than one range. Pair each open
+  // half_term_start with the next half_term_end in the same academic year.
+  const pending = [];
+  const sorted = [...rows].filter((r) => r && r.date && !isSchoolScoped(r)).sort((a, b) => a.date.localeCompare(b.date));
+  for (const r of sorted) {
+    if (r.event_type === 'half_term_end') {
+      const i = pending.findIndex((p) => p.academic_year === r.academic_year && p.date <= r.date);
+      if (i !== -1) { ranges.push([pending[i].date, r.date]); pending.splice(i, 1); }
+      continue;
     }
+    if (!['half_term_start', 'bank_holiday', 'inset_day'].includes(r.event_type)) continue;
+    if (r.end_date && r.end_date !== r.date) ranges.push([r.date, r.end_date]);
+    else if (r.event_type === 'half_term_start') pending.push(r);
+    else singles.add(r.date);
   }
+  for (const p of pending) singles.add(p.date);
   return { ranges, singles };
 }
 
@@ -99,17 +125,17 @@ function closureSets(rows) {
  */
 function allIntervals(rows) {
   const years = [...new Set(rows.map((r) => r.academic_year))].sort();
-  const out = [];
-  let resolvedAny = false;
+  const intervals = [];
+  const resolved = new Set();
   for (const ay of years) {
     const iv = termIntervals(rows.filter((r) => r.academic_year === ay));
     if (!iv) continue;
-    resolvedAny = true;
-    out.push(...iv.map(([s, e]) => [s, e, ay]));
+    resolved.add(ay);
+    intervals.push(...iv.map(([s, e]) => [s, e, ay]));
   }
-  if (!resolvedAny) return null;
-  out.sort((a, b) => a[0].localeCompare(b[0]));
-  return out;
+  if (!resolved.size) return null;
+  intervals.sort((a, b) => a[0].localeCompare(b[0]));
+  return { intervals, resolved };
 }
 
 /**
@@ -127,11 +153,11 @@ function classifyAbsence({ fromIso, toIso, rows, bankHolidayDates = [] }) {
   if (toIso < fromIso) return { ok: false, reason: 'reversed' };
   if (daysBetween(fromIso, toIso) + 1 > MAX_RANGE_DAYS) return { ok: false, reason: 'too_long' };
 
-  const intervals = allIntervals(rows || []);
-  if (!intervals) return { ok: false, reason: 'unresolved' };
+  const resolvedSet = allIntervals(rows || []);
+  if (!resolvedSet) return { ok: false, reason: 'unresolved' };
+  const { intervals, resolved } = resolvedSet;
   const { ranges, singles } = closureSets(rows);
   const bank = new Set(bankHolidayDates);
-  const yearSpan = [intervals[0][0], intervals[intervals.length - 1][1]];
 
   const byKind = { school: 0, weekend: 0, bankHoliday: 0, closure: 0, holiday: 0, unknown: 0 };
   const days = [];
@@ -143,7 +169,9 @@ function classifyAbsence({ fromIso, toIso, rows, bankHolidayDates = [] }) {
     else if (bank.has(date)) kind = 'bankHoliday';
     else if (ranges.some(([s, e]) => date >= s && date <= e)) kind = 'holiday';
     else if (singles.has(date)) kind = 'closure';
-    else if (date < yearSpan[0] || date > yearSpan[1]) { kind = 'unknown'; coveredByCalendar = false; }
+    // A date whose own academic year didn't resolve is NOT a holiday, it is
+    // unpublished - even when it sits between two years that did resolve.
+    else if (!resolved.has(ayOf(date))) { kind = 'unknown'; coveredByCalendar = false; }
     else if (intervals.some(([s, e]) => date >= s && date <= e)) kind = 'school';
     else kind = 'holiday';
     byKind[kind]++;
@@ -159,8 +187,7 @@ function classifyAbsence({ fromIso, toIso, rows, bankHolidayDates = [] }) {
  */
 function estimateFines({ country, parents = 1, children = 1 }) {
   const r = RULES[country] || RULES.England;
-  const p = Math.min(2, Math.max(1, parseInt(parents, 10) || 1));
-  const c = Math.min(6, Math.max(1, parseInt(children, 10) || 1));
+  const { parents: p, children: c } = clampCounts({ parents, children });
   const n = p * c;
   return {
     rules: r,
@@ -201,13 +228,19 @@ function breakName(firstOffIso) {
  * a half-term range row via `ranges`). Returns null when none can be derived.
  * { name, firstOff, lastOff, weekdays, distanceDays }
  */
-function nearestBreak({ fromIso, rows }) {
+function nearestBreak({ fromIso, toIso, rows }) {
   if (!isIsoDate(fromIso)) return null;
-  const intervals = allIntervals(rows || []);
-  if (!intervals) return null;
+  const untilIso = isIsoDate(toIso) && toIso >= fromIso ? toIso : fromIso;
+  const resolvedSet = allIntervals(rows || []);
+  if (!resolvedSet) return null;
+  const { intervals } = resolvedSet;
   const { ranges } = closureSets(rows);
   const candidates = [];
   for (let i = 0; i < intervals.length - 1; i++) {
+    // A gap between two intervals is only a real break when the years are the
+    // same or consecutive; a missing year in between is a data hole, not a
+    // 300-day summer.
+    if (ayStart(intervals[i + 1][2]) - ayStart(intervals[i][2]) > 1) continue;
     const firstOff = shiftDays(intervals[i][1], 1);
     const lastOff = shiftDays(intervals[i + 1][0], -1);
     if (lastOff >= firstOff) candidates.push([firstOff, lastOff]);
@@ -216,8 +249,8 @@ function nearestBreak({ fromIso, rows }) {
   const scored = candidates
     .map(([s, e]) => {
       const weekdays = eachDay(s, e).filter((d) => { const w = new Date(`${d}T00:00:00Z`).getUTCDay(); return w >= 1 && w <= 5; }).length;
-      // Distance from the chosen start to the break (0 if the start is inside it).
-      const distanceDays = fromIso < s ? daysBetween(fromIso, s) : (fromIso > e ? daysBetween(e, fromIso) : 0);
+      // Distance from the chosen dates to the break (0 when they overlap it).
+      const distanceDays = untilIso < s ? daysBetween(untilIso, s) : (fromIso > e ? daysBetween(e, fromIso) : 0);
       return { name: breakName(s), firstOff: s, lastOff: e, weekdays, distanceDays };
     })
     .filter((b) => b.weekdays >= 3)
@@ -230,6 +263,8 @@ module.exports = {
   MAX_RANGE_DAYS,
   countryOf,
   isIsoDate,
+  ayOf,
+  clampCounts,
   classifyAbsence,
   estimateFines,
   meetsThreshold,

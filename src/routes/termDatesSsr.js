@@ -1302,8 +1302,9 @@ function bankHolidayPage(annotated, defs) {
 // the trip cover, does that meet the national penalty-notice threshold, and
 // what would the notices add up to per parent per child. Pure HTML GET form,
 // server-rendered result (no new inline script, CSP untouched). Result pages
-// carry noindex + a canonical to the bare URL so the index never fills with
-// query-string variants.
+// carry a canonical to the bare URL so query-string variants consolidate
+// there instead of competing (no noindex: Google treats noindex + a canonical
+// elsewhere as conflicting signals).
 
 const FINES_SLUG = 'term-time-holiday-fines';
 const gbp = (n) => `£${Number(n).toLocaleString('en-GB')}`;
@@ -1382,11 +1383,13 @@ async function computeFinesOutcome(form) {
   const absence = fines.classifyAbsence({ fromIso: from, toIso: to, rows, bankHolidayDates });
   if (!absence.ok) return { error: absence.reason, authority };
   const country = fines.countryOf(authority);
-  const money = fines.estimateFines({ country, parents: one(form.parents), children: one(form.children) });
+  // Same defaults as the form renders (2 parents, 1 child), so a shared link
+  // without those params prices what the select boxes show.
+  const money = fines.estimateFines({ country, parents: one(form.parents) || 2, children: one(form.children) || 1 });
   return {
     ok: true, authority, country, absence, money, bankApplied,
     threshold: fines.meetsThreshold(country, absence.sessions),
-    nearest: fines.nearestBreak({ fromIso: from, rows }),
+    nearest: fines.nearestBreak({ fromIso: from, toIso: to, rows }),
     from, to,
   };
 }
@@ -1533,7 +1536,6 @@ function finesPage({ authorities, defs, form, outcome }) {
   const E = fines.RULES.England;
   const title = `Term-Time Holiday Fines ${defs.y1}/${defs.y2}: How Much, Per Child, and When | Housemait`;
   const description = `Check how many school days a term-time holiday would cover in your council's ${defs.ayLabel} calendar, whether it meets the ${E.thresholdSessions}-session threshold, and what the ${gbp(E.firstEarly)} to ${gbp(E.firstLate)} penalty notices add up to per parent per child.`;
-  const used = !!outcome;
   const one = (v) => esc((Array.isArray(v) ? v[0] : (v == null ? '' : String(v))).trim());
   const sel = (a, b) => (String(a) === String(b) ? ' selected' : '');
 
@@ -1543,8 +1545,10 @@ function finesPage({ authorities, defs, form, outcome }) {
   const options = `<option value="">Choose your council…</option>`
     + `<optgroup label="England">${eng.map(opt).join('')}</optgroup>`
     + (wal.length ? `<optgroup label="Wales">${wal.map(opt).join('')}</optgroup>` : '');
-  const children = one(form.children) || '1';
-  const parents = one(form.parents) || '2';
+  // Echo the CLAMPED counts so the selects always show what was priced.
+  const counts = fines.clampCounts({ parents: one(form.parents) || 2, children: one(form.children) || 1 });
+  const children = String(counts.children);
+  const parents = String(counts.parents);
 
   const faq = [
     { q: 'How much is the fine for taking a child out of school in England?', a: `${gbp(E.firstEarly)} per parent per child if paid within ${E.earlyDays} days, rising to ${gbp(E.firstLate)} if paid within ${E.lateDays} days. A second notice for the same child within ${E.repeatWindowYears} years is ${gbp(E.second)} with no reduced rate, and a third time leads to prosecution rather than another notice.` },
@@ -1571,7 +1575,7 @@ function finesPage({ authorities, defs, form, outcome }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}" />
-  <link rel="canonical" href="${esc(canonical)}" />${used ? '\n  <meta name="robots" content="noindex,follow" />' : ''}
+  <link rel="canonical" href="${esc(canonical)}" />
   <meta property="og:title" content="${esc(title)}" />
   <meta property="og:description" content="${esc(description)}" />
   <meta property="og:type" content="website" />
@@ -1880,7 +1884,10 @@ router.get(`/${FINES_SLUG}`, async (req, res, next) => {
       .sort((a, b) => a.name.localeCompare(b.name));
     const form = req.query || {};
     const outcome = await computeFinesOutcome(form);
-    res.set('Cache-Control', CACHE_HEADER).type('html').send(finesPage({ authorities, defs, form, outcome }));
+    // A fail-open answer (bank holidays unreachable) is knowingly incomplete;
+    // never let the CDN pin it for an hour.
+    const cache = outcome && outcome.ok && !outcome.bankApplied ? 'no-store' : CACHE_HEADER;
+    res.set('Cache-Control', cache).type('html').send(finesPage({ authorities, defs, form, outcome }));
   } catch (err) {
     console.error('[term-dates-ssr] fines page failed:', err.message);
     next();
