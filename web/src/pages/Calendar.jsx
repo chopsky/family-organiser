@@ -2796,15 +2796,25 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Selected day agenda for mobile */}
+            {/* Selected day agenda for mobile - the SAME day-section shape as
+                the Schedule view (header row + cards), so the two agenda
+                surfaces are indistinguishable. Header tap opens Day view,
+                as it does there. */}
             {selectedDate && (
               <div>
-                <div className="font-bold uppercase" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--color-plum)', marginBottom: 3 }}>
-                  {isSameDay(selectedDate, today) ? 'Today' : `${selectedDate.toLocaleDateString('en-GB', { month: 'short' })} ${selectedDate.getDate()}`}
-                </div>
-                <h3 style={{ fontFamily: M_SERIF, fontSize: 20, fontWeight: 400, color: M_INK, margin: '0 0 12px' }}>
-                  {selectedDate.toLocaleDateString('en-GB', { weekday: 'long' })}
-                </h3>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('day')}
+                  className="flex items-baseline bg-transparent border-0 cursor-pointer"
+                  style={{ gap: 7, marginBottom: 9, padding: '0 2px', fontFamily: 'inherit' }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 700, color: isSameDay(selectedDate, today) ? 'var(--color-plum)' : M_INK }}>
+                    {isSameDay(selectedDate, today) ? 'Today' : selectedDate.toLocaleDateString('en-GB', { weekday: 'long' })}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>
+                    {selectedDate.toLocaleDateString('en-GB', { month: 'short' })} {selectedDate.getDate()}
+                  </span>
+                </button>
                 {[...eventsForDate(selectedDate).map(e => ({ ...e, _type: 'event' })), ...tasksForDate(selectedDate).map(t => ({ ...t, _type: 'task' }))].map(item => {
                   const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
                   const badge = getTypeBadge(item);
