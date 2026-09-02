@@ -365,7 +365,7 @@ export function SchoolStep({ d, update }) {
         <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Where {verb} {who} go to school?</h1>
         <p style={{ ...SUB, marginTop: 10 }}>
           {isZa
-            ? 'Type the school’s name. We’ll add the national term dates and holidays to your calendar.'
+            ? 'Type the school’s name and tell us which calendar it follows.'
             : 'Type the school’s name. Once you’re in, you can add its term dates from the school’s website or a photo of the letter.'}
         </p>
         <div style={{ marginTop: 18 }}>
@@ -373,7 +373,7 @@ export function SchoolStep({ d, update }) {
             value={picked?.name || ''}
             onChange={(e) => {
               const name = e.target.value;
-              update({ school: name.trim() ? { urn: null, name, type: null, local_authority: null, postcode: null, country, freeText: true } : null });
+              update({ school: name.trim() ? { ...(picked || {}), urn: null, name, type: null, local_authority: null, postcode: null, country, freeText: true } : null });
             }}
             placeholder={isZa ? 'e.g. Sandown Primary' : 'e.g. Lincoln Elementary'}
             autoCapitalize="words"
@@ -382,6 +382,35 @@ export function SchoolStep({ d, update }) {
             style={inputStyle}
           />
         </div>
+        {/* South Africa: public schools follow the national calendar;
+            independent schools set their own. Nothing is assumed - the
+            national dates are only imported when the family says so,
+            because the wrong calendar on a private-school family's
+            year is worse than none (founder, 2026-09-02). */}
+        {isZa && picked?.name && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+            {[
+              { v: true, label: 'Public school', note: 'Follows the national term dates - we’ll add them for you' },
+              { v: false, label: 'Private or independent', note: 'Sets its own calendar - add its dates on the School page' },
+            ].map((o) => {
+              const on = picked.usesNationalDates === o.v;
+              return (
+                <button
+                  key={String(o.v)}
+                  type="button"
+                  onClick={() => update({ school: { ...picked, usesNationalDates: o.v } })}
+                  style={{
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
+                    border: `1.5px solid ${on ? T.purple : T.line2}`, background: on ? T.purpleSoft : T.surface,
+                  }}
+                >
+                  <div style={{ font: '600 15px Inter, sans-serif', color: on ? T.purpleDeep : T.ink }}>{o.label}</div>
+                  <div style={{ font: '500 12.5px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{o.note}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </>
     );
   }

@@ -37,7 +37,7 @@ export const emptyDraft = () => ({
   role: '',
   house: '',      // household name -> screens 11, 12
   cals: {},       // { providerId: true } - CONNECTED INTENT ONLY, never the URL
-  school: null,   // { urn, name, type, local_authority, postcode, country, freeText? } from the school step; created at replay
+  school: null,   // { urn, name, type, local_authority, postcode, country, freeText?, usesNationalDates? (ZA) } from the school step; created at replay
   inbox: '',      // claimed house-inbox slug; the alias is set after sign-up
   wa: false,      // wants WhatsApp; the real pairing happens after sign-up
   rem: false,     // notification permission granted

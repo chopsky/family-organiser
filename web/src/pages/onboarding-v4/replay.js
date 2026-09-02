@@ -164,9 +164,10 @@ export async function replaySchool(school) {
 
   let termDates = null;
   const independent = /independent|private/i.test(String(school.type || ''));
-  if (school.country === 'ZA') {
-    // South Africa: one national calendar, no council lookup - the same
-    // import the School page offers SA households.
+  if (school.country === 'ZA' && school.usesNationalDates === true) {
+    // South Africa: the national calendar applies to PUBLIC schools only -
+    // independent schools set their own, so the family's explicit answer
+    // at the step gates this import (never assumed).
     try {
       const { data } = await api.post(`/schools/${created.id}/import-sa-term-dates`, {});
       const n = Number(data?.count ?? 0);
