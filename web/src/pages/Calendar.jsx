@@ -370,9 +370,14 @@ function layoutOverlappingEvents(events) {
 
 /** Get months to fetch for a given date range */
 function getMonthsForRange(startDate, endDate) {
+  // Walk months anchored to the 1st: incrementing setMonth from a
+  // month-END date overflows (Aug 31 + 1 month = "Sep 31" = Oct 1), which
+  // skipped September entirely for the 31 Aug - 6 Sep week and left six
+  // empty columns (live report 2026-09-02). Day-1 anchoring can't overflow.
   const months = new Set();
-  const d = new Date(startDate);
-  while (d <= endDate) {
+  const d = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+  while (d <= end) {
     months.add(monthParam(d));
     d.setMonth(d.getMonth() + 1);
   }
