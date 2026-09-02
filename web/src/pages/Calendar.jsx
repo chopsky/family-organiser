@@ -2799,31 +2799,33 @@ export default function Calendar() {
                         else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
                       }}
                     >
-                      {/* Time column per the handoff (start over end); tasks
-                          keep their small badge - the design's cards are
-                          events-only and the checkbox-less list needs the
-                          type distinction somewhere. */}
+                      {/* Time column (start over end); tasks keep their small
+                          badge - the design's cards are events-only and the
+                          checkbox-less list needs the type distinction
+                          somewhere. Typography matches the Schedule view's
+                          cards exactly (founder, 2026-09-02): 13/500 start,
+                          10.5 end, 14/600 title, 11.5 location. */}
                       <div style={{ width: 56, flexShrink: 0 }}>
                         {item._type === 'task' ? (
                           <>
-                            <div className="font-bold" style={{ fontSize: 14, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>
                               {item.due_time ? item.due_time.substring(0, 5) : 'All day'}
                             </div>
                             <span className="inline-block font-semibold" style={{ fontSize: 9, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 5px', marginTop: 2 }}>{badge.label}</span>
                           </>
                         ) : item.all_day ? (
-                          <div className="font-bold" style={{ fontSize: 12, color: M_INK }}>All day</div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: M_INK, lineHeight: 1.3 }}>All day</div>
                         ) : (
                           <>
-                            <div className="font-bold" style={{ fontSize: 14, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.start_time)}</div>
-                            {item.end_time && <div style={{ fontSize: 11, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.end_time)}</div>}
+                            <div style={{ fontSize: 13, fontWeight: 500, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.start_time)}</div>
+                            {item.end_time && <div style={{ fontSize: 10.5, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.end_time)}</div>}
                           </>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold truncate" style={{ fontSize: 15, color: M_INK }}>{item.title}</div>
+                        <div className="font-semibold truncate" style={{ fontSize: 14, color: M_INK }}>{item.title}</div>
                         {(item.location || (item._type === 'event' && (selectedDayClashKeys.has(itemKey(item)) || (!childMode && item.category !== 'public_holiday' && item.category !== 'birthday' && looksLikeGathering(item.title))))) && (
-                          <div className="truncate" style={{ fontSize: 12, color: M_INK3, marginTop: 2 }}>
+                          <div className="truncate" style={{ fontSize: 11.5, color: M_INK3, marginTop: 2 }}>
                             {item.location}
                             {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
                               <span className={`font-semibold ${item.location ? 'ml-1.5' : ''}`} style={{ color: '#B45309' }}>⚠️ Clash</span>
