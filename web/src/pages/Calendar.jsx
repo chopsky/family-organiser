@@ -129,6 +129,67 @@ const CAL_VIEWS = [
   { value: 'schedule', label: 'Schedule' },
 ];
 
+// ── Event kinds (design_handoff_calendar type filter) ──
+// The handoff wants a `kind` per event; rather than a migration we DERIVE
+// it: weekly-activity occurrences are Clubs, school category is School,
+// appointment-ish titles are Appointments, everything else (birthdays
+// included) is Family. Public holidays match no kind, so any kind filter
+// hides them - you don't mean bank holidays when you ask for "Clubs".
+const CAL_KINDS = [
+  ['school', 'School'],
+  ['activity', 'Clubs'],
+  ['appointment', 'Appointments'],
+  ['family', 'Family'],
+];
+const APPOINTMENT_RE = /\b(dentist|doctor|dr|gp|optician|hygienist|physio|osteopath|chiropractor|vet|appointment|check-?up|clinic|hospital|orthodontist|midwife|barber|haircut)\b/i;
+function eventKind(e) {
+  if (e._activity) return 'activity';
+  if (e.category === 'school') return 'school';
+  if (e.category === 'birthday') return 'family';
+  if (e.category === 'public_holiday') return null;
+  return APPOINTMENT_RE.test(e.title || '') ? 'appointment' : 'family';
+}
+
+// Week/Day time-grid range: 07:00-22:00 per the handoff, stretched when
+// real events fall outside it (a 6am flight must not be invisible).
+const GRID_START_MIN = 7 * 60;
+const GRID_END_MIN = 22 * 60;
+function gridRangeFor(dayEventLists) {
+  let start = GRID_START_MIN; let end = GRID_END_MIN;
+  for (const list of dayEventLists) {
+    for (const ev of list) {
+      const s = new Date(ev.start_time); const e = ev.end_time ? new Date(ev.end_time) : null;
+      if (!Number.isNaN(s.getTime())) start = Math.min(start, Math.floor((s.getHours() * 60 + s.getMinutes()) / 60) * 60);
+      const endMin = e && !Number.isNaN(e.getTime()) ? e.getHours() * 60 + e.getMinutes() : null;
+      if (endMin != null && endMin > 0) end = Math.max(end, Math.min(24 * 60, Math.ceil(endMin / 60) * 60));
+    }
+  }
+  return { start, end };
+}
+const minOfDay = (iso) => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
+// The handoff's block text colour: the event colour pulled 58% toward ink.
+const inkMix = (hex) => `color-mix(in srgb, ${hex}, #1A1620 58%)`;
+
+// Filter chip (mobile filter panel): ink-filled when active, hairline ring
+// when not - per design_handoff_calendar.
+function MobileFilterChip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 flex items-center font-semibold"
+      style={{
+        gap: 6, borderRadius: 99, padding: '7px 13px', fontSize: 12.5,
+        background: active ? M_INK : '#fff', color: active ? '#fff' : M_INK2,
+        boxShadow: active ? 'none' : `inset 0 0 0 1px ${M_LINE_STRONG}`,
+        transition: 'all .15s ease',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 const REMINDER_OPTIONS = [
   { value: '5', unit: 'minutes', label: '5 minutes before' },
   { value: '10', unit: 'minutes', label: '10 minutes before' },
@@ -144,7 +205,6 @@ const REMINDER_OPTIONS = [
 ];
 
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 // ── Date helpers ────────────────────────────────────────────
 
@@ -206,13 +266,6 @@ function formatTime(iso) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatHour(hour) {
-  if (hour === 0) return '12 AM';
-  if (hour < 12) return `${hour} AM`;
-  if (hour === 12) return '12 PM';
-  return `${hour - 12} PM`;
-}
-
 function buildCalendarDays(year, month) {
   const firstDay = new Date(year, month, 1);
   const startOffset = mondayBasedDay(firstDay);
@@ -252,18 +305,6 @@ function getWeekDays(weekStart) {
     d.setDate(d.getDate() + i);
     return d;
   });
-}
-
-/** Get event position within hour grid (top offset & height in pixels) */
-function getEventPosition(event, hourHeight) {
-  const start = new Date(event.start_time);
-  const end = new Date(event.end_time);
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = end.getHours() * 60 + end.getMinutes();
-  const duration = Math.max(endMinutes - startMinutes, 15);
-  const top = (startMinutes / 60) * hourHeight;
-  const height = (duration / 60) * hourHeight;
-  return { top, height: Math.max(height, 20) };
 }
 
 /**
@@ -400,6 +441,10 @@ export default function Calendar() {
   // meaningfully off the top (the page scrolls the window in this view).
   const [scheduleShowTop, setScheduleShowTop] = useState(false);
   const scheduleEndRef = useRef(null);
+  // ── Mobile chrome (design_handoff_calendar) ──
+  const [mobileSearching, setMobileSearching] = useState(false); // title row morphed into search
+  const [showMobileFilters, setShowMobileFilters] = useState(false); // chip rows open
+  const [mobileKindFilter, setMobileKindFilter] = useState(null); // null | school|activity|appointment|family
   // One extension in flight at a time: cleared when fresh events land, so a
   // still-visible sentinel re-fires only after the new month has rendered.
   const scheduleExtendBusyRef = useRef(false);
@@ -535,7 +580,6 @@ export default function Calendar() {
   const formRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  const HOUR_HEIGHT = 52; // matches mockup
 
   // ── Client-side month cache (avoids re-fetching already loaded months) ──
   const monthCacheRef = useRef({}); // { '2026-03': { events: [...], tasks: [...], ts: Date.now() } }
@@ -791,11 +835,14 @@ export default function Calendar() {
     }
   }, [showForm]);
 
-  // Scroll to current time in day/week view
+  // Scroll to current time in day/week view. The grids start at 07:00
+  // (design_handoff_calendar) with 60px/50px hours - land the now-line a
+  // little below the card's top edge.
   useEffect(() => {
     if ((viewMode === 'day' || viewMode === 'week') && scrollContainerRef.current) {
-      const now = new Date();
-      const scrollTo = Math.max(0, (now.getHours() - 1) * HOUR_HEIGHT);
+      const nowD = new Date();
+      const rowH = viewMode === 'day' ? 60 : 50;
+      const scrollTo = Math.max(0, (nowD.getHours() - 7 - 1) * rowH);
       setTimeout(() => {
         scrollContainerRef.current?.scrollTo({ top: scrollTo, behavior: 'smooth' });
       }, 100);
@@ -958,6 +1005,60 @@ export default function Calendar() {
     return selectedDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
   }, [viewMode, currentMonth, selectedDate]);
 
+  // ── Mobile header title + sub per view (design_handoff_calendar) ──
+  const mobileNav = useMemo(() => {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    if (viewMode === 'day') {
+      return {
+        title: selectedDate.toLocaleDateString('en-GB', { weekday: 'long' }),
+        sub: `${selectedDate.toLocaleDateString('en-GB', { month: 'short' })} ${selectedDate.getDate()}`,
+      };
+    }
+    if (viewMode === 'week') {
+      const ws = getWeekStart(selectedDate);
+      const we = new Date(ws); we.setDate(we.getDate() + 6);
+      const sub = ws.getMonth() === we.getMonth()
+        ? `${ws.toLocaleDateString('en-GB', { month: 'short' })} ${ws.getDate()}–${we.getDate()}`
+        : `${ws.getDate()} ${ws.toLocaleDateString('en-GB', { month: 'short' })} – ${we.getDate()} ${we.toLocaleDateString('en-GB', { month: 'short' })}`;
+      return { title: ws.toLocaleDateString('en-GB', { month: 'long' }), sub };
+    }
+    if (viewMode === 'schedule') {
+      const cur = currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() === now.getMonth();
+      return cur
+        ? { title: 'Coming up', sub: currentMonth.toLocaleDateString('en-GB', { month: 'long' }) }
+        : { title: currentMonth.toLocaleDateString('en-GB', { month: 'long' }), sub: String(currentMonth.getFullYear()) };
+    }
+    return { title: currentMonth.toLocaleDateString('en-GB', { month: 'long' }), sub: String(currentMonth.getFullYear()) };
+  }, [viewMode, currentMonth, selectedDate]);
+
+  // Today pill shows only when the user is OFF today (month/selection-wise).
+  const offToday = !(
+    currentMonth.getFullYear() === today.getFullYear()
+    && currentMonth.getMonth() === today.getMonth()
+    && (viewMode === 'month' || viewMode === 'schedule' ? true : isSameDay(selectedDate, today))
+  ) || ((viewMode === 'day' || viewMode === 'week') && !isSameDay(selectedDate, today));
+
+  // Person filter (mobile chips): single-select over the SAME
+  // activeMemberFilters state the desktop cog multi-toggles. One member in
+  // the set = that chip active; the existing fail-open rule (items
+  // resolving to no member are household-wide and always shown) is exactly
+  // the handoff's "person filter includes whole-family events".
+  const mobileFilterWho = activeMemberFilters && activeMemberFilters.size === 1
+    ? [...activeMemberFilters][0] : null;
+  const personFilterActive = !!(activeMemberFilters && members.length > 0 && activeMemberFilters.size < members.length);
+  const mobileFilterCount = (personFilterActive ? 1 : 0) + (mobileKindFilter ? 1 : 0);
+  const setMobileFilterWho = (id) => {
+    setActiveMemberFilters(id ? new Set([id]) : new Set(members.map((m) => m.id)));
+  };
+  const clearMobileFilters = () => {
+    setMobileFilterWho(null);
+    setMobileKindFilter(null);
+  };
+  // Vertical space the filter chrome occupies - keeps the week/day grid
+  // caps honest instead of the prototype's magic constants.
+  const mobileFilterChromePx = showMobileFilters ? 96 : (mobileFilterCount > 0 ? 40 : 0);
+  const mobileSearchActive = mobileSearching && searchQuery.trim().length > 0;
+
   // ── Items for a given date ─────────────────────────────
 
   // Resolve an item's assignees to a Set of CURRENT member IDs, drawing from
@@ -1001,6 +1102,10 @@ export default function Calendar() {
       if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
       if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
       if (cat === 'school' && !activeFilters.has('school')) return false;
+      // Type filter (mobile chip rows): matches the derived kind. Every
+      // view and the search read through here, so it composes with the
+      // member filter below for free.
+      if (mobileKindFilter && eventKind(e) !== mobileKindFilter) return false;
       // Child Mode: holidays + school (term dates / extracurriculars) stay; any
       // other event must be assigned to a dependent. Unassigned adult/household
       // events are hidden (a deliberate departure from the fail-open default).
@@ -1774,9 +1879,8 @@ export default function Calendar() {
   const weekStart = getWeekStart(selectedDate);
   const weekDays = getWeekDays(weekStart);
 
-  // Current time indicator position
+  // Current time, for the week/day grids' red now-line.
   const now = new Date();
-  const currentTimeTop = (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_HEIGHT;
 
   // ── Search results ─────────────────────────────────────
   //
@@ -1956,6 +2060,72 @@ export default function Calendar() {
   // Shared search-results renderer, used by both the desktop popover and the
   // mobile full-width search bar. jumpToSearchResult already clears the query,
   // so a tapped result self-closes either dropdown.
+  // Mobile search agenda (design_handoff_calendar): full-width result cards
+  // replacing the views while a query is live. Same visibility rules as the
+  // views - category toggles, kind filter, member filter all apply.
+  function renderMobileSearchAgenda() {
+    const q = searchQuery.trim().toLowerCase();
+    const memberIdSetAll = new Set(members.map((m) => m.id));
+    const nameToId = new Map(members.map((m) => [m.name, m.id]));
+    const hits = events.filter((e) => {
+      const matches = (e.title || '').toLowerCase().includes(q) || (e.location || '').toLowerCase().includes(q);
+      if (!matches) return false;
+      const cat = e.category || 'general';
+      if (cat === 'general' && !activeFilters.has('events')) return false;
+      if (cat === 'birthday' && !activeFilters.has('birthdays')) return false;
+      if (cat === 'public_holiday' && !activeFilters.has('holidays')) return false;
+      if (cat === 'school' && !activeFilters.has('school')) return false;
+      if (mobileKindFilter && eventKind(e) !== mobileKindFilter) return false;
+      if (activeMemberFilters) {
+        const ids = assigneeMemberIds(e, nameToId, memberIdSetAll);
+        if (ids.size > 0 && ![...ids].some((id) => activeMemberFilters.has(id))) return false;
+      }
+      return true;
+    }).sort((a, b) => (a.start_time || '').localeCompare(b.start_time || '')).slice(0, 60);
+
+    return (
+      <div style={{ paddingTop: 4 }}>
+        <div className="text-[12px]" style={{ color: M_INK3, marginBottom: 12 }}>
+          {hits.length} {hits.length === 1 ? 'result' : 'results'} for “{searchQuery.trim()}”
+        </div>
+        <div className="flex flex-col" style={{ gap: 10 }}>
+          {hits.map((ev) => {
+            const hex = getEventHex(ev);
+            const d = new Date(ev.start_time);
+            const eventMembers = getEventMembers(ev);
+            return (
+              <div
+                key={ev.occurrence_key || ev.id}
+                className="flex items-center bg-white cursor-pointer text-left"
+                style={{ gap: 12, borderRadius: 16, padding: '12px 14px', borderLeft: `4px solid ${hex}`, boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+                onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+              >
+                <div style={{ width: 52, flexShrink: 0 }}>
+                  <div className="font-bold" style={{ fontSize: 11, color: 'var(--color-plum)', letterSpacing: '0.04em' }}>
+                    {d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()} {d.getDate()}
+                  </div>
+                  <div className="font-bold" style={{ fontSize: 13, color: M_INK, fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>
+                    {ev.all_day ? 'All day' : formatTime(ev.start_time)}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate font-semibold" style={{ fontSize: 14, color: M_INK }}>{ev.title}</div>
+                  {ev.location && <div className="truncate" style={{ fontSize: 12, color: M_INK3, marginTop: 1 }}>{ev.location}</div>}
+                </div>
+                {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 24 : 28, ringColor: '#FFFFFF' })}
+              </div>
+            );
+          })}
+          {hits.length === 0 && (
+            <div className="text-center" style={{ padding: '40px 0', color: M_INK3, fontFamily: M_SERIF, fontSize: 20 }}>
+              No matching events
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   function renderSearchResults() {
     if (searchQuery.trim().length < 2) return <p className="text-sm text-warm-grey p-3 text-center">Type at least 2 characters…</p>;
     if (searchLoading && searchResults.length === 0) return <p className="text-sm text-warm-grey p-3 text-center">Searching…</p>;
@@ -2073,7 +2243,9 @@ export default function Calendar() {
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
 
-      {/* ── Toolbar ──────────────────────────────────────────── */}
+      {/* ── Toolbar (desktop only - mobile gets the compact chrome below,
+            per design_handoff_calendar: no page title on phones) ── */}
+      <div className="hidden md:block">
       <PageHeader
         kicker={navigationLabel}
         title="Calendar"
@@ -2267,56 +2439,181 @@ export default function Calendar() {
         </>
         }
       />
+      </div>
 
-      {/* ── Mobile controls: full-width search, view switcher, month nav.
-            Desktop keeps these inline in the header toolbar above. ── */}
-      <div className="md:hidden flex flex-col gap-3">
-        {/* Search - hidden by default, revealed by the header search button */}
-        {mobileSearchOpen && (
-          <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-grey pointer-events-none">
-              <IconSearch className="w-[18px] h-[18px]" />
-            </span>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search events, people, places…"
-              autoFocus
-              className="w-full h-12 rounded-2xl pl-11 pr-11 text-[15px] text-charcoal bg-white border border-light-grey outline-none focus:border-plum placeholder:text-warm-grey"
-            />
-            <button
-              onClick={() => { setMobileSearchOpen(false); setSearchQuery(''); }}
-              aria-label="Close search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-warm-grey hover:text-charcoal"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-            </button>
-            {searchQuery.trim() && (
-              <div className="absolute left-0 right-0 top-[54px] bg-white rounded-2xl border border-light-grey z-30 p-2 max-h-72 overflow-y-auto" style={{ boxShadow: 'var(--shadow-lg)' }}>
-                {renderSearchResults()}
+      {/* ── Mobile chrome (design_handoff_calendar): compact two-row header.
+            Row 1: serif view title + sub (or the morphed search bar), Today
+            pill only when off today, then search / filter / add circles
+            (34px visuals inside 44px hit wrappers). Row 2 (below the filter
+            panel): chevrons flanking the 4-up segmented switcher. ── */}
+      <div className="md:hidden flex flex-col">
+        <div className="flex items-center gap-2" style={{ minHeight: 38, marginBottom: 12 }}>
+          {mobileSearching ? (
+            <>
+              <div
+                className="flex-1 min-w-0 flex items-center gap-2 bg-white"
+                style={{ borderRadius: 13, padding: '9px 13px', border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)' }}
+              >
+                <IconSearch className="w-4 h-4 shrink-0" style={{ color: M_INK3 }} />
+                <input
+                  autoFocus
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search events, people, places…"
+                  className="flex-1 min-w-0 border-0 outline-none bg-transparent text-[14px]"
+                  style={{ color: M_INK }}
+                />
+                {searchQuery && (
+                  <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')} className="shrink-0 flex" style={{ color: M_INK3 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                )}
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => { setMobileSearching(false); setSearchQuery(''); }}
+                className="shrink-0 text-[14px] font-semibold"
+                style={{ color: M_INK2, padding: '4px 2px' }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0 flex items-baseline overflow-hidden" style={{ gap: 7 }}>
+                <span className="whitespace-nowrap" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 27, lineHeight: 1, color: M_INK, letterSpacing: -0.4 }}>
+                  {mobileNav.title}
+                </span>
+                <span className="whitespace-nowrap text-[13px] font-semibold" style={{ color: M_INK3 }}>{mobileNav.sub}</span>
+              </div>
+              {offToday && (
+                <button
+                  type="button"
+                  onClick={goToday}
+                  className="shrink-0 rounded-full text-[11px] font-bold"
+                  style={{ color: 'var(--color-plum)', background: 'var(--color-plum-light)', padding: '5px 10px' }}
+                >
+                  Today
+                </button>
+              )}
+              {!childMode && (
+                <button type="button" aria-label="Search" onClick={() => setMobileSearching(true)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent">
+                  <span className="w-[34px] h-[34px] rounded-full bg-white flex items-center justify-center" style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}>
+                    <IconSearch className="w-4 h-4" />
+                  </span>
+                </button>
+              )}
+              {!childMode && (
+                <button type="button" aria-label="Filters" aria-expanded={showMobileFilters} onClick={() => setShowMobileFilters((s) => !s)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent relative">
+                  <span
+                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center"
+                    style={showMobileFilters
+                      ? { background: M_INK, color: '#fff' }
+                      : { background: '#fff', border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h9M19 7h1M4 17h1M11 17h9" /><circle cx="16" cy="7" r="2.6" /><circle cx="8" cy="17" r="2.6" /></svg>
+                  </span>
+                  {mobileFilterCount > 0 && (
+                    <span className="absolute flex items-center justify-center rounded-full text-white font-extrabold" style={{ top: 2, right: 2, minWidth: 16, height: 16, background: 'var(--color-plum)', fontSize: 9.5, padding: '0 4px' }}>
+                      {mobileFilterCount}
+                    </span>
+                  )}
+                </button>
+              )}
+              {canWrite && !childMode && (
+                <button type="button" aria-label="New event" onClick={() => openAddForm(selectedDate)} className="shrink-0 w-11 h-11 -m-[5px] flex items-center justify-center bg-transparent">
+                  <span className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-white" style={{ background: 'var(--color-plum)', boxShadow: '0 4px 12px rgba(108,61,217,0.35)' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  </span>
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Filter panel: two horizontally scrollable chip rows */}
+        {!childMode && showMobileFilters && (
+          <div className="flex flex-col" style={{ gap: 7, paddingBottom: 14 }}>
+            <div className="flex overflow-x-auto -mx-5 px-5" style={{ gap: 6, scrollbarWidth: 'none' }}>
+              <MobileFilterChip active={!personFilterActive} onClick={() => setMobileFilterWho(null)}>Everyone</MobileFilterChip>
+              {members.map((mb) => (
+                <MobileFilterChip key={mb.id} active={mobileFilterWho === mb.id} onClick={() => setMobileFilterWho(mobileFilterWho === mb.id ? null : mb.id)}>
+                  <Avatar member={mb} size={18} />
+                  {mb.name}
+                </MobileFilterChip>
+              ))}
+            </div>
+            <div className="flex overflow-x-auto -mx-5 px-5" style={{ gap: 6, scrollbarWidth: 'none' }}>
+              <MobileFilterChip active={!mobileKindFilter} onClick={() => setMobileKindFilter(null)}>All types</MobileFilterChip>
+              {CAL_KINDS.map(([k, label]) => (
+                <MobileFilterChip key={k} active={mobileKindFilter === k} onClick={() => setMobileKindFilter(mobileKindFilter === k ? null : k)}>{label}</MobileFilterChip>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Collapsed summary pill */}
+        {!childMode && !showMobileFilters && mobileFilterCount > 0 && (
+          <div style={{ paddingBottom: 12 }}>
+            <button
+              type="button"
+              onClick={clearMobileFilters}
+              className="inline-flex items-center rounded-full font-bold"
+              style={{ gap: 7, background: 'var(--color-plum-light)', color: 'var(--color-plum)', padding: '6px 12px', fontSize: 12 }}
+            >
+              Filtered: {[
+                personFilterActive && (mobileFilterWho ? (members.find((m) => m.id === mobileFilterWho)?.name || 'People') : 'People'),
+                mobileKindFilter && (CAL_KINDS.find((x) => x[0] === mobileKindFilter) || [])[1],
+              ].filter(Boolean).join(' · ')}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
           </div>
         )}
 
-        {/* Month navigation (view switcher moved to the header dropdown) */}
-        <div className="flex items-center justify-between">
-          <button onClick={navigatePrev} aria-label="Previous" className="w-9 h-9 rounded-full border border-light-grey bg-white flex items-center justify-center text-charcoal active:bg-plum-light">
-            <ChevronLeft />
-          </button>
-          <div className="flex items-center gap-2.5">
-            <span className="text-base font-semibold text-charcoal" style={{ fontFamily: 'var(--font-display)' }}>{navigationLabel}</span>
-            <button onClick={goToday} className="px-3 py-1 rounded-full bg-plum-light text-plum text-xs font-semibold">Today</button>
+        {/* View switcher row: chevrons page the current view */}
+        {!mobileSearchActive && (
+          <div className="flex items-center" style={{ gap: 8, paddingBottom: 2 }}>
+            <button type="button" aria-label="Previous" onClick={navigatePrev} className="shrink-0 w-11 h-11 -m-[6px] flex items-center justify-center bg-transparent">
+              <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center" style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}>
+                <ChevronLeft />
+              </span>
+            </button>
+            <div className="flex-1 flex" style={{ background: 'var(--color-warm-sand)', borderRadius: 12, padding: 3 }}>
+              {CAL_VIEWS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setViewMode(value)}
+                  className="flex-1 font-semibold"
+                  style={{
+                    padding: '7px 0', borderRadius: 9, fontSize: 12.5,
+                    background: viewMode === value ? '#fff' : 'transparent',
+                    color: viewMode === value ? M_INK : M_INK3,
+                    boxShadow: viewMode === value ? '0 1px 3px rgba(26,22,32,0.12)' : 'none',
+                    transition: 'all .15s ease',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button type="button" aria-label="Next" onClick={navigateNext} className="shrink-0 w-11 h-11 -m-[6px] flex items-center justify-center bg-transparent">
+              <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center" style={{ border: '1px solid rgba(26,22,32,0.07)', boxShadow: '0 1px 0 rgba(26,22,32,0.03)', color: M_INK2 }}>
+                <ChevronRight />
+              </span>
+            </button>
           </div>
-          <button onClick={navigateNext} aria-label="Next" className="w-9 h-9 rounded-full border border-light-grey bg-white flex items-center justify-center text-charcoal active:bg-plum-light">
-            <ChevronRight />
-          </button>
-        </div>
+        )}
       </div>
 
+      {/* Mobile search results: an agenda list replacing the views while a
+          query is live (the desktop popup search is untouched above). */}
+      {mobileSearchActive && (
+        <div className="md:hidden">{renderMobileSearchAgenda()}</div>
+      )}
+
       {/* ── Month View ──────────────────────────────────────── */}
-      {viewMode === 'month' && (
+      {viewMode === 'month' && !mobileSearchActive && (
         <div {...swipe.bindings}>
           {/* Desktop month grid */}
           <div className="hidden md:block">
@@ -2451,13 +2748,18 @@ export default function Calendar() {
             </div>
           )}
 
-          {/* Mobile mini calendar */}
+          {/* Mobile mini calendar (design_handoff_calendar month card):
+              white radius-22 card, dot rows in event colours, SELECTED day
+              gets the brand fill (today reads as a brand number when not
+              selected - on load today IS selected, so it starts filled). */}
           <div className="md:hidden">
-            <div className="bg-white rounded-2xl border border-light-grey p-3 mb-4" style={{ boxShadow: 'var(--shadow-sm)' }}>
-              <div className="grid grid-cols-7 gap-1">
+            <div className="bg-white mb-[22px]" style={{ borderRadius: 22, padding: '14px 12px 10px', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}>
+              <div className="grid grid-cols-7" style={{ marginBottom: 6 }}>
                 {DAY_HEADERS.map((d, i) => (
-                  <div key={i} className="text-center text-[11px] font-semibold text-warm-grey uppercase tracking-wider pb-1">{d.toUpperCase()}</div>
+                  <div key={i} className="text-center font-bold" style={{ fontSize: 10, color: M_INK3, letterSpacing: '0.06em' }}>{d.toUpperCase()}</div>
                 ))}
+              </div>
+              <div className="grid grid-cols-7" style={{ gap: 2 }}>
                 {calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
                   // Blank leading/trailing cells (no prev/next-month numbers), per the design.
                   if (!isCurrent) return <div key={idx} />;
@@ -2472,16 +2774,15 @@ export default function Calendar() {
                     <button
                       key={idx}
                       onClick={() => setSelectedDate(new Date(date))}
-                      className={`aspect-square flex flex-col items-center justify-center gap-1 rounded-2xl transition-colors ${
-                        isToday_ ? 'bg-plum' : isSelected ? 'bg-plum-light' : 'active:bg-plum-light'
-                      }`}
+                      className="aspect-square flex flex-col items-center justify-center transition-colors"
+                      style={{ gap: 3, borderRadius: 12, background: isSelected ? 'var(--color-plum)' : 'transparent' }}
                     >
-                      <span className={`text-sm leading-none ${isToday_ ? 'text-white font-bold' : isSelected ? 'text-plum font-semibold' : 'text-charcoal font-medium'}`}>
+                      <span style={{ fontSize: 14, lineHeight: 1, fontWeight: (isToday_ || isSelected) ? 700 : 500, color: isSelected ? '#fff' : (isToday_ ? 'var(--color-plum)' : M_INK) }}>
                         {date.getDate()}
                       </span>
-                      <span className="flex items-center justify-center gap-[3px] h-1.5">
+                      <span className="flex items-center justify-center" style={{ gap: 2, height: 4 }}>
                         {dots.map((c, di) => (
-                          <span key={di} className="w-1.5 h-1.5 rounded-full" style={{ background: isToday_ ? 'rgba(255,255,255,0.92)' : c }} />
+                          <span key={di} style={{ width: 4, height: 4, borderRadius: 2, background: isSelected ? 'rgba(255,255,255,0.85)' : c }} />
                         ))}
                       </span>
                     </button>
@@ -2490,11 +2791,14 @@ export default function Calendar() {
               </div>
             </div>
 
-            {/* Selected day events list for mobile */}
+            {/* Selected day agenda for mobile */}
             {selectedDate && (
               <div>
-                <h3 className="text-[15px] font-semibold mb-2.5" style={{ fontFamily: 'var(--font-display)' }}>
-                  {isSameDay(selectedDate, today) ? 'Today, ' : `${selectedDate.toLocaleDateString('en-GB', { weekday: 'short' })}, `}{selectedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+                <div className="font-bold uppercase" style={{ fontSize: 11, letterSpacing: '0.08em', color: 'var(--color-plum)', marginBottom: 3 }}>
+                  {isSameDay(selectedDate, today) ? 'Today' : `${selectedDate.toLocaleDateString('en-GB', { month: 'short' })} ${selectedDate.getDate()}`}
+                </div>
+                <h3 style={{ fontFamily: M_SERIF, fontSize: 20, fontWeight: 400, color: M_INK, margin: '0 0 12px' }}>
+                  {selectedDate.toLocaleDateString('en-GB', { weekday: 'long' })}
                 </h3>
                 {[...eventsForDate(selectedDate).map(e => ({ ...e, _type: 'event' })), ...tasksForDate(selectedDate).map(t => ({ ...t, _type: 'task' }))].map(item => {
                   const hex = item._type === 'task' ? '#E8724A' : getEventHex(item);
@@ -2509,41 +2813,61 @@ export default function Calendar() {
                   return (
                     <div
                       key={item.occurrence_key || `${item._type}-${item.id}`}
-                      className="flex items-center gap-2.5 p-3 bg-white rounded-xl mb-2"
-                      style={{ borderLeft: `4px solid ${hex}` }}
+                      className="flex items-center bg-white"
+                      style={{ gap: 12, borderRadius: 18, padding: '14px 16px', marginBottom: 10, borderLeft: `4px solid ${hex}`, boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
                       onClick={() => {
                         if (item._type === 'task') openTaskEditForm(item);
                         else if (item.category !== 'public_holiday' && item.category !== 'birthday') openEditForm(item);
                       }}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold truncate">{item.title}</div>
-                        <div className="text-[11px] text-warm-grey">
-                          {item._type === 'task'
-                            ? (item.due_time ? item.due_time.substring(0, 5) : 'All day')
-                            : (item.all_day
-                                ? 'All day'
-                                : `${formatTime(item.start_time)}${item.end_time ? ` – ${formatTime(item.end_time)}` : ''}`)}
-                          {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
-                            <span className="ml-1.5 font-semibold" style={{ color: '#B45309' }}>⚠️ Clash</span>
-                          )}
-                          {/* Ambient discovery for the invite loop: gatherings
-                              show where the RSVP link lives (tap = the event
-                              sheet, where the 🎈 card sits). */}
-                          {item._type === 'event' && !childMode
-                            && item.category !== 'public_holiday' && item.category !== 'birthday'
-                            && looksLikeGathering(item.title) && (
-                            <span className="ml-1.5 font-semibold text-plum">🎈 Invite families</span>
-                          )}
-                        </div>
+                      {/* Time column per the handoff (start over end); tasks
+                          keep their small badge - the design's cards are
+                          events-only and the checkbox-less list needs the
+                          type distinction somewhere. */}
+                      <div style={{ width: 56, flexShrink: 0 }}>
+                        {item._type === 'task' ? (
+                          <>
+                            <div className="font-bold" style={{ fontSize: 14, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>
+                              {item.due_time ? item.due_time.substring(0, 5) : 'All day'}
+                            </div>
+                            <span className="inline-block font-semibold" style={{ fontSize: 9, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 5px', marginTop: 2 }}>{badge.label}</span>
+                          </>
+                        ) : item.all_day ? (
+                          <div className="font-bold" style={{ fontSize: 12, color: M_INK }}>All day</div>
+                        ) : (
+                          <>
+                            <div className="font-bold" style={{ fontSize: 14, color: M_INK, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.start_time)}</div>
+                            {item.end_time && <div style={{ fontSize: 11, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>{formatTime(item.end_time)}</div>}
+                          </>
+                        )}
                       </div>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
-                      {renderMemberStack(eventMembers, { size: 24, ringColor: '#FFFFFF' })}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate" style={{ fontSize: 15, color: M_INK }}>{item.title}</div>
+                        {(item.location || (item._type === 'event' && (selectedDayClashKeys.has(itemKey(item)) || (!childMode && item.category !== 'public_holiday' && item.category !== 'birthday' && looksLikeGathering(item.title))))) && (
+                          <div className="truncate" style={{ fontSize: 12, color: M_INK3, marginTop: 2 }}>
+                            {item.location}
+                            {item._type === 'event' && selectedDayClashKeys.has(itemKey(item)) && (
+                              <span className={`font-semibold ${item.location ? 'ml-1.5' : ''}`} style={{ color: '#B45309' }}>⚠️ Clash</span>
+                            )}
+                            {/* Ambient discovery for the invite loop: gatherings
+                                show where the RSVP link lives (tap = the event
+                                sheet, where the 🎈 card sits). */}
+                            {item._type === 'event' && !childMode
+                              && item.category !== 'public_holiday' && item.category !== 'birthday'
+                              && looksLikeGathering(item.title) && (
+                              <span className="ml-1.5 font-semibold text-plum">🎈 Invite families</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {renderMemberStack(eventMembers, { size: eventMembers.length > 1 ? 26 : 32, ringColor: '#FFFFFF' })}
                     </div>
                   );
                 })}
                 {eventsForDate(selectedDate).length === 0 && tasksForDate(selectedDate).length === 0 && (
-                  <p className="text-sm text-warm-grey py-4">No events or tasks for this day</p>
+                  <div className="text-center bg-white" style={{ padding: '32px 20px', color: M_INK3, borderRadius: 18, fontFamily: M_SERIF, fontSize: 20 }}>
+                    Nothing scheduled
+                  </div>
                 )}
               </div>
             )}
@@ -2551,272 +2875,264 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* ── Week View ───────────────────────────────────────── */}
-      {viewMode === 'week' && (
-        <div
-          {...swipe.bindings}
-          // Mobile vs desktop chrome stacks differ - mobile has the sticky
-          // header + bottom nav (~320px combined), desktop just the page
-          // padding + H1 (~240px). Tailwind responsive class swaps the
-          // offset at the md: breakpoint.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_190px)]"
-        >
-          {/* Headers */}
-          <div className="grid" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
-            <div className="bg-cream border-b border-light-grey border-r border-light-grey" />
+      {/* ── Week View (design_handoff_calendar): day-number header row pinned
+            OUTSIDE the card; the white time-grid card scrolls internally and
+            is height-capped to end above the tab bar (the --grid-cap var
+            carries the real chrome heights, incl. the filter panel). Blocks
+            are solid tints of the event colour with ink-mixed text. ── */}
+      {viewMode === 'week' && !mobileSearchActive && (
+        <div {...swipe.bindings}>
+          {/* Day header row */}
+          <div className="grid items-center" style={{ gridTemplateColumns: '38px repeat(7, minmax(0, 1fr))', marginBottom: 8 }}>
+            <div />
             {weekDays.map((date, i) => {
               const isToday_ = isSameDay(date, today);
               return (
-                <div key={i} className={`py-2 px-1 text-center bg-cream border-b border-light-grey ${i < 6 ? 'border-r border-light-grey' : ''}`}>
-                  <div className="text-[10px] font-semibold text-warm-grey uppercase">{date.toLocaleDateString('en-GB', { weekday: 'short' })}</div>
-                  <button
-                    onClick={() => { setSelectedDate(new Date(date)); setViewMode('day'); }}
-                    className={`text-[15px] font-bold mt-0.5 ${
-                      isToday_ ? 'bg-plum text-white w-[26px] h-[26px] rounded-full inline-flex items-center justify-center text-[13px]' : 'text-charcoal hover:text-plum'
-                    }`}
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => { setSelectedDate(new Date(date)); setViewMode('day'); }}
+                  className="flex flex-col items-center bg-transparent"
+                  style={{ gap: 3, padding: '2px 0' }}
+                >
+                  <span className="font-bold" style={{ fontSize: 10, letterSpacing: '0.04em', color: isToday_ ? 'var(--color-plum)' : M_INK3 }}>
+                    {date.toLocaleDateString('en-GB', { weekday: 'short' })}
+                  </span>
+                  <span
+                    className="flex items-center justify-center font-bold"
+                    style={{ width: 26, height: 26, borderRadius: '50%', fontSize: 13, fontVariantNumeric: 'tabular-nums', background: isToday_ ? 'var(--color-plum)' : 'transparent', color: isToday_ ? '#fff' : M_INK }}
                   >
                     {date.getDate()}
-                  </button>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>
 
-          {/* All-day events strip */}
+          {/* All-day strip - the prototype's data had none, real weeks do
+              (term dates, birthdays). Compact tinted chips per day. */}
           {(() => {
-            const allDayByDate = weekDays.map(d => allDayEventsForDate(d));
-            const hasAllDay = allDayByDate.some(evs => evs.length > 0);
-            if (!hasAllDay) return null;
+            const allDayByDate = weekDays.map((d) => allDayEventsForDate(d));
+            if (!allDayByDate.some((l) => l.length > 0)) return null;
             return (
-              <div className="grid border-b border-light-grey" style={{ gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}>
-                <div className="text-[10px] text-warm-grey text-right pr-1 py-1 bg-cream border-r border-light-grey">all-day</div>
-                {allDayByDate.map((dayEvs, i) => (
-                  <div key={i} className={`p-0.5 flex flex-col gap-0.5 bg-cream ${i < 6 ? 'border-r border-light-grey' : ''}`}>
-                    {dayEvs.map(ev => (
-                      <div
-                        key={ev.occurrence_key || ev.id}
-                        className="text-[11px] font-semibold px-1 py-0.5 rounded truncate cursor-pointer hover:opacity-85"
-                        style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
-                        onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
-                      >
-                        {ev.title}
-                      </div>
-                    ))}
+              <div className="grid" style={{ gridTemplateColumns: '38px repeat(7, minmax(0, 1fr))', gap: 2, marginBottom: 8 }}>
+                <div style={{ fontSize: 9, color: M_INK3, textAlign: 'right', paddingRight: 4, paddingTop: 2 }}>all day</div>
+                {allDayByDate.map((list, i) => (
+                  <div key={i} className="flex flex-col min-w-0" style={{ gap: 2 }}>
+                    {list.map((ev) => {
+                      const hex = getEventHex(ev);
+                      return (
+                        <div
+                          key={ev.occurrence_key || ev.id}
+                          className="truncate cursor-pointer font-bold"
+                          style={{ fontSize: 9.5, color: inkMix(hex), background: hex + '2E', borderRadius: 5, padding: '2px 4px' }}
+                          onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                        >
+                          {ev.title}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
             );
           })()}
 
-          {/* Time grid - takes the remaining vertical space below the
-              week headers + all-day strip. flex-1 stretches it; min-h-0
-              lets it actually shrink below its content size so the
-              overflow-y-auto kicks in. The viewport cap lives on the
-              outer card so the entire calendar fits the screen. */}
-          <div ref={scrollContainerRef} className="overflow-y-auto flex-1 min-h-0">
-            <div className="relative" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
-              {/* Hour rows */}
-              {HOURS.map(hour => (
-                <div
-                  key={hour}
-                  className="absolute w-full grid border-b border-light-grey"
-                  style={{ top: `${hour * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px`, gridTemplateColumns: '48px repeat(7, minmax(0, 1fr))' }}
-                >
-                  <div className="relative text-[10px] font-medium text-warm-grey text-right pr-1.5 -mt-1.5 border-r border-light-grey bg-white z-[1]">
-                    {hour > 0 ? formatHour(hour) : ''}
-                  </div>
-                  {weekDays.map((date, i) => (
-                    <div
-                      key={i}
-                      className={`${i < 6 ? 'border-r border-light-grey' : ''} cursor-pointer hover:bg-cream transition-colors`}
-                      onClick={() => openAddForm(date, hour)}
-                    />
+          {/* Scrollable time-grid card */}
+          {(() => {
+            const perDay = weekDays.map((d) => timedEventsForDate(d));
+            const { start, end } = gridRangeFor(perDay);
+            const rowH = 50; const gutter = 38;
+            const totalH = ((end - start) / 60) * rowH;
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            const weekHasToday = weekDays.some((d) => isSameDay(d, today));
+            const hourCount = (end - start) / 60;
+            return (
+              <div
+                ref={scrollContainerRef}
+                className="overflow-y-auto bg-white max-h-[calc(100dvh_-_var(--grid-cap)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_240px)]"
+                style={{ '--grid-cap': `${318 + mobileFilterChromePx}px`, borderRadius: 18, padding: '10px 10px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+              >
+                <div className="relative" style={{ height: totalH, marginBottom: 20 }}>
+                  {Array.from({ length: hourCount + 1 }, (_, i) => start / 60 + i).map((h, i) => (
+                    <div key={h} className="absolute left-0 right-0" style={{ top: i * rowH, height: 0 }}>
+                      <div className="absolute text-right" style={{ left: 0, top: -7, width: gutter - 8, fontSize: 11, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>
+                        {String(h).padStart(2, '0')}:00
+                      </div>
+                      <div className="absolute" style={{ left: gutter, right: 0, top: 0, borderTop: '1px solid rgba(26,22,32,0.07)' }} />
+                    </div>
                   ))}
-                </div>
-              ))}
-
-              {/* Event layers per day */}
-              <div className="absolute top-0 bottom-0 grid" style={{ left: '48px', right: 0, gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
-                {weekDays.map((date, colIdx) => {
-                  const dayTimedEvents = timedEventsForDate(date);
-                  const overlapLayout = layoutOverlappingEvents(dayTimedEvents);
-                  const isToday_ = isSameDay(date, today);
-
-                  return (
-                    <div key={colIdx} className={`relative ${colIdx < 6 ? 'border-r border-light-grey' : ''} ${isToday_ ? 'bg-plum-light/30' : ''}`}>
-                      {dayTimedEvents.map(ev => {
-                        const pos = getEventPosition(ev, HOUR_HEIGHT);
-                        const layout = overlapLayout.get(ev.id) || { col: 0, totalCols: 1 };
-                        const widthPct = 100 / layout.totalCols;
-                        const leftPct = layout.col * widthPct;
-
+                  {weekHasToday && nowMin >= start && nowMin <= end && (
+                    <div className="absolute" style={{ left: gutter - 4, right: 0, top: ((nowMin - start) / 60) * rowH, height: 0, zIndex: 6 }}>
+                      <div className="absolute rounded-full" style={{ left: 0, top: -4, width: 8, height: 8, background: '#E5484D' }} />
+                      <div className="absolute" style={{ left: 4, right: 0, top: 0, borderTop: '2px solid #E5484D' }} />
+                    </div>
+                  )}
+                  <div className="absolute" style={{ left: gutter, right: 0, top: 0, bottom: 0 }}>
+                    <div className="absolute inset-0 grid" style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+                      {perDay.map((dayEvents, ci) => {
+                        const layout = layoutOverlappingEvents(dayEvents);
                         return (
-                          <div
-                            key={ev.occurrence_key || ev.id}
-                            className="absolute rounded-[5px] px-1.5 py-0.5 text-[11px] font-semibold overflow-hidden z-[2] cursor-pointer hover:opacity-85 leading-snug"
-                            style={{
-                              top: `${pos.top}px`,
-                              height: `${pos.height}px`,
-                              left: `calc(${leftPct}% + 2px)`,
-                              width: `calc(${widthPct}% - 4px)`,
-                              background: getEventHex(ev) + '18',
-                              color: getEventHex(ev),
-                            }}
-                            onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
-                          >
-                            <div className="truncate">{ev.title}</div>
-                            {pos.height > 28 && (
-                              <div className="text-[8px] font-medium opacity-75 mt-0.5 truncate">
-                                {formatTime(ev.start_time)}{ev.end_time ? `–${formatTime(ev.end_time)}` : ''}
-                              </div>
-                            )}
+                          <div key={ci} className="relative" style={{ borderLeft: ci ? '1px solid rgba(26,22,32,0.07)' : 'none' }}>
+                            {dayEvents.map((ev) => {
+                              const sMin = minOfDay(ev.start_time);
+                              const eMin = ev.end_time ? Math.max(minOfDay(ev.end_time), sMin + 20) : sMin + 60;
+                              const info = layout.get(ev.id) || { col: 0, totalCols: 1 };
+                              const w = 100 / info.totalCols;
+                              const hex = getEventHex(ev);
+                              return (
+                                <button
+                                  key={ev.occurrence_key || ev.id}
+                                  type="button"
+                                  className="absolute overflow-hidden text-left flex flex-col"
+                                  style={{
+                                    top: ((sMin - start) / 60) * rowH,
+                                    height: Math.max(16, ((eMin - sMin) / 60) * rowH - 2),
+                                    left: `calc(${info.col * w}% + 1px)`,
+                                    width: `calc(${w}% - 2px)`,
+                                    background: hex + '2E',
+                                    borderRadius: 6,
+                                    padding: '2px 4px',
+                                    gap: 1,
+                                  }}
+                                  onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                                >
+                                  <span className="font-bold" style={{ fontSize: 8.5, color: inkMix(hex), lineHeight: 1.05, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                    {ev.title}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
                         );
                       })}
-
-                      {/* Current time indicator */}
-                      {isToday_ && (
-                        <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top: `${currentTimeTop}px` }}>
-                          <div className="flex items-center">
-                            <div className="w-2.5 h-2.5 bg-coral rounded-full -ml-1.5" />
-                            <div className="flex-1 h-0.5 bg-coral" />
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 
-      {/* ── Day View ────────────────────────────────────────── */}
-      {viewMode === 'day' && selectedDate && (
-        <div
-          {...swipe.bindings}
-          // See note on the week-view card above for the offset rationale.
-          className="border border-light-grey rounded-2xl overflow-hidden bg-white flex flex-col max-h-[calc(100dvh_-_280px_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_190px)]"
-        >
-          {/* Day header - date itself is already shown in the toolbar's
-              navigation label above, so we keep just the event count here. */}
-          <div className="flex items-center justify-end px-5 py-3 bg-cream border-b border-light-grey">
-            <div className="text-xs text-warm-grey">
-              {eventsForDate(selectedDate).length + tasksForDate(selectedDate).length} events
-            </div>
-          </div>
-
-          {/* All-day events */}
+      {/* ── Day View (design_handoff_calendar): the week grid at reading
+            scale - 60px hours, tinted blocks with title + time · location,
+            avatar top-right when the block is wide/tall enough. Header rows
+            stay pinned; only the card scrolls. Tapping an empty hour keeps
+            the existing quick-add behaviour. ── */}
+      {viewMode === 'day' && selectedDate && !mobileSearchActive && (
+        <div {...swipe.bindings}>
+          {/* All-day strip */}
           {(() => {
             const allDay = allDayEventsForDate(selectedDate);
             if (allDay.length === 0) return null;
             return (
-              <div className="px-5 py-2 bg-cream border-b border-light-grey flex flex-wrap gap-1.5">
-                {allDay.map(ev => (
-                  <div
-                    key={ev.occurrence_key || ev.id}
-                    className="text-[10px] font-semibold px-2 py-0.5 rounded cursor-pointer hover:opacity-85"
-                    style={{ background: getEventHex(ev) + '18', color: getEventHex(ev) }}
-                    onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
-                  >
-                    {ev.title}
-                  </div>
-                ))}
+              <div className="flex flex-wrap" style={{ gap: 4, marginBottom: 8 }}>
+                {allDay.map((ev) => {
+                  const hex = getEventHex(ev);
+                  return (
+                    <div
+                      key={ev.occurrence_key || ev.id}
+                      className="cursor-pointer font-bold"
+                      style={{ fontSize: 11, color: inkMix(hex), background: hex + '2E', borderRadius: 6, padding: '3px 8px' }}
+                      onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                    >
+                      {ev.title}
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
 
-          {/* Timeline */}
-          <div ref={viewMode === 'day' ? scrollContainerRef : undefined} className="overflow-y-auto px-5 flex-1 min-h-0">
-            <div className="relative" style={{ height: `${24 * 56}px` }}>
-              {HOURS.map(hour => {
-                return (
-                  <div
-                    key={hour}
-                    className="relative border-b border-light-grey"
-                    style={{ height: '56px' }}
-                    onClick={() => openAddForm(selectedDate, hour)}
-                  >
-                    <div className="absolute left-0 -top-1.5 text-[10px] font-medium text-warm-grey bg-white pr-2 z-[1]" style={{ width: '42px' }}>
-                      {hour > 0 ? formatHour(hour) : ''}
-                    </div>
+          {/* Scrollable time-grid card */}
+          {(() => {
+            const dayEvents = timedEventsForDate(selectedDate);
+            const { start, end } = gridRangeFor([dayEvents]);
+            const rowH = 60; const gutter = 46;
+            const totalH = ((end - start) / 60) * rowH;
+            const isToday_ = isSameDay(selectedDate, today);
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            const hourCount = (end - start) / 60;
+            const layout = layoutOverlappingEvents(dayEvents);
+            return (
+              <div
+                ref={scrollContainerRef}
+                className="overflow-y-auto bg-white max-h-[calc(100dvh_-_var(--grid-cap)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[calc(100dvh_-_220px)]"
+                style={{ '--grid-cap': `${262 + mobileFilterChromePx}px`, borderRadius: 18, padding: '12px 14px 0', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}
+              >
+                {dayEvents.length === 0 && allDayEventsForDate(selectedDate).length === 0 ? (
+                  <div className="text-center" style={{ padding: '48px 0 68px', color: M_INK3, fontFamily: M_SERIF, fontSize: 20 }}>
+                    Nothing scheduled
                   </div>
-                );
-              })}
-
-              {/* Events */}
-              {(() => {
-                const dayTimedEvents = timedEventsForDate(selectedDate);
-                const overlapLayout = layoutOverlappingEvents(dayTimedEvents);
-                const hourH = 56;
-
-                return dayTimedEvents.map(ev => {
-                  const start = new Date(ev.start_time);
-                  const end = new Date(ev.end_time);
-                  const startMin = start.getHours() * 60 + start.getMinutes();
-                  const endMin = Math.max(end.getHours() * 60 + end.getMinutes(), startMin + 15);
-                  const top = (startMin / 60) * hourH;
-                  const height = Math.max(((endMin - startMin) / 60) * hourH, 20);
-                  const layout = overlapLayout.get(ev.id) || { col: 0, totalCols: 1 };
-                  const hex = getEventHex(ev);
-                  const eventMembers = getEventMembers(ev);
-                  const ringHex = hex + '18';
-
-                  return (
-                    <div
-                      key={ev.occurrence_key || ev.id}
-                      className="absolute rounded-lg px-2.5 py-1.5 z-[2] cursor-pointer hover:opacity-90 flex items-start gap-2 overflow-hidden"
-                      style={{
-                        // Left gutter (44px) reserves room for the time
-                        // labels on the left rail. We distribute the
-                        // *remaining* width across `totalCols` columns -
-                        // the previous formula proportionally shaved the
-                        // gutter from every column, which made the
-                        // rightmost card overflow past the hour line.
-                        top: `${top}px`,
-                        height: `${height}px`,
-                        left: `calc(44px + ${layout.col} * (100% - 44px) / ${layout.totalCols})`,
-                        width: `calc((100% - 44px) / ${layout.totalCols} - 4px)`,
-                        background: hex + '18',
-                        color: hex,
-                      }}
-                      onClick={(e) => { e.stopPropagation(); if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
-                    >
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <div className="text-[13px] font-semibold truncate leading-tight">{ev.title}</div>
-                        {height > 32 && (
-                          <div className="text-[10px] font-medium opacity-80 mt-0.5 truncate">
-                            {formatTime(ev.start_time)} – {formatTime(ev.end_time)}
-                          </div>
-                        )}
-                        {ev.location && height > 56 && (
-                          <div className="text-[11px] opacity-75 mt-0.5 flex items-center gap-1 truncate">
-                            <MapPinIcon /> {ev.location}
-                          </div>
-                        )}
-                      </div>
-                      {eventMembers.length > 0 && height > 32 && (
-                        <div className="mt-0.5">
-                          {renderMemberStack(eventMembers, { size: 24, ringColor: ringHex })}
+                ) : (
+                  <div className="relative" style={{ height: totalH, marginBottom: 20 }}>
+                    {Array.from({ length: hourCount + 1 }, (_, i) => start / 60 + i).map((h, i) => (
+                      <div key={h} className="absolute left-0 right-0" style={{ top: i * rowH, height: 0 }}>
+                        <div className="absolute text-right" style={{ left: 0, top: -7, width: gutter - 8, fontSize: 11, color: M_INK3, fontVariantNumeric: 'tabular-nums' }}>
+                          {String(h).padStart(2, '0')}:00
                         </div>
-                      )}
+                        <div className="absolute" style={{ left: gutter, right: 0, top: 0, borderTop: '1px solid rgba(26,22,32,0.07)' }} />
+                      </div>
+                    ))}
+                    {/* Tap an empty hour to quick-add (existing behaviour) */}
+                    {canWrite && !childMode && Array.from({ length: hourCount }, (_, i) => start / 60 + i).map((h, i) => (
+                      <div
+                        key={`add-${h}`}
+                        className="absolute"
+                        style={{ top: i * rowH, height: rowH, left: gutter, right: 0 }}
+                        onClick={() => openAddForm(selectedDate, h)}
+                      />
+                    ))}
+                    {isToday_ && nowMin >= start && nowMin <= end && (
+                      <div className="absolute pointer-events-none" style={{ left: gutter - 4, right: 0, top: ((nowMin - start) / 60) * rowH, height: 0, zIndex: 6 }}>
+                        <div className="absolute rounded-full" style={{ left: 0, top: -4, width: 8, height: 8, background: '#E5484D' }} />
+                        <div className="absolute" style={{ left: 4, right: 0, top: 0, borderTop: '2px solid #E5484D' }} />
+                      </div>
+                    )}
+                    <div className="absolute" style={{ left: gutter, right: 0, top: 0, bottom: 0, pointerEvents: 'none' }}>
+                      {dayEvents.map((ev) => {
+                        const sMin = minOfDay(ev.start_time);
+                        const eMin = ev.end_time ? Math.max(minOfDay(ev.end_time), sMin + 20) : sMin + 60;
+                        const info = layout.get(ev.id) || { col: 0, totalCols: 1 };
+                        const w = 100 / info.totalCols;
+                        const hex = getEventHex(ev);
+                        const blockH = Math.max(34, ((eMin - sMin) / 60) * rowH - 4);
+                        const narrow = info.totalCols > 1;
+                        const eventMembers = getEventMembers(ev);
+                        return (
+                          <div
+                            key={ev.occurrence_key || ev.id}
+                            className="absolute overflow-hidden flex flex-col cursor-pointer"
+                            style={{
+                              pointerEvents: 'auto',
+                              top: ((sMin - start) / 60) * rowH,
+                              height: blockH,
+                              left: `calc(${info.col * w}% + 2px)`,
+                              width: `calc(${w}% - 4px)`,
+                              background: hex + '2E',
+                              borderRadius: 9,
+                              padding: '7px 9px',
+                              gap: 2,
+                            }}
+                            onClick={() => { if (ev.category !== 'public_holiday' && ev.category !== 'birthday') openEditForm(ev); }}
+                          >
+                            <div className="flex items-center justify-between" style={{ gap: 6 }}>
+                              <span className="truncate font-bold" style={{ fontSize: 13, color: inkMix(hex), lineHeight: 1.15 }}>{ev.title}</span>
+                              {!narrow && blockH > 40 && renderMemberStack(eventMembers, { size: 22, ringColor: '#FFFFFF' })}
+                            </div>
+                            <span style={{ fontSize: 11, color: inkMix(hex), opacity: 0.75, fontVariantNumeric: 'tabular-nums' }}>
+                              {formatTime(ev.start_time)}{ev.end_time ? `–${formatTime(ev.end_time)}` : ''}{!narrow && blockH > 52 && ev.location ? ` · ${ev.location}` : ''}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                });
-              })()}
-
-              {/* Current time indicator */}
-              {isSameDay(selectedDate, today) && (
-                <div className="absolute z-20 pointer-events-none" style={{ top: `${(now.getHours() * 60 + now.getMinutes()) / 60 * 56}px`, left: '42px', right: 0 }}>
-                  <div className="flex items-center">
-                    <div className="w-2.5 h-2.5 bg-coral rounded-full -ml-1.5" />
-                    <div className="flex-1 h-0.5 bg-coral" />
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2827,7 +3143,7 @@ export default function Calendar() {
             extends it as the user scrolls. Events only (the reference spec) -
             tasks keep their own page; header tap opens the day, card tap the
             event's own sheet per each category's existing pattern. ── */}
-      {viewMode === 'schedule' && (
+      {viewMode === 'schedule' && !mobileSearchActive && (
         <div {...swipe.bindings}>
           {(() => {
             const now = new Date();
