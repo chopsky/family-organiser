@@ -736,9 +736,13 @@ router.post('/', requireAuth, requireHousehold, async (req, res) => {
           const startTime = act.all_day
             ? `${act.date}T00:00:00Z`
             : localToUTC(act.date, act.start_time || '09:00', userTz);
+          // No end given → one hour, not end=start (a zero-duration event
+          // breaks later start-time changes - see the bot's twin default).
           const endTime = act.all_day
             ? `${act.date}T23:59:59Z`
-            : localToUTC(act.date, act.end_time || act.start_time || '10:00', userTz);
+            : act.end_time
+              ? localToUTC(act.date, act.end_time, userTz)
+              : new Date(Date.parse(startTime) + 60 * 60000).toISOString();
 
           const createdActEvent = await db.createCalendarEvent(req.householdId, {
             title: act.title,

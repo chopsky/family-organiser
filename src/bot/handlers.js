@@ -1960,6 +1960,18 @@ function buildEventUpdates(updates, existing, household, user) {
     if (existing.all_day) {
       patch.start_time = `${nextStartDate}T00:00:00Z`;
       patch.end_time   = `${nextEndDate}T23:59:59Z`;
+    } else if (hasStart && !hasEnd && !hasEndDate) {
+      // Moving only the START moves the whole event: carry the original
+      // duration along (default 60 min when the stored end is missing or
+      // zero-length). Leaving the old end behind made "change time to
+      // 21:00" on an 18:00-19:00 meeting produce end<start, which the
+      // rollover repair below then pushed to TOMORROW 19:00 (real
+      // 2026-09-02 transcript - "it now runs until tomorrow").
+      patch.start_time = localToUTC(nextStartDate, nextStart, tz);
+      const durMs = existingEnd && !isNaN(existingEnd.getTime()) && existingEnd > existingStart
+        ? existingEnd - existingStart
+        : 60 * 60000;
+      patch.end_time = new Date(Date.parse(patch.start_time) + durMs).toISOString();
     } else {
       patch.start_time = localToUTC(nextStartDate, nextStart, tz);
       patch.end_time   = localToUTC(nextEndDate,   nextEnd,   tz);
@@ -2042,9 +2054,18 @@ async function createCalendarEventFromResult(ev, user, household, actions, origi
     const startTime = ev.all_day
       ? `${ev.date}T00:00:00Z`
       : localToUTC(ev.date, ev.start_time || '09:00', userTz);
+    // No end given → default to ONE HOUR, not end=start: a zero-duration
+    // event reads fine at creation but rots - a later "change time to X"
+    // sees the stale end behind the new start and the midnight-rollover
+    // repair pushes it to TOMORROW (real 2026-09-02 transcript). Multi-day
+    // ranges keep their end-at-start-time-on-last-day shape.
     const endTime = ev.all_day
       ? `${lastDay}T23:59:59Z`
-      : localToUTC(lastDay, ev.end_time || ev.start_time || '10:00', userTz);
+      : ev.end_time
+        ? localToUTC(lastDay, ev.end_time, userTz)
+        : lastDay !== ev.date
+          ? localToUTC(lastDay, ev.start_time || '10:00', userTz)
+          : new Date(Date.parse(startTime) + 60 * 60000).toISOString();
 
     // Dupe detection - skipped when classifier set force:true (user
     // affirmatively confirmed a duplicate in a prior turn).
@@ -5345,6 +5366,7 @@ function hasOpenQuestion(userId) {
 module.exports = {
   handleTextMessage,
   hasOpenQuestion,
+  buildEventUpdates,
   BRIEF_INTRO_MESSAGE,
   EVENING_BRIEF_OFFER_MESSAGE,
   isGroundedTarget,
