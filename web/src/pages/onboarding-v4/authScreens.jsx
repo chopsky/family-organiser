@@ -34,8 +34,12 @@ const backChevron = (onBack) => (
 );
 
 /** The three auth buttons, shared by sign-up and login. */
-function AuthStack({ onPick, auth }) {
+function AuthStack({ onPick, auth, intent }) {
   const { showGoogle, showApple, googleReady, appleReady, signInWithGoogle, signInWithApple } = auth;
+  // `intent` tells the server which screen this is: 'login' refuses to mint
+  // an account for an unknown email (the Hide-My-Email trap); sign-up leaves
+  // it unset and creates as before.
+  const opts = intent ? { intent } : undefined;
   const base = {
     width: '100%', minHeight: 44, padding: 15, borderRadius: R.auth,
     font: '600 15.5px Inter, system-ui, sans-serif', cursor: 'pointer',
@@ -44,7 +48,7 @@ function AuthStack({ onPick, auth }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
       {showGoogle && (
-      <button type="button" onClick={signInWithGoogle} disabled={!googleReady} style={{ ...base, background: T.purple, color: '#fff', border: 0, opacity: googleReady ? 1 : 0.6, cursor: googleReady ? 'pointer' : 'wait' }}>
+      <button type="button" onClick={() => signInWithGoogle(opts)} disabled={!googleReady} style={{ ...base, background: T.purple, color: '#fff', border: 0, opacity: googleReady ? 1 : 0.6, cursor: googleReady ? 'pointer' : 'wait' }}>
         <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="12" height="12" viewBox="0 0 48 48" aria-hidden="true">
             <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z" />
@@ -57,7 +61,7 @@ function AuthStack({ onPick, auth }) {
       </button>
       )}
       {showApple && (
-      <button type="button" onClick={signInWithApple} disabled={!appleReady} style={{ ...base, background: T.surface, color: T.ink, border: `1.5px solid ${T.line2}`, opacity: appleReady ? 1 : 0.6 }}>
+      <button type="button" onClick={() => signInWithApple(opts)} disabled={!appleReady} style={{ ...base, background: T.surface, color: T.ink, border: `1.5px solid ${T.line2}`, opacity: appleReady ? 1 : 0.6 }}>
         <svg width="15" height="18" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
           <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
         </svg>
@@ -187,7 +191,7 @@ function CodeEntry({ email, busy, error, onSubmit, onResend, resent }) {
       </form>
 
       <p style={{ fontSize: 12.5, lineHeight: 1.5, color: T.ink3, marginTop: 14 }}>
-        The email also has a link you can tap — but entering the code here keeps
+        The email also has a link you can tap, but entering the code here keeps
         anything you’ve already set up.
       </p>
       <Ghost onClick={onResend}>{resent ? 'Sent again' : 'Send it again'}</Ghost>
@@ -309,7 +313,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
 }
 
 /* ── Login (from the splash) ─ no Terms line: they agreed at sign-up. */
-export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn, onForgot }) {
+export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn, onForgot, socialError }) {
   const [face, setFace] = useState('pick');
   return (
     <div
@@ -342,7 +346,15 @@ export function LoginScreen({ onBack, onCreate, auth, v4, onLoggedIn, onForgot }
               onForgot={onForgot}
             />
           ) : (
-            <AuthStack onPick={() => setFace('email')} auth={auth} />
+            <>
+              <AuthStack onPick={() => setFace('email')} auth={auth} intent="login" />
+              {/* Social sign-in problems used to be invisible on this face
+                  (the email form was the only place an error rendered), so
+                  a refused Apple/Google tap looked like nothing happened. */}
+              {socialError && (
+                <p role="alert" style={{ fontSize: 13, lineHeight: 1.45, color: T.danger, marginTop: 12 }}>{socialError}</p>
+              )}
+            </>
           )}
         </div>
         <p style={{ fontSize: 12.5, color: T.ink3, marginTop: 16, display: 'flex', gap: 7, alignItems: 'flex-start' }}>
@@ -509,7 +521,7 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
           <div role="status" style={{ marginBottom: 10 }}>
             {outcome.calendars.failed.map((f) => (
               <p key={f.label} style={{ fontSize: 13, lineHeight: 1.45, color: T.ink2, marginBottom: 6 }}>
-                <b style={{ color: T.ink }}>{f.label}</b> isn’t connected — {f.error} You can add it in Settings.
+                <b style={{ color: T.ink }}>{f.label}</b> isn’t connected: {f.error} You can add it in Settings.
               </p>
             ))}
           </div>

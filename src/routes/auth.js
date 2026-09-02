@@ -2,6 +2,7 @@ const { Router } = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../db/queries');
+const { socialLoginRefusal } = require('../utils/social-login-guard');
 const { normaliseInviteCode, isValidInviteCodeShape } = require('../utils/invite-code');
 const { signToken, signSiriToken, requireAuth } = require('../middleware/auth');
 const { requireTurnstile } = require('../middleware/turnstile');
@@ -1359,7 +1360,7 @@ router.delete('/sessions', requireAuth, async (req, res) => {
 // ─── POST /api/auth/google ──────────────────────────────────────────────────
 
 router.post('/google', async (req, res) => {
-  const { idToken, code, inviteToken, promoCode, source, referralCode } = req.body;
+  const { idToken, code, inviteToken, promoCode, source, referralCode, intent } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
   const signupGclid = sanitizeGclid(req.body?.gclid);
@@ -1446,6 +1447,9 @@ router.post('/google', async (req, res) => {
           console.log(`[auth/google] Auto-attaching ${googleEmail} to household ${invite.household_id} via pending invite ${invite.id}`);
         }
       }
+      // Login-screen guard - see the Apple route for the rationale.
+      const refusal = socialLoginRefusal({ user, invite, intent, provider: 'google', email: googleEmail });
+      if (refusal) return res.status(404).json({ error: 'no_account', message: refusal });
       if (invite) {
         householdId = invite.household_id;
         acceptedInvite = invite;
@@ -1495,7 +1499,7 @@ router.post('/google', async (req, res) => {
 // ─── POST /api/auth/apple ───────────────────────────────────────────────────
 
 router.post('/apple', async (req, res) => {
-  const { idToken, name: appleName, inviteToken, promoCode, source, referralCode } = req.body;
+  const { idToken, name: appleName, inviteToken, promoCode, source, referralCode, intent } = req.body;
   const signupPromoCode = sanitizePromoCode(promoCode);
   const signupSource = sanitizeSignupSource(source);
   const signupGclid = sanitizeGclid(req.body?.gclid);
@@ -1567,6 +1571,12 @@ router.post('/apple', async (req, res) => {
           console.log(`[auth/apple] Auto-attaching ${appleEmail} to household ${invite.household_id} via pending invite ${invite.id}`);
         }
       }
+      // Login-screen guard: no account, no invite, and the client said it
+      // was LOGGING IN - refuse rather than mint an empty household (Apple's
+      // Hide-My-Email relay made this the default outcome; real support
+      // case 2026-09-02). Sign-up keeps creating accounts as before.
+      const refusal = socialLoginRefusal({ user, invite, intent, provider: 'apple', email: appleEmail });
+      if (refusal) return res.status(404).json({ error: 'no_account', message: refusal });
       if (invite) {
         householdId = invite.household_id;
         acceptedInvite = invite;

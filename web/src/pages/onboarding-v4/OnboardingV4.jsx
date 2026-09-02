@@ -186,6 +186,7 @@ export default function OnboardingV4({ initialPhase }) {
         // The existing reset page works inside the app: Turnstile bypasses
         // native origins, and the reset link opens the web page with a code.
         onForgot={() => navigate('/forgot-password')}
+        socialError={authError}
       />
     );
   }

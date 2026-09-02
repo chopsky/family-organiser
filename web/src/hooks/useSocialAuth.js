@@ -76,6 +76,12 @@ function isCancelError(err) {
 export default function useSocialAuth({ inviteToken, promoCode, signupSource, gclid, onSuccess, onError } = {}) {
   const [googleLoaded, setGoogleLoaded] = useState(false);
   const [nativeSocialLoginInitialised, setNativeSocialLoginInitialised] = useState(false);
+  // Which screen started the sign-in ('login' | null). Set at click time and
+  // read at POST time: the web Google flow posts from a popup callback, so
+  // the value has to survive across that gap. The server refuses to mint
+  // an account for an unknown email when intent is 'login'.
+  const intentRef = useRef(null);
+  const takeIntent = (opts) => { intentRef.current = typeof opts?.intent === 'string' ? opts.intent : null; };
   // Holds Google's OAuth code client (web), initialised once the GIS SDK loads.
   const codeClientRef = useRef(null);
 
@@ -102,10 +108,11 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
         source: signupSource || undefined,
         gclid: gclid || undefined,
         referralCode: resolveReferralCode() || undefined,
+        intent: intentRef.current || undefined,
       });
       onSuccess(data);
     } catch (err) {
-      onError(err.response?.data?.error || 'Google sign-in failed.');
+      onError(err.response?.data?.message || err.response?.data?.error || 'Google sign-in failed.');
     }
   }, [inviteToken, promoCode, signupSource, gclid, onSuccess, onError]);
 
@@ -196,7 +203,8 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
   //     and ASWebAuthenticationSession to authenticate. Returns an idToken
   //     in the same JWT format the server already verifies.
   //   • Web: trigger Google's One Tap popup via the JS SDK.
-  async function handleGoogleClick() {
+  async function handleGoogleClick(opts) {
+    takeIntent(opts);
     // iOS AND Android native both go through the Capgo plugin's native Google
     // SDK, which returns an idToken (the same JWT the server verifies for the
     // web code-exchange path). Google blocks its web JS SDK in a WebView, so
@@ -235,12 +243,13 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
           source: signupSource || undefined,
         gclid: gclid || undefined,
           referralCode: resolveReferralCode() || undefined,
+          intent: intentRef.current || undefined,
         });
         onSuccess(data);
       } catch (err) {
         if (isCancelError(err)) return;
         console.error('[social-login] native Google sign-in error:', err);
-        onError(err?.response?.data?.error || err?.message || 'Google sign-in failed.');
+        onError(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Google sign-in failed.');
       }
       return;
     }
@@ -252,7 +261,8 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
     codeClientRef.current.requestCode();
   }
 
-  async function handleApple() {
+  async function handleApple(opts) {
+    takeIntent(opts);
     // iOS native: use ASAuthorizationController via the Capgo plugin.
     // The com.apple.developer.applesignin entitlement on this app's bundle
     // ID handles the credential issuance - no Services ID, no redirect URL.
@@ -297,12 +307,13 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
           source: signupSource || undefined,
         gclid: gclid || undefined,
           referralCode: resolveReferralCode() || undefined,
+          intent: intentRef.current || undefined,
         });
         onSuccess(data);
       } catch (err) {
         if (isCancelError(err)) return;
         console.error('[social-login] iOS Apple sign-in error:', err);
-        onError(err?.response?.data?.error || err?.message || 'Apple sign-in failed.');
+        onError(err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Apple sign-in failed.');
       }
       return;
     }
@@ -336,11 +347,12 @@ export default function useSocialAuth({ inviteToken, promoCode, signupSource, gc
         source: signupSource || undefined,
         gclid: gclid || undefined,
         referralCode: resolveReferralCode() || undefined,
+        intent: intentRef.current || undefined,
       });
       onSuccess(data);
     } catch (err) {
       if (isCancelError(err)) return;
-      onError(err.response?.data?.error || 'Apple sign-in failed.');
+      onError(err.response?.data?.message || err.response?.data?.error || 'Apple sign-in failed.');
     }
   }
 
