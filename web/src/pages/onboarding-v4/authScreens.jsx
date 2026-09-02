@@ -523,6 +523,16 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
               : `Profiles ready for ${outcome.kids.slice(0, -1).join(', ')} and ${outcome.kids[outcome.kids.length - 1]}`}
           </p>
         )}
+        {/* The school step's outcome, spoken honestly: term dates landed, or
+            the school is in and the School page offers the other routes
+            (website / photo / PDF) - never a silent "we tried". */}
+        {outcome?.school?.name && (
+          <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
+            ✓ {outcome.school.termDates
+              ? `${outcome.school.name} added - ${outcome.school.termDates} term dates are on your calendar`
+              : `${outcome.school.name} added - grab its term dates on the School page`}
+          </p>
+        )}
         {/* The inbox claim, confirmed or honestly lost - replayInbox's
             contract promises the welcome screen reports it, and a silent
             claim is how a mis-captured alias goes unnoticed until Settings

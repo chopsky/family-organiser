@@ -120,15 +120,58 @@ export async function replayInbox(slug) {
  * one failure must not cost the others, and a fully failed replay just
  * means the family adds the kids in Family Setup like before.
  */
-export async function replayKids(names) {
+export async function replayKids(names, schoolId = null) {
   const created = [];
   for (const name of names || []) {
     try {
-      await api.post('/household/dependents', { name, dependent_kind: 'child' });
+      // Link each child to the school picked at the school step, so the
+      // per-child term calendar and prep pings resolve without a second
+      // visit to Family Setup.
+      await api.post('/household/dependents', { name, dependent_kind: 'child', ...(schoolId ? { school_id: schoolId } : {}) });
       created.push(name);
     } catch { /* skip - Family Setup remains the fallback */ }
   }
   return created;
+}
+
+/**
+ * Create the school picked at the school step and pull its term dates.
+ * The pick is a GIAS directory row (urn/name/type/local_authority/
+ * postcode), so POST /schools is exact; the LA import is the same call the
+ * School page makes - the shared directory answers instantly for known
+ * councils, and a miss just means the School page offers the other routes.
+ * Independent schools have no LA calendar, so the import is skipped for
+ * them rather than reported as a failure.
+ *
+ * Resolves { id, name, termDates } (termDates = number imported, or null
+ * when nothing landed) - or null when the school itself couldn't be created.
+ * Never throws.
+ */
+export async function replaySchool(school) {
+  if (!school?.name) return null;
+  let created = null;
+  try {
+    const { data } = await api.post('/schools', {
+      school_name: school.name,
+      school_urn: school.urn || null,
+      school_type: school.type || null,
+      local_authority: school.local_authority || null,
+      postcode: school.postcode || null,
+    });
+    created = data?.school || null;
+  } catch { return null; }
+  if (!created?.id) return null;
+
+  let termDates = null;
+  const independent = /independent|private/i.test(String(school.type || ''));
+  if (!independent && (school.local_authority || school.urn)) {
+    try {
+      const { data } = await api.post(`/schools/${created.id}/import-la-dates`);
+      const n = Number(data?.imported ?? data?.count ?? 0);
+      termDates = Number.isFinite(n) && n > 0 ? n : null;
+    } catch { termDates = null; }
+  }
+  return { id: created.id, name: created.school_name || school.name, termDates };
 }
 
 export async function replayQueued(d) {
@@ -137,6 +180,8 @@ export async function replayQueued(d) {
   // household they joined - never try to (re)claim it on their behalf.
   // Same for kids: the roster belongs to the household they joined.
   const inbox = d?.joining ? { claimed: false, conflict: false } : await replayInbox(d?.inbox);
-  const kids = d?.joining ? [] : await replayKids(d?.kids);
-  return { calendars, inbox, kids };
+  // School before kids, so the children can be created already linked to it.
+  const school = d?.joining ? null : await replaySchool(d?.school);
+  const kids = d?.joining ? [] : await replayKids(d?.kids, school?.id || null);
+  return { calendars, inbox, kids, school };
 }

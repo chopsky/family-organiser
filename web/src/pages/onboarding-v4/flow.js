@@ -26,7 +26,11 @@ import { Capacitor } from '@capacitor/core';
 // pairing. The real, live pairing now happens in the post-auth 'whatsapp'
 // PHASE, between sign-up and the celebration - where the code exchange can
 // actually run and the UI can tell the truth.
-export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'kids', 'house', 'cals', 'inbox', 'reminders'];
+// 'school' follows 'kids' and shows only when at least one child was named
+// (machine.js hops it otherwise): the GIAS search + LA term-dates import
+// already existed on the School page, but nothing in onboarding ever ASKED -
+// 3 of 13 kid-households in launch week added one (2026-09-02 cohort pull).
+export const STEPS = ['pains', 'plan', 'shape', 'you', 'role', 'kids', 'school', 'house', 'cals', 'inbox', 'reminders'];
 
 export const PHASES = ['splash', 'flow', 'login', 'signup', 'whatsapp', 'done'];
 

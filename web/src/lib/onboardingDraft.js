@@ -37,6 +37,7 @@ export const emptyDraft = () => ({
   role: '',
   house: '',      // household name -> screens 11, 12
   cals: {},       // { providerId: true } - CONNECTED INTENT ONLY, never the URL
+  school: null,   // { urn, name, type, local_authority, postcode } picked at the school step; created at replay
   inbox: '',      // claimed house-inbox slug; the alias is set after sign-up
   wa: false,      // wants WhatsApp; the real pairing happens after sign-up
   rem: false,     // notification permission granted
@@ -65,6 +66,7 @@ export function isDraftEmpty(d) {
   return (d.pains || []).length === 0
     && !d.shape && !d.you && !d.role && !d.house
     && Object.keys(d.cals || {}).length === 0
+    && !d.school
     && !d.wa && !d.rem;
 }
 
@@ -112,6 +114,7 @@ export function completedRecap(d) {
       value: `${calCount} connected`,
     });
   }
+  if (d.school?.name) rows.push({ key: 'school', icon: '🏫', label: 'School', value: d.school.name });
   if (d.wa) rows.push({ key: 'wa', icon: '💬', label: 'WhatsApp', value: 'Connected' });
   if (d.inbox) {
     rows.push({

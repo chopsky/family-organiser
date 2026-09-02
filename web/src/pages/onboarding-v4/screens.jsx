@@ -10,6 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
+import api from '../../lib/api';
 import { NOTES, PAINS, SHAPES, ROLES, houseSuggestions } from './content';
 import { Lockup, Cta, Ghost, OptionRow, ChipGrid, Field, Tick } from './ui';
 
@@ -282,6 +283,119 @@ export function KidsStep({ d, update }) {
             </span>
           ))}
         </div>
+      )}
+    </>
+  );
+}
+
+/* ── 06b School ─ right after the kids step, only when a child was named
+   (machine.js hops it otherwise). Searches the GIAS directory pre-auth
+   (the search endpoint is public); the pick is created at signup by
+   replay.js, which also pulls the council's term dates - so a family with
+   kids reaches the dashboard with term dates already on the calendar.
+   Launch-week data (2026-09-02): 3 of 13 kid-households had added a
+   school, because nothing had ever asked. */
+export function SchoolStep({ d, update }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const kids = d.kids || [];
+  const picked = d.school || null;
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); setSearching(false); return undefined; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get(`/schools/search?q=${encodeURIComponent(q)}`);
+        if (!cancelled) setResults((data?.schools || []).slice(0, 6));
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+
+  const pick = (r) => {
+    update({ school: { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null } });
+    setResults([]);
+  };
+  const who = kids.length === 1 ? kids[0] : kids.length === 2 ? `${kids[0]} and ${kids[1]}` : 'the kids';
+  const verb = kids.length === 1 ? 'does' : 'do';
+  const meta = (r) => [r.local_authority, r.postcode].filter(Boolean).join(' · ');
+
+  return (
+    <>
+      <p style={EYEBROW}>Step 4 of 6</p>
+      <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Where {verb} {who} go to school?</h1>
+      <p style={{ ...SUB, marginTop: 10 }}>Search by name. For most schools we’ll put the term dates and holidays straight onto your calendar.</p>
+      {picked ? (
+        <div
+          style={{
+            marginTop: 18, display: 'flex', alignItems: 'center', gap: 12,
+            padding: '14px 16px', borderRadius: 16, background: T.purpleSoft,
+          }}
+        >
+          <span style={{ fontSize: 22 }} aria-hidden="true">🏫</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ font: '600 15.5px Inter, sans-serif', color: T.purpleDeep }}>{picked.name}</div>
+            {meta(picked) && <div style={{ font: '500 13px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{meta(picked)}</div>}
+          </div>
+          <button
+            type="button"
+            onClick={() => update({ school: null })}
+            style={{ border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px Inter, sans-serif', color: T.purpleDeep, padding: '6px 2px' }}
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <>
+          <div style={{ marginTop: 18 }}>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && results[0]) { e.preventDefault(); pick(results[0]); } }}
+              placeholder="e.g. St Mary’s Primary"
+              autoCapitalize="words"
+              autoCorrect="off"
+              aria-label="School name"
+              style={{
+                width: '100%', padding: '15px 17px', borderRadius: 16,
+                border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
+                font: '600 16.5px Inter, sans-serif', color: T.ink,
+              }}
+            />
+          </div>
+          {results.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              {results.map((r) => (
+                <button
+                  key={r.urn || r.name}
+                  type="button"
+                  onClick={() => pick(r)}
+                  style={{
+                    textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
+                    border: `1.5px solid ${T.line2}`, background: T.surface,
+                  }}
+                >
+                  <div style={{ font: '600 15px Inter, sans-serif', color: T.ink }}>{r.name}</div>
+                  {meta(r) && <div style={{ font: '500 12.5px Inter, sans-serif', color: T.ink3, marginTop: 2 }}>{meta(r)}</div>}
+                </button>
+              ))}
+            </div>
+          )}
+          {query.trim().length >= 2 && !searching && results.length === 0 && (
+            <p style={{ ...SUB, marginTop: 12, fontSize: 14 }}>
+              Can’t find it? Skip for now - you can add any school, with its own term dates, on the School page.
+            </p>
+          )}
+          {searching && <p style={{ ...SUB, marginTop: 12, fontSize: 13, color: T.ink3 }}>Searching…</p>}
+        </>
       )}
     </>
   );

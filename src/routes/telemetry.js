@@ -20,7 +20,7 @@ const CONTEXTS = new Set(['onboarding', 'gate']);
 // dropped, so a renamed step shows up as a hole in the funnel, not an
 // error. 'invitecode' is the join-a-home overlay.
 const ONBOARDING_STEPS = new Set([
-  'splash', 'pains', 'plan', 'shape', 'you', 'role', 'kids', 'house',
+  'splash', 'pains', 'plan', 'shape', 'you', 'role', 'kids', 'school', 'house',
   'cals', 'inbox', 'reminders', 'signup', 'login', 'invitecode',
   'paywall', 'done',
   // 'ask' (pre-auth WhatsApp intent) retired 2026-08-28; kept accepted so

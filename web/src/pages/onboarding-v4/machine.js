@@ -26,6 +26,7 @@ export const STEP_META = {
   you:       { required: true,  autoAdvance: false, skipLabel: null },
   role:      { required: false, autoAdvance: true,  skipLabel: 'Skip for now' },
   kids:      { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
+  school:    { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
   house:     { required: true,  autoAdvance: false, skipLabel: null },
   cals:      { required: false, autoAdvance: false, skipLabel: "I'll do this later" },
   inbox:     { required: false, autoAdvance: false, skipLabel: 'Skip for now' },
@@ -49,7 +50,7 @@ export const autoAdvances = (i) => Boolean(metaAt(i)?.autoAdvance);
  * acts. Navigation hops over them; the joiner walks you → role → cals →
  * reminders (WhatsApp pairing is a post-auth phase, not a step).
  */
-const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'kids', 'house', 'inbox']);
+const FOUNDER_ONLY_STEPS = new Set(['pains', 'plan', 'shape', 'kids', 'school', 'house', 'inbox']);
 // Shapes with children in the picture - the only households the kids step
 // applies to. A skipped shape answer means "unknown", and asking housemates
 // to name their children is worse than not asking a family, so unknown skips.
@@ -58,6 +59,8 @@ const isSkipped = (i, d) => {
   const s = stepAt(i);
   if (Boolean(d?.joining) && FOUNDER_ONLY_STEPS.has(s)) return true;
   if (s === 'kids' && !KID_SHAPES.has(d?.shape)) return true;
+  // The school ask only makes sense once a child has been named.
+  if (s === 'school' && (d?.kids || []).length === 0) return true;
   return false;
 };
 const activeSteps = (d) => STEPS.filter((s, idx) => !isSkipped(idx, d));

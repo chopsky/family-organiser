@@ -22,8 +22,7 @@ import InviteCodeOverlay from './inviteCodeScreen';
 import useOnboardingFlow from './useOnboardingFlow';
 import { Step, Cta, Ghost, ResumeNotice } from './ui';
 import {
-  Splash, PainPicker, ShapePicker, NameStep, RoleStep, KidsStep, HouseStep, HouseSignOverlay,
-} from './screens';
+  Splash, PainPicker, ShapePicker, NameStep, RoleStep, KidsStep, HouseStep, HouseSignOverlay, SchoolStep } from './screens';
 import { PlanBeat } from './chatBeats';
 import { CalendarList, CalendarConnect } from './calendarScreens';
 import { RemindersBody, RemindersFooter } from './remindersScreen';
@@ -300,7 +299,8 @@ export default function OnboardingV4({ initialPhase }) {
                       // "done here" rather than implying something is missing.
                       : step === 'cals' ? (calCount > 0 ? `Done · ${calCount} connected` : 'Continue')
                         : step === 'kids' ? ((d.kids || []).length > 0 ? `That’s everyone (${d.kids.length})` : 'Continue')
-                          : 'Continue'}
+                          : step === 'school' ? (d.school ? 'Add this school' : 'Continue')
+                            : 'Continue'}
               </Cta>
             )}
             {skipLabel && <Ghost onClick={skip}>{skipLabel}</Ghost>}
@@ -319,6 +319,7 @@ export default function OnboardingV4({ initialPhase }) {
         {step === 'you' && <NameStep d={d} update={update} onEnter={() => canAdvance && next()} />}
         {step === 'role' && <RoleStep d={d} pick={pickAndAdvance} />}
         {step === 'kids' && <KidsStep d={d} update={update} />}
+        {step === 'school' && <SchoolStep d={d} update={update} />}
         {step === 'house' && (
           <HouseStep
             d={d}
