@@ -592,6 +592,23 @@ const NAV_JS = `
         d.addEventListener('mouseleave', function () { d.open = false; });
       });
     });
+    // Outbound CTA clicks. GA runs cookieless here (consent denied, no
+    // banner), so these arrive as aggregate event counts rather than user
+    // journeys - enough to compare pages and give signup_source a
+    // denominator. The authoritative conversion number stays server-side.
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href*="housemait.com"]') : null;
+      if (!a || typeof window.gtag !== 'function') return;
+      var href = a.getAttribute('href') || '';
+      if (href.indexOf('/school-term-dates') !== -1) return;
+      var m = href.match(/[?&]src=([a-z0-9-]+)/i);
+      window.gtag('event', 'termdates_cta_click', {
+        link_url: href,
+        cta_source: m ? m[1] : 'untagged',
+        cta_label: (a.textContent || '').trim().slice(0, 40),
+        page_path: location.pathname
+      });
+    });
   `;
 const NAV_JS_HASH = crypto.createHash('sha256').update(NAV_JS).digest('base64');
 
@@ -691,7 +708,7 @@ function detailPage({ title, description, canonicalPath, h1, sub, years, content
   <meta name="twitter:image" content="https://housemait.com/school-term-dates/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
   ${faqLd ? `<script type="application/ld+json">${JSON.stringify(faqLd)}</script>` : ''}
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=8" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
   <style>
 
 
@@ -960,7 +977,7 @@ function seasonalPage(slug, result) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=8" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -997,7 +1014,7 @@ function aboutPage(stats) {
   <title>${esc(title)}</title>
   <meta name="description" content="Where Housemait's UK school term-dates directory comes from: every council's own published calendar, re-checked monthly, with honest caveats." />
   <link rel="canonical" href="${esc(canonical)}" />
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=8" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1128,7 +1145,7 @@ function hubPage(hubSlug, members, entries) {
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=8" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
   <style>${SEASONAL_CSS}</style>${GA_SNIPPET}
   <script>${NAV_JS}</script>
 </head>
@@ -1206,7 +1223,7 @@ function bankHolidayPage(annotated, defs) {
   <meta property="og:image" content="${CANONICAL_BASE}/og-share.png" />
   <script type="application/ld+json">${JSON.stringify(crumbLd)}</script>
   <script type="application/ld+json">${JSON.stringify(faqLd)}</script>
-  <link rel="stylesheet" href="/school-term-dates/site.css?v=8" />
+  <link rel="stylesheet" href="/school-term-dates/site.css?v=9" />
   <style>${SEASONAL_CSS}
     .bh { max-width: 640px; }
     .bh .bh-title { font-family: 'Recoleta', Georgia, serif; font-size: 20px; color: #6B3FA0; margin-top: 2px; }
