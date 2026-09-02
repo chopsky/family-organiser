@@ -470,7 +470,9 @@ export default function Lists() {
                 </button>
               );
             })}
-            <button onClick={() => setNewList(true)} aria-label="New list" style={{ flexShrink: 0, width: 36, height: 36, borderRadius: '50%', background: '#fff', border: `1px dashed ${LINE_STRONG}`, color: INK3, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><IcPlus s={16} w={2.2} c={INK3} /></button>
+            {/* New-list lives in the page header's + (the standard page-top
+                primary action) - the dashed circle that used to sit here was
+                a second add button on the same screen. */}
           </div>
 
           {/* active list card (tinted in the list colour) */}
