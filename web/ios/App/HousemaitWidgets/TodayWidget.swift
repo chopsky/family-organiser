@@ -194,7 +194,11 @@ struct TodayLockView: View {
         // Calendar and Mail circles sit on), so the card reads over any
         // wallpaper. Without it the lines sat straight on the photo.
         ZStack {
+            // The pill's own rounding on the rectangular family is slight;
+            // clip it to the continuous rounded rectangle other Lock Screen
+            // cards use so it reads as a card, not a box.
             AccessoryWidgetBackground()
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 if let next = entry.next, !entry.isStale {
                     Text("Next · \(HMFormat.timeLabel(next))").font(.system(size: 12, weight: .semibold))
