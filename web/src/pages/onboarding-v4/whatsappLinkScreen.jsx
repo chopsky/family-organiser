@@ -3,9 +3,13 @@
  * Design: design_handoff_whatsapp_connect (high-fidelity).
  *
  * Benefit-led pitch ("Text it once. It's handled.") over a self-playing
- * mock WhatsApp conversation - photo of a school letter → filed events,
- * voice note → item on the list - then the green CTA. The demo plays
- * once per screen entry; reduced motion renders every bubble instantly.
+ * mock WhatsApp conversation - a one-line event, a photo of a school
+ * letter, a voice note for the shopping list, a question about half term -
+ * then the green CTA. Four exchanges in ~3.5s: the earlier cut showed one
+ * and left the chat half empty; the original four-beat cut took 5.5s and
+ * most people had gone before it finished. The demo uses the household's
+ * own children's names when the kids step supplied them. Plays once per
+ * screen entry; reduced motion renders every bubble instantly.
  *
  * Deliberate omissions per the handoff: no back button, no progress bar,
  * no logo - the screen opens straight onto the header.
@@ -114,15 +118,26 @@ function WaTyping() {
   );
 }
 
-// Sequence per the handoff: delays are from the previous step; a typing
-// indicator precedes each received bubble. Plays once per entry.
-// Two beats, fast. The four-beat version played for ~5.5s - longer than
-// the median 14s visit minus reading the header - and 27 of 30 people left
-// before tapping anything (Sept 2026 telemetry). Pairing IS the demo now.
+// Delays are from the previous step; a typing indicator precedes each
+// received bubble. Sent bubbles land fast, replies take a beat - the whole
+// thread is on screen in ~3.5s, under the median 14s visit. Older bubbles
+// scroll off the top of the fixed-height card like a real chat.
 const SEQ = [
-  { kind: 'photo', me: true, wait: 300 },
-  { kind: 'r1', wait: 900 },
+  { kind: 'ask1', me: true, wait: 200 },
+  { kind: 'ans1', wait: 650 },
+  { kind: 'photo', me: true, wait: 240 },
+  { kind: 'r1', wait: 700 },
+  { kind: 'voice', me: true, wait: 240 },
+  { kind: 'r2', wait: 650 },
+  { kind: 'ask2', me: true, wait: 240 },
+  { kind: 'ans2', wait: 650 },
 ];
+
+// Real names beat placeholders: the kids step ran two screens ago.
+function demoNames(kids) {
+  const names = (kids || []).map((k) => (typeof k === 'string' ? k : k?.name)).map((n) => String(n || '').trim()).filter(Boolean);
+  return { kid1: names[0] || 'Mia', kid2: names[1] || names[0] || 'Arlo' };
+}
 
 function useSeq(reduced) {
   const [n, setN] = useState(reduced ? SEQ.length : 0);
@@ -134,8 +149,9 @@ function useSeq(reduced) {
   return { shown: SEQ.slice(0, n), typing: !reduced && n < SEQ.length && !SEQ[n].me, animate: !reduced };
 }
 
-function ChatDemo({ reduced }) {
+function ChatDemo({ reduced, kids }) {
   const { shown, typing, animate } = useSeq(reduced);
+  const { kid1, kid2 } = demoNames(kids);
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 22, overflow: 'hidden', background: WA.paper, boxShadow: '0 18px 44px -20px rgba(26,22,32,0.38), 0 0 0 1px rgba(26,22,32,0.06)' }}>
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: WA.header, borderBottom: `1px solid ${WA.hairline}` }}>
@@ -150,22 +166,26 @@ function ChatDemo({ reduced }) {
       </div>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8, padding: 12, overflow: 'hidden' }}>
         {shown.map((it, k) => {
+          if (it.kind === 'ask1') return <WaBubble key={k} me animate={animate}>Dentist for {kid1}, Thu 3pm{waTime('17:57', true)}</WaBubble>;
+          if (it.kind === 'ans1') return <WaBubble key={k} animate={animate}>Done: {kid1} · Dentist · Thu 3:00pm. I&rsquo;ll nudge you at 2:30. 🦷{waTime('17:57')}</WaBubble>;
           if (it.kind === 'photo') return <WaBubble key={k} me wide animate={animate}><LetterPhoto /></WaBubble>;
           if (it.kind === 'voice') return <WaBubble key={k} me animate={animate}><VoiceNote /></WaBubble>;
           if (it.kind === 'r1') {
             return (
               <WaBubble key={k} wide animate={animate}>
-                <div>Letter read — Arlo&rsquo;s autumn term, filed:</div>
+                <div>Letter read. {kid2}&rsquo;s autumn term, filed:</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '7px 0 2px' }}>
                   {[['📅', 'Swimming gala · Tue 4:00pm'], ['🔔', 'Trip money £6 · nudge Thu']].map(([e, t]) => (
                     <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: T.purpleSoft, color: T.purpleDeep, borderRadius: 9, padding: '5px 9px', fontSize: 12, fontWeight: 600 }}>{e} {t}</span>
                   ))}
                 </div>
-                On the family calendar — everyone can see it.{waTime('17:58')}
+                On the family calendar, so everyone can see it.{waTime('17:58')}
               </WaBubble>
             );
           }
-          return <WaBubble key={k} animate={animate}>Milk&rsquo;s on the list. Whoever shops next will see it. 🥛{waTime('17:59')}</WaBubble>;
+          if (it.kind === 'r2') return <WaBubble key={k} animate={animate}>Milk, nappies and a card for Gran are on the list. Whoever shops next will see them. 🥛{waTime('17:59')}</WaBubble>;
+          if (it.kind === 'ask2') return <WaBubble key={k} me animate={animate}>When&rsquo;s half term?{waTime('18:01', true)}</WaBubble>;
+          return <WaBubble key={k} animate={animate}>Half term is Mon 26 to Fri 30 Oct. {kid2}&rsquo;s back on Monday 2 Nov.{waTime('18:01')}</WaBubble>;
         })}
         {typing && <WaTyping />}
       </div>
@@ -175,7 +195,7 @@ function ChatDemo({ reduced }) {
 
 /* ── The screen ──────────────────────────────────────────────────────── */
 
-export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null}) {
+export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null, kids = null }) {
   // init → offer → waiting → linked → (onDone)  |  init failure → onDone
   const [stage, setStage] = useState('init');
   const [pairing, setPairing] = useState(null);
@@ -261,18 +281,18 @@ export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null}) {
         <h1 style={H1}>Text it once. <span style={{ color: T.purple }}>It&rsquo;s handled.</span></h1>
         <p style={{ fontSize: 15, lineHeight: 1.45, color: T.ink2, textWrap: 'pretty', marginTop: 9 }}>
           {outcome?.school?.termDates
-            ? <>Try it straight away: text <b style={{ color: T.ink }}>&ldquo;when&rsquo;s half term?&rdquo;</b> &mdash; it already knows {outcome.school.name}&rsquo;s dates.</>
+            ? <>Try it straight away: text <b style={{ color: T.ink }}>&ldquo;when&rsquo;s half term?&rdquo;</b> and it already knows {outcome.school.name}&rsquo;s dates.</>
             : <>Housemait lives in your WhatsApp. Send plans, school letters or voice notes
-          like you&rsquo;d send them to a friend &mdash; filed for the whole family.</>}
+          like you&rsquo;d send them to a friend. Filed for the whole family.</>}
         </p>
       </div>
 
-      <ChatDemo reduced={reduced} />
+      <ChatDemo reduced={reduced} kids={kids} />
 
       <div style={{ flexShrink: 0, paddingTop: 14 }}>
         {expired && stage === 'offer' && (
           <p style={{ fontSize: 12, fontWeight: 500, color: T.ink3, textAlign: 'center', margin: '0 0 8px' }}>
-            That code expired — tap the button for a fresh one.
+            That code expired. Tap the button for a fresh one.
           </p>
         )}
         {stage === 'linked' ? (
@@ -281,7 +301,7 @@ export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null}) {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 16, borderRadius: 17, background: T.okBg, color: T.okInk, font: '700 16px var(--font-sans)' }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 6" /></svg>
-            WhatsApp linked — say hi anytime
+            WhatsApp linked. Say hi anytime
           </div>
         ) : (
           <a
