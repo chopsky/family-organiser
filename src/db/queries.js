@@ -5335,6 +5335,29 @@ async function getRecentPurchases(householdId, days = 14, db = supabase) {
  * never had a refresh token (e.g. password-reset-only or signed up but never
  * completed login) — UI treats them as "Never".
  */
+/**
+ * PostgREST puts .in() lists in the QUERYSTRING, so a few hundred UUIDs
+ * overflow the request line and the call dies at the network layer with
+ * "TypeError: fetch failed" - not a PostgREST error, so error-handling
+ * branches never see it and the whole admin request 500s.
+ *
+ * Measured against this project's Supabase on 2026-09-03: 300 ids fine,
+ * 427 fails. The admin list pages cross that as soon as the user base does,
+ * which is exactly how the Households page broke - no code changed, the
+ * estate simply grew past the cliff. Every filter over an UNBOUNDED id list
+ * must go through here; chunk size leaves generous headroom (~5.5KB).
+ */
+const IN_CHUNK = 150;
+async function selectInChunks(ids, run) {
+  const rows = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const { data, error } = await run(ids.slice(i, i + IN_CHUNK));
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+  return rows;
+}
+
 async function fetchLastActiveByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
   // "Last active" = the most recent of EVERY activity signal we record:
@@ -5344,10 +5367,14 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
   // Without the device_tokens signal, app users who hold a long-lived token
   // and rarely hit the refresh endpoint showed "Never" even though their
   // iOS-App platform (also derived from device_tokens) proves recent use.
-  const [tokensRes, devicesRes] = await Promise.all([
-    db.from('refresh_tokens').select('user_id, last_used_at').in('user_id', userIds),
-    db.from('device_tokens').select('user_id, updated_at').in('user_id', userIds),
+  const [tokenRows, deviceRows] = await Promise.all([
+    selectInChunks(userIds, (chunk) => db.from('refresh_tokens').select('user_id, last_used_at').in('user_id', chunk)),
+    // device_tokens stays best-effort: a missing table or column must never
+    // blank the list, so swallow its failure rather than throwing.
+    selectInChunks(userIds, (chunk) => db.from('device_tokens').select('user_id, updated_at').in('user_id', chunk)).catch(() => null),
   ]);
+  const tokensRes = { data: tokenRows, error: null };
+  const devicesRes = deviceRows === null ? { data: [], error: true } : { data: deviceRows, error: null };
   if (tokensRes.error) throw tokensRes.error;
   const map = new Map();
   const note = (userId, ts) => {
@@ -5381,25 +5408,41 @@ async function fetchLastActiveByUserIds(userIds, db = supabase) {
  */
 async function fetchLastWhatsAppByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
-  const CHUNK = 25;
+
+  // ONE bulk scan, not one query per user. The old shape fired a point query
+  // per id (chunked 25-wide), which is survivable for a 50-row page but not
+  // for the derived-sort paths that pass EVERY user in the estate: sorting
+  // households by "Last seen" fanned out to ~400 concurrent requests and the
+  // page died with "fetch failed".
+  //
+  // Instead: page the inbound log newest-first and take each user's FIRST
+  // appearance (which is their most recent message by construction), stopping
+  // as soon as every requested id is resolved. Deliberately no .in(userIds)
+  // filter - a few hundred UUIDs in a PostgREST querystring is its own
+  // failure mode, and the log is small enough to walk (1.2k inbound rows =
+  // 2 requests). MAX_PAGES caps the walk; a user whose last message falls
+  // outside the newest 25k reads as "never", which at current volume is
+  // years away and degrades gracefully when it arrives.
+  const targets = new Set(userIds);
   const map = new Map();
-  for (let i = 0; i < userIds.length; i += CHUNK) {
-    const chunk = userIds.slice(i, i + CHUNK);
-    const results = await Promise.all(
-      chunk.map((id) =>
-        db
-          .from('whatsapp_message_log')
-          .select('created_at')
-          .eq('user_id', id)
-          .eq('direction', 'inbound')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .then((res) => ({ id, ts: res.data?.[0]?.created_at || null }))
-      )
-    );
-    for (const { id, ts } of results) {
-      if (ts) map.set(id, ts);
+  const PAGE = 1000;
+  const MAX_PAGES = 25;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await db
+      .from('whatsapp_message_log')
+      .select('user_id, created_at')
+      .eq('direction', 'inbound')
+      .order('created_at', { ascending: false })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) throw error;
+    const rows = data || [];
+    for (const r of rows) {
+      if (!r.user_id || map.has(r.user_id) || !targets.has(r.user_id)) continue;
+      map.set(r.user_id, r.created_at);
+      if (map.size === targets.size) return map;
     }
+    if (rows.length < PAGE) break;
   }
   return map;
 }
@@ -5427,14 +5470,23 @@ const { parsePlatformFromUserAgent } = require('../utils/platform-detect');
 async function getPlatformsByUserIds(userIds, db = supabase) {
   if (!userIds || userIds.length === 0) return new Map();
 
-  const selectPlatformRows = (withVersion) => Promise.all([
-    db.from('refresh_tokens')
-      .select(withVersion ? 'user_id, user_agent, app_version, last_used_at' : 'user_id, user_agent, last_used_at')
-      .in('user_id', userIds),
-    db.from('device_tokens')
-      .select(withVersion ? 'user_id, active, app_version, updated_at' : 'user_id, active, updated_at')
-      .in('user_id', userIds).eq('platform', 'ios'),
-  ]);
+  const selectPlatformRows = async (withVersion) => {
+    // Chunked (see selectInChunks) but shaped like the original
+    // {data,error} pair so the missing-column fallback below still works.
+    try {
+      const [tokens, devices] = await Promise.all([
+        selectInChunks(userIds, (chunk) => db.from('refresh_tokens')
+          .select(withVersion ? 'user_id, user_agent, app_version, last_used_at' : 'user_id, user_agent, last_used_at')
+          .in('user_id', chunk)),
+        selectInChunks(userIds, (chunk) => db.from('device_tokens')
+          .select(withVersion ? 'user_id, active, app_version, updated_at' : 'user_id, active, updated_at')
+          .in('user_id', chunk).eq('platform', 'ios')),
+      ]);
+      return [{ data: tokens, error: null }, { data: devices, error: null }];
+    } catch (error) {
+      return [{ data: null, error }, { data: null, error }];
+    }
+  };
   let [tokensRes, devicesRes] = await selectPlatformRows(true);
   // Pre-migration fallback: drop app_version from the projection. Rows then
   // lack app_version, so noteAppVersion below simply records nothing.
@@ -5858,11 +5910,11 @@ async function resolveActivityFilter(activity, db = supabase) {
 
   const activeHouseholdIds = new Set();
   if (activeUserIds.length > 0) {
-    const { data: activeMembers } = await db
+    const activeMembers = await selectInChunks(activeUserIds, (chunk) => db
       .from('users')
       .select('household_id')
-      .in('id', activeUserIds)
-      .not('household_id', 'is', null);
+      .in('id', chunk)
+      .not('household_id', 'is', null));
     for (const m of activeMembers || []) activeHouseholdIds.add(m.household_id);
   }
 
@@ -5997,10 +6049,10 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
   // Attach member counts + last_active_at + documents
   const householdIds = data.map((h) => h.id);
   if (householdIds.length > 0) {
-    const { data: users } = await db
+    const users = await selectInChunks(householdIds, (chunk) => db
       .from('users')
       .select('id, household_id')
-      .in('household_id', householdIds);
+      .in('household_id', chunk));
 
     const countMap = {};
     const membersByHousehold = {};
@@ -6040,10 +6092,10 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
     }
 
     // Attach document counts + total bytes (single bulk fetch - same pattern as members)
-    const { data: docs } = await db
+    const docs = await selectInChunks(householdIds, (chunk) => db
       .from('documents')
       .select('household_id, file_size')
-      .in('household_id', householdIds);
+      .in('household_id', chunk));
 
     const docStats = {};
     for (const d of docs || []) {
@@ -6059,10 +6111,10 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
 
     // School adoption - one bulk fetch, same pattern as documents. Just the
     // count here; the detail page carries the per-school breakdown.
-    const { data: schoolRows } = await db
+    const schoolRows = await selectInChunks(householdIds, (chunk) => db
       .from('household_schools')
       .select('household_id')
-      .in('household_id', householdIds);
+      .in('household_id', chunk));
 
     const schoolCounts = {};
     for (const s of schoolRows || []) {
@@ -10948,6 +11000,8 @@ async function deleteRedemption(id, householdId, db = supabase) {
 }
 
 module.exports = {
+  __test: { selectInChunks },
+
   countOpenShoppingItems,
   getHolidayPauseDismissedUpto,
   setHolidayPauseDismissedUpto,
