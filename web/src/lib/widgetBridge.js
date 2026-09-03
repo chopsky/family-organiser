@@ -39,16 +39,25 @@ function whoLabel(members) {
  *   dashboard's getMembersForEvent) - keeps colour/name logic in one place
  * @param {string} householdName
  */
+// A timed event longer than this is a span, not an appointment: it goes in
+// the all-day row and never becomes "Next up". Without this, a 25-hour event
+// (the bot's old "until tomorrow" default) sat on the Lock Screen as "Now"
+// for a whole day after the meeting had happened (founder, 3 Sep).
+const SPAN_MS = 12 * 60 * 60 * 1000;
+
 export function buildWidgetPayload(todayEvents, membersFor, householdName) {
   const events = (todayEvents || []).map((ev, i) => {
     const members = membersFor ? (membersFor(ev) || []) : [];
     const primary = members[0] || null;
+    const startMs = ev.start_time ? Date.parse(ev.start_time) : NaN;
+    const endMs = ev.end_time ? Date.parse(ev.end_time) : NaN;
+    const isSpan = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs - startMs > SPAN_MS;
     return {
       id: String(ev.id || ev.occurrence_key || i),
       title: ev.title || 'Event',
       start: ev.start_time ? new Date(ev.start_time).toISOString() : null,
       end: ev.end_time ? new Date(ev.end_time).toISOString() : null,
-      allDay: Boolean(ev.all_day),
+      allDay: Boolean(ev.all_day) || isSpan,
       location: ev.location || null,
       color: primary ? hexFor(primary) : '#6B3FA0',
       who: whoLabel(members),
