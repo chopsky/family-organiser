@@ -548,7 +548,9 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
         {(outcome?.schools?.length ? outcome.schools : (outcome?.school ? [outcome.school] : [])).map((sc) => (
           <p key={sc.id || sc.name} style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
             ✓ {sc.termDates
-              ? `${sc.name} added - ${sc.termDates} term dates are on your calendar`
+              ? (sc.source === 'directory_adopted'
+                ? `${sc.name} added - ${sc.termDates} term dates from the school's own calendar, shared by another family there`
+                : `${sc.name} added - ${sc.termDates} term dates are on your calendar`)
               : `${sc.name} added - grab its term dates on the School page`}
           </p>
         ))}

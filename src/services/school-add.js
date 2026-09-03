@@ -125,6 +125,7 @@ async function importCouncilDates(school, householdId, userId) {
   await db.addSchoolTermDates(school.id, rows);
   await db.updateHouseholdSchoolMeta(school.id, {
     term_dates_source: 'local_authority',
+    uses_la_dates: true,
     term_dates_last_updated: new Date().toISOString(),
   });
   cache.invalidate(`schools:${householdId}`);
@@ -147,6 +148,9 @@ async function adoptDirectoryDates(school, householdId) {
   await db.addSchoolTermDates(school.id, hit.dates.map((d) => ({ ...d, source: 'school_directory' })));
   await db.updateHouseholdSchoolMeta(school.id, {
     term_dates_source: 'school_directory',
+    // Mirrors the adopt route: the flag is what the LA propagation sweep
+    // keys on, and a school on directory dates must never be re-councilled.
+    uses_la_dates: false,
     term_dates_last_updated: new Date().toISOString(),
   });
   await schoolDirDb.linkHouseholdSchoolToDirectory(school.id, hit.school.id).catch(() => {});
@@ -189,23 +193,44 @@ async function addConfirmedSchool({ householdId, userId, gias }) {
     cache.invalidate(`digest:${householdId}`);
   }
 
-  if (councilSchool) {
+  const result = await importBestTermDates(school, householdId, userId, { councilSchool });
+  return { school, ...result };
+}
+
+/**
+ * The one place that decides where a school's term dates come from, shared
+ * by the bot's add flow and the onboarding replay (POST /schools/:id/import-best):
+ *   - LA-maintained GIAS types -> the council's dates;
+ *   - everything else (academies, free schools, independents, faith trusts)
+ *     -> the cross-household directory if another family at the school has
+ *        already imported and reviewed the real calendar;
+ *   - otherwise 'needs_source': the school exists, the School page offers
+ *     website / photo / PDF.
+ * Onboarding used to send every school with a council name to the LA import,
+ * so an academy on its own calendar (Wolfson Hillel, a Jewish academy trust
+ * with Rosh Hashanah and Succot closures) landed Enfield's dates while the
+ * family next door held the right ones (founder, 3 Sep).
+ * Returns { outcome, imported, years, reason? }.
+ */
+async function importBestTermDates(school, householdId, userId, { councilSchool } = {}) {
+  const council = councilSchool ?? followsCouncilDates(school.school_type);
+  if (council) {
     try {
       const { imported, years } = await importCouncilDates(school, householdId, userId);
-      return { school, outcome: 'la_imported', imported, years };
+      return { outcome: 'la_imported', imported, years };
     } catch (err) {
       console.error('[school-add] council import failed:', err.message);
       // School exists; fall through to the ask-for-source path with the
       // friendly reason attached.
-      return { school, outcome: 'needs_source', imported: 0, years: [], reason: err.userMessage || null };
+      return { outcome: 'needs_source', imported: 0, years: [], reason: err.userMessage || null };
     }
   }
 
   const adopted = await adoptDirectoryDates(school, householdId);
   if (adopted) {
-    return { school, outcome: 'directory_adopted', imported: adopted.imported, years: adopted.years };
+    return { outcome: 'directory_adopted', imported: adopted.imported, years: adopted.years };
   }
-  return { school, outcome: 'needs_source', imported: 0, years: [] };
+  return { outcome: 'needs_source', imported: 0, years: [] };
 }
 
 /**
@@ -275,6 +300,7 @@ module.exports = {
   searchGiasCandidates,
   candidateLabel,
   addConfirmedSchool,
+  importBestTermDates,
   importTermDatesFromUrl,
   // exported for tests
   importCouncilDates,

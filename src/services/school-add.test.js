@@ -128,3 +128,47 @@ describe('addConfirmedSchool branches', () => {
     expect(out.school.id).toBe('existing');
   });
 });
+
+describe('importBestTermDates (onboarding replay + bot share one decision)', () => {
+  // The founder's case: a Jewish academy trust school with a council name in
+  // GIAS. Onboarding used to send it to the council import.
+  const wolfson = { id: 'sc9', school_name: 'Wolfson Hillel Primary School', school_type: 'Academy', local_authority: 'Enfield', school_urn: '146663' };
+
+  test('academy with a council name + directory record → the school\'s own dates, never the council\'s', async () => {
+    schoolDirectory.lookupDirectoryDatesForSchool.mockResolvedValue({
+      school: { id: 'dir9' },
+      dates: [
+        { event_type: 'bank_holiday', date: '2026-09-12', academic_year: '2026-2027', label: 'Rosh Hashanah' },
+        { event_type: 'half_term_start', date: '2026-10-26', academic_year: '2026-2027' },
+      ],
+    });
+    const out = await schoolAdd.importBestTermDates(wolfson, 'h1', 'u1');
+    expect(out.outcome).toBe('directory_adopted');
+    expect(out.imported).toBe(2);
+    expect(laDb.getDirectoryTermDatesByName).not.toHaveBeenCalled();
+    expect(db.addSchoolTermDates).toHaveBeenCalledWith('sc9', expect.arrayContaining([
+      expect.objectContaining({ source: 'school_directory', label: 'Rosh Hashanah' }),
+    ]));
+    // The flag the LA propagation sweep keys on must flip, or the next council
+    // refresh would overwrite the adopted calendar.
+    expect(db.updateHouseholdSchoolMeta).toHaveBeenCalledWith('sc9', expect.objectContaining({ uses_la_dates: false, term_dates_source: 'school_directory' }));
+  });
+
+  test('LA-maintained school → council dates, flag set', async () => {
+    laDb.getDirectoryTermDatesByName.mockResolvedValue([
+      { event_type: 'term_start', date: '2026-09-03', academic_year: '2026-2027' },
+    ]);
+    const out = await schoolAdd.importBestTermDates({ ...wolfson, school_type: 'Voluntary aided school' }, 'h1', 'u1');
+    expect(out.outcome).toBe('la_imported');
+    expect(schoolDirectory.lookupDirectoryDatesForSchool).not.toHaveBeenCalled();
+    expect(db.updateHouseholdSchoolMeta).toHaveBeenCalledWith('sc9', expect.objectContaining({ uses_la_dates: true, term_dates_source: 'local_authority' }));
+  });
+
+  test('academy with nothing on file → needs_source, nothing written', async () => {
+    const out = await schoolAdd.importBestTermDates(wolfson, 'h1', 'u1');
+    expect(out.outcome).toBe('needs_source');
+    expect(out.imported).toBe(0);
+    expect(db.addSchoolTermDates).not.toHaveBeenCalled();
+    expect(laDb.getDirectoryTermDatesByName).not.toHaveBeenCalled();
+  });
+});

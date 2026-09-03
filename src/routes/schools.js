@@ -1531,6 +1531,30 @@ router.get('/:schoolId/directory-dates', requireAuth, requireHousehold, async (r
 });
 
 /**
+ * POST /api/schools/:schoolId/import-best
+ *
+ * "Get this school's dates from wherever they should come from" - the
+ * onboarding replay's one call after creating the school. Council dates for
+ * LA-maintained types, the cross-household directory for schools that set
+ * their own calendar, otherwise nothing (the School page offers the other
+ * routes). Same decision as the WhatsApp bot's add flow, in one place.
+ * Response: { outcome: 'la_imported'|'directory_adopted'|'needs_source', imported, years, reason? }
+ */
+router.post('/:schoolId/import-best', requireAuth, requireHousehold, requireAdmin, async (req, res) => {
+  try {
+    const schools = await db.getHouseholdSchools(req.householdId);
+    const school = schools.find(s => s.id === req.params.schoolId);
+    if (!school) return res.status(404).json({ error: 'School not found.' });
+    const schoolAdd = require('../services/school-add');
+    const result = await schoolAdd.importBestTermDates(school, req.householdId, req.userId);
+    return res.json(result);
+  } catch (err) {
+    console.error('POST /api/schools/:id/import-best error:', err);
+    return res.status(500).json({ error: `Failed to import term dates: ${err.message}` });
+  }
+});
+
+/**
  * POST /api/schools/:schoolId/adopt-directory-dates
  *
  * One-tap import of the shared directory's dates for this school. Replaces

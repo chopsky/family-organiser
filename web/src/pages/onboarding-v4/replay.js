@@ -164,7 +164,7 @@ export async function replaySchool(school) {
   if (!created?.id) return null;
 
   let termDates = null;
-  const independent = /independent|private/i.test(String(school.type || ''));
+  let source = null; // 'la_imported' | 'directory_adopted' | 'sa_national' | null
   if (school.country === 'ZA' && school.usesNationalDates === true) {
     // South Africa: the national calendar applies to PUBLIC schools only -
     // independent schools set their own, so the family's explicit answer
@@ -173,19 +173,26 @@ export async function replaySchool(school) {
       const { data } = await api.post(`/schools/${created.id}/import-sa-term-dates`, {});
       const n = Number(data?.count ?? 0);
       termDates = Number.isFinite(n) && n > 0 ? n : null;
+      source = termDates ? 'sa_national' : null;
     } catch { termDates = null; }
-  } else if (!independent && (school.local_authority || school.urn)) {
-    // England/Wales: the council's dates via the shared directory.
+  } else if (school.urn || school.local_authority) {
+    // UK: the server decides the source - the council for LA-maintained
+    // schools, the cross-household directory for academies / independents
+    // whose own calendar another family has already imported, or nothing.
+    // Onboarding used to call the council import for any school with a
+    // council name, which put Enfield's dates on a Jewish academy while the
+    // family next door held the school's real ones (founder, 3 Sep).
     try {
-      const { data } = await api.post(`/schools/${created.id}/import-la-dates`);
-      const n = Number(data?.imported ?? data?.count ?? 0);
+      const { data } = await api.post(`/schools/${created.id}/import-best`);
+      const n = Number(data?.imported ?? 0);
       termDates = Number.isFinite(n) && n > 0 ? n : null;
+      source = data?.outcome || null;
     } catch { termDates = null; }
   }
   // Anywhere else (a free-text name, no urn): the school exists; term dates
   // come from the website/photo/PDF routes on the School page, and the Done
   // screen says exactly that.
-  return { id: created.id, name: created.school_name || school.name, termDates };
+  return { id: created.id, name: created.school_name || school.name, termDates, source };
 }
 
 export async function replayQueued(d) {
