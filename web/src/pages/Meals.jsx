@@ -1240,8 +1240,11 @@ function RecipeBoxView({ setError }) {
         setDetailRecipe(res.data.recipe);
       }
       await loadRecipes();
-    } catch {
-      setError('Could not import recipe from URL.');
+    } catch (err) {
+      // The server names the host when it knows the link can't be read
+      // (Instagram, Pinterest and friends) and points at the photo
+      // importer, which does handle them. Show that instead of a dead end.
+      setError(err.response?.data?.error || 'Could not import recipe from URL.');
     } finally {
       setImportingUrl(false);
     }

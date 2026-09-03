@@ -480,6 +480,38 @@ router.post('/recipes', requireAuth, requireHousehold, async (req, res) => {
 });
 
 /**
+ * Hosts a server-side fetch can never read a recipe from. Instagram,
+ * TikTok, Facebook and Threads serve a login wall rather than the post, and
+ * the recipe lives in a caption we never receive; Pinterest blocks bots and
+ * a pin is only a pointer to the real recipe on someone else's site.
+ *
+ * Saying so beats a generic failure, because the photo importer sitting
+ * right next to this one handles every one of them: a screenshot is read
+ * straight off the picture (founder, 3 Sep 2026).
+ */
+const LOGIN_WALLED_HOSTS = [
+  { re: /(^|\.)instagram\.com$|(^|\.)instagr\.am$/i, name: 'Instagram' },
+  { re: /(^|\.)tiktok\.com$/i, name: 'TikTok' },
+  { re: /(^|\.)facebook\.com$|(^|\.)fb\.watch$/i, name: 'Facebook' },
+  { re: /(^|\.)threads\.net$/i, name: 'Threads' },
+  { re: /(^|\.)x\.com$|(^|\.)twitter\.com$/i, name: 'X' },
+];
+const PINTEREST_HOST = /(^|\.)pinterest\.[a-z.]+$|(^|\.)pin\.it$/i;
+
+function unreadableHostMessage(rawUrl) {
+  let host;
+  try { host = new URL(String(rawUrl).trim()).hostname; } catch { return null; }
+  if (PINTEREST_HOST.test(host)) {
+    return "Pinterest doesn't let us read a pin. Open the pin, follow its link to the original recipe and paste that address instead, or screenshot the recipe and use Import from photo.";
+  }
+  const hit = LOGIN_WALLED_HOSTS.find((h) => h.re.test(host));
+  if (hit) {
+    return `${hit.name} keeps posts behind a login, so we can't read a recipe from the link. Screenshot the post and use Import from photo instead: it reads the recipe straight off the picture.`;
+  }
+  return null;
+}
+
+/**
  * POST /api/recipes/import-url
  * Import recipe from URL using AI.
  * Body: { url }
@@ -488,6 +520,11 @@ router.post('/recipes/import-url', requireAuth, requireHousehold, async (req, re
   const { url } = req.body;
   if (!url?.trim()) {
     return res.status(400).json({ error: 'URL is required' });
+  }
+  // Fail fast, and usefully, on the hosts we know we cannot read.
+  const unreadable = unreadableHostMessage(url);
+  if (unreadable) {
+    return res.status(400).json({ error: unreadable, use_photo_import: true });
   }
 
   try {
