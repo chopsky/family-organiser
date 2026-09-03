@@ -40,6 +40,9 @@ function getFileCategory(mimeType) {
   return 'default';
 }
 
+// Mirrors multer's limit in src/routes/documents.js.
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 function formatFileSize(bytes) {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -295,6 +298,15 @@ export default function Documents() {
     const failed = [];
     for (let i = 0; i < filesArr.length; i++) {
       const file = filesArr[i];
+      // Size check BEFORE sending: the server cuts a file off at 25 MB
+      // (multer), but by then the phone has been streaming for minutes and
+      // the abort reads as an upload that never completes (founder, a
+      // 400 MB PDF, 3 Sep). Say the limit up front instead.
+      if (file.size > MAX_UPLOAD_BYTES) {
+        failed.push(`${file.name} is ${formatFileSize(file.size)}; files can be up to ${formatFileSize(MAX_UPLOAD_BYTES)}`);
+        setUploadProgress({ done: i + 1, total: filesArr.length });
+        continue;
+      }
       try {
         const formData = new FormData();
         formData.append('file', file);
