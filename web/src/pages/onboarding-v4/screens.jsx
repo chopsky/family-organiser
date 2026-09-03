@@ -8,7 +8,7 @@
  * Layout values are the spec's; colours resolve through ./tokens to the app's
  * existing custom properties.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { T, SHADOW, R } from './tokens';
 import api from '../../lib/api';
 import { detectCountryFromLocaleRegion, detectCountryFromLocaleCookie, detectCountryFromTimezone } from '../../lib/country';
@@ -307,10 +307,25 @@ export function KidsStep({ d, update }) {
    replay. The pick is created at signup by replay.js. Launch-week data
    (2026-09-02): 3 of 13 kid-households had added a school, because
    nothing had ever asked. */
-export function SchoolStep({ d, update }) {
+export function SchoolStep({ d, update, onSearching = () => {} }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  // With the keyboard up, the frame's pinned footer sat on top of the
+  // results (founder's phone, 3 Sep): the list rendered below the input,
+  // under Continue, and nothing said "scroll". While the input has focus
+  // the frame drops its footer (onSearching) and the input scrolls to the
+  // top of the body, so the list gets the whole space above the keyboard.
+  const inputRef = useRef(null);
+  const onSearchingRef = useRef(onSearching);
+  onSearchingRef.current = onSearching;
+  const focusIn = () => {
+    onSearchingRef.current(true);
+    // After the keyboard animation, or the scroll lands on the old layout.
+    setTimeout(() => inputRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 260);
+  };
+  const focusOut = () => onSearchingRef.current(false);
+  useEffect(() => () => onSearchingRef.current(false), []);
   const [country, setCountry] = useState(() => (
     detectCountryFromLocaleRegion()
     || detectCountryFromLocaleCookie(readLocaleCookie())
@@ -351,6 +366,8 @@ export function SchoolStep({ d, update }) {
   const pick = (r) => {
     update({ school: { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null, country } });
     setResults([]);
+    // The input unmounts with the pick, so its blur never fires.
+    onSearchingRef.current(false);
   };
   const who = kids.length === 1 ? kids[0] : kids.length === 2 ? `${kids[0]} and ${kids[1]}` : 'the kids';
   const verb = kids.length === 1 ? 'does' : 'do';
@@ -385,6 +402,9 @@ export function SchoolStep({ d, update }) {
             autoCapitalize="words"
             autoCorrect="off"
             aria-label="School name"
+            ref={inputRef}
+            onFocus={focusIn}
+            onBlur={focusOut}
             style={inputStyle}
           />
         </div>
@@ -404,7 +424,7 @@ export function SchoolStep({ d, update }) {
                 <button
                   key={String(o.v)}
                   type="button"
-                  onClick={() => update({ school: { ...picked, usesNationalDates: o.v } })}
+                  onClick={() => { update({ school: { ...picked, usesNationalDates: o.v } }); inputRef.current?.blur(); }}
                   style={{
                     textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
                     border: `1.5px solid ${on ? T.purple : T.line2}`, background: on ? T.purpleSoft : T.surface,
@@ -457,6 +477,9 @@ export function SchoolStep({ d, update }) {
               autoCapitalize="words"
               autoCorrect="off"
               aria-label="School name"
+              ref={inputRef}
+              onFocus={focusIn}
+              onBlur={focusOut}
               style={inputStyle}
             />
           </div>
@@ -466,6 +489,9 @@ export function SchoolStep({ d, update }) {
                 <button
                   key={r.urn || r.name}
                   type="button"
+                  // Keep the input focused through the tap: a blur first
+                  // would bring the footer back mid-gesture.
+                  onPointerDown={(e) => e.preventDefault()}
                   onClick={() => pick(r)}
                   style={{
                     textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',

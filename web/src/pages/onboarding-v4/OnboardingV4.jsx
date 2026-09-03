@@ -59,6 +59,9 @@ export default function OnboardingV4({ initialPhase }) {
   // Which provider's connect flow is open, if any. A sub-view of step 08
   // rather than a step of its own, so the progress bar doesn't jump.
   const [connecting, setConnecting] = useState(null);
+  // The school step drops the frame's footer while its search box has
+  // focus: with the keyboard up, Continue covered the results list.
+  const [schoolSearching, setSchoolSearching] = useState(false);
 
   // Auth. useV4Auth turns a session into a finished household (naming it,
   // replaying the queued calendars, marking onboarded); useSocialAuth drives
@@ -303,7 +306,7 @@ export default function OnboardingV4({ initialPhase }) {
         // Inside a provider's connect flow, back means "leave this provider",
         // not "leave the calendar step".
         onBack={connecting ? () => setConnecting(null) : back}
-        footer={connecting ? null : step === 'inbox' ? (
+        footer={connecting || (step === 'school' && schoolSearching) ? null : step === 'inbox' ? (
           // Step 10 owns its footer: the CTA becomes a green confirmation
           // box on success, and the skip disappears once claiming starts.
           <>
@@ -346,7 +349,7 @@ export default function OnboardingV4({ initialPhase }) {
         {step === 'you' && <NameStep d={d} update={update} onEnter={() => canAdvance && next()} />}
         {step === 'role' && <RoleStep d={d} pick={pickAndAdvance} />}
         {step === 'kids' && <KidsStep d={d} update={update} />}
-        {step === 'school' && <SchoolStep d={d} update={update} />}
+        {step === 'school' && <SchoolStep d={d} update={update} onSearching={setSchoolSearching} />}
         {step === 'house' && (
           <HouseStep
             d={d}
