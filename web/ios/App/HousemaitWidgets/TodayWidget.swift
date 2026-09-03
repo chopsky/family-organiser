@@ -190,15 +190,24 @@ struct TodayMediumView: View {
 struct TodayLockView: View {
     let entry: TodayEntry
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            if let next = entry.next, !entry.isStale {
-                Text("Next · \(HMFormat.timeLabel(next))").font(.system(size: 12, weight: .semibold))
-                Text(next.title).font(.system(size: 13, weight: .bold)).lineLimit(1)
-                if let who = next.who, !who.isEmpty { Text(who).font(.system(size: 11)).lineLimit(1) }
-            } else {
-                Text("Housemait").font(.system(size: 12, weight: .semibold))
-                Text(entry.isStale ? "Open for today's plan" : "Nothing else today").font(.system(size: 12)).lineLimit(1)
+        // The system's frosted pill behind the text (the same glass the
+        // Calendar and Mail circles sit on), so the card reads over any
+        // wallpaper. Without it the lines sat straight on the photo.
+        ZStack {
+            AccessoryWidgetBackground()
+            VStack(alignment: .leading, spacing: 1) {
+                if let next = entry.next, !entry.isStale {
+                    Text("Next · \(HMFormat.timeLabel(next))").font(.system(size: 12, weight: .semibold))
+                    Text(next.title).font(.system(size: 13, weight: .bold)).lineLimit(1)
+                    if let who = next.who, !who.isEmpty { Text(who).font(.system(size: 11)).lineLimit(1) }
+                } else {
+                    Text("Housemait").font(.system(size: 12, weight: .semibold))
+                    Text(entry.isStale ? "Open for today's plan" : "Nothing else today").font(.system(size: 12)).lineLimit(1)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
         .lockSurface()
         .widgetURL(URL(string: "housemait://calendar"))
