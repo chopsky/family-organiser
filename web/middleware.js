@@ -105,10 +105,14 @@ export default function middleware(request) {
 
   // Transactional pages: stamp the housemait-locale cookie from the visitor's
   // IP if it's missing, so a direct visit to /signup (no prior marketing-page
-  // render) still carries the geo-derived country into the signup flow. The
-  // browser keeps the cookie on the second hit so the self-redirect resolves
-  // after one pass; no loop. Cookieless clients (curl, bots) just get a 307
-  // they don't follow, which is harmless on these pages.
+  // render) still carries the geo-derived country into the signup flow.
+  //
+  // The cookie rides the pass-through response itself - Vercel forwards
+  // headers on an x-middleware-next response to the client - so the page
+  // renders on the first hit with the cookie already set. This used to be
+  // a 307 back to the same URL, which a cookie-less fetcher follows forever:
+  // Google's tag diagnostics reported /login and /signup as untagged landing
+  // pages because it never saw a page at all (3 Sep 2026).
   if (SKIP_PATHS.has(path)) {
     const cookieHeader = request.headers.get('cookie') || '';
     if (/(?:^|;\s*)housemait-locale=/.test(cookieHeader)) return next(); // already set
@@ -116,13 +120,12 @@ export default function middleware(request) {
     const code = localeCodeForCountry(country);
     if (!code) return next(); // unrecognized country - leave the page alone
     const maxAge = 60 * 60 * 24 * 30; // 30 days, mirrors useLocale.js
-    const headers = new Headers();
+    const headers = new Headers({ 'x-middleware-next': '1' });
     headers.set(
       'Set-Cookie',
       `housemait-locale=${code}; Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure`,
     );
-    headers.set('Location', request.url);
-    return new Response(null, { status: 307, headers });
+    return new Response(null, { headers });
   }
 
   // Everything that isn't a locale landing root falls through to the SPA with
