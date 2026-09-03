@@ -200,6 +200,7 @@ struct TodayLockView: View {
                 Text(entry.isStale ? "Open for today's plan" : "Nothing else today").font(.system(size: 12)).lineLimit(1)
             }
         }
+        .lockSurface()
         .widgetURL(URL(string: "housemait://calendar"))
     }
 }
@@ -225,5 +226,6 @@ struct TodayWidget: Widget {
         .configurationDisplayName("Today")
         .description("What's next for the family, at a glance.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+        .housemaitMargins()
     }
 }

@@ -104,5 +104,6 @@ struct AskWidget: Widget {
         .configurationDisplayName("Ask Housemait")
         .description("One tap to type or talk to your family assistant.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .housemaitMargins()
     }
 }

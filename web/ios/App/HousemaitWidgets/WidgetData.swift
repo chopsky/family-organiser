@@ -99,4 +99,25 @@ extension View {
             self.background(color)
         }
     }
+
+    // Accessory (Lock Screen) families: the system paints the glass, but iOS 17
+    // still refuses to render ANY family that hasn't declared a container
+    // background - the gallery shows "Please adopt containerBackground API"
+    // in its place. A clear container is the declaration.
+    @ViewBuilder
+    func lockSurface() -> some View {
+        if #available(iOS 17.0, *) {
+            self.containerBackground(for: .widget) { Color.clear }
+        } else {
+            self
+        }
+    }
+}
+
+extension WidgetConfiguration {
+    // The views carry their own 14pt padding (a match for the app's cards);
+    // iOS 17's default content margins would stack another 16pt on top.
+    func housemaitMargins() -> some WidgetConfiguration {
+        self.contentMarginsDisabled()
+    }
 }
