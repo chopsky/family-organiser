@@ -317,6 +317,11 @@ async function seedContent({ household, sarah, james, olivia, henry }) {
     { title: 'Brunch at Riverside',     start: iso(dateOffset(6), 11, 0),  end: iso(dateOffset(6), 13, 0),  who: null,   color: 'sage', location: 'Riverside Café' },
     { title: 'Dentist - Olivia',        start: iso(dateOffset(8), 15, 30), end: iso(dateOffset(8), 16, 15), who: olivia, color: 'coral', location: 'Smile Dental, Hampstead' },
     { title: 'Work trip - Manchester',  start: iso(dateOffset(10), 8, 0),  end: iso(dateOffset(11), 18, 0), who: james,  color: 'sage' },
+    // Two DAILY events, so the household always has a "next" - the Today
+    // widget and the Next Up Live Activity need one whenever a reviewer
+    // looks, not just on the day the seed ran (App Review 1.14.0).
+    { title: 'School pickup',           start: iso(TODAY, 15, 15), end: iso(TODAY, 15, 45), who: sarah,  color: 'plum',  location: "St. Mary's Primary", recurrence: 'daily' },
+    { title: 'Family dinner',           start: iso(TODAY, 18, 30), end: iso(TODAY, 19, 15), who: null,   color: 'sage',  recurrence: 'daily' },
   ];
   await insertMany('calendar_events', events.map((e) => ({
     household_id: hid, title: e.title, description: null,
