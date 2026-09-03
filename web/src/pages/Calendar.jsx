@@ -947,9 +947,21 @@ export default function Calendar() {
 
   // ── Navigation ────────────────────────────────────────────
 
+  // Month paging moves the selected day WITH the grid: today if the new
+  // month is this month, else its 1st. Left where it was, the agenda under
+  // the grid kept showing a day from the previous month ("Tuesday Sep 22 ·
+  // Nothing scheduled" under October) until a date was tapped.
+  function selectDayInMonth(first) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const sameMonth = first.getFullYear() === now.getFullYear() && first.getMonth() === now.getMonth();
+    setSelectedDate(sameMonth ? now : first);
+  }
+
   function navigatePrev() {
     if (viewMode === 'month' || viewMode === 'schedule') {
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+      const first = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      setCurrentMonth(first);
+      if (viewMode === 'month') selectDayInMonth(first);
     } else if (viewMode === 'week') {
       const d = new Date(selectedDate);
       d.setDate(d.getDate() - 7);
@@ -965,7 +977,9 @@ export default function Calendar() {
 
   function navigateNext() {
     if (viewMode === 'month' || viewMode === 'schedule') {
-      setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+      const first = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      setCurrentMonth(first);
+      if (viewMode === 'month') selectDayInMonth(first);
     } else if (viewMode === 'week') {
       const d = new Date(selectedDate);
       d.setDate(d.getDate() + 7);
