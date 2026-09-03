@@ -303,11 +303,19 @@ function NotificationBell() {
   useEffect(() => {
     let cancelled = false;
     const load = () => api.get('/notifications')
-      .then(({ data }) => { if (!cancelled) setUnread(data?.unread || 0); })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const n = data?.unread || 0;
+        setUnread(n);
+        // The app-icon badge mirrors the bell: unread notifications, nothing
+        // else. (It used to be the overdue-task count - illegible, and no
+        // amount of reading could clear it; founder 2026-09-02.)
+        setBadgeCount(n);
+      })
       .catch(() => {});
     load();
     // The centre marks everything read on open; clear the dot without a refetch.
-    const clear = () => setUnread(0);
+    const clear = () => { setUnread(0); setBadgeCount(0); };
     window.addEventListener('housemait:notifications-read', clear);
     return () => {
       cancelled = true;
@@ -850,13 +858,6 @@ export default function Dashboard() {
     if (label.overdue || label.text === 'Today') return count + 1;
     return count;
   }, 0);
-
-  // Update the iOS app-icon badge whenever the actionable count shifts.
-  // No-op on web. MUST stay above the loading early-return so the
-  // hook is called on every render (Rules of Hooks).
-  useEffect(() => {
-    setBadgeCount(actionableCount);
-  }, [actionableCount]);
 
   if (loading) return <DashboardSkeleton />;
 

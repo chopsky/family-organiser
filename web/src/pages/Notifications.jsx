@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { clearBadge } from '../lib/badge';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
@@ -60,8 +61,17 @@ export default function Notifications() {
         // the rest of the app so the bell's dot clears immediately.
         if ((data?.unread || 0) > 0) {
           api.post('/notifications/read', {})
-            .then(() => window.dispatchEvent(new CustomEvent('housemait:notifications-read')))
+            .then(() => {
+              window.dispatchEvent(new CustomEvent('housemait:notifications-read'));
+              // The app-icon badge IS the unread count now - reading clears it.
+              clearBadge();
+            })
             .catch(() => {});
+        } else {
+          // Nothing unread, but a stale badge from an earlier build (the old
+          // overdue-task badge) may still be on the icon - reading is the
+          // natural moment to zero it.
+          clearBadge();
         }
       })
       .catch(() => { if (!cancelled) setItems([]); });

@@ -502,6 +502,20 @@ async function recordForUsers(userIds, { title, body, data, householdId } = {}) 
   }
 }
 
+/**
+ * This user's unread-notification count for the APNs/FCM badge. undefined
+ * (badge left alone) when the count can't be read - e.g. the notification
+ * centre migration hasn't run - so a counting hiccup never blocks a push.
+ */
+async function unreadBadgeFor(userId) {
+  try {
+    const n = await db.getUnreadNotificationCount(userId);
+    return Number.isFinite(Number(n)) ? Math.max(0, Number(n)) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function sendToUser(userId, { title, body, data, category, householdId } = {}) {
   // NOT gated on push being configured: the in-app centre is the durable
   // copy and must exist even when APNs/FCM aren't set up or the user has
@@ -527,7 +541,13 @@ async function sendToUser(userId, { title, body, data, category, householdId } =
     }
 
     const deviceTokens = tokens.map((t) => ({ token: t.token, platform: t.platform || 'ios' }));
-    return sendPushNotification(deviceTokens, { title, body, data });
+    // The app-icon badge = this user's UNREAD notifications, set absolutely
+    // on every push (never incremented), so it always matches the centre
+    // and clears when the centre is opened. Before 2026-09-02 the badge was
+    // the dashboard's overdue-task count - illegible, and impossible to
+    // clear by reading anything (founder: 21 on the icon, 0 unread).
+    const badge = await unreadBadgeFor(userId);
+    return sendPushNotification(deviceTokens, { title, body, data, badge });
   } catch (err) {
     console.error('[push] sendToUser error:', err.message);
     return { sent: 0, failed: 0 };
@@ -584,7 +604,7 @@ async function sendToHousehold(householdId, excludeUserId, { title, body, data, 
     }
 
     // Filter out users who have disabled this category
-    const eligibleTokens = [];
+    const eligibleUsers = [];
 
     if (category && VALID_CATEGORIES.includes(category)) {
       const userIds = Array.from(tokensByUser.keys());
@@ -593,21 +613,24 @@ async function sendToHousehold(householdId, excludeUserId, { title, body, data, 
       );
 
       for (let i = 0; i < userIds.length; i++) {
-        if (isCategoryEnabled(prefChecks[i], category)) {
-          eligibleTokens.push(...tokensByUser.get(userIds[i]));
-        }
+        if (isCategoryEnabled(prefChecks[i], category)) eligibleUsers.push(userIds[i]);
       }
     } else {
-      for (const tokens of tokensByUser.values()) {
-        eligibleTokens.push(...tokens);
-      }
+      eligibleUsers.push(...tokensByUser.keys());
     }
 
-    if (eligibleTokens.length === 0) {
+    if (eligibleUsers.length === 0) {
       return { sent: 0, failed: 0 };
     }
 
-    return sendPushNotification(eligibleTokens, { title, body, data });
+    // One send per user (not one batch for the household): the badge is
+    // per person - their own unread count - so it can't ride a shared
+    // payload. Results are summed so callers see the household total.
+    const results = await Promise.all(eligibleUsers.map(async (uid) => {
+      const badge = await unreadBadgeFor(uid);
+      return sendPushNotification(tokensByUser.get(uid), { title, body, data, badge });
+    }));
+    return results.reduce((acc, r) => ({ sent: acc.sent + (r?.sent || 0), failed: acc.failed + (r?.failed || 0) }), { sent: 0, failed: 0 });
   } catch (err) {
     console.error('[push] sendToHousehold error:', err.message);
     return { sent: 0, failed: 0 };
