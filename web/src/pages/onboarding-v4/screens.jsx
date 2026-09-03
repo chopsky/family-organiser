@@ -128,7 +128,7 @@ export function Splash({ onStart, onLogin, reduced }) {
               card - the old "cancel anytime" implied an auto-renewing
               wall that no longer exists. Premium (the assistant
               unlimited, briefs, sync) rides along free for 14 days. */}
-          Free for your family · 14 days of Premium
+          Free to use · 14 days of Premium
         </p>
         <Ghost onClick={onLogin}>I already have an account</Ghost>
       </div>

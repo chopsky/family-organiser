@@ -278,7 +278,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.okInk }} />
-              Free for your family · 14 days of Premium
+              Free to use · 14 days of Premium
             </span>
           </div>
 
