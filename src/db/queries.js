@@ -6136,6 +6136,60 @@ async function getAllHouseholdsAdmin({ search, page = 1, limit = 50, sort = 'cre
   return { households: data, total: count };
 }
 
+/**
+ * A household's invites for the admin detail page, newest first, with the
+ * lifecycle resolved into one status field.
+ *
+ * Two distinct kinds live in this table and they answer different questions:
+ *   - NAMED invites (email set) - "we asked this specific person to join".
+ *     Unaccepted ones are the activation signal that matters: on live data
+ *     36 of 93 named invites lapsed without ever being accepted.
+ *   - OPEN share-links (email = '') - the welcome screen's one-tap partner
+ *     link, reused while unexpired. Nobody was named, so a pending one says
+ *     nothing about a person; they are labelled separately and never counted
+ *     as "waiting on someone".
+ */
+async function getHouseholdInvitesAdmin(householdId, db = supabase) {
+  const { data, error } = await db
+    .from('invites')
+    .select('id, email, name, family_role, invited_by, accepted_at, expires_at, created_at')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const rows = data || [];
+  if (!rows.length) return [];
+
+  // Resolve who sent each invite (may be a since-deleted member).
+  const inviterIds = [...new Set(rows.map((r) => r.invited_by).filter(Boolean))];
+  const inviterNames = new Map();
+  if (inviterIds.length) {
+    try {
+      const inviters = await selectInChunks(inviterIds, (chunk) =>
+        db.from('users').select('id, name').in('id', chunk));
+      for (const u of inviters) inviterNames.set(u.id, u.name);
+    } catch { /* names are decoration - never fail the page for them */ }
+  }
+
+  const now = new Date().toISOString();
+  return rows.map((r) => {
+    const isOpenLink = !r.email || !r.email.trim();
+    const status = r.accepted_at ? 'accepted' : (r.expires_at > now ? 'pending' : 'expired');
+    return {
+      id: r.id,
+      email: isOpenLink ? null : r.email,
+      name: r.name || null,
+      family_role: r.family_role || null,
+      kind: isOpenLink ? 'share_link' : 'named',
+      status,
+      invited_by_name: inviterNames.get(r.invited_by) || null,
+      created_at: r.created_at,
+      expires_at: r.expires_at,
+      accepted_at: r.accepted_at,
+    };
+  });
+}
+
 async function getHouseholdDetailAdmin(householdId, db = supabase) {
   const { data: household, error } = await db
     .from('households')
@@ -6153,6 +6207,7 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     getHouseholdStorageUsage(householdId).catch(() => ({ totalBytes: 0, fileCount: 0 })),
     getHouseholdSchoolsAdmin(householdId, db).catch(() => []),
   ]);
+  const invites = await getHouseholdInvitesAdmin(householdId, db).catch(() => []);
 
   // Enrich each member with last_active_at + platforms, and roll up the
   // max as the household's last_active_at (so the detail header can show
@@ -6190,6 +6245,7 @@ async function getHouseholdDetailAdmin(householdId, db = supabase) {
     documents_bytes: storage.totalBytes,
     last_active_at: householdLastActive,
     schools,
+    invites,
   };
 }
 
@@ -11312,6 +11368,7 @@ module.exports = {
   getUserByIdAdmin,
   getAllHouseholdsAdmin,
   getHouseholdDetailAdmin,
+  getHouseholdInvitesAdmin,
   getHouseholdSchoolsAdmin,
   getPlatformStats,
   getSubscriptionStats,

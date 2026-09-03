@@ -304,6 +304,12 @@ export default function AdminHouseholdDetail() {
         <SchoolsCard schools={household.schools} />
       </div>
 
+      {/* Invites */}
+      <div className="mt-6">
+        <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Invites</h3>
+        <InvitesCard invites={household.invites} />
+      </div>
+
       {/* Members */}
       <div className="mt-6">
         <h3 className="font-display text-lg font-semibold text-charcoal mb-3">Members</h3>
@@ -543,6 +549,102 @@ const ACTIVITY_FEATURES = [
  *   - school, no dates     → added but the term calendar is empty (broken)
  *   - school, no children  → added but not linked to a child (half-finished)
  */
+/**
+ * Invites sent by this household, grouped BY PERSON rather than by row.
+ *
+ * Households re-invite: on live data one household invited the same address
+ * three times, twice lapsing before it was finally accepted. Counting rows
+ * would report "2 never accepted" about someone who is now a member, so each
+ * email is collapsed to its best outcome (accepted > pending > expired) and
+ * the retries show as a count.
+ *
+ * Share-links (email = '', the welcome screen's one-tap partner link) name
+ * nobody, so they are summarised separately and never counted as a person
+ * who ignored an ask.
+ */
+function InvitesCard({ invites }) {
+  const rows = invites || [];
+  if (rows.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-4 text-sm text-warm-grey">
+        No invites sent.
+      </div>
+    );
+  }
+
+  const links = rows.filter((i) => i.kind === 'share_link');
+
+  // Collapse named invites per email, keeping the best outcome.
+  const RANK = { accepted: 3, pending: 2, expired: 1 };
+  const byPerson = new Map();
+  for (const i of rows.filter((r) => r.kind === 'named')) {
+    const key = (i.email || '').toLowerCase();
+    const prev = byPerson.get(key);
+    if (!prev) {
+      byPerson.set(key, { ...i, attempts: 1 });
+      continue;
+    }
+    prev.attempts += 1;
+    if (RANK[i.status] > RANK[prev.status]) {
+      byPerson.set(key, { ...i, attempts: prev.attempts });
+    } else if (i.created_at > prev.created_at) {
+      prev.expires_at = i.expires_at;   // keep the latest expiry for display
+    }
+  }
+  const people = [...byPerson.values()].sort((a, b) => RANK[b.status] - RANK[a.status] || (b.created_at > a.created_at ? 1 : -1));
+  const count = (st) => people.filter((p) => p.status === st).length;
+
+  const BADGE = {
+    pending: ['Awaiting reply', 'bg-amber-100 text-amber-800'],
+    expired: ['Never accepted', 'bg-coral-light text-coral'],
+    accepted: ['Joined', 'bg-sage-light text-sage'],
+  };
+  const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const summary = [
+    count('pending') && `${count('pending')} awaiting reply`,
+    count('expired') && `${count('expired')} never accepted`,
+    count('accepted') && `${count('accepted')} joined`,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className="bg-white rounded-2xl shadow-[var(--shadow-sm)] p-4">
+      <p className="text-sm text-warm-grey mb-3">
+        {summary || 'Share-link only, no one named yet.'}
+      </p>
+
+      <div className="grid gap-2">
+        {people.map((i) => {
+          const [label, cls] = BADGE[i.status];
+          return (
+            <div key={i.id} className="flex items-center gap-3 text-sm border-t border-light-grey pt-2 first:border-t-0 first:pt-0">
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-charcoal">{i.name || i.email}</span>
+                {i.name && <span className="text-warm-grey"> · {i.email}</span>}
+                {i.family_role && <span className="text-warm-grey"> · {i.family_role}</span>}
+                <span className="block text-xs text-warm-grey mt-0.5">
+                  Invited {when(i.created_at)}
+                  {i.invited_by_name ? ` by ${i.invited_by_name}` : ''}
+                  {i.attempts > 1 ? ` · asked ${i.attempts} times` : ''}
+                  {i.status === 'pending' ? ` · expires ${when(i.expires_at)}` : ''}
+                  {i.status === 'accepted' ? ` · joined ${when(i.accepted_at)}` : ''}
+                </span>
+              </div>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg whitespace-nowrap ${cls}`}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {links.length > 0 && (
+        <p className="text-xs text-warm-grey mt-3 pt-2 border-t border-light-grey">
+          Plus {links.length} share {links.length === 1 ? 'link' : 'links'} (no one named)
+          {links.some((l) => l.status === 'accepted') ? `, ${links.filter((l) => l.status === 'accepted').length} used` : ''}.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SchoolsCard({ schools }) {
   if (!schools || schools.length === 0) {
     return (
