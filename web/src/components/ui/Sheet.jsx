@@ -11,12 +11,18 @@ import { useState, useEffect, useRef } from 'react';
  *
  * The handle is a real control, not decoration: drag it down past the
  * threshold (or flick it) and the sheet dismisses; anything less springs
- * back. Drag is scoped to the handle strip so content scrolling inside the
- * sheet keeps working. While open, the page behind is scroll-locked - on
+ * back. Drag is scoped to the top band (handle strip + optional header) so
+ * content scrolling inside the sheet keeps working. While open, the page behind is scroll-locked - on
  * iOS a fixed overlay alone doesn't stop touch scroll bleeding through to
  * the body, which read as "the drag scrolls the screen behind it".
  */
-export default function Sheet({ open, onClose, children, maxHeight = '88%' }) {
+// `header` renders INSIDE the drag zone (handle strip + header row), so the
+// whole top band of the sheet pulls it down - the 19px handle alone was too
+// small a target to find with a thumb (founder, 2026-09-02: "quite
+// difficult to pull down"). Buttons inside the header still tap: a press
+// that starts on an interactive element never becomes a drag, and the
+// pointer is only captured once the finger has actually moved.
+export default function Sheet({ open, onClose, children, header = null, maxHeight = '88%' }) {
   // Starts off-screen; the next frame flips `show` so the enter transition
   // runs. The sheet mounts fresh each time it opens (parent gates on `open`),
   // so no reset branch is needed.
@@ -57,25 +63,34 @@ export default function Sheet({ open, onClose, children, maxHeight = '88%' }) {
   if (!open) return null;
 
   const onHandleDown = (e) => {
-    drag.current = { startY: e.clientY, lastY: e.clientY, lastT: performance.now(), velocity: 0 };
-    setDragging(true);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // A press on a button/link in the header is a tap, never a drag.
+    if (e.target?.closest?.('button, a, input, textarea, select, [role="button"]')) return;
+    drag.current = { startY: e.clientY, lastY: e.clientY, lastT: performance.now(), velocity: 0, captured: false, pointerId: e.pointerId, el: e.currentTarget };
   };
   const onHandleMove = (e) => {
     if (!drag.current) return;
     const now = performance.now();
     const dy = Math.max(0, e.clientY - drag.current.startY);
+    // Capture only once the finger has clearly moved, so a slightly wobbly
+    // tap still lands as a tap on whatever is under it.
+    if (!drag.current.captured && dy > 6) {
+      drag.current.captured = true;
+      drag.current.el?.setPointerCapture?.(drag.current.pointerId);
+      setDragging(true);
+    }
     const dt = now - drag.current.lastT;
     if (dt > 0) drag.current.velocity = (e.clientY - drag.current.lastY) / dt; // px/ms
     drag.current.lastY = e.clientY;
     drag.current.lastT = now;
-    setDragY(dy);
+    if (drag.current.captured) setDragY(dy);
   };
   const onHandleUp = () => {
     if (!drag.current) return;
-    const { velocity } = drag.current;
-    const shouldClose = dragY > 120 || (velocity > 0.5 && dragY > 24);
+    const { velocity, captured } = drag.current;
     drag.current = null;
+    if (!captured) return; // never became a drag
+    // 80px, or a quick flick - the old 120px pull felt like it was resisting.
+    const shouldClose = dragY > 80 || (velocity > 0.35 && dragY > 16);
     setDragging(false);
     if (shouldClose) onClose();
     else setDragY(0);
@@ -103,20 +118,27 @@ export default function Sheet({ open, onClose, children, maxHeight = '88%' }) {
           overscrollBehavior: 'contain',
         }}
       >
-        {/* Grab handle - generous hit area, drag-to-dismiss. touch-action
-            none keeps the browser from turning the drag into a scroll. */}
+        {/* Drag zone: the grab handle AND the header row. touch-action none
+            keeps the browser from turning the drag into a scroll; buttons
+            inside the header are excluded in onHandleDown. */}
         <div
-          className="flex justify-center pt-2.5 pb-1 shrink-0"
-          style={{ touchAction: 'none', cursor: 'grab', paddingLeft: 40, paddingRight: 40 }}
+          className="shrink-0"
+          style={{ touchAction: 'none' }}
           onPointerDown={onHandleDown}
           onPointerMove={onHandleMove}
           onPointerUp={onHandleUp}
           onPointerCancel={onHandleUp}
-          role="button"
-          aria-label="Drag down or tap to close"
-          onDoubleClick={onClose}
         >
-          <div className="w-10 h-[5px] rounded-full" style={{ background: 'rgba(45,42,51,0.14)' }} />
+          <div
+            className="flex justify-center pt-2.5 pb-1"
+            style={{ cursor: 'grab' }}
+            role="button"
+            aria-label="Drag down to close"
+            onDoubleClick={onClose}
+          >
+            <div className="w-10 h-[5px] rounded-full" style={{ background: 'rgba(45,42,51,0.14)' }} />
+          </div>
+          {header}
         </div>
         <div className="flex-1 min-h-0 flex flex-col">{children}</div>
       </div>

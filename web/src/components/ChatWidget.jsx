@@ -1001,31 +1001,36 @@ I'm always here if you need me!`;
 
           {/* ── Mobile: bottom sheet (design_handoff_ai_chat) ── */}
           <div className="md:hidden">
-            <Sheet open={isOpen} onClose={() => setIsOpen(false)}>
-              {/* Header */}
+            <Sheet
+              open={isOpen}
+              onClose={() => setIsOpen(false)}
+              // The header lives inside the sheet's drag zone: the whole top band
+              // pulls the sheet down, not just the 19px handle.
+              header={(
               <div className="px-5 pb-3 pt-1 flex items-center gap-2.5 shrink-0">
-                {showHistory ? (
-                  <>
-                    <button onClick={() => setShowHistory(false)} aria-label="Back" className="p-1 -ml-1 text-warm-grey"><ArrowLeftIcon className="h-5 w-5" /></button>
-                    <h2 className="flex-1 text-[15px] font-semibold text-charcoal">Chat history</h2>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-9 h-9 rounded-[11px] flex items-center justify-center text-white shrink-0"
-                      style={{ background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)', boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}>
-                      <SparklesIcon className="h-[18px] w-[18px]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[15px] font-bold text-charcoal leading-tight">Housemait AI</div>
-                      <div className="text-[11px] text-warm-grey leading-tight">Knows your family · always on</div>
-                    </div>
-                    <button onClick={openHistory} aria-label="Chat history" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><HistoryIcon className="h-[18px] w-[18px]" /></button>
-                    <button onClick={startNewConversation} aria-label="New chat" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><PlusIcon className="h-[18px] w-[18px]" /></button>
-                  </>
-                )}
-                <button onClick={() => setIsOpen(false)} aria-label="Close" className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-warm-grey shrink-0" style={{ background: 'rgba(45,42,51,0.05)' }}><CloseIcon className="h-4 w-4" /></button>
-              </div>
-
+                  {showHistory ? (
+                    <>
+                      <button onClick={() => setShowHistory(false)} aria-label="Back" className="p-1 -ml-1 text-warm-grey"><ArrowLeftIcon className="h-5 w-5" /></button>
+                      <h2 className="flex-1 text-[15px] font-semibold text-charcoal">Chat history</h2>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-9 h-9 rounded-[11px] flex items-center justify-center text-white shrink-0"
+                        style={{ background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)', boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}>
+                        <SparklesIcon className="h-[18px] w-[18px]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[15px] font-bold text-charcoal leading-tight">Housemait AI</div>
+                        <div className="text-[11px] text-warm-grey leading-tight">Knows your family · always on</div>
+                      </div>
+                      <button onClick={openHistory} aria-label="Chat history" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><HistoryIcon className="h-[18px] w-[18px]" /></button>
+                      <button onClick={startNewConversation} aria-label="New chat" className="w-8 h-8 rounded-full flex items-center justify-center text-warm-grey hover:text-plum"><PlusIcon className="h-[18px] w-[18px]" /></button>
+                    </>
+                  )}
+                  <button onClick={() => setIsOpen(false)} aria-label="Close" className="w-[30px] h-[30px] rounded-full flex items-center justify-center text-warm-grey shrink-0" style={{ background: 'rgba(45,42,51,0.05)' }}><CloseIcon className="h-4 w-4" /></button>
+                </div>
+              )}
+            >
               {showHistory ? (
                 /* History list */
                 <div className="flex-1 overflow-y-auto px-3 pb-2">
