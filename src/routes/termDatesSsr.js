@@ -635,13 +635,22 @@ const CSP_HEADER = [
   // The Ads tag arrives automatically through the GA4 <-> Google Ads account
   // link, and without these it is silently blocked on exactly the pages the
   // term-dates ad campaign pays to land on.
-  "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
+  // GA's tag diagnostics flagged "security settings are blocking
+  // measurement" (3 Sep 2026): the Google tag also carries the Ads
+  // conversion destination, whose scripts and pixels come from
+  // googleadservices.com, www.google.com and the doubleclick hosts, and the
+  // loader itself may be served from a regional *.googletagmanager.com.
+  // Every host below is one Google documents for gtag + Ads conversions.
+  "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com https://*.google.com https://*.google.co.uk https://pagead2.googlesyndication.com https://*.g.doubleclick.net https://www.googleadservices.com",
   "object-src 'none'",
-  `script-src 'self' https://www.googletagmanager.com 'sha256-${GA_INLINE_HASH}' 'sha256-${NAV_JS_HASH}'`,
+  `script-src 'self' https://*.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://pagead2.googlesyndication.com 'sha256-${GA_INLINE_HASH}' 'sha256-${NAV_JS_HASH}'`,
   "script-src-attr 'none'",
   "style-src 'self' https: 'unsafe-inline'",
   // postcodes.io powers the index's find-my-council postcode lookup.
-  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://api.postcodes.io https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
+  "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.google.com https://api.postcodes.io https://pagead2.googlesyndication.com https://*.g.doubleclick.net https://www.googleadservices.com",
+  // Ads conversion linking loads a hidden frame from td.doubleclick.net;
+  // default-src 'self' would block it without this.
+  "frame-src 'self' https://td.doubleclick.net https://*.googletagmanager.com https://www.google.com",
   'upgrade-insecure-requests',
 ].join(';');
 
