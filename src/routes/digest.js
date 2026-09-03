@@ -82,7 +82,28 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
     let shoppingItems = [];
     let todayEvents = [];
     let weekMeals = [];
-    try { shoppingItems = await db.getShoppingList(req.householdId) || []; } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
+    // The dashboard card is the household's staple shopping list (the one
+    // the bot writes to), not every list merged: with a second list on the
+    // household the card labelled "Grocery list" showed stationery while
+    // the shopping list was empty (founder, 3 Sep). Other lists with open
+    // items are reported separately so the card can point at them.
+    let shoppingList = null;
+    let otherLists = [];
+    try {
+      const staple = await db.getDefaultShoppingList(req.householdId);
+      const allOpen = await db.getShoppingList(req.householdId) || [];
+      if (staple) {
+        shoppingList = { id: staple.id, name: staple.name || 'Shopping' };
+        shoppingItems = allOpen.filter((i) => i.list_id === staple.id);
+        const lists = await db.getShoppingLists(req.householdId).catch(() => []) || [];
+        otherLists = lists
+          .filter((l) => l.id !== staple.id)
+          .map((l) => ({ id: l.id, name: l.name, count: allOpen.filter((i) => i.list_id === l.id && !i.completed).length }))
+          .filter((l) => l.count > 0);
+      } else {
+        shoppingItems = allOpen;
+      }
+    } catch (e) { console.warn('digest: shopping list fetch failed:', e.message); }
     try {
       // Fetch a wide window then filter by date string - this matches how the Calendar page works
       // and avoids timezone mismatches between the DB (timestamptz/UTC) and the household TZ
@@ -163,6 +184,8 @@ router.get('/', requireAuth, requireHousehold, async (req, res) => {
       shoppingCount: shoppingItems.filter((i) => !i.completed).length,
       todayEvents,
       shoppingItems: shoppingItems.filter((i) => !i.completed),
+      shoppingList,
+      otherLists,
       weekMeals,
       taskScores,
     };

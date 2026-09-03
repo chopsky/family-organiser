@@ -215,7 +215,12 @@ export default function Lists() {
         // without knowing the grocery list's real id): resolve it to the
         // grocery staple once the lists are loaded.
         if (new URLSearchParams(window.location.search).get('list') === 'shopping') {
-          const staple = descriptors.find((d) => d.kind === 'shopping');
+          // Same preference order as the server's getDefaultShoppingList:
+          // with several shopping lists, "first" was sometimes Stationery.
+          const shops = descriptors.filter((d) => d.kind === 'shopping');
+          const staple = shops.find((d) => /^shopping$/i.test(d.name || ''))
+            || shops.find((d) => /grocer/i.test(d.name || ''))
+            || shops[0];
           if (staple) setActiveId(staple.id);
         }
       } catch { /* empty */ } finally { if (!cancelled) setLoading(false); }

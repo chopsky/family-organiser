@@ -900,6 +900,12 @@ export default function Dashboard() {
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))[0] || null;
   const outstanding = digest?.outstanding ?? [];
   const shoppingItems = (digest?.shoppingItems ?? []).filter(i => !i.completed);
+  // The staple list the card shows (id + real name) and any other lists
+  // with open items, from the digest. The link carries the id, so Lists
+  // opens that list directly instead of guessing from a sentinel.
+  const shoppingListName = digest?.shoppingList?.name || 'Shopping list';
+  const shoppingListHref = `/lists?list=${digest?.shoppingList?.id || 'shopping'}`;
+  const otherLists = digest?.otherLists || [];
   const weekMeals = digest?.weekMeals ?? [];
   // Per-member progress on today's chores/routines for the "Today's tasks" card.
   const taskScores = digest?.taskScores ?? [];
@@ -1263,20 +1269,30 @@ export default function Dashboard() {
         <div className={`${childMode ? 'hidden ' : ''}bg-linen rounded-2xl p-4.5 md:p-6 md:pt-5`} style={{ boxShadow: 'rgba(26, 22, 32, 0.04) 0px 1px 0px, rgba(26, 22, 32, 0.04) 0px 4px 14px' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-sans font-semibold text-bark">
-              Grocery list
+              {shoppingListName}
               {shoppingItems.length > 0 && (
                 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}> · {shoppingItems.length} item{shoppingItems.length !== 1 ? 's' : ''}</span>
               )}
             </h2>
-            <Link to="/lists?list=shopping" className="text-xs font-medium text-primary hover:underline">Open list →</Link>
+            <Link to={shoppingListHref} className="text-xs font-medium text-primary hover:underline">Open list →</Link>
           </div>
           {shoppingItems.length === 0 ? (
             <div className="py-6 text-center">
-              <p className="text-sm text-bark font-medium">Shopping list is empty</p>
+              <p className="text-sm text-bark font-medium">{shoppingListName} is empty</p>
               <p className="text-xs text-cocoa mt-1.5 leading-relaxed">
-                Tap <Link to="/lists?list=shopping" className="text-primary font-medium hover:underline">Open list →</Link> to
+                Tap <Link to={shoppingListHref} className="text-primary font-medium hover:underline">Open list →</Link> to
                 add items, or message <span className="italic">"add milk and eggs to the list"</span> to the WhatsApp bot.
               </p>
+              {otherLists.length > 0 && (
+                <p className="text-xs text-cocoa mt-3">
+                  {otherLists.map((l, i) => (
+                    <span key={l.id}>
+                      {i > 0 && ' · '}
+                      <Link to={`/lists?list=${l.id}`} className="text-primary font-medium hover:underline">{l.name}</Link> {l.count} item{l.count !== 1 ? 's' : ''}
+                    </span>
+                  ))}
+                </p>
+              )}
             </div>
           ) : (
             <>
