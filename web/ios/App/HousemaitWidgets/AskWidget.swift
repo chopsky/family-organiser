@@ -84,12 +84,25 @@ struct AskMediumView: View {
     }
 }
 
+/// Lock Screen circle: the sparkle on the system's glass, one tap to chat.
+struct AskLockCircleView: View {
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            Sparkle(size: 22)
+        }
+        .lockSurface()
+        .widgetURL(URL(string: "housemait://chat"))
+    }
+}
+
 struct AskWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     let entry: AskEntry
     var body: some View {
         switch family {
         case .systemMedium: AskMediumView()
+        case .accessoryCircular: AskLockCircleView()
         default: AskSmallView()
         }
     }
@@ -103,7 +116,7 @@ struct AskWidget: Widget {
         }
         .configurationDisplayName("Ask Housemait")
         .description("One tap to type or talk to your family assistant.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular])
         .housemaitMargins()
     }
 }

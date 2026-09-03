@@ -205,6 +205,22 @@ struct TodayLockView: View {
     }
 }
 
+/// The one-line family above the clock: "18:30 Swimming · Mason".
+struct TodayInlineView: View {
+    let entry: TodayEntry
+    var body: some View {
+        Group {
+            if let next = entry.next, !entry.isStale {
+                Text("\(HMFormat.timeLabel(next)) \(next.title)\(next.who.map { " · \($0)" } ?? "")")
+            } else {
+                Text(entry.isStale ? "Housemait · open for today" : "Housemait · nothing else today")
+            }
+        }
+        .lockSurface()
+        .widgetURL(URL(string: "housemait://calendar"))
+    }
+}
+
 struct TodayWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     let entry: TodayEntry
@@ -212,6 +228,7 @@ struct TodayWidgetEntryView: View {
         switch family {
         case .systemMedium: TodayMediumView(entry: entry)
         case .accessoryRectangular: TodayLockView(entry: entry)
+        case .accessoryInline: TodayInlineView(entry: entry)
         default: TodaySmallView(entry: entry)
         }
     }
@@ -225,7 +242,7 @@ struct TodayWidget: Widget {
         }
         .configurationDisplayName("Today")
         .description("What's next for the family, at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline])
         .housemaitMargins()
     }
 }
