@@ -10,7 +10,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import Segmented from '../components/ui/Segmented';
 import HeaderIconBtn from '../components/ui/HeaderIconBtn';
 import { useCanWrite } from '../context/SubscriptionContext';
-import useSwipeNavigate from '../hooks/useSwipeNavigate';
+import SwipePager from '../components/SwipePager';
 import { useChildMode } from '../context/ChildModeContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import { readCache, writeCache, loadCached } from '../lib/offlineCache';
@@ -656,7 +656,10 @@ export default function Calendar() {
         monthsToFetch = Array.from({ length: scheduleMonthsAhead + 1 }, (_, i) =>
           monthParam(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + i, 1)));
       } else {
-        monthsToFetch = [monthParam(currentMonth)];
+        // Month view: the neighbours too, so the pager's adjacent panes
+        // carry their dots while the grid is being dragged (each month is
+        // cached, so the extra cost is only on the first visit).
+        monthsToFetch = [-1, 0, 1].map((i) => monthParam(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + i, 1)));
       }
 
       const monthResults = await Promise.all(monthsToFetch.map(fetchMonth));
@@ -1001,9 +1004,10 @@ export default function Calendar() {
   }
 
   // Swipe left/right anywhere on the view = next/previous day, week or
-  // month - the arrows stay for desktop, but on a phone the page turns
-  // like the native calendar.
-  const swipe = useSwipeNavigate({ onPrev: navigatePrev, onNext: navigateNext });
+  // month. The content moves WITH the finger (SwipePager): the month grid
+  // as a three-pane strip with the neighbours under the thumb, the
+  // heavier week/day/schedule views as a single pane that follows and
+  // then slides. Arrows stay for desktop.
 
   // ── Navigation label ──────────────────────────────────────
 
@@ -2666,7 +2670,7 @@ export default function Calendar() {
 
       {/* ── Month View ──────────────────────────────────────── */}
       {viewMode === 'month' && !mobileSearchActive && (
-        <div {...swipe.bindings}>
+        <div>
           {/* Desktop month grid */}
           <div className="hidden md:block">
             <div className="border border-[rgba(26,22,32,0.07)] rounded-2xl overflow-hidden bg-white">
@@ -2805,43 +2809,60 @@ export default function Calendar() {
               gets the brand fill (today reads as a brand number when not
               selected - on load today IS selected, so it starts filled). */}
           <div className="md:hidden">
-            <div className="bg-white mb-[22px]" style={{ borderRadius: 22, padding: '14px 12px 10px', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)' }}>
-              <div className="grid grid-cols-7" style={{ marginBottom: 6 }}>
-                {DAY_HEADERS.map((d, i) => (
-                  <div key={i} className="text-center font-bold" style={{ fontSize: 10, color: M_INK3, letterSpacing: '0.06em' }}>{d.toUpperCase()}</div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7" style={{ gap: 2 }}>
-                {calendarDays.map(({ date, currentMonth: isCurrent }, idx) => {
-                  // Blank leading/trailing cells (no prev/next-month numbers), per the design.
-                  if (!isCurrent) return <div key={idx} />;
-                  const isToday_ = isSameDay(date, today);
-                  const isSelected = selectedDate && isSameDay(date, selectedDate);
-                  // Up to three coloured dots: each event in its own colour, tasks coral.
-                  const dots = [
-                    ...eventsForDate(date).map(e => getEventHex(e)),
-                    ...tasksForDate(date).map(() => '#E8724A'),
-                  ].slice(0, 3);
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedDate(new Date(date))}
-                      className="aspect-square flex flex-col items-center justify-center transition-colors"
-                      style={{ gap: 3, borderRadius: 12, background: isSelected ? 'var(--color-plum)' : 'transparent' }}
-                    >
-                      <span style={{ fontSize: 14, lineHeight: 1, fontWeight: (isToday_ || isSelected) ? 700 : 500, color: isSelected ? '#fff' : (isToday_ ? 'var(--color-plum)' : M_INK) }}>
-                        {date.getDate()}
-                      </span>
-                      <span className="flex items-center justify-center" style={{ gap: 2, height: 4 }}>
-                        {dots.map((c, di) => (
-                          <span key={di} style={{ width: 4, height: 4, borderRadius: 2, background: isSelected ? 'rgba(255,255,255,0.85)' : c }} />
-                        ))}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* The month card, rendered for the month on screen AND its two
+                neighbours inside the pager, so a drag shows the next month
+                arriving under the thumb. Neighbour cells read the same
+                events state; load() fetches the neighbours too. */}
+            <SwipePager
+              className="mb-[22px]"
+              onPrev={navigatePrev}
+              onNext={navigateNext}
+              renderPage={(offset) => {
+                const m = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
+                const days = offset === 0 ? calendarDays : buildCalendarDays(m.getFullYear(), m.getMonth());
+                return (
+                  <div className="bg-white" style={{ borderRadius: 22, padding: '14px 12px 10px', boxShadow: '0 1px 0 rgba(26,22,32,0.04), 0 4px 14px rgba(26,22,32,0.04)', margin: '0 1px' }}>
+                    <div className="grid grid-cols-7" style={{ marginBottom: 6 }}>
+                      {DAY_HEADERS.map((d, i) => (
+                        <div key={i} className="text-center font-bold" style={{ fontSize: 10, color: M_INK3, letterSpacing: '0.06em' }}>{d.toUpperCase()}</div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7" style={{ gap: 2 }}>
+                      {days.map(({ date, currentMonth: isCurrent }, idx) => {
+                        // Blank leading/trailing cells (no prev/next-month numbers), per the design.
+                        if (!isCurrent) return <div key={idx} />;
+                        const isToday_ = isSameDay(date, today);
+                        const isSelected = offset === 0 && selectedDate && isSameDay(date, selectedDate);
+                        // Up to three coloured dots: each event in its own colour, tasks coral.
+                        const dots = [
+                          ...eventsForDate(date).map(e => getEventHex(e)),
+                          ...tasksForDate(date).map(() => '#E8724A'),
+                        ].slice(0, 3);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            tabIndex={offset === 0 ? 0 : -1}
+                            onClick={() => setSelectedDate(new Date(date))}
+                            className="aspect-square flex flex-col items-center justify-center transition-colors"
+                            style={{ gap: 3, borderRadius: 12, background: isSelected ? 'var(--color-plum)' : 'transparent' }}
+                          >
+                            <span style={{ fontSize: 14, lineHeight: 1, fontWeight: (isToday_ || isSelected) ? 700 : 500, color: isSelected ? '#fff' : (isToday_ ? 'var(--color-plum)' : M_INK) }}>
+                              {date.getDate()}
+                            </span>
+                            <span className="flex items-center justify-center" style={{ gap: 2, height: 4 }}>
+                              {dots.map((c, di) => (
+                                <span key={di} style={{ width: 4, height: 4, borderRadius: 2, background: isSelected ? 'rgba(255,255,255,0.85)' : c }} />
+                              ))}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }}
+            />
 
             {/* Selected day agenda for mobile - the SAME day-section shape as
                 the Schedule view (header row + cards), so the two agenda
@@ -2948,7 +2969,7 @@ export default function Calendar() {
             carries the real chrome heights, incl. the filter panel). Blocks
             are solid tints of the event colour with ink-mixed text. ── */}
       {viewMode === 'week' && !mobileSearchActive && (
-        <div {...swipe.bindings}>
+        <SwipePager onPrev={navigatePrev} onNext={navigateNext}>
           {/* Day header row */}
           <div className="grid items-center" style={{ gridTemplateColumns: '38px repeat(7, minmax(0, 1fr))', marginBottom: 8 }}>
             <div />
@@ -3079,7 +3100,7 @@ export default function Calendar() {
               </div>
             );
           })()}
-        </div>
+        </SwipePager>
       )}
 
       {/* ── Day View (design_handoff_calendar): the week grid at reading
@@ -3088,7 +3109,7 @@ export default function Calendar() {
             stay pinned; only the card scrolls. Tapping an empty hour keeps
             the existing quick-add behaviour. ── */}
       {viewMode === 'day' && selectedDate && !mobileSearchActive && (
-        <div {...swipe.bindings}>
+        <SwipePager onPrev={navigatePrev} onNext={navigateNext}>
           {/* All-day strip */}
           {(() => {
             const allDay = allDayEventsForDate(selectedDate);
@@ -3200,7 +3221,7 @@ export default function Calendar() {
               </div>
             );
           })()}
-        </div>
+        </SwipePager>
       )}
 
       {/* ── Schedule View (continuous agenda - skips empty days) ──────────
@@ -3211,7 +3232,7 @@ export default function Calendar() {
             tasks keep their own page; header tap opens the day, card tap the
             event's own sheet per each category's existing pattern. ── */}
       {viewMode === 'schedule' && !mobileSearchActive && (
-        <div {...swipe.bindings}>
+        <SwipePager onPrev={navigatePrev} onNext={navigateNext}>
           {(() => {
             const now = new Date();
             now.setHours(0, 0, 0, 0);
@@ -3335,7 +3356,7 @@ export default function Calendar() {
           >
             ↑ Today
           </button>
-        </div>
+        </SwipePager>
       )}
 
       {/* ── Selected-day events panel (desktop month view only - week view
