@@ -43,6 +43,26 @@ export function useUniversalLinks() {
           let parsed;
           try { parsed = new URL(url); } catch { return; }
 
+          // housemait:// - the home-screen widgets and the Live Activity.
+          //   housemait://calendar        → the calendar
+          //   housemait://chat           → the AI chat, keyboard up
+          //   housemait://chat?voice=1   → the AI chat, dictating
+          // The chat open is stashed as well as dispatched: on a cold start
+          // the ChatWidget's listener may not be mounted yet, and it drains
+          // the stash when it mounts (same contract the More sheet uses).
+          if (parsed.protocol === 'housemait:') {
+            const target = parsed.hostname.toLowerCase();
+            if (target === 'chat') {
+              const detail = parsed.searchParams.get('voice') === '1' ? { voice: true } : { focus: true };
+              navigate('/dashboard');
+              window.__housemaitPendingChatOpen = detail;
+              window.dispatchEvent(new CustomEvent('openChatWidget', { detail }));
+            } else if (target === 'calendar') {
+              navigate('/calendar');
+            }
+            return;
+          }
+
           // Only follow links to our own domain. Custom schemes (e.g.
           // OAuth callbacks via capacitor://) flow through other handlers.
           if (!UNIVERSAL_LINK_HOSTS.has(parsed.hostname.toLowerCase())) return;

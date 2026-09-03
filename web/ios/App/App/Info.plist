@@ -93,6 +93,21 @@
 				<string>com.googleusercontent.apps.1094093123603-ic536dufes9m5bjnokcrt843j6udr7el</string>
 			</array>
 		</dict>
+		<!-- housemait:// - the home-screen widgets and the Live Activity deep
+		     link into the app with it (housemait://calendar, housemait://chat,
+		     housemait://chat?voice=1). Handled in web/src/hooks/useUniversalLinks.js. -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.housemait.app.widgets</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>housemait</string>
+			</array>
+		</dict>
 	</array>
+	<!-- The "Next up" Live Activity (widget extension) - iOS refuses to
+	     start one without this. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 </dict>
 </plist>

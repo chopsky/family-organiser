@@ -60,6 +60,10 @@ export function AuthProvider({ children }) {
     if (rt) {
       api.post('/auth/logout', { refreshToken: rt }).catch(() => {});
     }
+    // The home-screen widgets and Live Activity must not keep showing this
+    // family's day after sign-out (iOS only; no-ops elsewhere).
+    import('../lib/widgetBridge').then((m) => m.clearWidgets()).catch(() => {});
+    import('../lib/liveActivity').then((m) => m.endLiveActivity()).catch(() => {});
     safeRemoveItem('token');
     safeRemoveItem('refreshToken');
     safeRemoveItem('user');

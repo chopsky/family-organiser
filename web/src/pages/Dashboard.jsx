@@ -24,6 +24,8 @@ import AfterSchoolCard from '../components/AfterSchoolCard';
 import SetupNudges from '../components/SetupNudges';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { conflictedKeys, itemKey } from '../lib/conflicts';
+import { buildWidgetPayload, syncWidgets } from '../lib/widgetBridge';
+import { syncLiveActivity } from '../lib/liveActivity';
 
 // ── Avatar colour map (same as Layout.jsx) ──────────────────────
 
@@ -790,6 +792,21 @@ export default function Dashboard() {
   }, [queryClient, hid]);
   const ptr = usePullToRefresh(refreshAll);
   useAppForegroundRefresh(refreshAll);
+
+  // iOS home-screen widgets + the "Next up" Live Activity ride the digest:
+  // every load (initial, pull-to-refresh, foreground) hands today's events
+  // to the widget extension and reconciles the Live Activity. No-ops off
+  // iOS. Sits above every early return (Rules of Hooks) and BELOW the
+  // digest/household it reads (a dep array reading a later const is a TDZ
+  // crash - see the calendar containment effect).
+  useEffect(() => {
+    if (!digest) return;
+    const payload = buildWidgetPayload(digest.todayEvents || [], getMembersForEvent, household?.name);
+    syncWidgets(payload);
+    syncLiveActivity(payload);
+    // getMembersForEvent is a stable function declaration in this component.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [digest, household?.name]);
 
   // Review prompt, earned by the wins engine (lib/appReview). Requested HERE
   // and nowhere else: the Dashboard is hidden in Child Mode (kids land on

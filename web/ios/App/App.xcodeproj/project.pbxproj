@@ -7,8 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		030B6A9DD07124150E726528 /* NextUpAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A38C8A154964816E4435FF6 /* NextUpAttributes.swift */; };
+		18F28D1082154F9F880632FB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 38E24800E3377F3C2E1B6BE3 /* WidgetKit.framework */; };
+		271DEBD882EDECF12E96CA2E /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F7421F0A823BEFF1294C82 /* WidgetBridgePlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		36CBEFAF1B2D904340B88479 /* TodayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159A171E7A92CAE857D0E0C1 /* TodayWidget.swift */; };
 		3B63BB462FB0FF6800909AD9 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B63BB452FB0FF6800909AD9 /* GoogleService-Info.plist */; };
+		499D8B2398F6616EC77256DA /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B925DE5EECA3DCEA13793C2C /* LiveActivityPlugin.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -16,19 +21,58 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		5345ED1BBBE8AFA7B42FC53A /* NextUpAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A38C8A154964816E4435FF6 /* NextUpAttributes.swift */; };
+		5489620B1F299D4E743CF33B /* NextUpLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E9B47031D39835A72DBB739 /* NextUpLiveActivity.swift */; };
+		5AEFD10A3F6F4EC82DBCC911 /* HousemaitWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3717D3706A02D7809F17DBE5 /* HousemaitWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7E1A2B3C4D5E6F7A8B9C0D02 /* EventKitReaderPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D01 /* EventKitReaderPlugin.swift */; };
-		7E1A2B3C4D5E6F7A8B9C0D11 /* AdAttributionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */; };
-		7E1A2B3C4D5E6F7A8B9C0D23 /* ShoppingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */; };
-		7E1A2B3C4D5E6F7A8B9C0D21 /* SiriBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */; };
 		7E1A2B3C4D5E6F7A8B9C0D04 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D03 /* ViewController.swift */; };
+		7E1A2B3C4D5E6F7A8B9C0D11 /* AdAttributionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */; };
+		7E1A2B3C4D5E6F7A8B9C0D21 /* SiriBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */; };
+		7E1A2B3C4D5E6F7A8B9C0D23 /* ShoppingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */; };
+		A4E3F35AB756F8A604C94150 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7D00302115A607D5639A3190 /* Foundation.framework */; };
+		C9A29EBF8F58407480E220F6 /* AskWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51BECA70B245DFED5021CE26 /* AskWidget.swift */; };
+		E59643B15A9063F9017FC55C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EEC169FFEC2A128AC75931DA /* SwiftUI.framework */; };
+		E8DF384F9CEC2391EE24BE54 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499627B41AA95ACB96070C96 /* WidgetData.swift */; };
 		EK0000000000000000000005 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EK0000000000000000000006 /* PrivacyInfo.xcprivacy */; };
+		F68BF6D9728BE67BBCAB76A1 /* HousemaitWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F79111EB4094471E176F119 /* HousemaitWidgets.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AE96A47A104E89B3994343F0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1D476F4672CBF1E6830DD18F;
+			remoteInfo = HousemaitWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		12CD219F44408225285F8B50 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5AEFD10A3F6F4EC82DBCC911 /* HousemaitWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		159A171E7A92CAE857D0E0C1 /* TodayWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayWidget.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		2FE3822E15F8583F733FEC84 /* HousemaitWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HousemaitWidgets.entitlements; sourceTree = "<group>"; };
+		3717D3706A02D7809F17DBE5 /* HousemaitWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HousemaitWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		38E24800E3377F3C2E1B6BE3 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
 		3B63BB442FB0CBA400909AD9 /* AppRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AppRelease.entitlements; sourceTree = "<group>"; };
 		3B63BB452FB0FF6800909AD9 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		3BBA25EB2F8C2DCD0073525E /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		3F79111EB4094471E176F119 /* HousemaitWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HousemaitWidgets.swift; sourceTree = "<group>"; };
+		499627B41AA95ACB96070C96 /* WidgetData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
+		4A38C8A154964816E4435FF6 /* NextUpAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NextUpAttributes.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -37,12 +81,19 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		51BECA70B245DFED5021CE26 /* AskWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AskWidget.swift; sourceTree = "<group>"; };
+		76F7421F0A823BEFF1294C82 /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		7D00302115A607D5639A3190 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		7E1A2B3C4D5E6F7A8B9C0D01 /* EventKitReaderPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventKitReaderPlugin.swift; sourceTree = "<group>"; };
-		7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdAttributionPlugin.swift; sourceTree = "<group>"; };
-		7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingIntents.swift; sourceTree = "<group>"; };
-		7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriBridgePlugin.swift; sourceTree = "<group>"; };
 		7E1A2B3C4D5E6F7A8B9C0D03 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7A8B9C0D12 /* AdAttributionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdAttributionPlugin.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7A8B9C0D22 /* SiriBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiriBridgePlugin.swift; sourceTree = "<group>"; };
+		7E1A2B3C4D5E6F7A8B9C0D24 /* ShoppingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingIntents.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		9E9B47031D39835A72DBB739 /* NextUpLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NextUpLiveActivity.swift; sourceTree = "<group>"; };
+		B56C27BB75B0B514E57BC8B2 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B925DE5EECA3DCEA13793C2C /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
+		EEC169FFEC2A128AC75931DA /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		EK0000000000000000000006 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -55,6 +106,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CFC7A34CEC020F0AEB557639 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A4E3F35AB756F8A604C94150 /* Foundation.framework in Frameworks */,
+				18F28D1082154F9F880632FB /* WidgetKit.framework in Frameworks */,
+				E59643B15A9063F9017FC55C /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -64,6 +125,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				72D1A76193CDAA1DE74CA095 /* Frameworks */,
+				6986546CFB3E18FAFC6BDFF6 /* HousemaitWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,6 +134,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				3717D3706A02D7809F17DBE5 /* HousemaitWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,13 +159,66 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				3B63BB452FB0FF6800909AD9 /* GoogleService-Info.plist */,
+				76F7421F0A823BEFF1294C82 /* WidgetBridgePlugin.swift */,
+				B925DE5EECA3DCEA13793C2C /* LiveActivityPlugin.swift */,
+				4A38C8A154964816E4435FF6 /* NextUpAttributes.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		6986546CFB3E18FAFC6BDFF6 /* HousemaitWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				3F79111EB4094471E176F119 /* HousemaitWidgets.swift */,
+				499627B41AA95ACB96070C96 /* WidgetData.swift */,
+				159A171E7A92CAE857D0E0C1 /* TodayWidget.swift */,
+				51BECA70B245DFED5021CE26 /* AskWidget.swift */,
+				9E9B47031D39835A72DBB739 /* NextUpLiveActivity.swift */,
+				B56C27BB75B0B514E57BC8B2 /* Info.plist */,
+				2FE3822E15F8583F733FEC84 /* HousemaitWidgets.entitlements */,
+			);
+			name = HousemaitWidgets;
+			path = HousemaitWidgets;
+			sourceTree = "<group>";
+		};
+		6F6A2493382117EDE1E0E69D /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				7D00302115A607D5639A3190 /* Foundation.framework */,
+				38E24800E3377F3C2E1B6BE3 /* WidgetKit.framework */,
+				EEC169FFEC2A128AC75931DA /* SwiftUI.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		72D1A76193CDAA1DE74CA095 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				6F6A2493382117EDE1E0E69D /* iOS */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1D476F4672CBF1E6830DD18F /* HousemaitWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DD694262725576CF4CB67399 /* Build configuration list for PBXNativeTarget "HousemaitWidgets" */;
+			buildPhases = (
+				95CB81CE004BED36BABA4E9D /* Sources */,
+				CFC7A34CEC020F0AEB557639 /* Frameworks */,
+				FC9F503EDDFF7D1109C62C48 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HousemaitWidgets;
+			productName = HousemaitWidgets;
+			productReference = 3717D3706A02D7809F17DBE5 /* HousemaitWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -109,10 +226,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				12CD219F44408225285F8B50 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4F75D44515F10C92B88FB567 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -155,6 +274,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				1D476F4672CBF1E6830DD18F /* HousemaitWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -175,6 +295,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FC9F503EDDFF7D1109C62C48 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -188,10 +315,35 @@
 				7E1A2B3C4D5E6F7A8B9C0D23 /* ShoppingIntents.swift in Sources */,
 				7E1A2B3C4D5E6F7A8B9C0D21 /* SiriBridgePlugin.swift in Sources */,
 				7E1A2B3C4D5E6F7A8B9C0D04 /* ViewController.swift in Sources */,
+				271DEBD882EDECF12E96CA2E /* WidgetBridgePlugin.swift in Sources */,
+				499D8B2398F6616EC77256DA /* LiveActivityPlugin.swift in Sources */,
+				5345ED1BBBE8AFA7B42FC53A /* NextUpAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		95CB81CE004BED36BABA4E9D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F68BF6D9728BE67BBCAB76A1 /* HousemaitWidgets.swift in Sources */,
+				E8DF384F9CEC2391EE24BE54 /* WidgetData.swift in Sources */,
+				36CBEFAF1B2D904340B88479 /* TodayWidget.swift in Sources */,
+				C9A29EBF8F58407480E220F6 /* AskWidget.swift in Sources */,
+				5489620B1F299D4E743CF33B /* NextUpLiveActivity.swift in Sources */,
+				030B6A9DD07124150E726528 /* NextUpAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4F75D44515F10C92B88FB567 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = HousemaitWidgets;
+			target = 1D476F4672CBF1E6830DD18F /* HousemaitWidgets */;
+			targetProxy = AE96A47A104E89B3994343F0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -372,6 +524,68 @@
 			};
 			name = Release;
 		};
+		5A04D60B4936BF76ED0DC637 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = HousemaitWidgets/HousemaitWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 44;
+				DEVELOPMENT_TEAM = G37VHKH43S;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HousemaitWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.housemait.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7BFDB631A85927D5D239B6F7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = HousemaitWidgets/HousemaitWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 44;
+				DEVELOPMENT_TEAM = G37VHKH43S;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HousemaitWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.housemait.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -389,6 +603,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DD694262725576CF4CB67399 /* Build configuration list for PBXNativeTarget "HousemaitWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7BFDB631A85927D5D239B6F7 /* Release */,
+				5A04D60B4936BF76ED0DC637 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
