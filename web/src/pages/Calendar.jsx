@@ -1021,14 +1021,16 @@ export default function Calendar() {
     if (viewMode === 'day') {
       return {
         title: selectedDate.toLocaleDateString('en-GB', { weekday: 'long' }),
-        sub: `${selectedDate.toLocaleDateString('en-GB', { month: 'short' })} ${selectedDate.getDate()}`,
+        sub: `${selectedDate.getDate()} ${selectedDate.toLocaleDateString('en-GB', { month: 'short' })}`,
       };
     }
     if (viewMode === 'week') {
       const ws = getWeekStart(selectedDate);
       const we = new Date(ws); we.setDate(we.getDate() + 6);
+      // The title already names the month, so a same-month week is just
+      // "7–13"; a straddling week spells both months out.
       const sub = ws.getMonth() === we.getMonth()
-        ? `${ws.toLocaleDateString('en-GB', { month: 'short' })} ${ws.getDate()}–${we.getDate()}`
+        ? `${ws.getDate()}–${we.getDate()}`
         : `${ws.getDate()} ${ws.toLocaleDateString('en-GB', { month: 'short' })} – ${we.getDate()} ${we.toLocaleDateString('en-GB', { month: 'short' })}`;
       return { title: ws.toLocaleDateString('en-GB', { month: 'long' }), sub };
     }
@@ -2540,7 +2542,11 @@ export default function Calendar() {
             </>
           ) : (
             <>
-              <div className="flex-1 min-w-0 flex items-baseline overflow-hidden" style={{ gap: 7 }}>
+              {/* flex-wrap, not overflow-hidden: with four controls on the
+                  row the range label ("7–13") was clipped to nothing on a
+                  phone. It now sits beside the title when there's room and
+                  drops under it when there isn't. */}
+              <div className="flex-1 min-w-0 flex flex-wrap items-baseline" style={{ columnGap: 7, rowGap: 2 }}>
                 <span className="whitespace-nowrap" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 27, lineHeight: 1, color: M_INK, letterSpacing: -0.4 }}>
                   {mobileNav.title}
                 </span>
