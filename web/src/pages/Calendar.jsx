@@ -20,6 +20,7 @@ import { confirmDestructive } from '../lib/action-sheet';
 import ActivityModal from '../components/ActivityModal';
 import { looksLikeGathering } from '../lib/partyDetect';
 import { conflictedKeys, itemKey } from '../lib/conflicts';
+import WhatsAppWinNudge from '../components/WhatsAppWinNudge';
 import { isKidMember } from '../lib/kidsTheme';
 import { openInMaps } from '../lib/maps';
 
@@ -502,6 +503,9 @@ export default function Calendar() {
   const [inviteBusy, setInviteBusy] = useState(false);
   // Just-saved gathering offer ({id, title}) - see the save handler.
   const [gatherOffer, setGatherOffer] = useState(null);
+  // WhatsApp win-moment: flips true after an event is saved in the app - the
+  // moment 'next time, just text it' is a concrete offer, not a pitch.
+  const [waWin, setWaWin] = useState(false);
   const [gatherBusy, setGatherBusy] = useState(false);
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteRosterOpen, setInviteRosterOpen] = useState(false);
@@ -1699,6 +1703,7 @@ export default function Calendar() {
       if (createdEvent?.id && looksLikeGathering(createdEvent.title || payload.title) && !childMode) {
         setGatherOffer({ id: createdEvent.id, title: createdEvent.title || payload.title });
       }
+      if (createdEvent?.id && !childMode) setWaWin(true);
     } catch (err) {
       // Surface the server's actual error message instead of swallowing
       // it behind a generic banner - previously a failing PATCH said
@@ -2295,6 +2300,7 @@ export default function Calendar() {
       <PullIndicator state={ptr.state} />
       {error && <ErrorBanner message={error} onDismiss={() => setError('')} />}
       {!canWrite && <SubscribePrompt message="Subscribe to add or edit calendar events" className="mb-4" />}
+      <WhatsAppWinNudge show={waWin} context="event" />
 
       {/* ── Toolbar (desktop only - mobile gets the compact chrome below,
             per design_handoff_calendar: no page title on phones) ── */}

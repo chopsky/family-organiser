@@ -224,7 +224,7 @@ export default function OnboardingV4({ initialPhase }) {
   // Post-auth WhatsApp pairing - the account exists now, so the link can
   // actually happen. The screen advances itself (link / skip / unavailable).
   if (phase === 'whatsapp') {
-    return <WhatsAppLinkScreen reduced={reduced} onDone={() => goPhase('done')} />;
+    return <WhatsAppLinkScreen reduced={reduced} outcome={v4.outcome} onDone={() => goPhase('done')} />;
   }
 
   if (phase === 'done') {

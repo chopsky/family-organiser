@@ -12,6 +12,7 @@ import { IconUtensils, IconSearch, IconPlus, IconCart, IconChevronLeft, IconChev
 import { useCanWrite } from '../context/SubscriptionContext';
 import SubscribePrompt from '../components/SubscribePrompt';
 import ReferralNudge from '../components/ReferralNudge';
+import WhatsAppWinNudge from '../components/WhatsAppWinNudge';
 import PageHeader from '../components/ui/PageHeader';
 import PillBtn from '../components/ui/PillBtn';
 import Segmented from '../components/ui/Segmented';
@@ -384,6 +385,7 @@ function MealPlanView({ setError }) {
       {/* Win-moment referral nudge - appears only after the AI plan lands
           (and only inside the pilot; the component gates itself). */}
       <ReferralNudge show={planWin} context="meals" />
+      <WhatsAppWinNudge show={planWin} context="meals" />
       {/* Week navigation - hidden on print (the print-only heading below
           replaces it with a clean "Weekly Meal Plan · Week of X" title). */}
       <div className="flex items-center justify-center gap-5 bg-white rounded-[14px] border border-light-grey px-5 py-3 no-print">

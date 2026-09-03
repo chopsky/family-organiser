@@ -197,19 +197,31 @@ async function runSubscriptionRenewalCheck() {
 async function runWhatsAppFollowupCheck() {
   try {
     const { sendWhatsAppFollowupEmail } = require('../services/email');
+    const push = require('../services/push');
     const eligible = await db.findUsersAwaitingWhatsAppFollowup();
     if (!eligible || eligible.length === 0) return;
-    console.log(`[whatsapp-followup] Sending ${eligible.length} re-engagement email(s)`);
+    console.log(`[whatsapp-followup] ${eligible.length} user(s) due a WhatsApp follow-up`);
     for (const user of eligible) {
       try {
-        await sendWhatsAppFollowupEmail(user.email, user.name);
+        // Push first: a tap that lands on the pairing page beats a link in
+        // an inbox - 39 follow-up emails since mid-Aug produced 0 links.
+        // The email stays as the fallback for people without the app.
+        let tokens = [];
+        try { tokens = (await db.getActiveDeviceTokens(user.id)) || []; } catch { tokens = []; }
+        if (tokens.length > 0) {
+          const firstName = (user.name || 'there').trim().split(/\s+/)[0] || 'there';
+          await push.sendToUser(user.id, {
+            title: 'Your family assistant is one message away',
+            body: `${firstName}, link WhatsApp and you can text "dentist Thursday at 3" or send a school letter - no app needed. Takes 20 seconds.`,
+            data: { type: 'whatsapp_connect', url: '/connect-whatsapp' },
+          });
+          console.log(`[whatsapp-followup] push sent to user ${user.id}`);
+        } else {
+          await sendWhatsAppFollowupEmail(user.email, user.name);
+          console.log(`[whatsapp-followup] email sent to ${user.email}`);
+        }
         await db.markWhatsAppFollowupSent(user.id);
-        console.log(`[whatsapp-followup] sent to ${user.email}`);
       } catch (err) {
-        // Don't mark as sent on failure - next tick will retry. If the
-        // email address is genuinely undeliverable, Postmark will mark
-        // it as a hard bounce; the retry loop is bounded by the 7-day
-        // window so a permanently broken address will simply age out.
         console.error(`[whatsapp-followup] failed for user ${user.id}:`, err.message);
       }
     }

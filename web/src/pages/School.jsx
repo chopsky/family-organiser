@@ -13,6 +13,7 @@ import PageHeader from '../components/ui/PageHeader';
 import ActivityModal from '../components/ActivityModal';
 import TermDatesSheet from '../components/TermDatesSheet';
 import ReferralNudge from '../components/ReferralNudge';
+import WhatsAppWinNudge from '../components/WhatsAppWinNudge';
 import PillBtn from '../components/ui/PillBtn';
 import { BottomSheet } from '../components/BottomSheet';
 import Avatar from '../components/ui/Avatar';
@@ -717,6 +718,8 @@ export default function School() {
       {/* Win-moment referral nudge - only after a successful term-dates
           import (and only inside the pilot; the component gates itself). */}
       <ReferralNudge show={termWin} context="school" />
+      {/* Term dates just landed = the most concrete reason to text the bot. */}
+      <WhatsAppWinNudge show={termWin} context="school" detail={{ schoolName: householdSchools[0]?.school_name }} />
 
       {/* Schools - manage each school and its term dates here (decoupled
           from individual children, for privacy). */}

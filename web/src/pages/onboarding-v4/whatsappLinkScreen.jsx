@@ -116,11 +116,12 @@ function WaTyping() {
 
 // Sequence per the handoff: delays are from the previous step; a typing
 // indicator precedes each received bubble. Plays once per entry.
+// Two beats, fast. The four-beat version played for ~5.5s - longer than
+// the median 14s visit minus reading the header - and 27 of 30 people left
+// before tapping anything (Sept 2026 telemetry). Pairing IS the demo now.
 const SEQ = [
-  { kind: 'photo', me: true, wait: 700 },
-  { kind: 'r1', wait: 2000 },
-  { kind: 'voice', me: true, wait: 1100 },
-  { kind: 'r2', wait: 1700 },
+  { kind: 'photo', me: true, wait: 300 },
+  { kind: 'r1', wait: 900 },
 ];
 
 function useSeq(reduced) {
@@ -174,7 +175,7 @@ function ChatDemo({ reduced }) {
 
 /* ── The screen ──────────────────────────────────────────────────────── */
 
-export default function WhatsAppLinkScreen({ onDone, reduced }) {
+export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null}) {
   // init → offer → waiting → linked → (onDone)  |  init failure → onDone
   const [stage, setStage] = useState('init');
   const [pairing, setPairing] = useState(null);
@@ -259,8 +260,10 @@ export default function WhatsAppLinkScreen({ onDone, reduced }) {
         <p style={EYEBROW}>One last thing</p>
         <h1 style={H1}>Text it once. <span style={{ color: T.purple }}>It&rsquo;s handled.</span></h1>
         <p style={{ fontSize: 15, lineHeight: 1.45, color: T.ink2, textWrap: 'pretty', marginTop: 9 }}>
-          Housemait lives in your WhatsApp. Send plans, school letters or voice notes
-          like you&rsquo;d send them to a friend — filed for the whole family.
+          {outcome?.school?.termDates
+            ? <>Try it straight away: text <b style={{ color: T.ink }}>&ldquo;when&rsquo;s half term?&rdquo;</b> &mdash; it already knows {outcome.school.name}&rsquo;s dates.</>
+            : <>Housemait lives in your WhatsApp. Send plans, school letters or voice notes
+          like you&rsquo;d send them to a friend &mdash; filed for the whole family.</>}
         </p>
       </div>
 
@@ -304,18 +307,20 @@ export default function WhatsAppLinkScreen({ onDone, reduced }) {
             {busyLabel ? 'Opening WhatsApp…' : stage === 'waiting' ? 'Open WhatsApp again' : 'Link WhatsApp'}
           </a>
         )}
+        <div style={{ font: '500 12px var(--font-sans)', color: T.ink3, textAlign: 'center', marginTop: 10 }}>
+          Opens WhatsApp · takes 20 seconds · unlink anytime
+        </div>
+        {/* The skip stays (never trap anyone) but no longer competes with
+            the button: quieter, smaller, under the fine print. */}
         {stage !== 'linked' && (
           <button
             type="button"
             onClick={finish}
-            style={{ width: '100%', padding: 12, marginTop: 3, border: 0, background: 'transparent', font: '600 14.5px var(--font-sans)', color: T.ink2, cursor: 'pointer' }}
+            style={{ width: '100%', padding: '10px 12px 4px', border: 0, background: 'transparent', font: '500 13px var(--font-sans)', color: T.ink3, cursor: 'pointer' }}
           >
             Maybe later
           </button>
         )}
-        <div style={{ font: '500 12px var(--font-sans)', color: T.ink3, textAlign: 'center', marginTop: stage === 'linked' ? 12 : 0 }}>
-          Opens WhatsApp · takes 20 seconds · unlink anytime
-        </div>
       </div>
     </div>
   );
