@@ -273,8 +273,11 @@ export default function WhatsAppLinkScreen({ onDone, reduced, outcome = null, ki
   // failure exits to the celebration without a flash of broken UI.
   if (stage === 'init') return <div className="ob-v4" style={{ minHeight: '100dvh', background: T.bg }} />;
 
+  // height, not minHeight: the chat card is a fixed window that clips older
+  // bubbles (flex: 1, minHeight: 0). A stretchy wrapper let the thread push
+  // the button off the bottom of the screen (founder's phone, 3 Sep).
   return (
-    <div className="ob-v4" style={{ minHeight: '100dvh', background: T.bg, display: 'flex', flexDirection: 'column', padding: `0 24px calc(env(safe-area-inset-bottom, 0px) + 14px)` }}>
+    <div className="ob-v4" style={{ height: '100dvh', overflow: 'hidden', background: T.bg, display: 'flex', flexDirection: 'column', padding: `0 24px calc(env(safe-area-inset-bottom, 0px) + 14px)`, boxSizing: 'border-box' }}>
       {/* Header - deliberately no back button, progress bar or logo. */}
       <div style={{ flexShrink: 0, paddingTop: TOP_GAP, paddingBottom: 16 }}>
         <p style={EYEBROW}>One last thing</p>
