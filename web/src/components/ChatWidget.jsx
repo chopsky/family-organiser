@@ -758,7 +758,7 @@ I'm always here if you need me!`;
           style={{
             // Gradient AI orb from the floating-nav handoff. bottom-24
             // lands it just above the floating pill's right edge.
-            background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)',
+            background: 'var(--color-plum)',
             boxShadow: '0 12px 28px rgba(109,56,173,0.5), inset 0 2px 0 rgba(255,255,255,0.3)',
           }}
           title="Chat with AI Assistant"
@@ -1016,7 +1016,7 @@ I'm always here if you need me!`;
                   ) : (
                     <>
                       <div className="w-9 h-9 rounded-[11px] flex items-center justify-center text-white shrink-0"
-                        style={{ background: 'linear-gradient(135deg, var(--color-plum) 0%, #8E5FFF 100%)', boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}>
+                        style={{ background: 'var(--color-plum)', boxShadow: '0 4px 12px rgba(107,63,160,0.3)' }}>
                         <SparklesIcon className="h-[18px] w-[18px]" />
                       </div>
                       <div className="flex-1 min-w-0">
