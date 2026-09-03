@@ -40,6 +40,20 @@ const MAX_PULL_PX = 140;
 // top of a native UIScrollView.
 const DAMPING = 0.45;
 
+/** Any scrollable ancestor between the touch target and the PTR root
+ *  that isn't at its own top. */
+function nestedScrollerIsScrolled(target, root) {
+  let el = target instanceof Element ? target : null;
+  while (el && el !== root) {
+    if (el.scrollTop > 0) {
+      const oy = getComputedStyle(el).overflowY;
+      if (oy === 'auto' || oy === 'scroll') return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+}
+
 function isNative() {
   try { return Capacitor.isNativePlatform(); } catch { return false; }
 }
@@ -56,9 +70,13 @@ export function usePullToRefresh(onRefresh) {
 
   const onTouchStart = useCallback((e) => {
     if (!native || refreshingRef.current) return;
-    // Only arm if scrolled to the very top.
+    // Only arm if scrolled to the very top - of the page AND of any nested
+    // scroller under the finger. The Calendar's week/day time grids scroll
+    // inside their own container, so the page itself sits at 0 while the
+    // grid is halfway down; scrolling the grid back up read as a pull and
+    // fired a refresh at once (founder, 3 Sep).
     const scrollEl = e.currentTarget;
-    if ((scrollEl.scrollTop || 0) > 0) {
+    if ((scrollEl.scrollTop || 0) > 0 || nestedScrollerIsScrolled(e.target, scrollEl)) {
       startYRef.current = null;
       return;
     }
