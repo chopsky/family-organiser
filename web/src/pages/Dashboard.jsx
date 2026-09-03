@@ -803,10 +803,10 @@ export default function Dashboard() {
     if (!digest) return;
     const payload = buildWidgetPayload(digest.todayEvents || [], getMembersForEvent, household?.name);
     syncWidgets(payload);
-    syncLiveActivity(payload);
+    syncLiveActivity(payload, { userId: user?.id });
     // getMembersForEvent is a stable function declaration in this component.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [digest, household?.name]);
+  }, [digest, household?.name, user?.id]);
 
   // Review prompt, earned by the wins engine (lib/appReview). Requested HERE
   // and nowhere else: the Dashboard is hidden in Child Mode (kids land on

@@ -58,6 +58,12 @@ export function buildWidgetPayload(todayEvents, membersFor, householdName) {
       start: ev.start_time ? new Date(ev.start_time).toISOString() : null,
       end: ev.end_time ? new Date(ev.end_time).toISOString() : null,
       allDay: Boolean(ev.all_day) || isSpan,
+      // Who it's for (member ids) and whether it arrived from a synced
+      // calendar. An event with no members is household-wide when it was
+      // typed into Housemait, but unknown when it was synced in - the Live
+      // Activity treats those differently (founder, 3 Sep).
+      memberIds: members.map((m) => m?.id).filter(Boolean),
+      synced: Boolean(ev.external_feed_id || ev.subscription_id),
       location: ev.location || null,
       color: primary ? hexFor(primary) : '#6B3FA0',
       who: whoLabel(members),

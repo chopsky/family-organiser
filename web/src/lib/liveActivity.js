@@ -12,7 +12,30 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const LiveActivity = registerPlugin('LiveActivity');
-const LEAD_MS = 60 * 60 * 1000;
+// 30 minutes, matching the activity reminders: a countdown to leaving,
+// not an hour of Dynamic Island occupancy (was 60).
+const LEAD_MS = 30 * 60 * 1000;
+// Per-device switch (Settings > Next up in the Dynamic Island). Live
+// Activities are a device thing, so this stays local rather than a
+// household preference.
+const PREF_KEY = 'housemait_next_up_activity';
+export function nextUpEnabled() {
+  try { return localStorage.getItem(PREF_KEY) !== 'off'; } catch { return true; }
+}
+export function setNextUpEnabled(on) {
+  try { localStorage.setItem(PREF_KEY, on ? 'on' : 'off'); } catch { /* private mode */ }
+  if (!on) endLiveActivity();
+}
+// Is this event the user's business? Assigned to them, or unassigned AND
+// created in Housemait (household-wide by convention). An unassigned event
+// that came in from a synced calendar is nobody-in-particular's: a
+// holiday-camp booking on a third-party calendar sat in the founder's
+// Dynamic Island though it had nothing to do with him (3 Sep).
+function relevantTo(e, userId) {
+  const ids = e.memberIds || [];
+  if (ids.length > 0) return Boolean(userId) && ids.includes(userId);
+  return !e.synced;
+}
 // The countdown's job is over once the event has begun. It lingers this
 // long as "Now" so a glance at the island still says what just started,
 // then the next sync ends it - a four-hour holiday camp must not sit in
@@ -27,12 +50,13 @@ function isIos() {
  * Reconcile the Live Activity against the widget payload (buildWidgetPayload
  * output). Starts, updates or ends as needed. Never throws.
  */
-export async function syncLiveActivity(payload) {
+export async function syncLiveActivity(payload, { userId = null } = {}) {
   if (!isIos()) return;
   try {
     const now = Date.now();
+    if (!nextUpEnabled()) { await LiveActivity.end(); return; }
     const next = (payload?.events || [])
-      .filter((e) => !e.allDay && e.start)
+      .filter((e) => !e.allDay && e.start && relevantTo(e, userId))
       .map((e) => ({ ...e, startMs: Date.parse(e.start), endMs: e.end ? Date.parse(e.end) : Date.parse(e.start) + 60 * 60000 }))
       .filter((e) => e.startMs + GRACE_MS > now)
       .sort((a, b) => a.startMs - b.startMs)[0];

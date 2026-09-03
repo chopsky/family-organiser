@@ -34,6 +34,7 @@ import { MEMBER_HEX } from '../lib/memberColors';
 import { isKidMember } from '../lib/kidsTheme';
 import { useChildMode } from '../context/ChildModeContext';
 import useHasChildren from '../hooks/useHasChildren';
+import { nextUpEnabled, setNextUpEnabled } from '../lib/liveActivity';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
@@ -1001,6 +1002,8 @@ export default function Settings() {
   // defaults when no row exists, so falling back to a hand-rolled
   // shape is just belt-and-braces in case of a transient API blip.
   const isNative = Capacitor.isNativePlatform();
+  // Per-device: the Next Up Live Activity (Dynamic Island + Lock Screen countdown).
+  const [nextUp, setNextUp] = useState(() => nextUpEnabled());
   useEffect(() => {
     api.get('/notifications/preferences')
       .then(({ data }) => setNotifPrefs(data))
@@ -2562,6 +2565,26 @@ export default function Settings() {
                         </button>
                       </div>
                     ))}
+                  </div>
+                  {/* Next Up Live Activity - a countdown in the Dynamic Island and
+                      on the Lock Screen in the half hour before one of YOUR
+                      events. Per device (Live Activities are), so it lives in
+                      localStorage, not the household's notification prefs. */}
+                  <div className="flex items-center justify-between py-3 px-1 mt-1 border-t border-cream-border">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-bark">Next up in the Dynamic Island</p>
+                      <p className="text-xs text-cocoa">A countdown to your next event, 30 minutes before it starts. Only events for you, or for the whole family.</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={nextUp}
+                      aria-label="Toggle Next up in the Dynamic Island"
+                      onClick={() => { const on = !nextUp; setNextUp(on); setNextUpEnabled(on); }}
+                      className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors duration-200 ${nextUp ? 'bg-primary' : 'bg-sand'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${nextUp ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
                   </div>
                 </>
               ) : (
