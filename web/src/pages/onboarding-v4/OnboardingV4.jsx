@@ -236,7 +236,30 @@ export default function OnboardingV4({ initialPhase }) {
   // is the only sensible way on.
   const skipLabel = step === 'cals' && calCount > 0 ? null : skipLabelAt(f.i);
   // Submitting the household name shows the sign, which then advances.
-  const advance = () => { if (step === 'house') setSign(true); else next(); };
+  // Commit a typed-but-not-added child before leaving the kids step. The
+  // navigation must run from the merged draft: next() closes over the
+  // pre-update `d`, which still has no child, and would hop the school step.
+  const kidCount = (d.kids || []).length + ((d.kidDraft || '').trim() ? 1 : 0);
+  const flushKidDraft = () => {
+    const pending = (d.kidDraft || '').trim();
+    if (!pending) return null;
+    const kids = d.kids || [];
+    const dup = kids.some((k) => k.toLowerCase() === pending.toLowerCase());
+    return { ...d, kidDraft: '', kids: dup ? kids : [...kids, pending] };
+  };
+  const advance = () => {
+    if (step === 'house') { setSign(true); return; }
+    if (step === 'kids') {
+      const nd = flushKidDraft();
+      if (nd) {
+        update(() => nd);
+        const target = forwardFrom(f.i, nd);
+        goPhase(target.phase, target.i);
+        return;
+      }
+    }
+    next();
+  };
 
   return (
     <>
@@ -302,7 +325,7 @@ export default function OnboardingV4({ initialPhase }) {
                       // The calendar step is never a gate, so its CTA reads as
                       // "done here" rather than implying something is missing.
                       : step === 'cals' ? (calCount > 0 ? `Done · ${calCount} connected` : 'Continue')
-                        : step === 'kids' ? ((d.kids || []).length > 0 ? `That’s everyone (${d.kids.length})` : 'Continue')
+                        : step === 'kids' ? (kidCount > 0 ? `That’s everyone (${kidCount})` : 'Continue')
                           : step === 'school' ? (d.school ? 'Add this school' : 'Continue')
                             : 'Continue'}
               </Cta>

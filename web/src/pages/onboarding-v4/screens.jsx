@@ -216,15 +216,21 @@ export function RoleStep({ d, pick }) {
    otherwise). First names are enough; profiles are created at signup by
    replay.js, so Child Mode / School / stars are alive from day one. */
 export function KidsStep({ d, update }) {
-  const [draft, setDraft] = useState('');
+  // The half-typed name sits in the draft (kidDraft), not local state, so
+  // the frame's CTA can commit it: a parent who types "Mason" and taps
+  // Continue without Add used to lose the child - and with it the school
+  // step, which only shows once a child is named (founder hit this 3 Sep).
+  const draft = d.kidDraft || '';
+  const setDraft = (v) => update({ kidDraft: v });
   const kids = d.kids || [];
   const add = () => {
     const name = draft.trim();
     if (!name) return;
     if (!kids.some((k) => k.toLowerCase() === name.toLowerCase())) {
-      update({ kids: [...kids, name] });
+      update({ kids: [...kids, name], kidDraft: '' });
+    } else {
+      setDraft('');
     }
-    setDraft('');
   };
   return (
     <>
