@@ -255,11 +255,11 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               {rows.map((r) => (
                 <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0' }}>
                   <span style={{ fontSize: 14 }}>{r.icon}</span>
-                  <span style={{ width: 74, flexShrink: 0, font: '600 12.5px var(--font-sans)', color: T.ink3 }}>{r.label}</span>
+                  <span style={{ width: 74, flexShrink: 0, font: '600 12.5px var(--font-sans)', color: T.ink3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
                   <span
                     style={{
-                      flex: 1, textAlign: 'right', font: '600 13.5px var(--font-sans)',
-                      color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      flex: 1, minWidth: 0, textAlign: 'right', font: '600 13.5px var(--font-sans)', lineHeight: 1.25,
+                      color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: r.wrap ? 'normal' : 'nowrap',
                     }}
                   >
                     {r.value}
@@ -278,7 +278,7 @@ export function SignUpScreen({ d, onBack, auth, v4 }) {
               }}
             >
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: T.okInk }} />
-              Free for your family · Premium included for 14 days
+              Free for your family · 14 days of Premium
             </span>
           </div>
 

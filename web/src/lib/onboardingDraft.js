@@ -114,8 +114,22 @@ export function completedRecap(d) {
       value: `${calCount} connected`,
     });
   }
+  // One row per school. With several, the label is the child (or children)
+  // who go there - the pairing is the whole point of picking two - and the
+  // value may wrap: joined into one truncated line, the second school was
+  // invisible (founder, 3 Sep). A trailing "School" is dropped when the
+  // name is still unmistakable without it ("Wolfson Hillel Primary").
   const schools = (d.schools || []).filter((sc) => sc?.name);
-  if (schools.length) rows.push({ key: 'school', icon: '🏫', label: schools.length > 1 ? 'Schools' : 'School', value: schools.map((sc) => sc.name).join(' · ') });
+  const shortName = (name) => {
+    const m = String(name).match(/^(.*\S)\s+School$/i);
+    return m && m[1].split(/\s+/).length >= 2 ? m[1] : name;
+  };
+  const kidLabel = (names) => (names.length === 0 ? 'School' : names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}`);
+  schools.forEach((sc, i) => rows.push({
+    key: `school-${i}`, icon: '🏫',
+    label: schools.length > 1 ? kidLabel(sc.kids || []) : 'School',
+    value: shortName(sc.name), wrap: true,
+  }));
   if (d.wa) rows.push({ key: 'wa', icon: '💬', label: 'WhatsApp', value: 'Connected' });
   if (d.inbox) {
     rows.push({
