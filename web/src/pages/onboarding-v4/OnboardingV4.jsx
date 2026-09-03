@@ -329,7 +329,7 @@ export default function OnboardingV4({ initialPhase }) {
                       // "done here" rather than implying something is missing.
                       : step === 'cals' ? (calCount > 0 ? `Done · ${calCount} connected` : 'Continue')
                         : step === 'kids' ? (kidCount > 0 ? `That’s everyone (${kidCount})` : 'Continue')
-                          : step === 'school' ? (d.school ? 'Add this school' : 'Continue')
+                          : step === 'school' ? ((d.schools || []).length > 1 ? 'Add these schools' : (d.schools || []).length === 1 ? 'Add this school' : 'Continue')
                             : 'Continue'}
               </Cta>
             )}

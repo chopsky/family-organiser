@@ -304,25 +304,58 @@ export function KidsStep({ d, update }) {
    works pre-auth); every other country types a plain name - the directory
    is England-only, and a wrong pick would import English council dates -
    with South Africa additionally getting the national term dates at
-   replay. The pick is created at signup by replay.js. Launch-week data
+   replay. The picks are created at signup by replay.js. Launch-week data
    (2026-09-02): 3 of 13 kid-households had added a school, because
-   nothing had ever asked. */
+   nothing had ever asked.
+
+   Holds ONE SCHOOL PER CHILD (d.schools, each with its `kids`): siblings at
+   different schools are the norm once one is at secondary, and a single
+   pick silently linked every child to the first school (founder, 3 Sep).
+   With one child there is nothing to assign and the step looks exactly as
+   before; with more, each school card asks "Who goes here?" and an "Add
+   another school" link opens a second search. */
+function KidChips({ kids, school, onToggle }) {
+  if (kids.length < 2) return null;
+  const on = (k) => (school.kids || []).includes(k);
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 10 }}>
+      <span style={{ font: '500 12.5px var(--font-sans)', color: T.ink3, marginRight: 2 }}>Who goes here?</span>
+      {kids.map((k) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={on(k)}
+          onClick={() => onToggle(k)}
+          style={{
+            padding: '6px 11px', borderRadius: 99, cursor: 'pointer',
+            border: `1.5px solid ${on(k) ? T.purple : T.line2}`,
+            background: on(k) ? T.purple : T.surface, color: on(k) ? '#fff' : T.ink2,
+            font: '600 13px var(--font-sans)',
+          }}
+        >
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SchoolStep({ d, update, onSearching = () => {} }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   // With the keyboard up, the frame's pinned footer sat on top of the
   // results (founder's phone, 3 Sep): the list rendered below the input,
-  // under Continue, and nothing said "scroll". While the input has focus
+  // under Continue, and nothing said "scroll". While an input has focus
   // the frame drops its footer (onSearching) and the input scrolls to the
   // top of the body, so the list gets the whole space above the keyboard.
-  const inputRef = useRef(null);
   const onSearchingRef = useRef(onSearching);
   onSearchingRef.current = onSearching;
-  const focusIn = () => {
+  const focusIn = (e) => {
     onSearchingRef.current(true);
+    const el = e.target;
     // After the keyboard animation, or the scroll lands on the old layout.
-    setTimeout(() => inputRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 260);
+    setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 260);
   };
   const focusOut = () => onSearchingRef.current(false);
   useEffect(() => () => onSearchingRef.current(false), []);
@@ -342,7 +375,13 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
   const isGb = country === 'GB';
   const isZa = country === 'ZA';
   const kids = d.kids || [];
-  const picked = d.school || null;
+  const schools = d.schools || [];
+  // The search / text box shows for the first school, and again after
+  // "Add another school". Never for a school that is already picked.
+  const [adding, setAdding] = useState(false);
+  const showBox = schools.length === 0 || adding;
+  const assigned = new Set(schools.flatMap((sc) => sc.kids || []));
+  const unassigned = kids.filter((k) => !assigned.has(k));
 
   useEffect(() => {
     if (!isGb) return undefined;
@@ -363,12 +402,29 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
     return () => { cancelled = true; clearTimeout(t); };
   }, [query, isGb]);
 
+  // The first school takes every child; a later one takes whoever is not
+  // yet placed (usually nobody, so the chips do the moving).
+  const defaultKids = () => (schools.length === 0 ? kids : unassigned);
   const pick = (r) => {
-    update({ school: { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null, country } });
+    const school = { urn: r.urn, name: r.name, type: r.type || null, local_authority: r.local_authority || null, postcode: r.postcode || null, country, kids: defaultKids() };
+    update({ schools: [...schools, school] });
+    setQuery('');
     setResults([]);
+    setAdding(false);
     // The input unmounts with the pick, so its blur never fires.
     onSearchingRef.current(false);
   };
+  const remove = (i) => update({ schools: schools.filter((_, j) => j !== i) });
+  // A child is at one school: switching them on here takes them off the
+  // others; switching them off leaves them unplaced (the replay then links
+  // them to the only school, if there is only one).
+  const toggleKid = (i, k) => update({
+    schools: schools.map((sc, j) => {
+      const has = (sc.kids || []).includes(k);
+      if (j === i) return { ...sc, kids: has ? sc.kids.filter((x) => x !== k) : [...(sc.kids || []), k] };
+      return has ? { ...sc, kids: sc.kids.filter((x) => x !== k) } : sc;
+    }),
+  });
   const who = kids.length === 1 ? kids[0] : kids.length === 2 ? `${kids[0]} and ${kids[1]}` : 'the kids';
   const verb = kids.length === 1 ? 'does' : 'do';
   const meta = (r) => [r.local_authority, r.postcode].filter(Boolean).join(' · ');
@@ -377,11 +433,28 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
     border: `1.5px solid ${T.line2}`, background: T.surface, outline: 'none',
     font: '600 16.5px var(--font-sans)', color: T.ink,
   };
+  const cardStyle = { marginTop: 12, padding: '14px 16px', borderRadius: 16, background: T.purpleSoft };
+  const addAnother = kids.length > 1 && schools.length > 0 && schools.length < kids.length && !adding && (
+    <button
+      type="button"
+      onClick={() => setAdding(true)}
+      style={{ marginTop: 12, padding: '10px 2px', border: 0, background: 'transparent', cursor: 'pointer', font: '600 14.5px var(--font-sans)', color: T.purpleDeep, textAlign: 'left' }}
+    >
+      + Add another school{unassigned.length === 1 ? ` for ${unassigned[0]}` : ''}
+    </button>
+  );
 
   // Non-GB: a plain name is the whole answer - it lands in the draft as
   // they type (no pick step), so the CTA reads "Add this school" once
-  // there's a name.
+  // there's a name. Each school is its own editable box.
   if (!isGb) {
+    const setName = (i, name) => {
+      if (!name.trim()) { if (i < schools.length) remove(i); return; }
+      if (i < schools.length) { update({ schools: schools.map((sc, j) => (j === i ? { ...sc, name } : sc)) }); return; }
+      update({ schools: [...schools, { urn: null, name, type: null, local_authority: null, postcode: null, country, freeText: true, kids: defaultKids() }] });
+      setAdding(false);
+    };
+    const slots = showBox ? [...schools, null] : schools;
     return (
       <>
         <p style={EYEBROW}>Step 4 of 6</p>
@@ -391,52 +464,52 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
             ? 'Type the school’s name and tell us which calendar it follows.'
             : 'Type the school’s name. Once you’re in, you can add its term dates from the school’s website or a photo of the letter.'}
         </p>
-        <div style={{ marginTop: 18 }}>
-          <input
-            value={picked?.name || ''}
-            onChange={(e) => {
-              const name = e.target.value;
-              update({ school: name.trim() ? { ...(picked || {}), urn: null, name, type: null, local_authority: null, postcode: null, country, freeText: true } : null });
-            }}
-            placeholder={isZa ? 'e.g. Sandown Primary' : 'e.g. Lincoln Elementary'}
-            autoCapitalize="words"
-            autoCorrect="off"
-            aria-label="School name"
-            ref={inputRef}
-            onFocus={focusIn}
-            onBlur={focusOut}
-            style={inputStyle}
-          />
-        </div>
-        {/* South Africa: public schools follow the national calendar;
-            independent schools set their own. Nothing is assumed - the
-            national dates are only imported when the family says so,
-            because the wrong calendar on a private-school family's
-            year is worse than none (founder, 2026-09-02). */}
-        {isZa && picked?.name && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
-            {[
-              { v: true, label: 'Public school', note: 'Follows the national term dates - we’ll add them for you' },
-              { v: false, label: 'Private or independent', note: 'Sets its own calendar - add its dates on the School page' },
-            ].map((o) => {
-              const on = picked.usesNationalDates === o.v;
-              return (
-                <button
-                  key={String(o.v)}
-                  type="button"
-                  onClick={() => { update({ school: { ...picked, usesNationalDates: o.v } }); inputRef.current?.blur(); }}
-                  style={{
-                    textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
-                    border: `1.5px solid ${on ? T.purple : T.line2}`, background: on ? T.purpleSoft : T.surface,
-                  }}
-                >
-                  <div style={{ font: '600 15px var(--font-sans)', color: on ? T.purpleDeep : T.ink }}>{o.label}</div>
-                  <div style={{ font: '500 12.5px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{o.note}</div>
-                </button>
-              );
-            })}
+        {slots.map((sc, i) => (
+          <div key={i} style={{ marginTop: i === 0 ? 18 : 12 }}>
+            <input
+              value={sc?.name || ''}
+              onChange={(e) => setName(i, e.target.value)}
+              placeholder={i === 0 ? (isZa ? 'e.g. Sandown Primary' : 'e.g. Lincoln Elementary') : 'The other school’s name'}
+              autoCapitalize="words"
+              autoCorrect="off"
+              aria-label={i === 0 ? 'School name' : 'Another school’s name'}
+              onFocus={focusIn}
+              onBlur={focusOut}
+              style={inputStyle}
+            />
+            {/* South Africa: public schools follow the national calendar;
+                independent schools set their own. Nothing is assumed - the
+                national dates are only imported when the family says so,
+                because the wrong calendar on a private-school family's
+                year is worse than none (founder, 2026-09-02). */}
+            {isZa && sc?.name && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                {[
+                  { v: true, label: 'Public school', note: 'Follows the national term dates - we’ll add them for you' },
+                  { v: false, label: 'Private or independent', note: 'Sets its own calendar - add its dates on the School page' },
+                ].map((o) => {
+                  const on = sc.usesNationalDates === o.v;
+                  return (
+                    <button
+                      key={String(o.v)}
+                      type="button"
+                      onClick={() => { update({ schools: schools.map((x, j) => (j === i ? { ...x, usesNationalDates: o.v } : x)) }); document.activeElement?.blur?.(); }}
+                      style={{
+                        textAlign: 'left', padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
+                        border: `1.5px solid ${on ? T.purple : T.line2}`, background: on ? T.purpleSoft : T.surface,
+                      }}
+                    >
+                      <div style={{ font: '600 15px var(--font-sans)', color: on ? T.purpleDeep : T.ink }}>{o.label}</div>
+                      <div style={{ font: '500 12.5px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{o.note}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {sc?.name && <KidChips kids={kids} school={sc} onToggle={(k) => toggleKid(i, k)} />}
           </div>
-        )}
+        ))}
+        {addAnother}
       </>
     );
   }
@@ -446,38 +519,37 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
       <p style={EYEBROW}>Step 4 of 6</p>
       <h1 style={{ ...H1, fontSize: 34, marginTop: 8 }}>Where {verb} {who} go to school?</h1>
       <p style={{ ...SUB, marginTop: 10 }}>Search by name. For most schools we’ll put the term dates and holidays straight onto your calendar.</p>
-      {picked ? (
-        <div
-          style={{
-            marginTop: 18, display: 'flex', alignItems: 'center', gap: 12,
-            padding: '14px 16px', borderRadius: 16, background: T.purpleSoft,
-          }}
-        >
-          <span style={{ fontSize: 22 }} aria-hidden="true">🏫</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ font: '600 15.5px var(--font-sans)', color: T.purpleDeep }}>{picked.name}</div>
-            {meta(picked) && <div style={{ font: '500 13px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{meta(picked)}</div>}
+      {schools.map((sc, i) => (
+        <div key={sc.urn || sc.name} style={{ ...cardStyle, marginTop: i === 0 ? 18 : 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }} aria-hidden="true">🏫</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ font: '600 15.5px var(--font-sans)', color: T.purpleDeep }}>{sc.name}</div>
+              {meta(sc) && <div style={{ font: '500 13px var(--font-sans)', color: T.ink3, marginTop: 2 }}>{meta(sc)}</div>}
+            </div>
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              style={{ border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.purpleDeep, padding: '6px 2px' }}
+            >
+              {schools.length > 1 ? 'Remove' : 'Change'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => update({ school: null })}
-            style={{ border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.purpleDeep, padding: '6px 2px' }}
-          >
-            Change
-          </button>
+          <KidChips kids={kids} school={sc} onToggle={(k) => toggleKid(i, k)} />
         </div>
-      ) : (
+      ))}
+      {showBox && (
         <>
-          <div style={{ marginTop: 18 }}>
+          <div style={{ marginTop: schools.length ? 12 : 18 }}>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && results[0]) { e.preventDefault(); pick(results[0]); } }}
-              placeholder="e.g. St Mary’s Primary"
+              placeholder={schools.length ? (unassigned.length === 1 ? `${unassigned[0]}’s school` : 'The other school') : 'e.g. St Mary’s Primary'}
               autoCapitalize="words"
               autoCorrect="off"
-              aria-label="School name"
-              ref={inputRef}
+              aria-label={schools.length ? 'Another school’s name' : 'School name'}
+              autoFocus={schools.length > 0}
               onFocus={focusIn}
               onBlur={focusOut}
               style={inputStyle}
@@ -510,8 +582,14 @@ export function SchoolStep({ d, update, onSearching = () => {} }) {
             </p>
           )}
           {searching && <p style={{ ...SUB, marginTop: 12, fontSize: 13, color: T.ink3 }}>Searching…</p>}
+          {adding && (
+            <button type="button" onClick={() => { setAdding(false); setQuery(''); }} style={{ marginTop: 8, padding: '8px 2px', border: 0, background: 'transparent', cursor: 'pointer', font: '600 13.5px var(--font-sans)', color: T.ink3 }}>
+              Never mind
+            </button>
+          )}
         </>
       )}
+      {addAnother}
     </>
   );
 }

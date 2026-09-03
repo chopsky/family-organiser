@@ -545,13 +545,13 @@ export function DoneScreen({ d, onEnter, reduced, outcome }) {
         {/* The school step's outcome, spoken honestly: term dates landed, or
             the school is in and the School page offers the other routes
             (website / photo / PDF) - never a silent "we tried". */}
-        {outcome?.school?.name && (
-          <p style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
-            ✓ {outcome.school.termDates
-              ? `${outcome.school.name} added - ${outcome.school.termDates} term dates are on your calendar`
-              : `${outcome.school.name} added - grab its term dates on the School page`}
+        {(outcome?.schools?.length ? outcome.schools : (outcome?.school ? [outcome.school] : [])).map((sc) => (
+          <p key={sc.id || sc.name} style={{ fontSize: 13, color: T.okInk, marginBottom: 10 }}>
+            ✓ {sc.termDates
+              ? `${sc.name} added - ${sc.termDates} term dates are on your calendar`
+              : `${sc.name} added - grab its term dates on the School page`}
           </p>
-        )}
+        ))}
         {/* The inbox claim, confirmed or honestly lost - replayInbox's
             contract promises the welcome screen reports it, and a silent
             claim is how a mis-captured alias goes unnoticed until Settings

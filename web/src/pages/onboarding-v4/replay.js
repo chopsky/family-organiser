@@ -120,13 +120,14 @@ export async function replayInbox(slug) {
  * one failure must not cost the others, and a fully failed replay just
  * means the family adds the kids in Family Setup like before.
  */
-export async function replayKids(names, schoolId = null) {
+export async function replayKids(names, schoolIdFor = null) {
   const created = [];
   for (const name of names || []) {
     try {
-      // Link each child to the school picked at the school step, so the
-      // per-child term calendar and prep pings resolve without a second
-      // visit to Family Setup.
+      // Link each child to THEIR school from the school step (a function of
+      // the name, or one id for all), so the per-child term calendar and
+      // prep pings resolve without a second visit to Family Setup.
+      const schoolId = typeof schoolIdFor === 'function' ? schoolIdFor(name) : schoolIdFor;
       await api.post('/household/dependents', { name, dependent_kind: 'child', ...(schoolId ? { school_id: schoolId } : {}) });
       created.push(name);
     } catch { /* skip - Family Setup remains the fallback */ }
@@ -193,8 +194,21 @@ export async function replayQueued(d) {
   // household they joined - never try to (re)claim it on their behalf.
   // Same for kids: the roster belongs to the household they joined.
   const inbox = d?.joining ? { claimed: false, conflict: false } : await replayInbox(d?.inbox);
-  // School before kids, so the children can be created already linked to it.
-  const school = d?.joining ? null : await replaySchool(d?.school);
-  const kids = d?.joining ? [] : await replayKids(d?.kids, school?.id || null);
-  return { calendars, inbox, kids, school };
+  // Schools before kids, so the children can be created already linked to
+  // theirs. `d.school` (singular) is the pre-3-Sep draft shape; a draft from
+  // a run that straddled the deploy still replays.
+  const drafts = d?.joining ? [] : (d?.schools?.length ? d.schools : (d?.school ? [{ ...d.school, kids: d.kids || [] }] : []));
+  const schools = [];
+  for (const sd of drafts) {
+    const made = await replaySchool(sd);
+    if (made) schools.push({ ...made, kids: sd.kids || [] });
+  }
+  // A child not placed on any card (the chips only appear with 2+ kids)
+  // goes to the only school there is; with several, unplaced stays unlinked.
+  const idFor = (name) => {
+    const mine = schools.find((sc) => (sc.kids || []).includes(name));
+    return (mine || (schools.length === 1 ? schools[0] : null))?.id || null;
+  };
+  const kids = d?.joining ? [] : await replayKids(d?.kids, idFor);
+  return { calendars, inbox, kids, school: schools[0] || null, schools };
 }
