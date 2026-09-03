@@ -119,18 +119,22 @@ function WaTyping() {
 }
 
 // Delays are from the previous step; a typing indicator precedes each
-// received bubble. Sent bubbles land fast, replies take a beat - the whole
-// thread is on screen in ~3.5s, under the median 14s visit. Older bubbles
-// scroll off the top of the fixed-height card like a real chat.
+// received bubble. Paced at reading speed: a sent bubble lands, the reply
+// takes a beat, and the NEXT send waits long enough to read the reply
+// (longer after the letter, the wordiest one). ~10s end to end. The CTA is
+// live from the first frame, so the pace costs nobody anything - and the
+// thread scrolls, so anything that has moved up can be read again. The
+// 3.5s version pushed the first exchanges off the top before anyone could
+// read them (founder's phone, 3 Sep).
 const SEQ = [
-  { kind: 'ask1', me: true, wait: 200 },
-  { kind: 'ans1', wait: 650 },
-  { kind: 'photo', me: true, wait: 240 },
-  { kind: 'r1', wait: 700 },
-  { kind: 'voice', me: true, wait: 240 },
-  { kind: 'r2', wait: 650 },
-  { kind: 'ask2', me: true, wait: 240 },
-  { kind: 'ans2', wait: 650 },
+  { kind: 'ask1', me: true, wait: 350 },
+  { kind: 'ans1', wait: 1000 },
+  { kind: 'photo', me: true, wait: 1700 },
+  { kind: 'r1', wait: 1100 },
+  { kind: 'voice', me: true, wait: 2100 },
+  { kind: 'r2', wait: 1000 },
+  { kind: 'ask2', me: true, wait: 1800 },
+  { kind: 'ans2', wait: 1000 },
 ];
 
 // Real names beat placeholders: the kids step ran two screens ago.
@@ -152,6 +156,19 @@ function useSeq(reduced) {
 function ChatDemo({ reduced, kids }) {
   const { shown, typing, animate } = useSeq(reduced);
   const { kid1, kid2 } = demoNames(kids);
+  // A real thread: follows the newest bubble, but a reader who has scrolled
+  // back up to re-read is left where they are.
+  const scrollRef = useRef(null);
+  const lastHeightRef = useRef(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const wasFollowing = lastHeightRef.current === 0
+      || lastHeightRef.current - el.scrollTop - el.clientHeight < 48;
+    lastHeightRef.current = el.scrollHeight;
+    if (!wasFollowing) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' });
+  }, [shown.length, typing, reduced]);
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', borderRadius: 22, overflow: 'hidden', background: WA.paper, boxShadow: '0 18px 44px -20px rgba(26,22,32,0.38), 0 0 0 1px rgba(26,22,32,0.06)' }}>
       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: WA.header, borderBottom: `1px solid ${WA.hairline}` }}>
@@ -164,7 +181,8 @@ function ChatDemo({ reduced, kids }) {
         </span>
         <svg width="17" height="17" viewBox="0 0 24 24" fill={T.ink3} aria-hidden="true"><circle cx="12" cy="5" r="1.9" /><circle cx="12" cy="12" r="1.9" /><circle cx="12" cy="19" r="1.9" /></svg>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8, padding: 12, overflow: 'hidden' }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+       <div style={{ minHeight: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 8, padding: 12 }}>
         {shown.map((it, k) => {
           if (it.kind === 'ask1') return <WaBubble key={k} me animate={animate}>Dentist for {kid1}, Thu 3pm{waTime('17:57', true)}</WaBubble>;
           if (it.kind === 'ans1') return <WaBubble key={k} animate={animate}>Done: {kid1} · Dentist · Thu 3:00pm. I&rsquo;ll nudge you at 2:30. 🦷{waTime('17:57')}</WaBubble>;
@@ -188,6 +206,7 @@ function ChatDemo({ reduced, kids }) {
           return <WaBubble key={k} animate={animate}>Half term is Mon 26 to Fri 30 Oct. {kid2}&rsquo;s back on Monday 2 Nov.{waTime('18:01')}</WaBubble>;
         })}
         {typing && <WaTyping />}
+       </div>
       </div>
     </div>
   );
