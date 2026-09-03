@@ -2560,15 +2560,16 @@ export default function Calendar() {
             </>
           ) : (
             <>
-              {/* flex-wrap, not overflow-hidden: with four controls on the
-                  row the range label ("7–13") was clipped to nothing on a
-                  phone. It now sits beside the title when there's room and
-                  drops under it when there isn't. */}
-              <div className="flex-1 min-w-0 flex flex-wrap items-baseline" style={{ columnGap: 7, rowGap: 2 }}>
-                <span className="whitespace-nowrap" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 27, lineHeight: 1, color: M_INK, letterSpacing: -0.4 }}>
+              {/* A fixed two-line block in EVERY view: title, then the date
+                  line beneath. Inline, the date line was clipped by the four
+                  controls; wrapping made the header bounce between one and
+                  two lines as the Today pill came and went while paging
+                  weeks (founder, 3 Sep). A constant shape never moves. */}
+              <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 3 }}>
+                <span className="whitespace-nowrap truncate" style={{ fontFamily: 'var(--font-serif-display)', fontSize: 27, lineHeight: 1, color: M_INK, letterSpacing: -0.4 }}>
                   {mobileNav.title}
                 </span>
-                <span className="whitespace-nowrap text-[13px] font-semibold" style={{ color: M_INK3 }}>{mobileNav.sub}</span>
+                <span className="whitespace-nowrap truncate text-[13px] font-semibold" style={{ color: M_INK3, lineHeight: 1.1, minHeight: 14 }}>{mobileNav.sub}</span>
               </div>
               {offToday && (
                 <button
