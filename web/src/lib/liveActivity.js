@@ -13,6 +13,11 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 const LiveActivity = registerPlugin('LiveActivity');
 const LEAD_MS = 60 * 60 * 1000;
+// The countdown's job is over once the event has begun. It lingers this
+// long as "Now" so a glance at the island still says what just started,
+// then the next sync ends it - a four-hour holiday camp must not sit in
+// the Dynamic Island as "Now" all afternoon (founder, 3 Sep).
+const GRACE_MS = 10 * 60 * 1000;
 
 function isIos() {
   try { return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'; } catch { return false; }
@@ -29,7 +34,7 @@ export async function syncLiveActivity(payload) {
     const next = (payload?.events || [])
       .filter((e) => !e.allDay && e.start)
       .map((e) => ({ ...e, startMs: Date.parse(e.start), endMs: e.end ? Date.parse(e.end) : Date.parse(e.start) + 60 * 60000 }))
-      .filter((e) => e.endMs > now)
+      .filter((e) => e.startMs + GRACE_MS > now)
       .sort((a, b) => a.startMs - b.startMs)[0];
 
     if (!next || next.startMs - now > LEAD_MS) {

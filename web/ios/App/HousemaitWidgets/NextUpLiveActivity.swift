@@ -57,10 +57,12 @@ private struct Countdown: View {
         if state.start > now {
             // Live, system-driven countdown - no timeline churn needed.
             Text(timerInterval: now...state.start, countsDown: true)
-        } else if let end = state.end, end > now {
+        } else if now < state.start.addingTimeInterval(10 * 60) {
+            // Ten minutes of "Now", matching the app's grace; then the app's
+            // next sync ends the activity.
             Text("Now")
         } else {
-            Text("Done")
+            Text("Started")
         }
     }
 }

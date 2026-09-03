@@ -13,11 +13,20 @@ struct TodayEntry: TimelineEntry {
     var events: [WidgetEvent] { payload?.events ?? [] }
     var timed: [WidgetEvent] { events.filter { !$0.allDay && $0.start != nil } }
     var allDay: [WidgetEvent] { events.filter { $0.allDay } }
-    /// Timed events that haven't finished yet, soonest first.
+    /// How long an event that has begun still counts as "next" (shown as
+    /// "Now"). After that the card moves on to what follows: a four-hour
+    /// holiday camp is not "next up" at lunchtime (founder, 3 Sep).
+    static let grace: TimeInterval = 10 * 60
+    /// Timed events still ahead (or just begun), soonest first.
     var upcoming: [WidgetEvent] {
-        timed.filter { ($0.end ?? $0.start ?? date) >= date }.sorted { ($0.start ?? date) < ($1.start ?? date) }
+        timed.filter { ($0.start ?? date).addingTimeInterval(TodayEntry.grace) >= date }.sorted { ($0.start ?? date) < ($1.start ?? date) }
     }
     var next: WidgetEvent? { upcoming.first }
+    /// "Now" once the next event has begun, else its start time.
+    func lead(_ e: WidgetEvent) -> String {
+        if let s = e.start, s <= date { return "Now" }
+        return "Next · \(HMFormat.timeLabel(e))"
+    }
     var isStale: Bool {
         guard let p = payload else { return true }
         // The app writes at least once a day; a payload for another day is old news.
@@ -53,7 +62,9 @@ struct TodayProvider: TimelineProvider {
         // One entry per upcoming boundary (starts AND ends), so the card
         // flips exactly when the day moves on - not on a polling interval.
         for e in payload?.events ?? [] where !e.allDay {
-            for d in [e.start, e.end].compactMap({ $0 }) where d > now { dates.append(d.addingTimeInterval(1)) }
+            // Start, the end of its "Now" grace, and end - so the card flips
+            // exactly when the day moves on, not on a polling interval.
+            for d in [e.start, e.start?.addingTimeInterval(TodayEntry.grace), e.end].compactMap({ $0 }) where d > now { dates.append(d.addingTimeInterval(1)) }
         }
         // And a midnight entry so a stale "today" turns into an honest
         // "open the app" instead of yesterday's schedule.
@@ -201,7 +212,7 @@ struct TodayLockView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 1) {
                 if let next = entry.next, !entry.isStale {
-                    Text("Next · \(HMFormat.timeLabel(next))").font(.system(size: 12, weight: .semibold))
+                    Text(entry.lead(next)).font(.system(size: 12, weight: .semibold))
                     Text(next.title).font(.system(size: 13, weight: .bold)).lineLimit(1)
                     if let who = next.who, !who.isEmpty { Text(who).font(.system(size: 11)).lineLimit(1) }
                 } else {
@@ -224,7 +235,7 @@ struct TodayInlineView: View {
     var body: some View {
         Group {
             if let next = entry.next, !entry.isStale {
-                Text("\(HMFormat.timeLabel(next)) \(next.title)\(next.who.map { " · \($0)" } ?? "")")
+                Text("\((next.start.map { $0 <= entry.date } ?? false) ? "Now" : HMFormat.timeLabel(next)) \(next.title)\(next.who.map { " · \($0)" } ?? "")")
             } else {
                 Text(entry.isStale ? "Housemait · open for today" : "Housemait · nothing else today")
             }

@@ -51,6 +51,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["supported": false])
     }
 
+    /// Mirrors GRACE_MS in web/src/lib/liveActivity.js.
+    static let graceAfterStart: TimeInterval = 10 * 60
+
     @objc func start(_ call: CAPPluginCall) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) {
@@ -74,9 +77,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     await a.end(nil, dismissalPolicy: .immediate)
                 }
                 do {
-                    // Stale after the event ends (or an hour past start) so iOS
-                    // can tidy it up even if the app never gets to say "end".
-                    let stale = state.end ?? start.addingTimeInterval(3600)
+                    // Stale ten minutes after the start: the countdown's job is
+                    // done once the event has begun, and iOS can tidy the card
+                    // even if the app never gets to say "end".
+                    let stale = start.addingTimeInterval(LiveActivityPlugin.graceAfterStart)
                     let activity = try Activity<NextUpAttributes>.request(
                         attributes: attrs,
                         content: .init(state: state, staleDate: stale),
@@ -108,7 +112,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 who: call.getString("who")
             )
             Task {
-                let stale = state.end ?? start.addingTimeInterval(3600)
+                let stale = start.addingTimeInterval(LiveActivityPlugin.graceAfterStart)
                 for a in Activity<NextUpAttributes>.activities {
                     await a.update(.init(state: state, staleDate: stale))
                 }
