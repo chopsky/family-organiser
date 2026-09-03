@@ -38,7 +38,9 @@ async function start() {
     });
     app.use((err, req, res, next) => {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large. Maximum size is 10 MB.' });
+        // Each multer route sets its own limit (documents 25 MB, receipts
+        // less), so don't quote a number here; the clients state theirs.
+        return res.status(413).json({ error: 'File too large for this upload.' });
       }
       if (err.code === 'LIMIT_UNEXPECTED_FILE') {
         return res.status(400).json({ error: 'Unexpected file field.' });
