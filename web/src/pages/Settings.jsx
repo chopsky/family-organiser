@@ -2868,8 +2868,8 @@ export default function Settings() {
           as well as people who just want one more thing. */}
       <SectionWrapper slug="feedback" title="Something missing?" icon={IconSparkles}>
         <p className="text-sm text-cocoa">
-          Tell Grant, who builds Housemait. Every message goes straight to his
-          inbox and he replies to all of them.
+          Every message goes straight to the person who builds Housemait,
+          and every one gets a reply.
         </p>
         {fbSent ? (
           <div className="mt-4 p-3 rounded-xl bg-sage-light text-sm text-bark">
@@ -2893,7 +2893,7 @@ export default function Settings() {
               disabled={fbSending || !fbText.trim()}
               className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-plum hover:bg-plum/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
             >
-              {fbSending ? 'Sending…' : 'Send to Grant'}
+              {fbSending ? 'Sending…' : 'Send'}
             </button>
           </form>
         )}

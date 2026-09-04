@@ -410,7 +410,7 @@ export default function Help() {
           Drop us a note and we'll get back within one working day. Got an
           idea rather than a problem?{' '}
           <Link to="/settings?section=feedback" className="text-plum hover:underline">
-            Tell Grant what's missing
+            Tell us what's missing
           </Link>
           .
         </p>
