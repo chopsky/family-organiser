@@ -91,8 +91,9 @@ function matrix(key, question, rows, columns, { required = true } = {}) {
   const group = uuid();
   blocks.push({ uuid: uuid(), type: 'MATRIX', groupUuid: group, groupType: 'MATRIX', payload: { isRequired: required, name: key } });
   const ref = { group, rows: {}, columns: {} };
-  rows.forEach((r, i) => { const id = uuid(); ref.rows[r] = id; blocks.push({ uuid: id, type: 'MATRIX_ROW', groupUuid: group, groupType: 'MATRIX', payload: { index: i, isFirst: i === 0, isLast: i === rows.length - 1, text: r, html: r } }); });
+  // Tally validates the order: every column block before any row block.
   columns.forEach((c, i) => { const id = uuid(); ref.columns[c] = id; blocks.push({ uuid: id, type: 'MATRIX_COLUMN', groupUuid: group, groupType: 'MATRIX', payload: { index: i, isFirst: i === 0, isLast: i === columns.length - 1, text: c, html: c } }); });
+  rows.forEach((r, i) => { const id = uuid(); ref.rows[r] = id; blocks.push({ uuid: id, type: 'MATRIX_ROW', groupUuid: group, groupType: 'MATRIX', payload: { index: i, isFirst: i === 0, isLast: i === rows.length - 1, text: r, html: r } }); });
   refs[key] = ref;
   return ref;
 }
