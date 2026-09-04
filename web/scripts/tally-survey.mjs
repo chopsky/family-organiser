@@ -106,24 +106,36 @@ function email(key, question, { required = false } = {}) {
   blocks.push({ uuid: uuid(), type: 'INPUT_EMAIL', groupUuid: uuid(), groupType: 'INPUT_EMAIL', payload: { isRequired: required, placeholder: 'you@example.com', name: key } });
 }
 
-/** Branching: show a group of blocks only when a choice answer matches. */
+/**
+ * Branching: reveal a section only when a choice answer matches. Tally
+ * evaluates a logic block where it sits in the flow, so the rule is
+ * inserted straight after the question it reads (before the blocks it
+ * reveals), never appended at the end - an earlier draft put the rules
+ * after the thank-you page, which only allows plain text, and the API
+ * rejected the whole form.
+ */
 function showWhen(ref, optionText, blockUuids) {
   const optionUuid = ref.options[optionText];
   if (!optionUuid) throw new Error(`no option "${optionText}"`);
-  blocks.push({
+  const rule = {
     uuid: uuid(), type: 'CONDITIONAL_LOGIC', groupUuid: uuid(), groupType: 'CONDITIONAL_LOGIC',
     payload: {
       conditionals: [{ uuid: uuid(), type: 'SINGLE', payload: { field: { uuid: optionUuid, blockGroupUuid: ref.group, title: optionText, payload: {} }, value: optionUuid } }],
       actions: [{ uuid: uuid(), payload: { showBlocks: blockUuids } }],
     },
-  });
+  };
+  const anchor = blocks.findLastIndex((b) => b.groupUuid === ref.group);
+  blocks.splice(anchor + 1, 0, rule);
 }
 
-// Record which block uuids belong to a "section" so logic can show/hide them.
+// A "section" is a run of blocks a rule can reveal. They start hidden, so
+// a respondent who doesn't trigger the rule never sees them.
 function section(fn) {
   const start = blocks.length;
   fn();
-  return blocks.slice(start).map((b) => b.uuid);
+  const made = blocks.slice(start);
+  for (const b of made) b.payload.isHidden = true;
+  return made.map((b) => b.uuid);
 }
 
 // ── the survey (mirrors docs/survey-2026-09.md) ─────────────────────────────
@@ -201,16 +213,20 @@ longText('q13_anything_else', "Anything else you'd like to tell me?");
 choice('q14_interview', "Would you be up for a 15-minute chat about how you use it? I'll add another 30 days of Premium as a thank you.", ['Yes, email me', 'No thanks'], { required: false });
 email('q14b_email', 'Best email to reach you on', { required: false });
 
-pageBreak({ thankYou: true });
-text("Thank you. Your 30 days of Premium will land within a couple of days, and I'll email the voucher winner at the end of the month. Grant.");
-
-// ── branching ───────────────────────────────────────────────────────────────
+// ── branching (rules land right after the question each one reads) ─────────
 if (LOGIC) {
   for (const opt of ['Knew about it, never tried', "Didn't know it existed"]) showWhen(wa, opt, waNever);
   for (const opt of ['I use it', 'Tried it, then stopped']) showWhen(wa, opt, waUsed);
   for (const opt of ['Knew about it, never tried', "Didn't know it existed"]) showWhen(cal, opt, calNever);
   for (const opt of ['Less than that', "I've stopped using it"]) showWhen(q1, opt, lapsed);
+} else {
+  // No rules: nothing may stay hidden, or those questions would never show.
+  for (const b of blocks) delete b.payload.isHidden;
 }
+
+// The thank-you page must be last and may hold only plain content.
+pageBreak({ thankYou: true });
+text("Thank you. Your 30 days of Premium will land within a couple of days, and I'll email the voucher winner at the end of the month. Grant.");
 
 // ── ship it ─────────────────────────────────────────────────────────────────
 const form = { name: 'Housemait survey, September 2026', status: PUBLISH ? 'PUBLISHED' : 'DRAFT', blocks };
