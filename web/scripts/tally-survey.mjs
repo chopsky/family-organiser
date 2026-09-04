@@ -66,10 +66,11 @@ function choice(key, question, options, { multi = false, required = true, other 
   const group = uuid();
   const type = multi ? 'CHECKBOX' : 'MULTIPLE_CHOICE_OPTION';
   const groupType = multi ? 'CHECKBOXES' : 'MULTIPLE_CHOICE';
-  const ref = { group, options: {} };
+  const ref = { group, options: {}, title: question, questionType: type, firstUuid: null };
   const list = other ? [...options, 'Something else'] : options;
   list.forEach((opt, i) => {
     const id = uuid();
+    if (i === 0) ref.firstUuid = id;
     ref.options[opt] = id;
     blocks.push({
       uuid: id, type, groupUuid: group, groupType,
@@ -118,11 +119,25 @@ function email(key, question, { required = false } = {}) {
 function showWhen(ref, optionText, blockUuids) {
   const optionUuid = ref.options[optionText];
   if (!optionUuid) throw new Error(`no option "${optionText}"`);
+  // Shape per the OpenAPI schema embedded in developers.tally.so's
+  // conditional-logic page (2026-09-03): the field reference is the
+  // question (its first option block carries the question), typed
+  // INPUT_FIELD with the option block type as questionType; the comparison
+  // IS_ANY_OF takes the chosen option uuids; the action is SHOW_BLOCKS.
   const rule = {
     uuid: uuid(), type: 'CONDITIONAL_LOGIC', groupUuid: uuid(), groupType: 'CONDITIONAL_LOGIC',
     payload: {
-      conditionals: [{ uuid: uuid(), type: 'SINGLE', payload: { field: { uuid: optionUuid, blockGroupUuid: ref.group, title: optionText, payload: {} }, value: optionUuid } }],
-      actions: [{ uuid: uuid(), payload: { showBlocks: blockUuids } }],
+      logicalOperator: 'AND',
+      conditionals: [{
+        uuid: uuid(), type: 'SINGLE',
+        payload: {
+          field: { uuid: ref.firstUuid, type: 'INPUT_FIELD', questionType: ref.questionType, blockGroupUuid: ref.group, title: ref.title },
+          comparison: 'IS_ANY_OF',
+          value: [optionUuid],
+        },
+      }],
+      actions: [{ uuid: uuid(), type: 'SHOW_BLOCKS', payload: { showBlocks: blockUuids } }],
+      updateUuid: null,
     },
   };
   const anchor = blocks.findLastIndex((b) => b.groupUuid === ref.group);
