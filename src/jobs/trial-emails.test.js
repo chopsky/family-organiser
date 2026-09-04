@@ -34,6 +34,7 @@ const TRIALING = (overrides = {}) => ({
 function setupDefaults() {
   db.findHouseholdsWithTrialEndingInDays.mockResolvedValue([]);
   db.findHouseholdsWithExpiredTrial.mockResolvedValue([]);
+  db.findHouseholdsCreatedDaysAgo.mockResolvedValue([]);
   db.markEmailSentIfNew.mockResolvedValue(true);
   db.getHouseholdPrimaryContact.mockResolvedValue({
     id: 'u-1', name: 'Sarah Smith', email: 'sarah@example.com', role: 'admin',
@@ -193,5 +194,25 @@ describe('selection is keyed on trial_ends_at, not signup age', () => {
     await runTrialEmailCheck();
     const asked = db.findHouseholdsWithTrialEndingInDays.mock.calls.map((c) => c[0]).sort((a, b) => a - b);
     expect(asked).toEqual([1, 2, 5, 7]);
+  });
+});
+
+describe('day-3 "what made you sign up?"', () => {
+  beforeEach(() => { process.env.UNSUBSCRIBE_TOKEN_SECRET = process.env.UNSUBSCRIBE_TOKEN_SECRET || 'test-secret'; });
+
+  test('households created 3 days ago get the personal note with one-tap links, once', async () => {
+    db.findHouseholdsCreatedDaysAgo.mockResolvedValue([TRIALING({ id: 'hh-3' })]);
+    await runTrialEmailCheck();
+    expect(db.findHouseholdsCreatedDaysAgo).toHaveBeenCalledWith(3);
+    expect(db.markEmailSentIfNew).toHaveBeenCalledWith('hh-3', 'day3_why');
+    expect(email.sendDay3WhyEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'sarah@example.com', firstName: 'Sarah',
+      links: expect.arrayContaining([expect.objectContaining({ key: 'whatsapp', url: expect.stringContaining('/api/feedback/why?token=') })]),
+    }));
+    // Nudge-opted-out households are left alone.
+    jest.clearAllMocks(); setupDefaults();
+    db.findHouseholdsCreatedDaysAgo.mockResolvedValue([TRIALING({ id: 'hh-4', trial_emails_enabled: false })]);
+    await runTrialEmailCheck();
+    expect(email.sendDay3WhyEmail).not.toHaveBeenCalled();
   });
 });

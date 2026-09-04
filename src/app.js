@@ -233,6 +233,11 @@ app.use('/api/rsvp', require('./routes/rsvp'));
 // both endpoints are GETs, which the gate always lets through.
 app.use('/api/referrals', require('./routes/referrals'));
 
+// Feedback: the Settings "Something missing?" box (auth'd) and the day-3
+// email's one-tap answers (public, signed token). Before the gate so an
+// expired household can still tell us why.
+app.use('/api/feedback', require('./routes/feedback'));
+
 // Trial / subscription gate. Returns 402 for households whose trial has
 // expired or whose subscription has lapsed. Excludes /auth, /subscription,
 // /admin, /inbound-email, /webhooks via an internal allowlist - see

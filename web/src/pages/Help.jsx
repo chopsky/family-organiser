@@ -407,7 +407,12 @@ export default function Help() {
           Still need help?
         </h2>
         <p className="text-warm-grey mt-1 text-[15px]">
-          Drop us a note and we'll get back within one working day.
+          Drop us a note and we'll get back within one working day. Got an
+          idea rather than a problem?{' '}
+          <Link to="/settings?section=feedback" className="text-plum hover:underline">
+            Tell Grant what's missing
+          </Link>
+          .
         </p>
         <div className="mt-5">
           <ContactForm compact />

@@ -63,6 +63,13 @@ async function runTrialEmailCheck() {
     // loudly so monitoring can pick it up.
     console.error('[trial-emails] Daily run failed with:', err);
   }
+  try {
+    await processDay3Why();
+  } catch (err) {
+    // One step's failure shouldn't take down the whole run, but log
+    // loudly so monitoring can pick it up.
+    console.error('[trial-emails] Daily run failed with:', err);
+  }
   console.log(`[trial-emails] Daily run complete in ${Date.now() - started}ms`);
 }
 
@@ -101,6 +108,36 @@ async function processAdminExpiryAlerts() {
       console.log(`[trial-emails] admin expiry alert sent for household ${household.id}`);
     } catch (err) {
       console.error(`[trial-emails] admin expiry alert failed for household ${household.id}:`, err.message);
+    }
+  }
+}
+
+/**
+ * Day 3: "what made you sign up?" - a personal note from the founder with
+ * one-tap answer links (services/feedback.js) and Reply-To set to him.
+ * Keyed on household age, not trial end, because it's about the moment
+ * they arrived. Respects the nudge opt-out; one-shot via sent_emails.
+ */
+async function processDay3Why() {
+  const households = (await db.findHouseholdsCreatedDaysAgo(3)) || [];
+  if (households.length === 0) return;
+  const { signupReasonLinks } = require('../services/feedback');
+  for (const household of households) {
+    try {
+      if (household.trial_emails_enabled === false) continue;
+      const claimed = await db.markEmailSentIfNew(household.id, 'day3_why');
+      if (!claimed) continue;
+      const recipient = await db.getHouseholdPrimaryContact(household.id);
+      if (!recipient?.email) continue;
+      const firstName = (recipient.name || '').trim().split(/\s+/)[0] || '';
+      await email.sendDay3WhyEmail({
+        to: recipient.email,
+        firstName,
+        links: signupReasonLinks(recipient.id, household.id),
+      });
+      console.log(`[trial-emails] sent day3_why to ${recipient.email} (household ${household.id})`);
+    } catch (err) {
+      console.error(`[trial-emails] day3_why failed for household ${household.id}:`, err.message);
     }
   }
 }

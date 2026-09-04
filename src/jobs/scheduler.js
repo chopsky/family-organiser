@@ -960,6 +960,16 @@ function startScheduler() {
   });
   console.log('✓ LA term-dates freshness audit scheduled (Mondays 05:00 UTC)');
 
+  // ── Feedback digest: Mondays 07:30 Europe/London ───────────────────────────
+  // One email of everything users said last week (feedback box, sign-up
+  // reasons, deletion reasons, "AI said no", chat-handled WhatsApp). Pure
+  // DB reads; weekly lock inside the job.
+  cron.schedule('30 7 * * 1', () => {
+    const { runFeedbackDigest } = require('./feedback-digest');
+    return runFeedbackDigest();
+  }, { timezone: 'Europe/London' });
+  console.log('✓ Feedback digest scheduled (Mondays 07:30 Europe/London)');
+
   // ── Stale device-calendar nudge: daily at 17:30 Europe/London ──────────────
   // Pushes the OWNER of a device-synced calendar whose phone hasn't synced
   // for 3+ days - opening the app is itself the fix (foreground sync).

@@ -999,6 +999,11 @@ router.get('/export', requireAuth, async (req, res) => {
 //   - Wrong password returns 401 without revealing which half failed.
 router.delete('/account', requireAuth, async (req, res) => {
   const { password, confirmation } = req.body;
+  // Exit reason - one tap in the modal, optional line of detail. Older app
+  // builds send neither, so the server never requires them.
+  const { EXIT_REASONS } = require('../services/feedback');
+  const exitReason = EXIT_REASONS[req.body?.reason] ? req.body.reason : null;
+  const exitDetail = String(req.body?.reason_detail || '').trim().slice(0, 1000) || null;
   // Phase 8 / spec §9: belt-and-braces typed-word confirmation on top of
   // the password re-entry. The frontend can still show its own modal
   // affordance, but the backend also insists on the literal word
@@ -1114,7 +1119,17 @@ router.delete('/account', requireAuth, async (req, res) => {
         onboarded: !!user.onboarded_at,
         ad_attribution: user.ad_attribution || null,
       };
-      const { error: enrichedErr } = await supabaseAdmin.from('deletion_audit_log').insert(enrichedRow);
+      // Exit reason columns are the newest layer (migration-user-feedback.sql);
+      // try with them, then without, then the base row.
+      let enrichedErr = null;
+      if (exitReason || exitDetail) {
+        const withExit = { ...enrichedRow, exit_reason: exitReason, exit_detail: exitDetail };
+        ({ error: enrichedErr } = await supabaseAdmin.from('deletion_audit_log').insert(withExit));
+        if (enrichedErr) console.warn('[delete-account] exit-reason insert failed (migration pending?):', enrichedErr.message);
+      } else {
+        enrichedErr = new Error('no exit reason');
+      }
+      if (enrichedErr) ({ error: enrichedErr } = await supabaseAdmin.from('deletion_audit_log').insert(enrichedRow));
       if (enrichedErr) {
         const { error: baseErr } = await supabaseAdmin.from('deletion_audit_log').insert(baseRow);
         if (baseErr) throw baseErr;
@@ -1141,7 +1156,9 @@ router.delete('/account', requireAuth, async (req, res) => {
           `Household: ${esc(household?.name || '-')} - ${deletionMode === 'household_deleted' ? 'household deleted with them' : 'other members remain'}<br/>` +
           (ageDays !== null ? `Account age: ${ageDays} day${ageDays === 1 ? '' : 's'}<br/>` : '') +
           (src ? `Signup source: ${esc(src)}<br/>` : '') +
-          `WhatsApp linked: ${user.whatsapp_linked ? 'yes' : 'no'}`
+          `WhatsApp linked: ${user.whatsapp_linked ? 'yes' : 'no'}` +
+          (exitReason ? `<br/><br/>Reason: <strong>${esc(EXIT_REASONS[exitReason])}</strong>` : '<br/><br/>Reason: not given') +
+          (exitDetail ? `<br/><em>${esc(exitDetail)}</em>` : '')
         );
       } catch (err) {
         console.error('[delete-account] admin alert failed:', err.message);

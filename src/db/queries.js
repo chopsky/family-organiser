@@ -11055,6 +11055,101 @@ async function deleteRedemption(id, householdId, db = supabase) {
   if (error) throw error;
 }
 
+// ─── Feedback channels ───────────────────────────────────────────────────────
+
+/**
+ * Households created N days ago (half-open one-day window), non-internal.
+ * Drives the day-3 "what made you sign up?" email. select('*') so any
+ * later column rides along without a pre-migration 400.
+ */
+async function findHouseholdsCreatedDaysAgo(daysAgo, db = supabase) {
+  const now = Date.now();
+  const windowStart = new Date(now - (daysAgo + 1) * 86_400_000).toISOString();
+  const windowEnd   = new Date(now - daysAgo * 86_400_000).toISOString();
+  const { data, error } = await db
+    .from('households')
+    .select('*')
+    .eq('is_internal', false)
+    .gte('created_at', windowStart)
+    .lt('created_at', windowEnd);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Best-effort ledger write for the feedback channels. The email to the
+ * founder is the guaranteed path; this returns false (and warns) while
+ * migration-user-feedback.sql is pending instead of failing the request.
+ */
+async function insertUserFeedback(row, db = supabase) {
+  const { error } = await db.from('user_feedback').insert(row);
+  if (error) {
+    console.warn('[user-feedback] insert failed (migration-user-feedback.sql pending?):', error.message);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Everything the weekly feedback digest reads, in one call. Each source is
+ * tolerant of its own table or column being unmigrated (returns []), and
+ * internal households are dropped so founder testing doesn't drown it.
+ */
+async function getFeedbackDigest({ days = 7 } = {}, db = supabase) {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const tolerant = async (label, q) => {
+    const { data, error } = await q;
+    if (error) { console.warn(`[feedback-digest] ${label} skipped:`, error.message); return []; }
+    return data || [];
+  };
+  const internal = await tolerant('internal', db.from('households').select('id, name').eq('is_internal', true));
+  const skip = new Set(internal.map((h) => h.id));
+
+  const [feedbackRaw, deletionsRaw, chatRaw, misses] = await Promise.all([
+    tolerant('user_feedback', db.from('user_feedback')
+      .select('user_id, household_id, kind, answer, message, context, created_at')
+      .gte('created_at', since).order('created_at', { ascending: false }).limit(200)),
+    tolerant('deletion_audit_log', db.from('deletion_audit_log')
+      .select('user_email, household_name, deletion_mode, exit_reason, exit_detail, user_created_at, deleted_at')
+      .gte('deleted_at', since).order('deleted_at', { ascending: false }).limit(100)),
+    tolerant('whatsapp chat', db.from('whatsapp_message_log')
+      .select('household_id, user_id, body, response, intent, created_at')
+      .eq('direction', 'inbound').in('intent', ['chat', 'general'])
+      .gte('created_at', since).order('created_at', { ascending: false }).limit(300)),
+    getAiCapabilityMisses({ days }, db).catch((err) => {
+      console.warn('[feedback-digest] ai misses skipped:', err.message);
+      return { misses: [] };
+    }),
+  ]);
+
+  const feedback = feedbackRaw.filter((r) => !skip.has(r.household_id));
+  const chat = chatRaw.filter((r) => !skip.has(r.household_id) && (r.body || '').trim()).slice(0, 40);
+
+  const userIds = [...new Set([...feedback, ...chat].map((r) => r.user_id).filter(Boolean))];
+  const users = userIds.length
+    ? await tolerant('users', db.from('users').select('id, name, email, household_id').in('id', userIds))
+    : [];
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const hhIds = [...new Set([...feedback, ...chat].map((r) => r.household_id).filter(Boolean))];
+  const hhs = hhIds.length ? await tolerant('households', db.from('households').select('id, name').in('id', hhIds)) : [];
+  const hhById = new Map(hhs.map((h) => [h.id, h.name]));
+  const decorate = (r) => ({
+    ...r,
+    userName: userById.get(r.user_id)?.name || null,
+    userEmail: userById.get(r.user_id)?.email || null,
+    householdName: hhById.get(r.household_id) || null,
+  });
+
+  return {
+    since,
+    days,
+    feedback: feedback.map(decorate),
+    deletions: deletionsRaw,
+    chat: chat.map(decorate),
+    misses: (misses.misses || []).slice(0, 40),
+  };
+}
+
 module.exports = {
   __test: { selectInChunks },
 
@@ -11548,4 +11643,7 @@ module.exports = {
   computeOnboardingFunnel,
   getOnboardingFunnel,
   getReferralFunnel,
+  findHouseholdsCreatedDaysAgo,
+  insertUserFeedback,
+  getFeedbackDigest,
 };

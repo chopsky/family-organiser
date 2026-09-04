@@ -35,6 +35,7 @@ import { isKidMember } from '../lib/kidsTheme';
 import { useChildMode } from '../context/ChildModeContext';
 import useHasChildren from '../hooks/useHasChildren';
 import { nextUpEnabled, setNextUpEnabled } from '../lib/liveActivity';
+import { EXIT_REASONS } from '../lib/feedbackReasons';
 import {
   getLocationPermission, requestLocationPermission, openLocationSettings, clearLocationCache,
 } from '../lib/location';
@@ -490,13 +491,14 @@ const IOS_SECTIONS = [
   { slug: 'data',         title: 'Your data',         icon: 'IconDownload',      group: 'Account' },
   // `action` rows fire immediately instead of opening a popup - Rate
   // Housemait jumps straight to the App Store review composer.
+  { slug: 'feedback',     title: 'Something missing?', icon: 'IconSparkles',     group: 'Account' },
   { slug: 'rate',         title: 'Rate Housemait',    icon: 'IconStar',          group: 'Account', action: openWriteReview },
   { slug: 'delete',       title: 'Delete account',    icon: 'IconTrash', danger: true, group: 'Account' },
 ];
 const IOS_GROUPS = [...new Set(IOS_SECTIONS.map((s) => s.group))];
 const IOS_SECTION_ICONS = {
   IconMessageCircle, IconCalendar, IconMail, IconBell, IconMapPin,
-  IconShield, IconDownload, IconUser, IconTrash, IconStar,
+  IconShield, IconDownload, IconUser, IconTrash, IconStar, IconSparkles,
 };
 
 /**
@@ -853,6 +855,28 @@ export default function Settings() {
   const [deleteTypedConfirm, setDeleteTypedConfirm] = useState(''); // must equal "DELETE"
   const [deleting, setDeleting]             = useState(false);
   const [deleteError, setDeleteError]       = useState('');
+  const [deleteReason, setDeleteReason]     = useState('');   // one of EXIT_REASONS keys, required
+  const [deleteDetail, setDeleteDetail]     = useState('');   // optional free text
+
+  // ── "Something missing?" feedback box ────────────────────────────
+  const [fbText, setFbText]       = useState('');
+  const [fbSending, setFbSending] = useState(false);
+  const [fbSent, setFbSent]       = useState(false);
+  const [fbError, setFbError]     = useState('');
+  async function handleSendFeedback(e) {
+    e.preventDefault();
+    const message = fbText.trim();
+    if (!message) return;
+    setFbSending(true); setFbError('');
+    try {
+      await api.post('/feedback', { message, context: 'settings' });
+      setFbSent(true); setFbText('');
+    } catch (err) {
+      setFbError(err.response?.data?.error || 'Could not send that. Please try again.');
+    } finally {
+      setFbSending(false);
+    }
+  }
 
   // Data export (GDPR Article 20 - right to portability)
   const [exporting, setExporting] = useState(false);
@@ -1220,11 +1244,15 @@ export default function Settings() {
       setDeleteError('Please confirm you understand this cannot be undone.');
       return;
     }
+    if (!deleteReason) {
+      setDeleteError('Tell us why you are leaving, even in one tap. It is the most useful thing we learn.');
+      return;
+    }
     setDeleting(true);
     try {
       // Backend requires the literal string "DELETE" plus, for password
       // accounts, the password (re-auth). SSO users send no password.
-      await api.delete('/auth/account', { data: { ...(deletePassword ? { password: deletePassword } : {}), confirmation: 'DELETE' } });
+      await api.delete('/auth/account', { data: { ...(deletePassword ? { password: deletePassword } : {}), confirmation: 'DELETE', reason: deleteReason, reason_detail: deleteDetail.trim() || undefined } });
       // Clear the auth context without calling the server's /auth/logout
       // endpoint - the refresh token we'd post there was just deleted with
       // the rest of our data, so attempting it would 404.
@@ -2835,6 +2863,42 @@ export default function Settings() {
         </button>
       </SectionWrapper>
 
+      {/* Something missing? - a line straight to the founder's inbox. Sits
+          with the account sections so it is found by people about to leave
+          as well as people who just want one more thing. */}
+      <SectionWrapper slug="feedback" title="Something missing?" icon={IconSparkles}>
+        <p className="text-sm text-cocoa">
+          Tell Grant, who builds Housemait. Every message goes straight to his
+          inbox and he replies to all of them.
+        </p>
+        {fbSent ? (
+          <div className="mt-4 p-3 rounded-xl bg-sage-light text-sm text-bark">
+            Sent. Thank you, it really does shape what gets built next.{' '}
+            <button type="button" onClick={() => setFbSent(false)} className="text-plum font-semibold hover:underline">Send another</button>
+          </div>
+        ) : (
+          <form onSubmit={handleSendFeedback} className="mt-4 space-y-3">
+            <textarea
+              value={fbText}
+              onChange={(e) => setFbText(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              disabled={fbSending}
+              placeholder="What would make Housemait more useful for your family?"
+              className="w-full border border-cream-border rounded-xl px-4 py-3 bg-cream focus:outline-none focus:ring-2 focus:ring-plum/30 focus:border-plum transition-all text-bark text-sm"
+            />
+            {fbError && <div className="p-3 rounded-lg bg-error/10 border border-error/30 text-sm text-error">{fbError}</div>}
+            <button
+              type="submit"
+              disabled={fbSending || !fbText.trim()}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-plum hover:bg-plum/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
+            >
+              {fbSending ? 'Sending…' : 'Send to Grant'}
+            </button>
+          </form>
+        )}
+      </SectionWrapper>
+
       {/* Danger zone - delete account. Sits above the Log out affordance
           because Log out is the very last thing on the page; users
           looking to leave the app see it without having to scroll past
@@ -2856,6 +2920,8 @@ export default function Settings() {
             setDeleteConfirmed(false);
             setDeleteTypedConfirm('');
             setDeleteError('');
+            setDeleteReason('');
+            setDeleteDetail('');
           }}
           className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-error hover:bg-error/90 text-white font-semibold text-sm transition-colors"
         >
@@ -2941,6 +3007,42 @@ export default function Settings() {
               }}
               className="space-y-3"
             >
+              {/* Exit reason - one tap, required. The single most useful
+                  thing a leaving user can tell us; the optional line
+                  below it is where the real answer usually is. */}
+              <div>
+                <label className="block text-xs font-semibold text-bark mb-1.5">
+                  Why are you leaving?
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {EXIT_REASONS.map((r) => (
+                    <button
+                      key={r.key}
+                      type="button"
+                      disabled={deleting}
+                      onClick={() => setDeleteReason(r.key)}
+                      aria-pressed={deleteReason === r.key}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                        deleteReason === r.key
+                          ? 'bg-plum-light border-plum text-plum'
+                          : 'border-cream-border text-bark hover:bg-cream'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={deleteDetail}
+                  onChange={(e) => setDeleteDetail(e.target.value)}
+                  rows={2}
+                  maxLength={1000}
+                  disabled={deleting}
+                  placeholder="Anything else? Optional, but read by a person."
+                  className="mt-2 w-full border border-cream-border rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-error/30 focus:border-error transition-all text-bark text-sm"
+                />
+              </div>
+
               {/* Password re-auth only for accounts that have a password.
                   Google/Apple SSO users have none, so we drop the field for
                   them (otherwise their account is impossible to delete). */}
@@ -3012,7 +3114,8 @@ export default function Settings() {
                     deleting ||
                     (accountInfo.has_password !== false && !deletePassword) ||
                     deleteTypedConfirm !== 'DELETE' ||
-                    !deleteConfirmed
+                    !deleteConfirmed ||
+                    !deleteReason
                   }
                   className="flex-1 py-3 rounded-xl bg-error hover:bg-error/90 disabled:bg-error/40 text-white font-semibold text-sm transition-colors"
                 >

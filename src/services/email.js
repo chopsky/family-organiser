@@ -795,7 +795,114 @@ async function sendAnnouncementEmail({ to, subject, html }) {
   });
 }
 
+// ─── Feedback channels ───────────────────────────────────────────────────────
+
+/**
+ * A personal note, not a branded template: no logo bar, plain type, the
+ * width of a written email. Used for the messages that are meant to read
+ * as one person writing to another (the day-3 question).
+ */
+function personalTemplate(body) {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:24px 16px;background:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:${BRAND.charcoal};">
+  <div style="max-width:560px;margin:0 auto;font-size:16px;line-height:1.6;">
+    ${body}
+  </div>
+</body>
+</html>`;
+}
+
+const FOUNDER_REPLY_TO = process.env.FOUNDER_REPLY_EMAIL || process.env.SUPPORT_EMAIL || 'hello@housemait.com';
+
+/**
+ * Day-3 "what made you sign up?" - one question, answered with one tap or
+ * a reply. Links are signed one-shot URLs from services/feedback.js.
+ */
+async function sendDay3WhyEmail({ to, firstName, links }) {
+  const name = (firstName || '').trim() || 'there';
+  const list = links.map((l) =>
+    `<li style="margin:0 0 8px;"><a href="${l.url}" style="color:${BRAND.plum};font-weight:600;text-decoration:none;">${l.label}</a></li>`
+  ).join('');
+  const html = personalTemplate(`
+    <p style="margin:0 0 16px;">Hi ${name},</p>
+    <p style="margin:0 0 16px;">I'm Grant, and I build Housemait. You signed up a few days ago and I'd love to know one thing: what made you sign up?</p>
+    <p style="margin:0 0 8px;">Tap whichever is closest:</p>
+    <ul style="margin:0 0 20px;padding-left:20px;">${list}</ul>
+    <p style="margin:0 0 16px;">Or just hit reply and tell me in a sentence. I read every one, and it decides what I build next.</p>
+    <p style="margin:0;">Thanks,<br/>Grant</p>
+  `);
+  await sendEmail(to, 'Quick question about Housemait', html, { replyTo: FOUNDER_REPLY_TO, trackLinks: 'None' });
+}
+
+/**
+ * Immediate founder alert for a feedback-box message or a day-3 answer.
+ * Reply-To is the user, so answering is one keystroke from the inbox.
+ */
+async function sendUserFeedbackAlert({ user, message, context }) {
+  const to = process.env.ADMIN_ALERT_EMAIL || process.env.SUPPORT_EMAIL;
+  if (!to) { console.warn('[feedback-alert] no ADMIN_ALERT_EMAIL - skipping'); return; }
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const who = user?.name ? `${esc(user.name)}${user.email ? ` (${esc(user.email)})` : ''}` : 'A user';
+  const html = emailTemplate('Feedback', `
+    <p style="color:${BRAND.inkLight};font-size:13px;margin:0 0 12px;">${who}${context ? ` · ${esc(context)}` : ''}</p>
+    <p style="color:${BRAND.ink};line-height:1.6;font-size:16px;margin:0;white-space:pre-wrap;">${esc(message)}</p>
+    ${user?.id ? `<p style="margin:20px 0 0;"><a href="${BASE_URL}/admin/users/${esc(user.id)}" style="color:${BRAND.plum};">Open in admin</a></p>` : ''}
+  `);
+  const subject = `Feedback from ${user?.name || 'a user'}: ${String(message).replace(/\s+/g, ' ').slice(0, 60)}`;
+  await sendEmail(to, subject, html, user?.email ? { replyTo: user.email } : {});
+}
+
+/**
+ * Monday digest of everything users said last week, in one email.
+ * Shape comes from db.getFeedbackDigest.
+ */
+async function sendFeedbackDigestEmail(data) {
+  const to = process.env.ADMIN_ALERT_EMAIL || process.env.SUPPORT_EMAIL;
+  if (!to) { console.warn('[feedback-digest] no ADMIN_ALERT_EMAIL - skipping'); return; }
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const when = (iso) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const section = (title, rows) => `
+    <h3 style="color:${BRAND.charcoal};font-size:15px;margin:24px 0 8px;">${esc(title)} <span style="color:${BRAND.inkLight};font-weight:400;">(${rows.length})</span></h3>
+    ${rows.length ? `<ul style="margin:0;padding-left:18px;color:${BRAND.ink};font-size:14px;line-height:1.55;">${rows.join('')}</ul>`
+                  : `<p style="color:${BRAND.inkLight};font-size:14px;margin:0;">Nothing this week.</p>`}`;
+  const li = (s) => `<li style="margin:0 0 8px;">${s}</li>`;
+
+  const feedback = data.feedback.map((r) => {
+    const who = `${esc(r.userName || 'Someone')}${r.householdName ? `, ${esc(r.householdName)}` : ''}`;
+    const body = r.kind === 'signup_reason'
+      ? `signed up for <strong>${esc(r.answer)}</strong>`
+      : `<em>${esc(r.message)}</em>${r.context ? ` <span style="color:${BRAND.inkLight};">(${esc(r.context)})</span>` : ''}`;
+    return li(`${when(r.created_at)} · ${who}: ${body}`);
+  });
+  const deletions = data.deletions.map((r) => {
+    const age = r.user_created_at ? Math.round((new Date(r.deleted_at) - new Date(r.user_created_at)) / 86_400_000) : null;
+    const reason = r.exit_reason ? `<strong>${esc(r.exit_reason.replace(/_/g, ' '))}</strong>` : 'no reason given';
+    return li(`${when(r.deleted_at)} · ${esc(r.household_name || r.user_email || 'unknown')}${age !== null ? ` (${age}d old)` : ''}: ${reason}${r.exit_detail ? ` <em>${esc(r.exit_detail)}</em>` : ''}`);
+  });
+  const misses = data.misses.map((m) =>
+    li(`${when(m.at)} · ${esc(m.householdName)} (${m.channel === 'whatsapp' ? 'WhatsApp' : 'app chat'}): <em>${esc(m.snippet.slice(0, 160))}</em>`));
+  const chat = data.chat.map((r) =>
+    li(`${when(r.created_at)} · ${esc(r.userName || r.householdName || 'Someone')}: <em>${esc((r.body || '').slice(0, 160))}</em>`));
+
+  const total = feedback.length + deletions.length + misses.length + chat.length;
+  const html = emailTemplate(`What users told us this week`, `
+    <p style="color:${BRAND.inkLight};font-size:13px;margin:0;">Since ${when(data.since)} · ${total} item${total === 1 ? '' : 's'}</p>
+    ${section('Feedback box and sign-up reasons', feedback)}
+    ${section('Why people deleted their account', deletions)}
+    ${section('The assistant said no', misses)}
+    ${section('WhatsApp messages handled as plain chat', chat)}
+    <p style="color:${BRAND.inkLight};font-size:12px;margin:28px 0 0;">Weekly, Mondays. Internal households excluded. Full detail in <a href="${BASE_URL}/admin/analytics" style="color:${BRAND.plum};">admin</a>.</p>
+  `);
+  await sendEmail(to, `What users told us this week: ${total} item${total === 1 ? '' : 's'}`, html);
+}
+
 module.exports = {
+  sendDay3WhyEmail,
+  sendUserFeedbackAlert,
+  sendFeedbackDigestEmail,
   usageToTemplateModel, // exported for tests
   sendVerificationEmail,
   sendWhatsAppFollowupEmail,
