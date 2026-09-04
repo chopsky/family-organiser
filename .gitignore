@@ -14,3 +14,6 @@ web/node_modules/
 
 # Stray agent worktrees - never commit
 .claude/worktrees/
+
+# Generated Tally form JSON (UUIDs change every run; the script is the source)
+docs/*.tally.json
