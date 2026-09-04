@@ -123,7 +123,7 @@ function showWhen(ref, optionText, blockUuids) {
   // conditional-logic page (2026-09-03): the field reference is the
   // question (its first option block carries the question), typed
   // INPUT_FIELD with the option block type as questionType; the comparison
-  // IS_ANY_OF takes the chosen option uuids; the action is SHOW_BLOCKS.
+  // IS takes the chosen option uuid; the action is SHOW_BLOCKS.
   const rule = {
     uuid: uuid(), type: 'CONDITIONAL_LOGIC', groupUuid: uuid(), groupType: 'CONDITIONAL_LOGIC',
     payload: {
@@ -132,8 +132,10 @@ function showWhen(ref, optionText, blockUuids) {
         uuid: uuid(), type: 'SINGLE',
         payload: {
           field: { uuid: ref.firstUuid, type: 'INPUT_FIELD', questionType: ref.questionType, blockGroupUuid: ref.group, title: ref.title },
-          comparison: 'IS_ANY_OF',
-          value: [optionUuid],
+          // Single-choice questions take IS with one option; the validator
+          // rejects IS_ANY_OF for this field type ("comparisonNotAllowed").
+          comparison: 'IS',
+          value: optionUuid,
         },
       }],
       actions: [{ uuid: uuid(), type: 'SHOW_BLOCKS', payload: { showBlocks: blockUuids } }],
