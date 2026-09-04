@@ -458,7 +458,12 @@ router.get('/feed/:token.ics', feedLimiter, async (req, res) => {
     const { events, tasks } = await db.getAllEventsForFeed(tokenData.household_id, tokenData.user_id);
 
     const ical = await getIcal();
-    const calendar = ical({ name: household.name + ' \u2014 Housemait' });
+    // ttl emits REFRESH-INTERVAL + X-PUBLISHED-TTL. Without them a
+    // subscriber falls back to its own default, and Apple Calendar's can be
+    // as slow as once a week - which reads to the user as "it stopped
+    // syncing" when an event added today doesn't appear (founder, 3 Sep
+    // 2026). An hour is the shortest interval Apple actually honours.
+    const calendar = ical({ name: `${household.name} Housemait`, ttl: 60 * 60 });
 
     // Add calendar events. The explicit, row-id-based UID is load-bearing:
     // without it ical-generator mints a RANDOM UID on every request, so

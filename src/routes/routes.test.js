@@ -1603,6 +1603,20 @@ describe('outbound calendar feed emits stable UIDs', () => {
     expect(uidsOf(second.text)).toEqual(uids1);
   });
 
+  // Subscribers with no refresh hint fall back to their own default, and
+  // Apple Calendar's can be as slow as once a week - which the user reads
+  // as "it stopped syncing" (founder, 3 Sep 2026).
+  test('the feed tells subscribers how often to refresh', async () => {
+    armFeed();
+    const res = await request(app).get('/api/calendar/feed/tok123.ics');
+    expect(res.status).toBe(200);
+    expect(res.text).toMatch(/REFRESH-INTERVAL;VALUE=DURATION:PT1H/);
+    expect(res.text).toMatch(/X-PUBLISHED-TTL:PT1H/);
+    // The calendar name is user-facing (it labels the calendar in Apple's
+    // sidebar), so it follows the no-em-dash rule.
+    expect(res.text).not.toMatch(/\u2014/);
+  });
+
   // Weekly extracurriculars flagged show_on_calendar are materialised into
   // per-occurrence VEVENTs (child name in the summary, stable UIDs), inside
   // the activity's term window; unflagged activities stay out of the feed.
