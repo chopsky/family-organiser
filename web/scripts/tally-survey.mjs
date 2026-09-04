@@ -11,6 +11,7 @@
  *   TALLY_API_KEY=... node web/scripts/tally-survey.mjs   # creates the form (DRAFT)
  *   TALLY_API_KEY=... node web/scripts/tally-survey.mjs --publish
  *   ... --no-logic   # skip the branching rules (add them in the editor)
+ *   ... --form <id>  # update that existing form in place instead of creating one
  *
  * The API key is created at tally.so/settings/api-keys (free plan is fine)
  * and is read ONLY from the environment. Never paste it into this file.
@@ -32,8 +33,11 @@
 import { randomUUID as uuid } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
 const DRY = args.has('--dry-run');
+// --form <id>: PATCH that form in place (same body) rather than POST a new one.
+const FORM_ID = argv[argv.indexOf('--form') + 1] && argv.includes('--form') ? argv[argv.indexOf('--form') + 1] : null;
 const PUBLISH = args.has('--publish');
 const LOGIC = !args.has('--no-logic');
 
@@ -175,14 +179,15 @@ choice('q3_pmf', 'How would you feel if you could no longer use Housemait?', [
   'Very disappointed', 'Somewhat disappointed', 'Not disappointed', "I haven't used it enough to say",
 ]);
 
-const FEATURES = ['The WhatsApp assistant', 'Connecting your Apple, Google or Outlook calendar', 'School term dates', 'Meal planning', 'Kids mode, chores and stars', 'The assistant in the app (the sparkle button)'];
+// Tally's logic cannot read a grid answer (its field types have no matrix
+// entry), so the two features with follow-ups are asked once each as plain
+// questions, and the grid covers the other four. Nothing is asked twice.
 const GRID = ['I use it', 'Tried it, then stopped', 'Knew about it, never tried', "Didn't know it existed"];
+const FEATURES = ['School term dates', 'Meal planning', 'Kids mode, chores and stars', 'The assistant in the app (the sparkle button)'];
 matrix('q4_features', 'For each of these, which is closest to the truth?', FEATURES, GRID);
 
-// The grid answer can't drive logic reliably through the API, so the two
-// WhatsApp follow-ups hinge on one plain question instead.
 pageBreak();
-const wa = choice('q4b_whatsapp', 'And the WhatsApp assistant specifically: which is closest?', GRID);
+const wa = choice('q5_whatsapp', 'The WhatsApp assistant: which is closest to the truth?', GRID);
 
 const waNever = section(() => {
   choice('q5_wa_why_not', "What's the main reason you haven't connected WhatsApp?", [
@@ -198,7 +203,7 @@ const waUsed = section(() => {
 });
 
 pageBreak();
-const cal = choice('q7a_calendar', 'And connecting your existing calendar: which is closest?', GRID);
+const cal = choice('q7_calendar', 'Connecting your Apple, Google or Outlook calendar: which is closest to the truth?', GRID);
 const calNever = section(() => {
   choice('q7_cal_why_not', 'What stopped you connecting your existing calendar?', [
     "I didn't know I could", "I wasn't sure it would stay in sync", 'I was worried it would duplicate things or make a mess',
@@ -259,15 +264,16 @@ if (DRY) process.exit(0);
 const key = process.env.TALLY_API_KEY;
 if (!key) { console.error('TALLY_API_KEY is not set. Create one at tally.so/settings/api-keys and export it.'); process.exit(1); }
 
-const res = await fetch('https://api.tally.so/forms', {
-  method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+const res = await fetch(FORM_ID ? `https://api.tally.so/forms/${FORM_ID}` : 'https://api.tally.so/forms', {
+  method: FORM_ID ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(form),
 });
 const body = await res.json().catch(() => ({}));
 if (!res.ok) { console.error(`Tally said ${res.status}:`, JSON.stringify(body, null, 2)); process.exit(1); }
-console.log(`Created form ${body.id} (${body.status}) → https://tally.so/forms/${body.id}/edit`);
+const id = body.id || FORM_ID;
+console.log(`${FORM_ID ? 'Updated' : 'Created'} form ${id} (${body.status || form.status}) → https://tally.so/forms/${id}/edit`);
 
 // Read it back so the founder can see what survived (logic especially).
-const check = await fetch(`https://api.tally.so/forms/${body.id}/questions`, { headers: { Authorization: `Bearer ${key}` } });
+const check = await fetch(`https://api.tally.so/forms/${id}/questions`, { headers: { Authorization: `Bearer ${key}` } });
 const qs = await check.json().catch(() => null);
 if (Array.isArray(qs)) console.log(`Tally reports ${qs.length} questions.`);
 else if (qs?.items) console.log(`Tally reports ${qs.items.length} questions.`);
