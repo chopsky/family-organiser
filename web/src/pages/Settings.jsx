@@ -2868,12 +2868,12 @@ export default function Settings() {
           as well as people who just want one more thing. */}
       <SectionWrapper slug="feedback" title="Something missing?" icon={IconSparkles}>
         <p className="text-sm text-cocoa">
-          Every message goes straight to the person who builds Housemait,
-          and every one gets a reply.
+          Tell us what would make Housemait better for your family. We read
+          every message.
         </p>
         {fbSent ? (
           <div className="mt-4 p-3 rounded-xl bg-sage-light text-sm text-bark">
-            Sent. Thank you, it really does shape what gets built next.{' '}
+            Sent. Thank you, it shapes what gets built next.{' '}
             <button type="button" onClick={() => setFbSent(false)} className="text-plum font-semibold hover:underline">Send another</button>
           </div>
         ) : (
